@@ -1,0 +1,30 @@
+{
+  "name": "open-music-sdk-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "Open, community-led TypeScript SDK for the Apple Music API",
+  "license": "MIT",
+  "repository": "github:open-music-sdk/js",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "codegen": "turbo run codegen",
+    "dev": "turbo run dev",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "catalog:",
+    "eslint": "catalog:",
+    "tooling-eslint-config": "workspace:*",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "tooling-tsdown-config",
+  "private": true,
+  "type": "module",
+  "exports": "./index.js",
+  "dependencies": {
+    "tsdown": "catalog:"
+  }
+}

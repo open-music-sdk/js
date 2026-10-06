@@ -1,0 +1,37 @@
+import js from "@eslint/js";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
+/**
+ * Shared ESLint config. Consumers call `config({ tsconfigRootDir: import.meta.dirname })`.
+ * @param {{ tsconfigRootDir: string }} options
+ */
+export function config({ tsconfigRootDir }) {
+  return tseslint.config(
+    { ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "**/coverage/**"] },
+    js.configs.recommended,
+    ...tseslint.configs.strictTypeChecked,
+    ...tseslint.configs.stylisticTypeChecked,
+    {
+      languageOptions: {
+        globals: { ...globals.browser, ...globals.node },
+        parserOptions: { projectService: true, tsconfigRootDir },
+      },
+      rules: {
+        // Interfaces and type aliases: lowercase `t` + PascalCase (tSong, tClientOptions).
+        // Classes PascalCase; methods and properties camelCase.
+        "@typescript-eslint/naming-convention": [
+          "error",
+          { selector: "default", format: ["camelCase"], leadingUnderscore: "allow" },
+          { selector: ["interface", "typeAlias"], prefix: ["t"], format: ["PascalCase"] },
+          { selector: ["class", "enum", "enumMember", "typeParameter"], format: ["PascalCase"] },
+          { selector: "variable", format: ["camelCase", "PascalCase", "UPPER_CASE"] },
+          { selector: "function", format: ["camelCase", "PascalCase"] },
+          { selector: "import", format: ["camelCase", "PascalCase"] },
+          { selector: ["objectLiteralProperty", "typeProperty"], modifiers: ["requiresQuotes"], format: null },
+        ],
+      },
+    },
+    { files: ["**/*.{js,mjs,cjs}"], ...tseslint.configs.disableTypeChecked },
+  );
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# codegen: raw Apple documentation pages are cached locally, never committed
+codegen/**/.cache/

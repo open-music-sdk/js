@@ -1,0 +1,26 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "agentGuidance": false,
+  "tasks": {
+    "codegen": {
+      "inputs": ["codegen/docc-ir/**", "codegen/emit/src/**", "packages/types/overrides/**"],
+      "outputs": ["packages/types/src/generated/**", "packages/validate/src/generated/**"],
+      "cache": true
+    },
+    "build": {
+      "dependsOn": ["^build", "codegen"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
