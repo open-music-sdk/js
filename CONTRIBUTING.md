@@ -2,7 +2,7 @@
 
 ## Setup
 
-- Node 22 or newer (see `.nvmrc`), pnpm via `corepack enable`.
+- Node 24 or newer (see `.nvmrc`), pnpm via `corepack enable`.
 - `pnpm install`, then `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`. Each runs through Turborepo.
 
 ## Changes to published packages

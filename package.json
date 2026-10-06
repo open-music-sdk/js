@@ -18,10 +18,12 @@
     "dev": "turbo run dev",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "pnpm build && changeset publish"
+    "changeset:publish": "pnpm build && changeset publish",
+    "crawl": "pnpm --filter codegen-docc-crawl crawl"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
+    "@types/node": "catalog:",
     "eslint": "catalog:",
     "tooling-eslint-config": "workspace:*",
     "turbo": "catalog:",

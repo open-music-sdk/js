@@ -1,0 +1,10 @@
+{
+  "name": "codegen-docc-crawl",
+  "private": true,
+  "type": "module",
+  "description": "Walks Apple's DocC render JSON for the Apple Music API and writes the committed IR",
+  "scripts": {
+    "crawl": "node crawl.mjs",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  }
+}

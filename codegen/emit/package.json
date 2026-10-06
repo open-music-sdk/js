@@ -1,0 +1,10 @@
+{
+  "name": "codegen-emit",
+  "private": true,
+  "type": "module",
+  "description": "Emits @open-music-sdk/types and @open-music-sdk/validate from codegen/docc-ir/ir.json",
+  "scripts": {
+    "codegen": "node src/emit.mjs",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  }
+}

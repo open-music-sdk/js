@@ -1,14 +1,12 @@
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-/**
- * Shared ESLint config. Consumers call `config({ tsconfigRootDir: import.meta.dirname })`.
- * @param {{ tsconfigRootDir: string }} options
- */
-export function config({ tsconfigRootDir }) {
-  return tseslint.config(
-    { ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "**/coverage/**"] },
+/** Shared ESLint config. Consumers call `config({ tsconfigRootDir: import.meta.dirname })`. */
+export function config({ tsconfigRootDir }: { tsconfigRootDir: string }) {
+  return defineConfig(
+    { ignores: ["**/dist/**", "**/src/generated/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "**/coverage/**"] },
     js.configs.recommended,
     ...tseslint.configs.strictTypeChecked,
     ...tseslint.configs.stylisticTypeChecked,

@@ -3,20 +3,42 @@
   "agentGuidance": false,
   "tasks": {
     "codegen": {
-      "inputs": ["codegen/docc-ir/**", "codegen/emit/src/**", "packages/types/overrides/**"],
-      "outputs": ["packages/types/src/generated/**", "packages/validate/src/generated/**"],
-      "cache": true
+      "inputs": [
+        "src/**",
+        "$TURBO_ROOT$/codegen/docc-ir/**"
+      ],
+      "outputs": [
+        "$TURBO_ROOT$/packages/types/src/index.ts",
+        "$TURBO_ROOT$/packages/types/src/generated/**",
+        "$TURBO_ROOT$/packages/validate/src/index.ts",
+        "$TURBO_ROOT$/packages/validate/src/generated/**"
+      ]
     },
     "build": {
-      "dependsOn": ["^build", "codegen"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build",
+        "codegen-emit#codegen"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build",
+        "codegen-emit#codegen"
+      ]
     },
-    "lint": {},
+    "lint": {
+      "dependsOn": [
+        "codegen-emit#codegen"
+      ]
+    },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build",
+        "codegen-emit#codegen"
+      ]
     },
     "dev": {
       "cache": false,

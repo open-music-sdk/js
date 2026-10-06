@@ -1,0 +1,18 @@
+{
+  "name": "@open-music-sdk/types",
+  "version": "0.0.0",
+  "description": "Generated TypeScript types for the Apple Music API. Zero dependencies, source only.",
+  "license": "MIT",
+  "repository": "github:open-music-sdk/js",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["src"],
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  }
+}

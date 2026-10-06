@@ -2,7 +2,7 @@
 
 > Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
-Open, community-led TypeScript SDK for the Apple Music API. ESM only, Node 22+, every modern browser and edge runtime.
+Open, community-led TypeScript SDK for the Apple Music API. ESM only, Node 24+, every modern browser and edge runtime.
 
 ## Status
 
@@ -14,7 +14,7 @@ Scaffolding and repository tooling only. No packages are published yet.
 pnpm-workspace.yaml   workspace globs and the dependency catalog
 turbo.json            codegen → build → typecheck → lint → test
 tsconfig.base.json    strict TypeScript base every package extends
-eslint.config.js      root ESLint config (tooling/eslint-config)
+eslint.config.ts      root ESLint config (tooling/eslint-config)
 .changeset/           one fixed version group: @open-music-sdk/*
 tooling/              private shared configs: eslint, tsdown, vitest
 ```

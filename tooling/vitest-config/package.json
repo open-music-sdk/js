@@ -2,8 +2,11 @@
   "name": "tooling-vitest-config",
   "private": true,
   "type": "module",
-  "exports": "./index.js",
+  "exports": "./index.ts",
   "dependencies": {
     "vitest": "catalog:"
+  },
+  "scripts": {
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
   }
 }

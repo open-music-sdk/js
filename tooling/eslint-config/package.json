@@ -2,7 +2,7 @@
   "name": "tooling-eslint-config",
   "private": true,
   "type": "module",
-  "exports": "./index.js",
+  "exports": "./index.ts",
   "dependencies": {
     "@eslint/js": "catalog:",
     "globals": "catalog:",
@@ -11,5 +11,8 @@
   "peerDependencies": {
     "eslint": "catalog:",
     "typescript": "catalog:"
+  },
+  "scripts": {
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
   }
 }
