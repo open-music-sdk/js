@@ -82,6 +82,17 @@ export interface tAppleMusicClient {
 
 type tSettled<T> = { readonly value: T; readonly error?: undefined } | { readonly error: AppleMusicError; readonly value?: undefined };
 
+/** A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a last, empty page. */
+function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
+  if (page === undefined) return { data: [], next: undefined };
+  const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status: 200 });
+  if (typeof page !== "object" || page === null || Array.isArray(page)) throw shape("expected a page object");
+  const { data, next } = page as { data?: unknown; next?: unknown };
+  if (data != null && !Array.isArray(data)) throw shape("data is not an array");
+  if (next != null && typeof next !== "string") throw shape("next is not a string");
+  return { data: (data as readonly unknown[] | null | undefined) ?? [], next: next ?? undefined };
+}
+
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
 const formatIssues = (issues: readonly tValidationIssue[]) =>
@@ -199,8 +210,8 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     let next: string | undefined = path;
     let params = init.params;
     while (next !== undefined) {
-      const page: tPage<T> = await request(next, { ...init, params });
-      yield* page.data ?? [];
+      const page = pageOf(await request<unknown>(next, { ...init, params }), next);
+      yield* page.data as readonly T[];
       next = page.next;
       params = undefined; // a next link already carries the query
     }
@@ -209,10 +220,10 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
   async function storefront(): Promise<string> {
     if (options.storefront !== undefined) return options.storefront;
     if (!userToken) throw new AppleMusicError("UserTokenInvalid", "No storefront configured and no Music User Token to resolve one from; pass storefront");
-    storefrontPromise ??= request<tStorefrontsResponse>("v1/me/storefront")
+    storefrontPromise ??= request<unknown>("v1/me/storefront")
       .then((r) => {
-        const id = r.data[0]?.id;
-        if (id === undefined) throw new AppleMusicError("ApiError", "/v1/me/storefront returned no storefront", { status: 200 });
+        const id = (r as Partial<tStorefrontsResponse> | null | undefined)?.data?.[0]?.id;
+        if (typeof id !== "string") throw new AppleMusicError("ApiError", "/v1/me/storefront returned no storefront", { status: 200 });
         return id;
       })
       .catch((e: unknown) => {

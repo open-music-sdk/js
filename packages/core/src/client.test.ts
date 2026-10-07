@@ -655,6 +655,47 @@ describe("paginate", () => {
     expect(e.status).toBe(500);
   });
 
+  describe("only an array `data` is yielded and only a string `next` is followed", () => {
+    test.each([
+      ["an empty body", { status: 204 }],
+      ["data: null", { body: { data: null } }],
+      ["next: null", { body: { data: [], next: null } }],
+    ])("%s ends the iteration", async (_, reply) => {
+      const { music, calls } = client([reply]);
+      expect(await items(music.paginate("v1/x"))).toEqual([]);
+      expect(calls).toHaveLength(1);
+    });
+
+    test.each([
+      ["a null body", { body: null }],
+      ["an array body", { body: [1, 2] }],
+      ["a string body", { body: "abc" }],
+      ["data as a number", { body: { data: 5 } }],
+      ["data as a string", { body: { data: "abc" } }],
+      ["data as an object", { body: { data: { id: "1" } } }],
+      ["next as a number", { body: { data: [], next: 7 } }],
+      ["next as an object", { body: { data: [], next: {} } }],
+    ])("%s is an ApiError naming the path, not a TypeError", async (_, reply) => {
+      const { music } = client([reply]);
+      const e = await failure(items(music.paginate("v1/catalog/us/songs")));
+      expect(e._tag).toBe("ApiError");
+      expect(e.status).toBe(200);
+      expect(e.message).toContain("v1/catalog/us/songs");
+    });
+
+    test("items before a malformed page are still delivered", async () => {
+      const { music } = client([{ body: { data: [1, 2], next: "/v1/x?offset=2" } }, { body: { data: "oops" } }]);
+      const seen: unknown[] = [];
+      const e = await failure(
+        (async () => {
+          for await (const item of music.paginate("v1/x")) seen.push(item);
+        })(),
+      );
+      expect(seen).toEqual([1, 2]);
+      expect(e.message).toContain("/v1/x?offset=2");
+    });
+  });
+
   test("the user token travels with every page", async () => {
     const { music, header } = client([{ body: { data: [1], next: "/v1/me/x?offset=1" } }, { body: { data: [] } }], { userToken: "user" });
     await items(music.paginate("v1/me/x"));
@@ -688,9 +729,19 @@ describe("storefront", () => {
     expect(calls).toHaveLength(0);
   });
 
-  test("an empty answer is an ApiError", async () => {
-    const { music } = client([{ body: { data: [] } }], { userToken: "user" });
-    expect((await failure(music.storefront()))._tag).toBe("ApiError");
+  test.each([
+    ["an empty data array", { body: { data: [] } }],
+    ["an empty body", { status: 204 }],
+    ["a null body", { body: null }],
+    ["no data member", { body: {} }],
+    ["data as a string", { body: { data: "us" } }],
+    ["a storefront without an id", { body: { data: [{ type: "storefronts" }] } }],
+    ["a non-string id", { body: { data: [{ id: 5 }] } }],
+  ])("%s is an ApiError, not a TypeError", async (_, reply) => {
+    const { music } = client([reply], { userToken: "user" });
+    const e = await failure(music.storefront());
+    expect(e._tag).toBe("ApiError");
+    expect(e.message).toContain("/v1/me/storefront");
   });
 
   test("a failed resolution is not cached", async () => {
