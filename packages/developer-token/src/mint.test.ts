@@ -212,6 +212,63 @@ describe("mintDeveloperToken: invalid options", () => {
   });
 });
 
+describe("mintDeveloperToken and cachedMinter: a pem that is not a string, plain or redacted, is refused by name", () => {
+  const wrong: [string, (pem: string) => unknown][] = [
+    ["null", () => null],
+    ["undefined", () => undefined],
+    ["a number", () => 42],
+    ["a boolean", () => true],
+    ["an empty string", () => ""],
+    ["a Buffer, as readFileSync gives without an encoding", (pem) => Buffer.from(pem)],
+    ["a promise, as a read that was not awaited gives", (pem) => Promise.resolve(pem)],
+    ["an array holding the key", (pem) => [pem]],
+    ["an object holding the key", (pem) => ({ pem })],
+    ["an object whose unwrap is the key, not a function", (pem) => ({ unwrap: pem })],
+    ["a function returning the key", (pem) => () => pem],
+    ["a redacted number", () => redacted(42)],
+    ["a redacted empty string", () => redacted("")],
+    ["a redacted Buffer of the key", (pem) => redacted(Buffer.from(pem))],
+    ["a redacted wrapper around a redacted key", (pem) => redacted(redacted(pem))],
+  ];
+
+  test.each(wrong)("%s, to mintDeveloperToken: a TypeError about pem that does not show what it was given", async (_name, make) => {
+    const error: unknown = await mintDeveloperToken({ ...valid, pem: make(valid.pem as string) as string }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^developer token: pem must be the contents of the \.p8 file/);
+    expect(leaks(shown(error))).toBe(false);
+  });
+
+  test.each(wrong)("%s, to cachedMinter: the same, when the minter is created", (_name, make) => {
+    let error: unknown;
+    try {
+      cachedMinter({ ...valid, pem: make(valid.pem as string) as string });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^developer token: pem must be the contents of the \.p8 file/);
+    expect(leaks(shown(error))).toBe(false);
+  });
+
+  test.each([
+    ["nothing", undefined],
+    ["null", null],
+    ["a string", "DEF123GHIJ"],
+    ["a number", 42],
+  ])("%s in place of the options is a TypeError that says an options object was expected", async (_name, options) => {
+    const error: unknown = await mintDeveloperToken(options as unknown as tMintOptions).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^developer token: expected an options object/);
+    expect(() => cachedMinter(options as unknown as tMintOptions)).toThrow(/^developer token: expected an options object/);
+  });
+
+  test("the key itself in place of the options is refused without being quoted", async () => {
+    const error: unknown = await mintDeveloperToken(valid.pem as unknown as tMintOptions).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(leaks(shown(error))).toBe(false);
+  });
+});
+
 describe("mintDeveloperToken: the key never ends up in a token or an error by being put in the wrong option", () => {
   test.each([
     ["keyId", (pem: string) => ({ keyId: pem })],

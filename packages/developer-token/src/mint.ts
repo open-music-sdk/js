@@ -24,18 +24,20 @@ export interface tCachedMinterOptions extends tMintOptions {
 const MAX_TTL_SECONDS = 15_777_000;
 const DEFAULT_TTL_SECONDS = 150 * 86_400;
 
-function text(name: string, value: unknown): asserts value is string {
-  if (typeof value !== "string" || value === "") throw new TypeError(`developer token: ${name} must be a non-empty string`);
+/** What a value is, for an error that must not show what it holds: a value in the wrong place may be the private key. */
+const got = (value: unknown) => (typeof value === "string" ? `${String(value.length)} characters` : value === null ? "null" : typeof value);
+
+/** The PEM out of `pem`: the string itself, or the string a redacted wrapper holds. Anything else is refused by name. */
+function pemOf(pem: unknown): string {
+  const value: unknown = typeof pem === "object" && pem !== null && "unwrap" in pem && typeof pem.unwrap === "function" ? (pem.unwrap as () => unknown)() : pem;
+  if (typeof value === "string" && value !== "") return value;
+  throw new TypeError(`developer token: pem must be the contents of the .p8 file as a string, or that string redacted; got ${got(value)}`);
 }
 
-/**
- * Apple's Team IDs and key IDs are ten capital letters and digits. Anything else is refused before it is signed
- * into a token, and described rather than quoted: a value in the wrong place may be the private key.
- */
+/** Apple's Team IDs and key IDs are ten capital letters and digits. Anything else is refused before it is signed into a token. */
 function id(name: string, value: unknown) {
   if (typeof value === "string" && /^[A-Z0-9]{10}$/.test(value)) return;
-  const got = typeof value === "string" ? `${String(value.length)} characters` : typeof value;
-  throw new TypeError(`developer token: ${name} must be ten capital letters and digits, as Apple issues it; got ${got}`);
+  throw new TypeError(`developer token: ${name} must be ten capital letters and digits, as Apple issues it; got ${got(value)}`);
 }
 
 /** What a browser sends as Origin: scheme, host and port, in their canonical spelling. */
@@ -50,9 +52,10 @@ function isOrigin(value: unknown): boolean {
 }
 
 /** Checks everything that can be checked without parsing the key, and returns the PEM and the lifetime. */
-function check({ pem, teamId, keyId, ttlSeconds = DEFAULT_TTL_SECONDS, origin }: tMintOptions): { pem: string; ttlSeconds: number } {
-  const key: unknown = typeof pem === "object" ? pem.unwrap() : pem;
-  text("pem", key);
+function check(options: tMintOptions): { pem: string; ttlSeconds: number } {
+  if (typeof options !== "object" || (options as unknown) === null) throw new TypeError(`developer token: expected an options object with pem, teamId and keyId; got ${got(options)}`);
+  const { teamId, keyId, ttlSeconds = DEFAULT_TTL_SECONDS, origin } = options;
+  const key = pemOf(options.pem);
   id("teamId", teamId);
   id("keyId", keyId);
   if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > MAX_TTL_SECONDS)
