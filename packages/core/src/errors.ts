@@ -1,0 +1,43 @@
+// Every failure the SDK raises is one class with a `_tag`. Narrow with isAppleMusicError(e, tag).
+import type { tError } from "@open-music-sdk/types";
+
+export type tErrorTag = "DeveloperTokenRejected" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
+
+/** A Standard Schema issue, as any validator reports it. */
+export interface tValidationIssue {
+  readonly message: string;
+  readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
+}
+
+export interface tErrorDetails {
+  /** HTTP status of the response that produced the error. */
+  readonly status?: number | undefined;
+  /** Apple's parsed `errors` array, when the body had one. */
+  readonly errors?: readonly tError[] | undefined;
+  /** Validator issues, on a ValidationError. */
+  readonly issues?: readonly tValidationIssue[] | undefined;
+  /** The delay Apple asked for in a Retry-After header, in milliseconds. */
+  readonly retryAfterMs?: number | undefined;
+  readonly cause?: unknown;
+}
+
+export class AppleMusicError<Tag extends tErrorTag = tErrorTag> extends Error {
+  override readonly name = "AppleMusicError";
+  readonly _tag: Tag;
+  readonly status: number | undefined;
+  readonly errors: readonly tError[] | undefined;
+  readonly issues: readonly tValidationIssue[] | undefined;
+  readonly retryAfterMs: number | undefined;
+
+  constructor(tag: Tag, message: string, details: tErrorDetails = {}) {
+    super(message, "cause" in details ? { cause: details.cause } : undefined);
+    this._tag = tag;
+    this.status = details.status;
+    this.errors = details.errors;
+    this.issues = details.issues;
+    this.retryAfterMs = details.retryAfterMs;
+  }
+}
+
+export const isAppleMusicError = <Tag extends tErrorTag = tErrorTag>(e: unknown, tag?: Tag): e is AppleMusicError<Tag> =>
+  e instanceof AppleMusicError && (tag === undefined || e._tag === tag);

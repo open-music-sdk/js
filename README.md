@@ -20,7 +20,7 @@ libs, and the integrations people actually install. Every package ships the same
 | `codegen` | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
 | `@open-music-sdk/types` | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
 | `@open-music-sdk/validate` | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
-| `@open-music-sdk/core` | ⬜ Not started | 0% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks |
+| `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
 | `@open-music-sdk/developer-token` | ⬜ Not started | 0% | JWT minting · cached minter · remote token provider · key file loading |
 | `@open-music-sdk/user-token` | ⬜ Not started | 0% | Music User Token intake · validation · pluggable stores |
 | `@open-music-sdk/util-artwork` | ⬜ Not started | 0% | Artwork URL templates · srcset helpers · browser only |
@@ -47,7 +47,7 @@ eslint.config.ts      root ESLint config (tooling/eslint-config)
 .changeset/           one fixed version group: @open-music-sdk/*
 tooling/              private shared configs: eslint, tsdown, vitest
 codegen/              docc-crawl → docc-ir/ir.json → emit (see codegen/README.md)
-packages/             foundation packages: types, validate
+packages/             foundation packages: types, validate, core
 ```
 
 Planned workspaces: `clients/` (one per token boundary), `lib/` (conveniences),
