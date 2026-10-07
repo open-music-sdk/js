@@ -12,11 +12,15 @@ export interface tRemoteOptions {
 }
 
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+// A developer token is a few hundred bytes. The limits are far above that and far below what could hurt:
+// whatever answers at the endpoint decides how much is sent, and must not decide how much is kept.
+const MAX_BODY_BYTES = 16_384;
+const MAX_TOKEN_LENGTH = 8192;
 const JWT = /^[\w-]+\.([\w-]+)\.[\w-]+$/;
 
-/** `exp` of a JWT in epoch milliseconds, or undefined when `token` is not a JWT that carries one. */
+/** `exp` of a JWT in epoch milliseconds, or undefined when `token` is not a JWT of a sane length that carries one. */
 function expiry(token: unknown): number | undefined {
-  const payload = typeof token === "string" ? JWT.exec(token)?.[1] : undefined;
+  const payload = typeof token === "string" && token.length <= MAX_TOKEN_LENGTH ? JWT.exec(token)?.[1] : undefined;
   if (payload === undefined) return undefined;
   try {
     const claims: unknown = JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/")));
@@ -24,6 +28,37 @@ function expiry(token: unknown): number | undefined {
     return typeof exp === "number" && Number.isFinite(exp) ? exp * 1000 : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * The body as text, or undefined once it has run past MAX_BODY_BYTES. It is counted as it arrives, after any
+ * decompression, and what lies beyond the limit is cancelled rather than read.
+ */
+async function bounded(res: Response): Promise<string | undefined> {
+  const stream = res.body as ReadableStream<Uint8Array> | null | undefined;
+  if (Number(res.headers.get("content-length")) > MAX_BODY_BYTES) {
+    await stream?.cancel();
+    return undefined;
+  }
+  if (typeof stream?.getReader !== "function") {
+    // Nothing to count: an empty answer, or a runtime whose responses have no body stream. Read whole, then judge.
+    const text = await res.text();
+    return text.length > MAX_BODY_BYTES ? undefined : text;
+  }
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    bytes += value.byteLength;
+    if (bytes > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return undefined;
+    }
+    text += decoder.decode(value, { stream: true });
   }
 }
 
@@ -77,10 +112,10 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     const exchange = async () => {
       // A redirect is refused: the token comes from the URL that was configured or from nowhere.
       const answer = await fetchImpl(endpoint, { cache: "no-store", redirect: "error", signal: timeout });
-      return { res: answer, body: (await answer.text()).trim() };
+      return { res: answer, body: await bounded(answer) };
     };
     let res: Response;
-    let body: string;
+    let body: string | undefined;
     try {
       // The signal asks fetch to stop at the timeout. The race makes sure this stops waiting then, even for a
       // fetch that was wrapped without passing the signal on; whatever it answers later is still read to the end.
@@ -94,10 +129,15 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
         status: res.status,
         retryAfterMs: parseRetryAfter(res.headers.get("retry-after")),
       });
-    let token: unknown = body;
-    if (body.startsWith("{")) {
+    if (body === undefined)
+      throw new AppleMusicError("DeveloperTokenUnavailable", `developer token endpoint ${where} answered with more than ${String(MAX_BODY_BYTES)} bytes, which is no developer token`, {
+        status: res.status,
+      });
+    const text = body.trim();
+    let token: unknown = text;
+    if (text.startsWith("{")) {
       try {
-        token = (JSON.parse(body) as { token?: unknown }).token;
+        token = (JSON.parse(text) as { token?: unknown }).token;
       } catch {
         token = undefined;
       }

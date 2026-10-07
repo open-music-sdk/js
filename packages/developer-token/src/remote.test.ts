@@ -1,6 +1,7 @@
 import { createClient, isAppleMusicError, type AppleMusicError } from "@open-music-sdk/core";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { gzipSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { remoteDeveloperToken } from "./remote.js";
 
@@ -379,6 +380,122 @@ describe("remoteDeveloperToken: an unreachable endpoint is DeveloperTokenUnavail
   });
 });
 
+describe("remoteDeveloperToken: an answer larger than any token is refused without being read to the end", () => {
+  const LIMIT = 16_384;
+  const token = jwt();
+  /** The token followed by enough whitespace to make the body exactly `bytes` long. */
+  const padded = (bytes: number) => token + " ".repeat(bytes - token.length);
+  /** A body that arrives in 4 KB chunks for ever, and says how much of it was asked for. */
+  function endless() {
+    const seen = { chunks: 0, cancelled: false };
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          seen.chunks++;
+          controller.enqueue(new Uint8Array(4096).fill(32));
+        },
+        cancel() {
+          seen.cancelled = true;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    return { stream, seen };
+  }
+
+  test.each([token.length, 1000, LIMIT - 1, LIMIT])("a body of %i bytes is read and its token taken", async (bytes) => {
+    const { fetch } = endpoint({ text: padded(bytes) });
+    expect(await remoteDeveloperToken(ENDPOINT, { fetch })({})).toBe(token);
+  });
+
+  test.each([LIMIT + 1, 2 * LIMIT, 1_000_000])("a body of %i bytes is DeveloperTokenUnavailable, though a good token opens it", async (bytes) => {
+    const { fetch } = endpoint({ text: padded(bytes) });
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+  });
+
+  test("a body that never ends is given up on at the limit, not at the timeout, and the rest is cancelled", async () => {
+    const { stream, seen } = endless();
+    const { fetch } = endpoint({ body: stream });
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 60_000 })({}));
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+    expect(seen.chunks).toBeLessThanOrEqual(6); // 16 KB at 4 KB a chunk, and little more
+    expect(seen.cancelled).toBe(true);
+  });
+
+  test("an answer that declares itself too long is refused without a byte of it being read", async () => {
+    const { stream, seen } = endless();
+    const { fetch } = endpoint({ body: stream, headers: { "content-length": String(LIMIT + 1) } });
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+    expect(seen).toEqual({ chunks: 0, cancelled: true });
+  });
+
+  test("a declared length within the limit does not excuse a body that runs past it", async () => {
+    const { stream, seen } = endless();
+    const { fetch } = endpoint({ body: stream, headers: { "content-length": "300" } });
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    expect(e._tag).toBe("DeveloperTokenUnavailable");
+    expect(seen.cancelled).toBe(true);
+  });
+
+  test.each([404, 500, 503])("an error page of any size is still reported as its status, %i, and is not read past the limit either", async (status) => {
+    const { stream, seen } = endless();
+    const { fetch } = endpoint({ status, body: stream });
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", status]);
+    expect(seen.chunks).toBeLessThanOrEqual(6);
+    expect(seen.cancelled).toBe(true);
+  });
+
+  test("the error for an oversized answer says what was wrong and quotes none of it", async () => {
+    const { fetch } = endpoint({ text: `${jwt({ exp: NOW_SECONDS + 60 }, "s3cret")}${" ".repeat(LIMIT)}` });
+    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=hunter2`, { fetch })({}));
+    expect(e.message).toContain(ENDPOINT);
+    expect(e.message).toContain("16384 bytes");
+    expect(`${e.message} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`).not.toMatch(/s3cret|hunter2/);
+  });
+
+  describe("a token is a few hundred characters, and one of thousands is not believed", () => {
+    /** A well-formed token with a readable exp, `length` characters long. */
+    const sized = (length: number) => {
+      const head = token.slice(0, token.lastIndexOf(".") + 1);
+      return head + "s".repeat(length - head.length);
+    };
+
+    test.each([200, 1000, 8191, 8192])("a token of %i characters is taken", async (length) => {
+      const { fetch } = endpoint({ text: sized(length) });
+      expect(await remoteDeveloperToken(ENDPOINT, { fetch })({})).toHaveLength(length);
+    });
+
+    test.each([8193, 12_000, LIMIT])("a token of %i characters is refused, well formed though it is, as text or as JSON", async (length) => {
+      for (const reply of [{ text: sized(length) }, { json: { token: sized(Math.min(length, LIMIT - 20)) } }]) {
+        const { fetch } = endpoint(reply);
+        const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+        expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+      }
+    });
+  });
+
+  describe("where a response has no body stream to count, as on some runtimes", () => {
+    const streamless = (text: string, status = 200) => () =>
+      Promise.resolve({ ok: status >= 200 && status < 300, status, headers: new Headers(), body: undefined, text: () => Promise.resolve(text) } as unknown as Response);
+
+    test.each([token.length, LIMIT])("an answer of %i characters is read whole and its token taken", async (length) => {
+      expect(await remoteDeveloperToken(ENDPOINT, { fetch: streamless(padded(length)) })({})).toBe(token);
+    });
+
+    test.each([LIMIT + 1, 1_000_000])("an answer of %i characters is refused all the same", async (length) => {
+      const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch: streamless(padded(length)) })({}));
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+    });
+
+    test("an error answer is still its status", async () => {
+      expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch: streamless("nope", 503) })({}))).status).toBe(503);
+    });
+  });
+});
+
 describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given does with the signal", () => {
   const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   /** A response whose body never ends and ignores every signal. */
@@ -458,12 +575,16 @@ describe("remoteDeveloperToken: the request", () => {
     let server: Server;
     let base: string;
     const token = jwt({ exp: Math.floor(NOW / 1000) + 12 * HOUR_SECONDS }, "real");
+    // 64 MB of spaces in about 64 KB of gzip, made before any test measures memory.
+    const bomb = gzipSync(Buffer.alloc(64 * 1024 * 1024, 32));
     beforeAll(async () => {
       server = createServer((req, res) => {
         const port = String((server.address() as AddressInfo).port);
         if (req.url === "/token") res.end(token);
         else if (req.url === "/moved") res.writeHead(302, { location: "/token" }).end();
         else if (req.url === "/elsewhere") res.writeHead(307, { location: `http://localhost:${port}/token` }).end();
+        else if (req.url === "/bomb") res.writeHead(200, { "content-encoding": "gzip" }).end(bomb);
+        else if (req.url === "/squeezed") res.writeHead(200, { "content-encoding": "gzip" }).end(gzipSync(`${token}${" ".repeat(4000)}`));
         else res.writeHead(404).end();
       });
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -484,6 +605,19 @@ describe("remoteDeveloperToken: the request", () => {
     ])("a redirect %s is refused, though a token waits at the end of it", async (_name, path) => {
       const e = await failure(remoteDeveloperToken(`${base}${path}`)());
       expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
+    });
+
+    test("a compressed answer is measured as it inflates: 64 MB behind 64 KB on the wire is refused, and little of it kept", async () => {
+      expect(bomb.byteLength).toBeLessThan(128 * 1024);
+      const before = process.memoryUsage().rss;
+      const e = await failure(remoteDeveloperToken(`${base}/bomb`)());
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
+      expect(e.message).toContain("more than 16384 bytes"); // refused for its size, not read whole and found wanting
+      expect(process.memoryUsage().rss - before).toBeLessThan(32 * 1024 * 1024);
+    });
+
+    test("a compressed answer within the limit is read like any other", async () => {
+      expect(await remoteDeveloperToken(`${base}/squeezed`)()).toBe(token);
     });
 
     test("a missing endpoint is its own status, not Apple's", async () => {

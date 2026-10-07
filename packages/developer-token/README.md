@@ -107,6 +107,10 @@ the signature; Apple does. The request is a plain `GET` with `cache: "no-store"`
 (`timeoutMs`, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
 your `fetch` does not pass the abort signal on.
 
+The answer is read up to 16 KB and no further, counted after any decompression; the rest is cancelled.
+A token longer than 8 KB is not believed either: a real one is a few hundred bytes. What answers at
+your URL decides how much is sent, not how much is kept.
+
 A redirect is refused, so the token only ever comes from the URL you configured. Point it at the final
 URL: a framework that redirects `/api/token` to `/api/token/` will otherwise fail every fetch.
 
@@ -122,7 +126,7 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 | Unreachable, timed out, or dropped mid-body | none | Yes |
 | 429, or 5xx other than 501 | The endpoint's | Yes, after its `Retry-After` if it sent one |
 | Any other status that is not 2xx | The endpoint's | No |
-| 2xx without a JWT that has an `exp` | The endpoint's | No |
+| 2xx without a JWT that has an `exp`, or with more than 16 KB | The endpoint's | No |
 
 ## Caching
 
