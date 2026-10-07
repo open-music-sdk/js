@@ -3,10 +3,29 @@
   "version": "0.0.0",
   "description": "Generated Standard Schema validators for Apple Music API responses. Opt-in, tree-shakeable.",
   "license": "MIT",
-  "repository": "github:open-music-sdk/js",
+  "keywords": [
+    "apple-music-api",
+    "apple-music",
+    "musickit",
+    "typescript",
+    "sdk",
+    "validation",
+    "validator",
+    "standard-schema",
+    "runtime-validation"
+  ],
+  "homepage": "https://github.com/open-music-sdk/js/tree/main/packages/validate#readme",
+  "bugs": "https://github.com/open-music-sdk/js/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-music-sdk/js.git",
+    "directory": "packages/validate"
+  },
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
