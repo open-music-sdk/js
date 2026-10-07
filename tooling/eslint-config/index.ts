@@ -28,8 +28,13 @@ export function config({ tsconfigRootDir }: { tsconfigRootDir: string }) {
           { selector: "import", format: ["camelCase", "PascalCase"] },
           { selector: ["objectLiteralProperty", "typeProperty"], modifiers: ["requiresQuotes"], format: null },
         ],
+        // The SDK never logs: a log line is where a token or a key ends up by accident. What a consumer needs to
+        // know reaches them as an error or through a hook, and what they print is theirs to decide.
+        "no-console": "error",
       },
     },
+    // Tools and sample apps print by design.
+    { files: ["codegen/**", "apps/**"], rules: { "no-console": "off" } },
     { files: ["**/*.{js,mjs,cjs}"], ...tseslint.configs.disableTypeChecked },
   );
 }
