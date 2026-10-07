@@ -18,10 +18,13 @@ export interface tUserTokenIntakeOptions {
 const reply = (status: number, error: string, headers: Record<string, string> = {}) =>
   Response.json({ error }, { status, headers: { "cache-control": "no-store", ...headers } });
 
-/** The body as text, or undefined once it runs past `limit` bytes. Content-Length is only a claim, so the stream is counted. */
-async function readCapped(req: Request, limit: number): Promise<string | undefined> {
-  if (!req.body) return "";
-  const reader = req.body.getReader();
+/** Whether a Content-Type header says JSON: `application/json`, with or without parameters. */
+export const isJson = (contentType: string | null): boolean => /^application\/json\s*(;|$)/i.test(contentType ?? "");
+
+/** A body as text, or undefined once it runs past `limit` bytes. Content-Length is only a claim, so the stream is counted. */
+export async function readCapped(body: ReadableStream<Uint8Array> | null, limit: number): Promise<string | undefined> {
+  if (!body) return "";
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let text = "";
   let size = 0;
@@ -40,19 +43,20 @@ async function readCapped(req: Request, limit: number): Promise<string | undefin
 /**
  * A handler for `POST` with a JSON body `{ "token": "..." }`. Answers 204 once Apple has accepted the
  * token and the store has it; otherwise `{ "error": ... }` with 422 when the token is no good and
- * 502 when Apple could not be asked. Neither the token nor Apple's reply is ever echoed.
+ * 502 when Apple did not confirm it. Neither the token nor Apple's error text is ever echoed.
+ * Apple is asked through `client`, under its retry policy; bounding that wait is the caller's call.
  */
 export function userTokenIntake(client: tAppleMusicClient, options: tUserTokenIntakeOptions): (req: Request) => Promise<Response> {
   return async (req) => {
     if (req.method !== "POST") return reply(405, "MethodNotAllowed", { allow: "POST" });
     // A page on another site cannot send JSON without a preflight, so this also stops one from
     // binding its own token to a signed-in visitor.
-    if (!/^application\/json\s*(;|$)/i.test(req.headers.get("content-type") ?? "")) return reply(415, "UnsupportedMediaType");
+    if (!isJson(req.headers.get("content-type"))) return reply(415, "UnsupportedMediaType");
     // The user comes from the session and nowhere else; nothing in the body can name one.
     const userId = await options.userId(req);
     if (!userId) return reply(401, "Unauthorized");
 
-    const text = await readCapped(req, MAX_BODY_BYTES);
+    const text = await readCapped(req.body, MAX_BODY_BYTES);
     if (text === undefined) return reply(413, "PayloadTooLarge");
     let token: unknown;
     try {
