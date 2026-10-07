@@ -1,6 +1,10 @@
 import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
 import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 
+// This module is also the package's "./remote" entry, for code that must carry no signing code: nothing it
+// imports, directly or through another module, may reach jose or ./mint.js. A test walks the imports.
+export type { tDeveloperTokenProvider } from "./cache.js";
+
 /** Invalid values throw a TypeError. */
 export interface tRemoteOptions {
   /** Default: the global fetch. Wrap it to add credentials or headers your endpoint needs. */

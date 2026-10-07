@@ -35,9 +35,9 @@ APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END 
 ```
 
 ```ts
-// In a browser: no key. A bundler drops the signing code, which this import never reaches.
+// In a browser: no key and no signing code. This entry never references jose, bundler or no bundler.
 import { createClient } from "@open-music-sdk/core";
-import { remoteDeveloperToken } from "@open-music-sdk/developer-token";
+import { remoteDeveloperToken } from "@open-music-sdk/developer-token/remote";
 
 const music = createClient({ developerToken: remoteDeveloperToken("/api/token"), storefront: "us" });
 ```
@@ -49,8 +49,13 @@ const music = createClient({ developerToken: remoteDeveloperToken("/api/token"),
 | `fromEnv(env, names?)` | Reads the private key, Team ID and key ID from an environment; the key comes back redacted |
 | `mintDeveloperToken(options)` | Signs one ES256 JWT with [`jose`](https://github.com/panva/jose): `kid` in the header, `iss`, `iat`, `exp`, and `origin` if given |
 | `cachedMinter(options)` | A provider that mints on first use, shares one mint between concurrent requests, and mints again before `exp` |
-| `remoteDeveloperToken(url, options?)` | A provider that fetches the token from your endpoint, with the same caching |
+| `remoteDeveloperToken(url, options?)` | A provider that fetches the token from your endpoint, with the same caching. Also the only export of `@open-music-sdk/developer-token/remote`. |
 | `redacted(value)` | Wraps a secret so string conversion and JSON print `<redacted>`, as does `console.log` on Node and any runtime that honours its inspect symbol; `unwrap()` returns it. Elsewhere a console shows an object of functions, never the value. |
+
+The package has two entries. `@open-music-sdk/developer-token` is everything. `/remote` is
+`remoteDeveloperToken` alone, in a file that imports neither `jose` nor the minter, for code that must
+carry no signing code: a page that loads modules without a bundler gets none, and nothing there can
+sign a token even if a private key were handed to it by mistake.
 
 ## The key
 
