@@ -21,7 +21,7 @@ libs, and the integrations people actually install. Every package ships the same
 | `@open-music-sdk/types` | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
 | `@open-music-sdk/validate` | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
 | `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
-| `@open-music-sdk/developer-token` | ⬜ Not started | 0% | JWT minting · cached minter · remote token provider · key file loading |
+| `@open-music-sdk/developer-token` | 🚧 In progress | 0% | JWT minting · cached minter · remote token provider · key file loading |
 | `@open-music-sdk/user-token` | ⬜ Not started | 0% | Music User Token intake · validation · pluggable stores |
 | `@open-music-sdk/util-artwork` | ⬜ Not started | 0% | Artwork URL templates · srcset helpers · browser only |
 | `@open-music-sdk/client-catalog` | ⬜ Not started | 0% | Catalog, storefront, search, and chart endpoints · developer token only |
