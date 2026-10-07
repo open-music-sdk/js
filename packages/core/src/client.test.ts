@@ -242,6 +242,81 @@ describe("token providers", () => {
   });
 });
 
+describe("request: a token that cannot be a header is refused before it is sent, and never quoted", () => {
+  const SECRET = "s3cretT0ken";
+  const unfit: [string, unknown][] = [
+    ["a line break inside it", `${SECRET}\n${SECRET}`],
+    ["a carriage return inside it", `${SECRET}\r${SECRET}`],
+    ["a header smuggled after it", `${SECRET}\r\nx-evil: 1`],
+    ["a NUL inside it", `${SECRET}\0${SECRET}`],
+    ["a space inside it", `${SECRET} ${SECRET}`],
+    ["a tab inside it", `${SECRET}\t${SECRET}`],
+    ["a letter outside ASCII", `${SECRET}é`],
+    ["a character outside Latin-1", `${SECRET}☃`],
+    ["nothing in it", ""],
+    ["only whitespace in it", " \n"],
+  ];
+  /** What only a provider can hand over: a configured token is a string or it is taken for a provider. */
+  const notStrings: [string, unknown][] = [
+    ["undefined", undefined],
+    ["a number", 12345],
+    ["an object holding the token", { token: SECRET }],
+  ];
+  /** Everything an error shows when it is printed or serialised. */
+  const shown = (e: Error) => `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`;
+  const refusal = async (p: Promise<unknown>): Promise<Error> => {
+    const error: unknown = await p.catch((e: unknown) => e);
+    if (error instanceof Error) return error;
+    throw new Error("expected a rejection");
+  };
+
+  /** Sends a request that carries both tokens and expects it refused for the one named. */
+  async function refused(name: "developerToken" | "userToken", options: Partial<tClientOptions>) {
+    const { music, calls } = client([], { userToken: "user", ...options, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const error = await refusal(music.request("v1/me/library/songs"));
+    expect(error).toBeInstanceOf(TypeError);
+    expect(isAppleMusicError(error)).toBe(false);
+    expect(error.message).toMatch(new RegExp(`^${name} is not a token`));
+    expect(shown(error)).not.toContain(SECRET);
+    expect(calls).toHaveLength(0);
+  }
+
+  describe.each(["developerToken", "userToken"] as const)("%s", (name) => {
+    test.each(unfit)("a string with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: token });
+    });
+    test.each(unfit)("a provider answering with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: () => Promise.resolve(token) });
+    });
+    test.each(notStrings)("a provider answering with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: () => token as string });
+    });
+  });
+
+  test.each([
+    ["a JWT", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJERUYxMjNHSElKIn0.c2ln-_"],
+    ["base64 with its padding and symbols", "Ak9+/abc=="],
+    ["every printable ASCII character", "!\"#$%&'()*+,-./0123456789:;<=>?@ABCXYZ[\\]^_`abcxyz{|}~"],
+  ])("%s is sent exactly as given, as both tokens", async (_name, token) => {
+    const { music, header } = client([], { developerToken: token, userToken: token });
+    await music.request("v1/me/library/songs");
+    expect([header("authorization"), header("music-user-token")]).toEqual([`Bearer ${token}`, token]);
+  });
+
+  test.each(["dev\n", "\ndev", "  dev  ", "dev\r\n", "\tdev"])("whitespace around %j, as a token read from a file has, is dropped", async (token) => {
+    const { music, header } = client([], { developerToken: token, userToken: token });
+    await music.request("v1/me/library/songs");
+    expect([header("authorization"), header("music-user-token")]).toEqual(["Bearer dev", "dev"]);
+  });
+
+  test("a refused token takes no turn in the rate limiter", async () => {
+    const acquire = vi.fn(() => Promise.resolve());
+    const { music } = client([], { developerToken: "bad token", rateLimit: { acquire } });
+    await refusal(music.request("v1/test"));
+    expect(acquire).not.toHaveBeenCalled();
+  });
+});
+
 describe("responses", () => {
   test.each([
     [{ status: 200, body: { data: [song] } }, { data: [song] }],

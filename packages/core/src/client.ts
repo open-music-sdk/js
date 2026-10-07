@@ -107,6 +107,18 @@ function pageOf(page: unknown, path: string): { readonly data: readonly unknown[
 
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
+
+/**
+ * A token, fit to be a header value. A runtime's own complaint about a value it cannot send quotes the value,
+ * so a token with a line break or a space inside it is refused here and described, never repeated.
+ * Whitespace around it, as a token read from a file has, is dropped.
+ */
+function credential(name: string, token: unknown): string {
+  const value = typeof token === "string" ? token.trim() : "";
+  if (/^[\x21-\x7e]+$/.test(value)) return value;
+  const got = typeof token === "string" ? `${String(token.length)} characters` : typeof token;
+  throw new TypeError(`${name} is not a token: expected printable characters with no spaces or line breaks inside, got ${got}`);
+}
 const formatIssues = (issues: readonly tValidationIssue[]) =>
   issues.map((i) => `${(i.path ?? []).map((s) => String(typeof s === "object" ? s.key : s)).join(".") || "<root>"}: ${i.message}`).join("; ");
 
@@ -133,9 +145,9 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     // One attempt: send, read, classify, then tell the hook. Every response is settled, even one about
     // to be replaced: settling reads the body, and an unread body keeps its connection out of the pool.
     const exchange = async (token: string): Promise<tSettled<T>> => {
+      const headers = new Headers({ authorization: `Bearer ${credential("developerToken", token)}` });
       await options.rateLimit?.acquire(signal);
-      const headers = new Headers({ authorization: `Bearer ${token}` });
-      if (user && userToken) headers.set("music-user-token", await userToken({ signal }));
+      if (user && userToken) headers.set("music-user-token", credential("userToken", await userToken({ signal })));
       if (body !== null) headers.set("content-type", "application/json");
       const req = new Request(url, { method: init.method ?? "GET", headers, body, signal: signal ?? null });
       options.onRequest?.(req);
