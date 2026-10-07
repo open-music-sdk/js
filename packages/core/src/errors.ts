@@ -1,7 +1,11 @@
 // Every failure the SDK raises is one class with a `_tag`. Narrow with isAppleMusicError(e, tag).
 import type { tError } from "@open-music-sdk/types";
 
-export type tErrorTag = "DeveloperTokenRejected" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
+/**
+ * All but one describe what Apple answered. `DeveloperTokenUnavailable` is raised by a developer token provider
+ * that could not obtain a token at all, so its `status` is its own source's, never Apple's.
+ */
+export type tErrorTag = "DeveloperTokenRejected" | "DeveloperTokenUnavailable" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
 
 /** A Standard Schema issue, as any validator reports it. */
 export interface tValidationIssue {
@@ -16,7 +20,7 @@ export interface tErrorDetails {
   readonly errors?: readonly tError[] | undefined;
   /** Validator issues, on a ValidationError. */
   readonly issues?: readonly tValidationIssue[] | undefined;
-  /** The delay Apple asked for in a Retry-After header, in milliseconds. */
+  /** The delay a Retry-After header asked for, in milliseconds. */
   readonly retryAfterMs?: number | undefined;
   readonly cause?: unknown;
 }

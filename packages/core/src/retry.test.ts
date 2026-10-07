@@ -47,6 +47,20 @@ describe("retryable", () => {
   ])("does not retry %s", (e) => {
     expect(retryable(e)).toBe(false);
   });
+
+  test.each([
+    ["no status, its source being unreachable", undefined],
+    ["429", 429],
+    ["500", 500],
+    ["502", 502],
+    ["503", 503],
+    ["504", 504],
+  ])("retries a developer token that was unavailable with %s", (_name, status) => {
+    expect(retryable(fail("DeveloperTokenUnavailable", { status }))).toBe(true);
+  });
+  test.each([200, 204, 302, 400, 401, 403, 404, 501])("does not retry a developer token that was unavailable with %i", (status) => {
+    expect(retryable(fail("DeveloperTokenUnavailable", { status }))).toBe(false);
+  });
 });
 
 describe("retry", () => {

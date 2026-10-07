@@ -1,4 +1,4 @@
-import { AppleMusicError } from "@open-music-sdk/core";
+import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
 import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 
 /** Invalid values throw a TypeError. */
@@ -41,8 +41,8 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * the private key. The endpoint answers 2xx with the JWT as text, or as JSON `{ "token": "<jwt>" }`.
  *
  * The token is reused until shortly before its `exp`, concurrent requests share one fetch, and a token Apple
- * answers 401 to is fetched again. An unreachable endpoint is a `NetworkError`; any other answer than a
- * developer token is an `ApiError`.
+ * answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
+ * the endpoint's status when it answered, so it is never mistaken for an answer from Apple.
  */
 export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions = {}): tDeveloperTokenProvider {
   const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -80,9 +80,13 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
       body = (await res.text()).trim();
     } catch (e) {
       // Only the kind of failure is repeated. A runtime's own message may spell out the whole URL, query included.
-      throw new AppleMusicError("NetworkError", `developer token endpoint ${where} could not be reached (${e instanceof Error ? e.name : typeof e})`, { cause: e });
+      throw new AppleMusicError("DeveloperTokenUnavailable", `developer token endpoint ${where} could not be reached (${e instanceof Error ? e.name : typeof e})`, { cause: e });
     }
-    if (!res.ok) throw new AppleMusicError("ApiError", `developer token endpoint ${where} answered ${String(res.status)}`, { status: res.status });
+    if (!res.ok)
+      throw new AppleMusicError("DeveloperTokenUnavailable", `developer token endpoint ${where} answered ${String(res.status)}`, {
+        status: res.status,
+        retryAfterMs: parseRetryAfter(res.headers.get("retry-after")),
+      });
     let token: unknown = body;
     if (body.startsWith("{")) {
       try {
@@ -94,7 +98,7 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     const expiresAt = expiry(token);
     // The body is never quoted: it may be a credential, or a page of markup.
     if (typeof token !== "string" || expiresAt === undefined)
-      throw new AppleMusicError("ApiError", `developer token endpoint ${where} did not answer with a JWT that has an exp claim`, { status: res.status });
+      throw new AppleMusicError("DeveloperTokenUnavailable", `developer token endpoint ${where} did not answer with a JWT that has an exp claim`, { status: res.status });
     return { token, expiresAt };
   };
 

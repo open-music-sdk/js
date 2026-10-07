@@ -13,7 +13,7 @@ const jwt = (claims: unknown = { iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_S
   `${b64url({ alg: "ES256", kid: "ABC123DEFG" })}.${b64url(claims)}.${signature}`;
 const expiring = (inSeconds: number, tag = "") => jwt({ exp: NOW_SECONDS + inSeconds }, `sig${tag}`);
 
-type tReply = { status?: number; text?: string; json?: unknown; body?: BodyInit } | Error | "hang";
+type tReply = { status?: number; text?: string; json?: unknown; body?: BodyInit; headers?: Record<string, string> } | Error | "hang";
 
 /** Every Response the fake endpoint handed out, so the suite can insist each body was read. */
 const responses: Response[] = [];
@@ -31,7 +31,7 @@ function endpoint(...replies: tReply[]) {
           reject(init.signal?.reason as Error);
         });
       });
-    const res = new Response(reply.body ?? reply.text ?? JSON.stringify(reply.json), { status: reply.status ?? 200 });
+    const res = new Response(reply.body ?? reply.text ?? JSON.stringify(reply.json), { status: reply.status ?? 200, headers: reply.headers ?? {} });
     responses.push(res);
     return Promise.resolve(res);
   };
@@ -308,41 +308,41 @@ describe("remoteDeveloperToken: reading the answer", () => {
     ["a token without exp", { text: jwt({ iss: "DEF123GHIJ", iat: NOW_SECONDS }) }],
     ["a token whose exp is a string", { text: jwt({ exp: String(NOW_SECONDS + 60) }) }],
     ["a token whose exp is null", { text: jwt({ exp: null }) }],
-  ])("%s is an ApiError, not a token", async (_name, reply) => {
+  ])("%s is DeveloperTokenUnavailable with the answer's status, not a token", async (_name, reply) => {
     const { fetch } = endpoint(reply);
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
-    expect(e._tag).toBe("ApiError");
+    expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(e.status).toBe(200);
   });
 
-  test.each([301, 400, 401, 403, 404, 429, 500, 503])("a %i is an ApiError carrying the status, whatever the body", async (status) => {
+  test.each([301, 400, 401, 403, 404, 429, 500, 503])("a %i is DeveloperTokenUnavailable carrying the status, whatever the body", async (status) => {
     const { fetch } = endpoint({ status, text: jwt() });
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
-    expect(e._tag).toBe("ApiError");
+    expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(e.status).toBe(status);
   });
 });
 
-describe("remoteDeveloperToken: an unreachable endpoint is a NetworkError", () => {
+describe("remoteDeveloperToken: an unreachable endpoint is DeveloperTokenUnavailable with no status", () => {
   test("fetch throwing", async () => {
     const cause = new TypeError("fetch failed");
     const { fetch } = endpoint(cause);
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
-    expect(e._tag).toBe("NetworkError");
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect(e.cause).toBe(cause);
   });
 
   test("the connection dropping while the body is read", async () => {
     const { fetch } = endpoint({ body: brokenBody() });
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
-    expect(e._tag).toBe("NetworkError");
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect((e.cause as Error).message).toBe("connection reset");
   });
 
   test("an endpoint that never answers, once timeoutMs has passed", async () => {
     const { fetch } = endpoint("hang");
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 })({}));
-    expect(e._tag).toBe("NetworkError");
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect((e.cause as Error).name).toBe("TimeoutError");
   });
 
@@ -384,7 +384,7 @@ describe("remoteDeveloperToken: the request", () => {
     controller.abort(reason);
     expect(await first).toBe(reason);
     expect(calls[0]?.init?.signal?.aborted).toBe(false);
-    expect((await second)._tag).toBe("NetworkError"); // the timeout, not the first caller's abort
+    expect(((await second).cause as Error).name).toBe("TimeoutError"); // the timeout, not the first caller's abort
     expect(calls).toHaveLength(1);
   });
 });
@@ -490,8 +490,69 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
     const { fetch, sent, tokenCalls } = world([{ status: 403, text: "" }], []);
     const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
     const e = await failure(music.request("v1/test"));
-    expect([e._tag, e.status]).toEqual(["ApiError", 403]);
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 403]);
     expect(tokenCalls).toHaveLength(1);
     expect(sent).toEqual([]);
+  });
+
+  test.each([
+    [401, "DeveloperTokenRejected"],
+    [403, "UserTokenInvalid"],
+    [404, "ApiError"],
+    [429, "RateLimited"],
+    [500, "ApiError"],
+  ] as const)("the endpoint's own %i is never reported under %s, the tag the same status from Apple would get", async (status, applesTag) => {
+    const { fetch } = world([{ status, text: "" }], []);
+    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false, userToken: "user" });
+    const e = await failure(music.request("v1/me/library/songs"));
+    expect(e._tag).toBe("DeveloperTokenUnavailable");
+    expect(isAppleMusicError(e, applesTag)).toBe(false);
+    expect(e.status).toBe(status);
+  });
+
+  test("a rate-limited endpoint is retried, as Apple's 429 would be", async () => {
+    const { fetch, sent, tokenCalls } = world([{ status: 429, text: "", headers: { "retry-after": "0" } }, { text: jwt() }], []);
+    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2, baseDelayMs: 0 } });
+    await music.request("v1/test");
+    expect(tokenCalls).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+  });
+
+  test("the endpoint's Retry-After decides how long the client waits before asking it again", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"], now: NOW });
+    const { fetch, sent, tokenCalls } = world([{ status: 503, text: "", headers: { "retry-after": "3" } }, { text: jwt() }], []);
+    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2 } });
+    const done = music.request("v1/test");
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(tokenCalls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await done;
+    expect(tokenCalls).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+  });
+});
+
+describe("remoteDeveloperToken: Retry-After", () => {
+  test.each([
+    ["seconds", "120", 120_000],
+    ["zero", "0", 0],
+    ["an HTTP date", new Date(NOW + 90_000).toUTCString(), 90_000],
+  ])("given as %s is carried on the error in milliseconds", async (_name, header, expected) => {
+    const { fetch } = endpoint({ status: 503, text: "", headers: { "retry-after": header } });
+    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBe(expected);
+  });
+
+  test.each([
+    ["absent", {}],
+    ["unreadable", { "retry-after": "soon" }],
+    ["negative", { "retry-after": "-5" }],
+  ])("%s leaves retryAfterMs undefined", async (_name, headers) => {
+    const { fetch } = endpoint({ status: 503, text: "", headers });
+    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
+  });
+
+  test("on an answer that is not a failure, it is ignored", async () => {
+    const { fetch } = endpoint({ text: "not a token", headers: { "retry-after": "120" } });
+    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
   });
 });

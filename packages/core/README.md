@@ -35,7 +35,7 @@ try {
 | Export | Does |
 | --- | --- |
 | `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser` |
-| `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenRejected`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
+| `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenRejected`, `DeveloperTokenUnavailable`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
 | `retry(fn, policy?, signal?)`, `retryable` | Exponential backoff with full jitter; honours `Retry-After` |
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
 | `parseRetryAfter(header)` | Seconds or HTTP date to milliseconds |
@@ -56,6 +56,7 @@ try {
 | 5xx except 501 | Retried; then `ApiError`. |
 | Other 4xx, 501 | `ApiError` with `status` and Apple's `errors` array. |
 | `fetch` throws | `NetworkError`, retried. An abort is rethrown untouched. |
+| No developer token | `DeveloperTokenUnavailable`, thrown by a provider that could not get one. Its `status` is the provider's own source's, never Apple's. Retried when there is no status, or it is 429 or 5xx except 501. |
 
 The default policy makes two attempts with a 250 ms base delay and a 4 s cap, and waits for a
 `Retry-After` of up to 60 s (`maxRetryAfterMs`); a longer one is not waited for, the `RateLimited`
@@ -67,7 +68,9 @@ create a limiter with yours and share one instance across every client on the sa
 
 `developerToken` and `userToken` take a string or a provider `(ctx) => string | Promise<string>`.
 A provider is called once per request, and once more with `ctx.rejected` set when Apple answers 401,
-so a caching minter can replace a stale token. `as(userToken)` derives a client for one listener;
+so a caching minter can replace a stale token. A provider that cannot get a token throws
+`AppleMusicError("DeveloperTokenUnavailable", …)` to have the retry policy applied; anything else it
+throws reaches the caller untouched. `as(userToken)` derives a client for one listener;
 `forUser(userId)` does the same by looking the token up in `userTokenStore`.
 
 ## Hooks

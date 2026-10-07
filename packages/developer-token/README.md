@@ -91,11 +91,15 @@ A relative URL such as `/api/token` resolves against the document's base URL on 
 `fetch` would. Creating the provider never needs a document, so a module that a server also loads can
 create it; using it where there is none throws a `TypeError`. Outside a browser, pass an absolute URL.
 
-| Endpoint | Outcome |
-| --- | --- |
-| Unreachable, timed out, or dropped mid-body | `NetworkError`, which the client's retry policy retries |
-| Not 2xx | `ApiError` with the `status`; 5xx is retried, 4xx is not |
-| 2xx without a JWT that has an `exp` | `ApiError` |
+Whatever goes wrong at the endpoint is an `AppleMusicError` tagged `DeveloperTokenUnavailable`, so it is
+never mistaken for an answer from Apple: a 404 from your endpoint is not "no such song".
+
+| Endpoint | `status` | Retried by the client |
+| --- | --- | --- |
+| Unreachable, timed out, or dropped mid-body | none | Yes |
+| 429, or 5xx other than 501 | The endpoint's | Yes, after its `Retry-After` if it sent one |
+| Any other status that is not 2xx | The endpoint's | No |
+| 2xx without a JWT that has an `exp` | The endpoint's | No |
 
 ## Caching
 

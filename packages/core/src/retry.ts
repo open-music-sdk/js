@@ -19,9 +19,17 @@ export interface tRetryPolicy {
 
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
-/** Network failures, 429, and 5xx other than 501 (reserved, never implemented). */
+const transient = (status: number | undefined) => status !== undefined && status >= 500 && status !== 501;
+
+/**
+ * Network failures, 429, and 5xx other than 501 (reserved, never implemented). A developer token that could not
+ * be obtained is judged the same way, by what its source answered: no status means the source was unreachable.
+ */
 export const retryable = (e: AppleMusicError): boolean =>
-  e._tag === "NetworkError" || e._tag === "RateLimited" || (e._tag === "ApiError" && e.status !== undefined && e.status >= 500 && e.status !== 501);
+  e._tag === "NetworkError" ||
+  e._tag === "RateLimited" ||
+  (e._tag === "ApiError" && transient(e.status)) ||
+  (e._tag === "DeveloperTokenUnavailable" && (e.status === undefined || e.status === 429 || transient(e.status)));
 
 export interface tResolvedRetryPolicy {
   readonly maxAttempts: number;

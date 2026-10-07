@@ -401,6 +401,52 @@ describe("retrying", () => {
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
   });
 
+  describe("a developer token provider that cannot get a token", () => {
+    const unavailable = (status?: number) => new AppleMusicError("DeveloperTokenUnavailable", "token source down", { status });
+    /** A provider that throws each error in turn, then answers "dev". */
+    const flaky = (...errors: AppleMusicError[]) =>
+      vi.fn((): Promise<string> => {
+        const error = errors.shift();
+        return error === undefined ? Promise.resolve("dev") : Promise.reject(error);
+      });
+
+    test.each([undefined, 429, 500, 503])("with status %s is asked again, and the request then goes out once", async (status) => {
+      const developerToken = flaky(unavailable(status), unavailable(status));
+      const { music, calls } = client([{ body: { ok: true } }], { developerToken, retry: quick });
+      expect(await music.request("v1/test")).toEqual({ ok: true });
+      expect(developerToken).toHaveBeenCalledTimes(3);
+      expect(calls).toHaveLength(1);
+    });
+
+    test.each([200, 401, 403, 404, 501])("with status %i is not asked again: the error reaches the caller as thrown and Apple is never called", async (status) => {
+      const error = unavailable(status);
+      const developerToken = flaky(error);
+      const { music, calls } = client([], { developerToken, retry: quick });
+      await expect(music.request("v1/test")).rejects.toBe(error);
+      expect(developerToken).toHaveBeenCalledTimes(1);
+      expect(calls).toHaveLength(0);
+    });
+
+    test("keeps its own tag and status when attempts run out, so it is never mistaken for Apple's answer", async () => {
+      const developerToken = flaky(unavailable(503), unavailable(503), unavailable(503));
+      const { music } = client([], { developerToken, retry: quick });
+      const e = await failure(music.request("v1/test"));
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 503]);
+    });
+
+    test("is waited for as long as its Retry-After asks", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
+      const developerToken = flaky(new AppleMusicError("DeveloperTokenUnavailable", "busy", { status: 503, retryAfterMs: 2000 }));
+      const { music, calls } = client([{ body: { ok: true } }], { developerToken, retry: { maxAttempts: 2 } });
+      const done = music.request("v1/test");
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(developerToken).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await done).toEqual({ ok: true });
+      expect(calls).toHaveLength(1);
+    });
+  });
+
   describe("a connection lost after the headers is a network failure like any other", () => {
     /** A 200 whose body stream fails with `reason`, or with the request's abort reason when `reason` is "abort". */
     const broken = (reason: Error | "abort") => (input: RequestInfo | URL) => {

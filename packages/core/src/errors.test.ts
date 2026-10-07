@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { AppleMusicError, isAppleMusicError, type tErrorTag } from "./errors.js";
 
-const TAGS: tErrorTag[] = ["DeveloperTokenRejected", "UserTokenInvalid", "RateLimited", "ApiError", "ValidationError", "NetworkError"];
+const TAGS: tErrorTag[] = ["DeveloperTokenRejected", "DeveloperTokenUnavailable", "UserTokenInvalid", "RateLimited", "ApiError", "ValidationError", "NetworkError"];
 
 describe("AppleMusicError", () => {
   test.each(TAGS)("is an Error tagged %s", (tag) => {
