@@ -397,6 +397,20 @@ describe("retrying", () => {
     expect(calls).toHaveLength(2);
   });
 
+  test("an undefined policy field means the default, not forever", async () => {
+    vi.useFakeTimers();
+    const { music, calls } = client([{ status: 500 }, { status: 500 }, { status: 500 }], { retry: { maxAttempts: undefined, baseDelayMs: undefined } });
+    const out = failure(music.request("v1/test"));
+    await vi.runAllTimersAsync();
+    expect((await out).status).toBe(500);
+    expect(calls).toHaveLength(2);
+  });
+
+  test("an invalid policy fails at createClient", () => {
+    expect(() => createClient({ developerToken: "dev", retry: { maxAttempts: 0 } })).toThrow(TypeError);
+    expect(() => createClient({ developerToken: "dev", retry: { baseDelayMs: Number.NaN } })).toThrow(TypeError);
+  });
+
   test("the limiter is acquired before every attempt", async () => {
     const acquire = vi.fn(() => Promise.resolve());
     const { music } = client([{ status: 500 }, { body: {} }], { retry: quick, rateLimit: { acquire } });

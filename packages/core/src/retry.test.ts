@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AppleMusicError, type tErrorDetails, type tErrorTag } from "./errors.js";
-import { parseRetryAfter, retry, retryable, sleep } from "./retry.js";
+import { parseRetryAfter, resolveRetryPolicy, retry, retryable, sleep, type tRetryPolicy } from "./retry.js";
 
 const fail = (tag: tErrorTag, details?: tErrorDetails) => new AppleMusicError(tag, tag, details);
 /** Rejects with the nth value on the nth attempt, then keeps rejecting with the last. Non-Errors are deliberate. */
@@ -167,6 +167,48 @@ describe("retry", () => {
     expect(await out).toBe(reason);
     await vi.runAllTimersAsync();
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("retry policy: every field is optional, never silently infinite", () => {
+  const defaults = { maxAttempts: 2, baseDelayMs: 250, maxDelayMs: 4000, retryOn: retryable };
+
+  test.each([
+    ["no policy", undefined],
+    ["an empty policy", {}],
+    ["every field explicitly undefined", { maxAttempts: undefined, baseDelayMs: undefined, maxDelayMs: undefined, retryOn: undefined }],
+  ])("%s resolves to the defaults", (_, policy) => {
+    expect(resolveRetryPolicy(policy)).toEqual(defaults);
+  });
+
+  test("fields fall back one by one, not as a block", () => {
+    const retryOn = () => true;
+    expect(resolveRetryPolicy({ maxAttempts: 5, baseDelayMs: undefined, retryOn })).toEqual({ ...defaults, maxAttempts: 5, retryOn });
+    expect(resolveRetryPolicy({ maxDelayMs: 0 })).toEqual({ ...defaults, maxDelayMs: 0 });
+  });
+
+  test("an explicitly undefined maxAttempts still stops at the default", async () => {
+    const fn = vi.fn(failing(fail("NetworkError")));
+    await settle(retry(fn, { maxAttempts: undefined, baseDelayMs: undefined }));
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  test.each<[string, tRetryPolicy]>([
+    ["maxAttempts 0", { maxAttempts: 0 }],
+    ["maxAttempts -1", { maxAttempts: -1 }],
+    ["maxAttempts 1.5", { maxAttempts: 1.5 }],
+    ["maxAttempts NaN", { maxAttempts: Number.NaN }],
+    ["maxAttempts Infinity", { maxAttempts: Number.POSITIVE_INFINITY }],
+    ["maxAttempts as a string", { maxAttempts: "3" as unknown as number }],
+    ["baseDelayMs -1", { baseDelayMs: -1 }],
+    ["baseDelayMs NaN", { baseDelayMs: Number.NaN }],
+    ["maxDelayMs Infinity", { maxDelayMs: Number.POSITIVE_INFINITY }],
+    ["retryOn not a function", { retryOn: true as unknown as () => boolean }],
+  ])("%s is a TypeError before the first attempt", async (_, policy) => {
+    expect(() => resolveRetryPolicy(policy)).toThrow(TypeError);
+    const fn = vi.fn();
+    await expect(retry(fn, policy)).rejects.toThrow(TypeError);
+    expect(fn).not.toHaveBeenCalled();
   });
 });
 

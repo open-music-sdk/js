@@ -3,7 +3,7 @@
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
 import { AppleMusicError, type tValidationIssue } from "./errors.js";
 import type { tRateLimiter } from "./rate-limit.js";
-import { parseRetryAfter, retry, type tRetryPolicy } from "./retry.js";
+import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from "./retry.js";
 
 const BASE_URL = "https://api.music.apple.com/";
 const BASE_ORIGIN = new URL(BASE_URL).origin;
@@ -89,7 +89,7 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
   const developerToken = toProvider(options.developerToken);
   const userToken = options.userToken === undefined ? undefined : toProvider(options.userToken);
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  const policy = options.retry === false ? { maxAttempts: 1 } : options.retry;
+  const policy = resolveRetryPolicy(options.retry === false ? { maxAttempts: 1 } : options.retry);
   let storefrontPromise: Promise<string> | undefined;
 
   async function request<T>(path: string, init: tRequestInit<T> = {}): Promise<T> {
