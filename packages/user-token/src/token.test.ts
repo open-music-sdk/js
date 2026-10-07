@@ -85,16 +85,30 @@ describe("validateUserToken", () => {
   });
 
   test.each([
-    [401, "DeveloperTokenRejected"],
     [404, "ApiError"],
     [429, "RateLimited"],
     [500, "ApiError"],
     [503, "ApiError"],
   ])("%i is the client's %s, not a verdict on the token", async (status, tag) => {
-    const { music } = fakeClient([{ status }]);
+    const { music, calls } = fakeClient([{ status }]);
     const e = await failure(validateUserToken(music, "user-token"));
     expect(e._tag).toBe(tag);
     expect(e.status).toBe(status);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("401, with the developer token accepted on its own, is UserTokenInvalid", async () => {
+    const { music } = fakeClient([appleError(401, "Unauthorized"), {}]);
+    const e = await failure(validateUserToken(music, "user-token"));
+    expect(e._tag).toBe("UserTokenInvalid");
+    expect(e.status).toBe(401);
+  });
+
+  test("401, with the developer token refused on its own too, is DeveloperTokenRejected", async () => {
+    const { music } = fakeClient([appleError(401, "Unauthorized"), appleError(401, "Unauthorized")]);
+    const e = await failure(validateUserToken(music, "user-token"));
+    expect(e._tag).toBe("DeveloperTokenRejected");
+    expect(e.status).toBe(401);
   });
 
   test("a failed fetch is a NetworkError", async () => {
@@ -203,6 +217,94 @@ describe("userTokenFromEnv", () => {
   });
 });
 
+describe("a 401 on a personal endpoint is settled by asking once more without the user token", () => {
+  const sent = (calls: Request[]) => calls.map((c) => [new URL(c.url).pathname, c.headers.get("authorization"), c.headers.get("music-user-token")]);
+
+  test("the second request is GET /v1/test with the developer token and no user token", async () => {
+    const { music, calls } = fakeClient([{ status: 401 }, {}]);
+    await failure(validateUserToken(music, "user-token"));
+    expect(calls.map((c) => c.method)).toEqual(["GET", "GET"]);
+    expect(sent(calls)).toEqual([
+      ["/v1/me/storefront", "Bearer dev", "user-token"],
+      ["/v1/test", "Bearer dev", null],
+    ]);
+  });
+
+  test("a client bound to a listener does not lend its user token to the second request either", async () => {
+    const { music, calls } = fakeClient([{ status: 401 }, {}], { userToken: "bound" });
+    await failure(validateUserToken(music, "candidate"));
+    expect(sent(calls).map((c) => c[2])).toEqual(["candidate", null]);
+  });
+
+  test.each<[string, tReply]>([
+    ["an empty 200", {}],
+    ["a 204", { status: 204 }],
+    ["a 200 with a body", { body: { ok: true } }],
+  ])("%s to the second request means the listener was the problem", async (_, probe) => {
+    const { music, calls } = fakeClient([appleError(401, "Unauthorized"), probe]);
+    const e = await failure(validateUserToken(music, "user-token"));
+    expect(e._tag).toBe("UserTokenInvalid");
+    expect(e.message).toMatch(/not signed in, or no Apple Music subscription/);
+    expect(e.errors?.[0]?.title).toBe("Unauthorized");
+    expect(isAppleMusicError(e.cause, "DeveloperTokenRejected")).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
+
+  test.each<[string, tReply, string]>([
+    ["401", { status: 401 }, "DeveloperTokenRejected"],
+    ["404", { status: 404 }, "ApiError"],
+    ["429", { status: 429 }, "RateLimited"],
+    ["500", { status: 500 }, "ApiError"],
+    ["a failed fetch", new TypeError("fetch failed"), "NetworkError"],
+  ])("%s to the second request is that request's own error: nothing was learned about the listener", async (_, probe, tag) => {
+    const { music, calls } = fakeClient([{ status: 401 }, probe]);
+    const e = await failure(validateUserToken(music, "user-token"));
+    expect(e._tag).toBe(tag);
+    expect(e.message).not.toMatch(/subscription/);
+    expect(calls).toHaveLength(2);
+  });
+
+  test.each<[string, tReply]>([
+    ["200", { body: storefront() }],
+    ["403", { status: 403 }],
+    ["404", { status: 404 }],
+    ["429", { status: 429 }],
+    ["500", { status: 500 }],
+    ["a failed fetch", new TypeError("fetch failed")],
+  ])("%s to the first request is not followed by a second", async (_, reply) => {
+    const { music, calls } = fakeClient([reply]);
+    await validateUserToken(music, "user-token").catch(() => undefined);
+    expect(sent(calls).map((c) => c[0])).toEqual(["/v1/me/storefront"]);
+  });
+
+  test("a provider that replaces a rejected developer token is asked first, and the second request uses what it gave", async () => {
+    let current = "dev-0";
+    const developerToken = (ctx: { rejected?: string | undefined }) => {
+      if (ctx.rejected !== undefined) current = "dev-1";
+      return current;
+    };
+    const { music, calls } = fakeClient([{ status: 401 }, { status: 401 }, {}], { developerToken });
+    expect((await failure(validateUserToken(music, "user-token")))._tag).toBe("UserTokenInvalid");
+    expect(sent(calls)).toEqual([
+      ["/v1/me/storefront", "Bearer dev-0", "user-token"],
+      ["/v1/me/storefront", "Bearer dev-1", "user-token"],
+      ["/v1/test", "Bearer dev-1", null],
+    ]);
+  });
+
+  test("aborting during the second request rejects with the reason", async () => {
+    const { music, calls } = fakeClient([{ status: 401 }, "hang"]);
+    const controller = new AbortController();
+    const out = validateUserToken(music, "user-token", { signal: controller.signal });
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(2);
+    });
+    const reason = new Error("stop");
+    controller.abort(reason);
+    await expect(out).rejects.toBe(reason);
+  });
+});
+
 describe("validating leaves the client it was given as it was", () => {
   test("the token under test replaces the one the client is bound to, for this call only", async () => {
     const { music, calls } = fakeClient([], { userToken: "bound" });
@@ -255,6 +357,8 @@ describe("no error quotes a token", () => {
   test.each<[string, string, tReply[]]>([
     ["rejected for its shape", "secret token", []],
     ["rejected by Apple", "secret-token", [appleError(403, "Forbidden")]],
+    ["rejected for the listener's account", "secret-token", [appleError(401, "Unauthorized"), {}]],
+    ["sent with a developer token Apple refuses", "secret-token", [appleError(401, "Unauthorized"), appleError(401, "Unauthorized")]],
     ["Apple could not vouch for", "secret-token", [appleError(500, "Internal Server Error")]],
     ["Apple named no storefront for", "secret-token", [{ body: {} }]],
   ])("one %s", async (_, token, replies) => {

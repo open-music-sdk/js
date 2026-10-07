@@ -275,16 +275,29 @@ describe("userTokenIntake: one status per outcome", () => {
     expect(calls).toHaveLength(0);
   });
 
-  test.each<[string, tReply, string]>([
-    ["401", { status: 401 }, "DeveloperTokenRejected"],
-    ["404", { status: 404 }, "ApiError"],
-    ["429", { status: 429 }, "RateLimited"],
-    ["500", { status: 500 }, "ApiError"],
-    ["a 200 naming no storefront", { body: { data: [] } }, "ApiError"],
-    ["an empty 200", {}, "ApiError"],
-    ["a failed fetch", new TypeError("fetch failed"), "NetworkError"],
-  ])("502 when Apple answers %s, with the client's error tag", async (_, reply, tag) => {
-    const { handler } = intake([reply]);
+  test("422 UserTokenInvalid when Apple answers 401 for the listener but accepts the developer token on its own", async () => {
+    const { handler, calls } = intake([appleError(401, "Unauthorized"), {}]);
+    const res = await handler(post({ token: "user-token" }));
+    expect(res.status).toBe(422);
+    expect(await errorOf(res)).toBe("UserTokenInvalid");
+    expect(calls.map((c) => [new URL(c.url).pathname, c.headers.get("music-user-token")])).toEqual([
+      ["/v1/me/storefront", "user-token"],
+      ["/v1/test", null],
+    ]);
+  });
+
+  test.each<[string, tReply[], string]>([
+    ["401, and 401 again without the user token", [{ status: 401 }, { status: 401 }], "DeveloperTokenRejected"],
+    ["401, then 500 without the user token", [{ status: 401 }, { status: 500 }], "ApiError"],
+    ["401, then nothing without the user token", [{ status: 401 }, new TypeError("fetch failed")], "NetworkError"],
+    ["404", [{ status: 404 }], "ApiError"],
+    ["429", [{ status: 429 }], "RateLimited"],
+    ["500", [{ status: 500 }], "ApiError"],
+    ["a 200 naming no storefront", [{ body: { data: [] } }], "ApiError"],
+    ["an empty 200", [{}], "ApiError"],
+    ["a failed fetch", [new TypeError("fetch failed")], "NetworkError"],
+  ])("502 when Apple answers %s, with the client's error tag", async (_, replies, tag) => {
+    const { handler } = intake(replies);
     const res = await handler(post({ token: "user-token" }));
     expect(res.status).toBe(502);
     expect(await errorOf(res)).toBe(tag);
@@ -294,7 +307,8 @@ describe("userTokenIntake: one status per outcome", () => {
 describe("a token is stored only after Apple accepts it", () => {
   test.each<[string, Request, tReply[]]>([
     ["Apple answers 403", post({ token: "user-token" }), [{ status: 403 }]],
-    ["Apple answers 401", post({ token: "user-token" }), [{ status: 401 }]],
+    ["Apple answers 401 for the listener", post({ token: "user-token" }), [{ status: 401 }, {}]],
+    ["Apple refuses the developer token", post({ token: "user-token" }), [{ status: 401 }, { status: 401 }]],
     ["Apple answers 429", post({ token: "user-token" }), [{ status: 429 }]],
     ["Apple answers 500", post({ token: "user-token" }), [{ status: 500 }]],
     ["Apple names no storefront", post({ token: "user-token" }), [{ body: {} }]],
@@ -466,7 +480,8 @@ describe("no response carries the token or Apple's error text, and none may be c
     ["rejected by Apple", post({ token: "secret-token" }), [appleError(403, "Forbidden")]],
     ["rejected for its shape", post({ token: "secret token" }), []],
     ["Apple failing", post({ token: "secret-token" }), [appleError(500, "Internal Server Error")]],
-    ["Apple refusing the developer token", post({ token: "secret-token" }), [appleError(401, "Unauthorized")]],
+    ["Apple answering 401 for the listener", post({ token: "secret-token" }), [appleError(401, "Unauthorized"), {}]],
+    ["Apple refusing the developer token", post({ token: "secret-token" }), [appleError(401, "Unauthorized"), appleError(401, "Unauthorized")]],
     ["a bad body", post('{"token":"secret-token"'), []],
     ["too large", post({ token: "secret-token", pad: "x".repeat(9000) }), []],
     ["the wrong content type", post({ token: "secret-token" }, { "content-type": "text/plain" }), []],

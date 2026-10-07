@@ -65,12 +65,15 @@ characters. Anything else is `UserTokenInvalid` without a request. Then Apple de
 | --- | --- |
 | 2xx naming a storefront | Resolves to the storefront id |
 | 2xx naming none | `ApiError`; the token is not treated as accepted |
-| 403 | `UserTokenInvalid` |
+| 403 | `UserTokenInvalid`, with `status` 403 |
+| 401, and the developer token works on its own | `UserTokenInvalid`, with `status` 401 |
+| 401, and the developer token is refused on its own too | `DeveloperTokenRejected` |
 | Anything else | The client's usual error, which says nothing about the token |
 
-A 401 is `DeveloperTokenRejected`. Apple documents that on `/v1/me` a 401 can also mean the listener
-is not signed in or has no subscription; nothing here tells the two apart. No error message quotes
-the token.
+Apple documents two causes for a 401 on `/v1/me`: the developer token, or a listener who is not
+signed in or has no Apple Music subscription. So after a 401, one more request is made with the
+developer token alone (`GET /v1/test`). If Apple accepts it, the listener was the problem; if that
+request fails in any way, its error is the one you get. No error message quotes the token.
 
 `userTokenFromEnv` treats a missing token as no token, not as an error: an unset, empty, or blank
 variable is `undefined`. A variable that is set has to pass the same header check, and throws
@@ -88,7 +91,7 @@ variable is `undefined`. A variable that is set has to pass the same header chec
 | 405 | `{ "error": "MethodNotAllowed" }` | Not a `POST` |
 | 413 | `{ "error": "PayloadTooLarge" }` | The body is over 8 KiB |
 | 415 | `{ "error": "UnsupportedMediaType" }` | The content type is not `application/json` |
-| 422 | `{ "error": "UserTokenInvalid" }` | The token is malformed or Apple answered 403; nothing is stored |
+| 422 | `{ "error": "UserTokenInvalid" }` | The token is malformed, Apple answered 403, or Apple answered 401 for the listener; nothing is stored |
 | 502 | `{ "error": "<tag>" }` | Apple did not confirm the token: `DeveloperTokenRejected`, `RateLimited`, `ApiError`, `NetworkError`; nothing is stored |
 
 - **`userId` is the authentication.** It must return the signed-in user from your own session and
@@ -100,8 +103,8 @@ variable is `undefined`. A variable that is set has to pass the same header chec
   the client you pass, under its `retry` option: by default a failure is retried once, and a 429 is
   waited out for a `Retry-After` of up to 60 s before the handler answers. Pass a client with the
   policy you want on this route, or put your own timeout around the handler.
-- **Every attempt is an Apple API call** against your developer token. Rate-limit the route as you
-  would a login.
+- **Every attempt is an Apple API call** against your developer token, and a 401 costs one more to
+  find out whose it was. Rate-limit the route as you would a login.
 - **Anything else that throws rejects the handler**, and is yours to answer: `userId`, the store, a
   body something else has already read, a request aborted part way.
 - Every response is `Cache-Control: no-store`, and none carries the token or Apple's error text.
