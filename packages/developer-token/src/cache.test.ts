@@ -1,5 +1,6 @@
+import { getEventListeners } from "node:events";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { cached, type tIssued } from "./cache.js";
+import { cached, orAbort, type tIssued } from "./cache.js";
 
 const NOW = Date.UTC(2026, 9, 7);
 const MINUTE = 60_000;
@@ -19,7 +20,7 @@ function manual() {
   return { issue, pending };
 }
 
-const outcome = (p: Promise<string>) =>
+const outcome = <T>(p: Promise<T>) =>
   p.then(
     (value) => ({ value }),
     (error: unknown) => ({ error }),
@@ -460,13 +461,94 @@ describe("cached: a caller's abort is its own", () => {
     expect(unhandled).not.toHaveBeenCalled();
   });
 
-  test("no listener is left on the signal after the call settles", async () => {
+  test.each([
+    ["resolves", (pending: ReturnType<typeof manual>["pending"]) => pending[0]?.resolve({ token: "t1", expiresAt: NOW + DAY })],
+    ["rejects", (pending: ReturnType<typeof manual>["pending"]) => pending[0]?.reject(new Error("boom"))],
+  ])("a signal that many calls waited on carries no listener once the issue %s", async (_name, settle) => {
+    const { issue, pending } = manual();
+    const provider = cached(issue);
+    const controller = new AbortController();
+    const calls = [1, 2, 3].map(() => outcome(provider({ signal: controller.signal })));
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(3);
+    settle(pending);
+    await Promise.all(calls);
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+  });
+
+  test("a call answered from the cache never touches the signal", async () => {
+    const provider = cached(issuer());
+    await provider({});
     const controller = new AbortController();
     const add = vi.spyOn(controller.signal, "addEventListener");
-    const provider = cached(issuer());
     await provider({ signal: controller.signal });
-    // The listener is registered with a signal of its own, which the call aborts when it settles.
-    const options = add.mock.calls[0]?.[2] as AddEventListenerOptions;
-    expect(options.signal?.aborted).toBe(true);
+    expect(add).not.toHaveBeenCalled();
+  });
+});
+
+describe("cached: called directly", () => {
+  test("it needs no context at all", async () => {
+    const provider = cached(issuer());
+    expect([await provider(), await provider(undefined), await provider({})]).toEqual(["t1", "t1", "t1"]);
+  });
+});
+
+describe("orAbort", () => {
+  const never = new Promise<string>(() => undefined);
+
+  test.each([
+    ["no signal", undefined],
+    ["a signal that never aborts", new AbortController().signal],
+  ])("with %s, it is the flight: its value", async (_name, signal) => {
+    expect(await orAbort(Promise.resolve("value"), signal)).toBe("value");
+  });
+
+  test.each([
+    ["no signal", undefined],
+    ["a signal that never aborts", new AbortController().signal],
+  ])("with %s, it is the flight: its failure", async (_name, signal) => {
+    const boom = new Error("boom");
+    await expect(orAbort(Promise.reject(boom), signal)).rejects.toBe(boom);
+  });
+
+  test.each([
+    ["an Error", new Error("gone")],
+    ["a DOMException", new DOMException("too slow", "TimeoutError")],
+    ["a string", "gone"],
+  ])("an abort with %s as its reason rejects with that reason while the flight is still pending", async (_name, reason) => {
+    const controller = new AbortController();
+    const waiting = outcome(orAbort(never, controller.signal));
+    controller.abort(reason);
+    expect(await waiting).toEqual({ error: reason });
+  });
+
+  test("a signal aborted before the call rejects at once, without waiting for a flight that may never settle", async () => {
+    const reason = new Error("gone");
+    await expect(orAbort(never, AbortSignal.abort(reason))).rejects.toBe(reason);
+  });
+
+  test("an abort does not cancel the flight or swallow its result for anyone else", async () => {
+    const { issue, pending } = manual();
+    const flight = issue().then((issued) => issued.token);
+    const controller = new AbortController();
+    const aborted = outcome(orAbort(flight, controller.signal));
+    const patient = orAbort(flight, new AbortController().signal);
+    controller.abort(new Error("gone"));
+    await aborted;
+    pending[0]?.resolve({ token: "t1", expiresAt: NOW + DAY });
+    expect(await patient).toBe("t1");
+  });
+
+  test("a flight that fails after the abort is not an unhandled rejection", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const { issue, pending } = manual();
+    const controller = new AbortController();
+    const aborted = outcome(orAbort(issue(), controller.signal));
+    controller.abort(new Error("gone"));
+    await aborted;
+    pending[0]?.reject(new Error("boom"));
+    await flush();
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
   });
 });

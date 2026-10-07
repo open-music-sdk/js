@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
+import { inspect } from "node:util";
 import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -43,6 +44,15 @@ async function read(token: string) {
   const { payload, protectedHeader } = await jwtVerify(token, publicKey);
   return { header: protectedHeader, claims: payload };
 }
+
+/** True when any stretch of the private key's body shows up in the text. */
+function leaks(text: string): boolean {
+  const body = (valid.pem as string).split("\n").slice(1, -1).join("");
+  for (let i = 0; i + 12 <= body.length; i += 4) if (text.includes(body.slice(i, i + 12))) return true;
+  return false;
+}
+/** Everything an error can show: message, stack, hidden fields, and its whole chain of causes. */
+const shown = (e: unknown) => `${inspect(e, { depth: null, showHidden: true })} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`;
 
 const invalid: [string, Record<string, unknown>][] = [
   ["a missing pem", { pem: undefined }],
@@ -175,13 +185,24 @@ describe("mintDeveloperToken: the key", () => {
     await expect(mintDeveloperToken({ ...valid, pem })).rejects.toThrow(TypeError);
   });
 
-  test("a rejected key is not quoted in the error", async () => {
-    const pem = valid.pem as string;
-    const body = pem.split("\n")[1] ?? ""; // the first line of key material, which is cut short below
-    const error: unknown = await mintDeveloperToken({ ...valid, pem: pem.replace(body, body.slice(0, -4)) }).catch((e: unknown) => e);
+  test.each([
+    ["its first line cut short", (pem: string) => pem.replace(pem.split("\n")[1] ?? "", (pem.split("\n")[1] ?? "").slice(0, -4))],
+    ["its last line cut short", (pem: string) => pem.replace(pem.split("\n").at(-2) ?? "", (pem.split("\n").at(-2) ?? "").slice(0, -3))],
+    ["its opening bytes changed", (pem: string) => pem.replace("\nM", "\nX")],
+    ["a dash missing from its armor", (pem: string) => pem.replace("-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY----")],
+    ["the armor of another format", (pem: string) => pem.replaceAll("PRIVATE KEY", "EC PRIVATE KEY")],
+    ["no armor at all", (pem: string) => pem.split("\n").slice(1, -1).join("\n")],
+    ["quotes left around it", (pem: string) => JSON.stringify(pem)],
+    ["its line breaks escaped twice", (pem: string) => pem.replaceAll("\n", "\\\\n")],
+  ])("a key rejected for having %s is not quoted anywhere in the error, from its first line to its last", async (_name, damage) => {
+    const error: unknown = await mintDeveloperToken({ ...valid, pem: damage((valid.pem as string).trim()) }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
-    const said = `${String(error)} ${String((error as Error).cause)} ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`;
-    expect(said).not.toContain(body.slice(0, 16));
+    expect(leaks(shown(error))).toBe(false);
+  });
+
+  test("the check itself can see a key when one is shown", () => {
+    expect(leaks(shown(new Error(`bad key ${valid.pem as string}`)))).toBe(true);
+    expect(leaks(shown(new Error("bad key", { cause: new Error((valid.pem as string).split("\n").at(-2)) })))).toBe(true);
   });
 });
 
@@ -192,10 +213,6 @@ describe("mintDeveloperToken: invalid options", () => {
 });
 
 describe("mintDeveloperToken: the key never ends up in a token or an error by being put in the wrong option", () => {
-  const body = () => (valid.pem as string).split("\n").slice(1, -1).join("");
-  /** True when any stretch of the key's body shows up in the text. */
-  const leaks = (text: string) => Array.from({ length: Math.floor((body().length - 12) / 4) }, (_unused, i) => body().slice(i * 4, i * 4 + 12)).some((part) => text.includes(part));
-
   test.each([
     ["keyId", (pem: string) => ({ keyId: pem })],
     ["teamId", (pem: string) => ({ teamId: pem })],
@@ -205,8 +222,7 @@ describe("mintDeveloperToken: the key never ends up in a token or an error by be
   ])("the key given as %s is refused, not signed, and not quoted", async (_name, misplace) => {
     const error: unknown = await mintDeveloperToken({ ...valid, ...misplace(valid.pem as string) }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
-    const e = error as Error;
-    expect(leaks(`${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`)).toBe(false);
+    expect(leaks(shown(error))).toBe(false);
   });
 });
 

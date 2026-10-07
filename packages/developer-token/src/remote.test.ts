@@ -283,6 +283,15 @@ describe("remoteDeveloperToken: runs on browsers older than its newest built-ins
 
 describe("remoteDeveloperToken: reading the answer", () => {
   const token = jwt();
+  // Chosen so the encoded claims contain "-" and "_", which plain base64 decoding does not understand.
+  const urlSafe = jwt({ exp: NOW_SECONDS + 12 * HOUR_SECONDS, note: "???>>>~~~" });
+  test("a token whose claims use both characters that set base64url apart from base64 is read like any other", async () => {
+    expect(urlSafe.split(".")[1]).toMatch(/-.*_|_.*-/); // or the fixture proves nothing
+    const { fetch, calls } = endpoint({ text: urlSafe });
+    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    expect([await provider({}), await provider({})]).toEqual([urlSafe, urlSafe]);
+    expect(calls).toHaveLength(1); // its exp was understood, so it was cached
+  });
   test.each([
     ["the JWT as text", { text: token }],
     ["the JWT with whitespace around it", { text: `\n  ${token}\r\n` }],
@@ -318,6 +327,9 @@ describe("remoteDeveloperToken: reading the answer", () => {
     ["a token without exp", { text: jwt({ iss: "DEF123GHIJ", iat: NOW_SECONDS }) }],
     ["a token whose exp is a string", { text: jwt({ exp: String(NOW_SECONDS + 60) }) }],
     ["a token whose exp is null", { text: jwt({ exp: null }) }],
+    ["a token whose exp is not finite", { text: `aGVhZGVy.${b64url('{"exp":1e999}')}.c2ln` }],
+    ["a token whose exp is a boolean", { text: jwt({ exp: true }) }],
+    ["a token whose exp is nested", { text: jwt({ claims: { exp: NOW_SECONDS + 60 } }) }],
   ])("%s is DeveloperTokenUnavailable with the answer's status, not a token", async (_name, reply) => {
     const { fetch } = endpoint(reply);
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
@@ -424,6 +436,22 @@ describe("remoteDeveloperToken: the request", () => {
     expect(init).toMatchObject({ cache: "no-store", redirect: "error" });
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect([init.method, init.headers, init.credentials, init.body, init.mode]).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  test.each([
+    ["ten seconds by default", {}, 10_000],
+    ["ten seconds when timeoutMs is undefined", { timeoutMs: undefined }, 10_000],
+    ["the configured timeoutMs", { timeoutMs: 2500 }, 2500],
+  ])("the endpoint is given %s to answer, and fetch is handed that very signal", async (_name, options, expected) => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    try {
+      const { fetch, calls } = endpoint();
+      await remoteDeveloperToken(ENDPOINT, { fetch, ...options })({});
+      expect(timeout).toHaveBeenCalledExactlyOnceWith(expected);
+      expect(calls[0]?.init?.signal).toBe(timeout.mock.results[0]?.value);
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   describe("against a real server, with the real fetch", () => {

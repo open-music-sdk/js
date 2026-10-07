@@ -19,6 +19,7 @@ const MIN_ISSUE_INTERVAL_MS = 60_000;
 /** `flight`, unless `signal` aborts first, in which case its reason is thrown. The flight itself is left running. */
 export async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
   if (signal === undefined) return flight;
+  signal.throwIfAborted(); // an abort that already happened fires no event to wait for
   const settled = new AbortController();
   const aborted = new Promise<void>((resolve) => {
     signal.addEventListener("abort", () => {
