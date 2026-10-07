@@ -27,6 +27,15 @@ function expiry(token: unknown): number | undefined {
   }
 }
 
+/** `new URL` as a value. `URL.parse` would do, but it is newer than the browsers this has to run in. */
+function parse(url: string | URL, base?: string): URL | undefined {
+  try {
+    return new URL(url, base);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * A `developerToken` provider that fetches the token from an endpoint you host, for code that must not hold
  * the private key. The endpoint answers 2xx with the JWT as text, or as JSON `{ "token": "<jwt>" }`.
@@ -43,7 +52,7 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     throw new TypeError(`remoteDeveloperToken: timeoutMs must be a number above 0 and at most ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
   // A relative URL only means something where there is a document to resolve it against.
   const base = (globalThis as { location?: { href?: string } }).location?.href;
-  const endpoint = URL.parse(url, base);
+  const endpoint = parse(url, base);
   if (endpoint?.protocol !== "https:" && endpoint?.protocol !== "http:")
     throw new TypeError(`remoteDeveloperToken: "${String(url)}" is not an http(s) URL; outside a browser it must be absolute`);
   const where = endpoint.origin + endpoint.pathname;

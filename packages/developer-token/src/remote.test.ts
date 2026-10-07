@@ -125,6 +125,31 @@ describe("remoteDeveloperToken: configuration", () => {
   });
 });
 
+describe("remoteDeveloperToken: runs on browsers older than its newest built-ins", () => {
+  // Each of these arrived after 2022 and is missing from browsers still in wide use.
+  const recent: [string, object, string][] = [
+    ["URL.parse", URL, "parse"],
+    ["URL.canParse", URL, "canParse"],
+    ["Promise.withResolvers", Promise, "withResolvers"],
+    ["Array.fromAsync", Array, "fromAsync"],
+    ["AbortSignal.any", AbortSignal, "any"],
+  ];
+
+  test.each(recent)("works without %s", async (_name, owner, method) => {
+    const original = Object.getOwnPropertyDescriptor(owner, method);
+    Reflect.deleteProperty(owner, method);
+    try {
+      const { fetch } = endpoint({ text: jwt() }, { status: 503, text: "" });
+      const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+      expect(await provider({})).toBe(jwt());
+      expect(() => remoteDeveloperToken("javascript:alert(1)", { fetch })).toThrow(TypeError);
+      await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    } finally {
+      if (original) Object.defineProperty(owner, method, original);
+    }
+  });
+});
+
 describe("remoteDeveloperToken: reading the answer", () => {
   const token = jwt();
   test.each([
