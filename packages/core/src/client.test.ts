@@ -392,6 +392,49 @@ describe("retrying", () => {
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
   });
 
+  describe("a connection lost after the headers is a network failure like any other", () => {
+    /** A 200 whose body stream fails with `reason`, or with the request's abort reason when `reason` is "abort". */
+    const broken = (reason: Error | "abort") => (input: RequestInfo | URL) => {
+      const req = input instanceof Request ? input : new Request(input);
+      const stream = new ReadableStream({
+        start(controller) {
+          if (reason === "abort") {
+            req.signal.addEventListener("abort", () => {
+              controller.error(req.signal.reason as Error);
+            });
+          } else controller.error(reason);
+        },
+      });
+      return Promise.resolve(new Response(stream, { status: 200 }));
+    };
+
+    test("is NetworkError with the cause, and is retried", async () => {
+      const terminated = new TypeError("terminated");
+      let n = 0;
+      const { fetch: good } = fakeFetch({ body: { ok: true } });
+      const fetch = (input: RequestInfo | URL) => (++n === 1 ? broken(terminated)(input) : good(input));
+      const music = createClient({ developerToken: "dev", fetch, retry: quick });
+      expect(await music.request("v1/test")).toEqual({ ok: true });
+      expect(n).toBe(2);
+
+      const dead = createClient({ developerToken: "dev", fetch: broken(terminated), retry: false });
+      const e = await failure(dead.request("v1/catalog/us/songs/1"));
+      expect(e._tag).toBe("NetworkError");
+      expect(e.cause).toBe(terminated);
+      expect(e.message).toBe("GET /v1/catalog/us/songs/1: terminated");
+    });
+
+    test("an abort during the read surfaces untouched", async () => {
+      const music = createClient({ developerToken: "dev", fetch: broken("abort"), retry: quick });
+      const controller = new AbortController();
+      const out = music.request("v1/test", { signal: controller.signal });
+      await new Promise((r) => setImmediate(r));
+      const reason = new Error("navigated away");
+      controller.abort(reason);
+      await expect(out).rejects.toBe(reason);
+    });
+  });
+
   test("retry: false means one attempt", async () => {
     const { music, calls } = client([{ status: 500 }, { body: {} }], { retry: false });
     expect((await failure(music.request("v1/test"))).status).toBe(500);

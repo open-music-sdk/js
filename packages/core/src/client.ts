@@ -145,7 +145,14 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
   }
 
   async function settle<T>(res: Response, init: tRequestInit<T>, user: boolean, url: URL): Promise<tSettled<T>> {
-    const text = await res.text();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (e) {
+      // The connection can drop after the headers arrive; that is a network failure like any other.
+      if (init.signal?.aborted) throw e;
+      return { error: new AppleMusicError("NetworkError", `${init.method ?? "GET"} ${url.pathname}: ${e instanceof Error ? e.message : String(e)}`, { cause: e }) };
+    }
     if (res.ok) {
       if (!text) return { value: undefined as T };
       let value: unknown;
