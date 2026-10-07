@@ -1,10 +1,16 @@
 import { generateKeyPairSync } from "node:crypto";
 import { inspect } from "node:util";
 import { createClient } from "@open-music-sdk/core";
-import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, jwtVerify } from "jose";
+import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { cachedMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
 import { redacted } from "./redacted.js";
+
+// jose as it is, with its key import counted: how often the minter parses the key is part of what it promises.
+vi.mock("jose", async (importOriginal) => {
+  const jose = await importOriginal<typeof import("jose")>();
+  return { ...jose, importPKCS8: vi.fn(jose.importPKCS8) };
+});
 
 const NOW = Date.UTC(2026, 9, 7);
 const NOW_SECONDS = NOW / 1000;
@@ -34,6 +40,7 @@ const at = (ms: number) => {
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date", "performance"], now: NOW });
+  vi.mocked(importPKCS8).mockClear();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -357,6 +364,136 @@ describe("cachedMinter", () => {
     const first = await minter({});
     at(age);
     expect(await minter({ rejected: first })).toBe(first);
+  });
+});
+
+describe("cachedMinter: what it mints is settled when it is created", () => {
+  type tLoose = Record<string, unknown> & { origin?: string[] };
+  /** The caller's own object, which it is free to do anything to once the minter exists. */
+  const mine = (): tLoose => ({ ...valid, ttlSeconds: 3600, origin: ["https://app.example"] });
+  /** Makes the minter mint again, a minute further on each time, and returns what it mints. */
+  let minute = 0;
+  const again = async (minter: ReturnType<typeof cachedMinter>) => {
+    const held = await minter();
+    at(++minute * 60_000);
+    return minter({ rejected: held });
+  };
+  beforeEach(() => {
+    minute = 0;
+  });
+
+  const meddling: [string, (options: tLoose) => void][] = [
+    ["a longer ttlSeconds", (o) => (o.ttlSeconds = 15_000_000)],
+    ["another teamId", (o) => (o.teamId = "ZZZZZZZZZZ")],
+    ["another keyId", (o) => (o.keyId = "ZZZZZZZZZZ")],
+    ["an origin pushed onto its list", (o) => o.origin?.push("https://someone-else.example")],
+    ["its list of origins emptied in place", (o) => o.origin?.splice(0)],
+    ["its list of origins replaced", (o) => (o.origin = ["https://someone-else.example"])],
+    ["its origin deleted", (o) => delete o.origin],
+    ["its pem cleared", (o) => (o.pem = undefined)],
+    ["its pem replaced with something that is no key", (o) => (o.pem = "not a key")],
+    ["values no minter would accept", (o) => Object.assign(o, { teamId: "", keyId: 42, ttlSeconds: -1, origin: [] })],
+    [
+      "every property deleted",
+      (o) => {
+        for (const k of Object.keys(o)) Reflect.deleteProperty(o, k);
+      },
+    ],
+  ];
+
+  describe.each([
+    ["before the minter is first used", true],
+    ["after the minter has minted", false],
+  ])("the caller's object changed %s", (_when, early) => {
+    test.each(meddling)("%s changes no token the minter goes on to mint", async (_name, meddle) => {
+      const options = mine();
+      const minter = cachedMinter(options as unknown as tMintOptions);
+      if (!early) await minter();
+      meddle(options);
+      for (const token of [await minter(), await again(minter), await again(minter)]) {
+        const { header, claims } = await read(token);
+        expect({ kid: header.kid, iss: claims.iss, origin: claims.origin, life: (claims.exp ?? 0) - (claims.iat ?? 0) }).toEqual({
+          kid: "ABC123DEFG",
+          iss: "DEF123GHIJ",
+          origin: ["https://app.example"],
+          life: 3600,
+        });
+      }
+    });
+  });
+
+  test("two minters made from one object, changed in between, each keep what they were given", async () => {
+    const options = mine();
+    const first = cachedMinter(options as unknown as tMintOptions);
+    options.ttlSeconds = 7200;
+    options.origin = ["https://other.example"];
+    const second = cachedMinter(options as unknown as tMintOptions);
+    const [a, b] = [await read(await first()), await read(await second())];
+    expect([(a.claims.exp ?? 0) - (a.claims.iat ?? 0), a.claims.origin]).toEqual([3600, ["https://app.example"]]);
+    expect([(b.claims.exp ?? 0) - (b.claims.iat ?? 0), b.claims.origin]).toEqual([7200, ["https://other.example"]]);
+  });
+});
+
+describe("cachedMinter: the key is parsed once and the PEM not gone back to", () => {
+  /** Makes the minter mint a new token `times` times, a minute apart. */
+  async function mintAgain(minter: ReturnType<typeof cachedMinter>, times: number) {
+    let held = await minter();
+    for (let i = 1; i <= times; i++) {
+      at(i * 60_000);
+      held = await minter({ rejected: held });
+    }
+  }
+
+  test("nothing is parsed until a token is wanted", () => {
+    cachedMinter(valid);
+    expect(importPKCS8).not.toHaveBeenCalled();
+  });
+
+  test.each([1, 2, 5])("after %i further mints the key has still been imported once", async (times) => {
+    const minter = cachedMinter(valid);
+    await mintAgain(minter, times);
+    expect(importPKCS8).toHaveBeenCalledTimes(1);
+  });
+
+  test("callers arriving together on a new minter cause one import", async () => {
+    const minter = cachedMinter(valid);
+    await Promise.all([minter(), minter(), minter()]);
+    expect(importPKCS8).toHaveBeenCalledTimes(1);
+  });
+
+  test("a key that cannot be imported is tried again on the next call, not remembered as broken", async () => {
+    const minter = cachedMinter({ ...valid, pem: "not a key" });
+    await expect(minter()).rejects.toThrow(TypeError);
+    await expect(minter()).rejects.toThrow(TypeError);
+    expect(importPKCS8).toHaveBeenCalledTimes(2);
+  });
+
+  test("an import that fails once for a reason of the moment does not cost the minter its key", async () => {
+    vi.mocked(importPKCS8).mockRejectedValueOnce(new Error("crypto busy"));
+    const minter = cachedMinter(valid);
+    await expect(minter()).rejects.toThrow(TypeError);
+    await read(await minter());
+    expect(importPKCS8).toHaveBeenCalledTimes(2);
+  });
+
+  test("the imported key can sign and cannot be exported", async () => {
+    await cachedMinter(valid)();
+    const key = (await vi.mocked(importPKCS8).mock.results[0]?.value) as CryptoKey;
+    expect([key.type, key.extractable, key.usages]).toEqual(["private", false, ["sign"]]);
+  });
+
+  test("a redacted key is opened once, when the minter is created, and never again", async () => {
+    const unwrap = vi.fn(() => valid.pem as string);
+    const minter = cachedMinter({ ...valid, pem: { unwrap, toString: () => "<redacted>", toJSON: () => "<redacted>" } });
+    expect(unwrap).toHaveBeenCalledTimes(1);
+    await mintAgain(minter, 3);
+    expect(unwrap).toHaveBeenCalledTimes(1);
+  });
+
+  test("mintDeveloperToken, which keeps nothing, imports the key each time it is called", async () => {
+    await mintDeveloperToken(valid);
+    await mintDeveloperToken(valid);
+    expect(importPKCS8).toHaveBeenCalledTimes(2);
   });
 });
 

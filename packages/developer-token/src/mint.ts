@@ -51,8 +51,19 @@ function isOrigin(value: unknown): boolean {
   }
 }
 
-/** Checks everything that can be checked without parsing the key, and returns the PEM and the lifetime. */
-function check(options: tMintOptions): { pem: string; ttlSeconds: number } {
+/** What goes into a token, apart from the key. */
+interface tClaims {
+  readonly teamId: string;
+  readonly keyId: string;
+  readonly ttlSeconds: number;
+  readonly origin: readonly string[] | undefined;
+}
+
+/**
+ * Checks everything that can be checked without parsing the key, and returns it as values of its own: nothing the
+ * caller does to its object, or to the origin list inside it, reaches a later mint.
+ */
+function check(options: tMintOptions): tClaims & { readonly pem: string } {
   if (typeof options !== "object" || (options as unknown) === null) throw new TypeError(`developer token: expected an options object with pem, teamId and keyId; got ${got(options)}`);
   const { teamId, keyId, ttlSeconds = DEFAULT_TTL_SECONDS, origin } = options;
   const key = pemOf(options.pem);
@@ -60,6 +71,7 @@ function check(options: tMintOptions): { pem: string; ttlSeconds: number } {
   id("keyId", keyId);
   if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > MAX_TTL_SECONDS)
     throw new TypeError(`developer token: ttlSeconds must be an integer from 1 to ${String(MAX_TTL_SECONDS)}, got ${String(ttlSeconds)}`);
+  let origins: string[] | undefined;
   if (origin !== undefined) {
     // An empty list is refused rather than sent: whether Apple reads it as "no origin" or "any origin" is undocumented.
     if (!Array.isArray(origin) || origin.length === 0) throw new TypeError("developer token: origin must be a non-empty array; omit it for no restriction");
@@ -67,25 +79,28 @@ function check(options: tMintOptions): { pem: string; ttlSeconds: number } {
     for (let i = 0; i < origin.length; i++)
       if (!isOrigin(origin[i]))
         throw new TypeError(`developer token: origin[${String(i)}] must be a web origin such as https://app.example: scheme, host and port, with no path or trailing slash`);
+    origins = Array.from(origin as readonly string[]); // a list of the minter's own, which the caller's later changes do not reach
   }
   // An environment variable often carries the PEM with its line breaks escaped; a PEM has no backslashes of its own.
   // jose insists the armor is the very first thing, so a stray newline or a byte order mark is trimmed away.
-  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), ttlSeconds };
+  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), teamId, keyId, ttlSeconds, origin: origins };
 }
 
-async function issue(options: tMintOptions): Promise<tIssued> {
-  const { pem, ttlSeconds } = check(options);
-  let key;
+/** The PEM as a key that can sign and cannot be exported. */
+async function importKey(pem: string): Promise<CryptoKey> {
   try {
-    key = await importPKCS8(pem, "ES256");
+    return await importPKCS8(pem, "ES256");
   } catch (e) {
     throw new TypeError("developer token: pem is not a PKCS8 P-256 private key (expected the contents of AuthKey_XXXXXXXXXX.p8)", { cause: e });
   }
+}
+
+async function sign(key: CryptoKey, { teamId, keyId, ttlSeconds, origin }: tClaims): Promise<tIssued> {
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + ttlSeconds;
-  const token = await new SignJWT(options.origin ? { origin: options.origin } : {})
-    .setProtectedHeader({ alg: "ES256", kid: options.keyId })
-    .setIssuer(options.teamId)
+  const token = await new SignJWT(origin ? { origin } : {})
+    .setProtectedHeader({ alg: "ES256", kid: keyId })
+    .setIssuer(teamId)
     .setIssuedAt(iat)
     .setExpirationTime(exp)
     .sign(key);
@@ -93,13 +108,23 @@ async function issue(options: tMintOptions): Promise<tIssued> {
 }
 
 /** Signs a developer token: an ES256 JWT with `iss`, `iat`, `exp`, and optionally `origin`. */
-export const mintDeveloperToken = async (options: tMintOptions): Promise<string> => (await issue(options)).token;
+export async function mintDeveloperToken(options: tMintOptions): Promise<string> {
+  const { pem, ...claims } = check(options);
+  return (await sign(await importKey(pem), claims)).token;
+}
 
 /**
  * A `developerToken` provider that mints on first use and reuses the token until shortly before it expires.
  * Concurrent requests share one mint, and a token Apple answers 401 to is replaced.
+ *
+ * The options are read once, here. The key is imported on first use and the PEM let go of: from then on the
+ * minter holds a key that can sign and cannot be exported, and no copy of the text it came from.
  */
 export function cachedMinter(options: tCachedMinterOptions): tDeveloperTokenProvider {
-  check(options);
-  return cached(() => issue(options), options.refreshAheadSeconds);
+  const { pem, ...claims } = check(options);
+  let key: string | CryptoKey = pem; // the PEM until it has been imported, then the key in its place
+  return cached(async () => {
+    if (typeof key === "string") key = await importKey(key);
+    return sign(key, claims);
+  }, options.refreshAheadSeconds);
 }

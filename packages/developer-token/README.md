@@ -88,6 +88,11 @@ Invalid options throw a `TypeError`: from `cachedMinter` when it is created, fro
 as a rejection. A key that is not a PKCS8 P-256 private key is a `TypeError` on first use; the key is
 never quoted in an error. The private key stays where you put it: only the signed token travels.
 
+`cachedMinter` reads its options once, when it is created, so nothing you do to your object afterwards
+changes what it mints. It imports the key on first use into a form that can sign and cannot be
+exported, and from then on holds no copy of the PEM text. The text is still wherever you got it from,
+`process.env` included.
+
 ## Your token endpoint
 
 A developer token is a bearer credential for your whole team's quota, and an endpoint that hands one
