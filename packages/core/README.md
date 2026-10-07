@@ -40,6 +40,10 @@ try {
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
 | `parseRetryAfter(header)` | Seconds or HTTP date to milliseconds |
 
+`isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
+with a string `_tag`, not by constructor. An error is recognised whichever copy of this package made
+it, so two versions installed side by side do not break your error handling.
+
 ## How a request is handled
 
 - `path` is `v1/...`, `/v1/...`, or a `next` subpath from a previous response.
