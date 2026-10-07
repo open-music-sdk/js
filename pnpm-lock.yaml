@@ -244,11 +244,10 @@ importers:
   packages/types: {}
 
   packages/user-token:
-    dependencies:
+    devDependencies:
       '@open-music-sdk/core':
         specifier: workspace:*
         version: link:../core
-    devDependencies:
       tooling-tsdown-config:
         specifier: workspace:*
         version: link:../../tooling/tsdown-config

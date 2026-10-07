@@ -37,10 +37,11 @@
     "lint": "eslint --flag unstable_native_nodejs_ts_config .",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@open-music-sdk/core": "workspace:*"
+  "peerDependencies": {
+    "@open-music-sdk/core": "workspace:^"
   },
   "devDependencies": {
+    "@open-music-sdk/core": "workspace:*",
     "tooling-tsdown-config": "workspace:*",
     "tooling-vitest-config": "workspace:*",
     "tsdown": "catalog:",
