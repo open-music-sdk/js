@@ -109,7 +109,7 @@ the rest of the request, so a hook that prints requests prints the token.
 `remoteDeveloperToken(url)` expects your endpoint to answer 2xx with the JWT as text or as JSON
 `{ "token": "<jwt>" }`. It reads `exp` from the token to know when to fetch again and does not verify
 the signature; Apple does. The request is a plain `GET` with `cache: "no-store"` and a timeout
-(`timeoutMs`, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
+(`timeoutMs`, whole milliseconds, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
 your `fetch` does not pass the abort signal on.
 
 The answer is read up to 16 KB and no further, counted after any decompression; the rest is cancelled.

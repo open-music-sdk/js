@@ -100,6 +100,18 @@ describe("remoteDeveloperToken: configuration", () => {
   test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31, "1000" as unknown as number])("refuses timeoutMs %s", (timeoutMs) => {
     expect(() => remoteDeveloperToken(ENDPOINT, { fetch: endpoint().fetch, timeoutMs })).toThrow(TypeError);
   });
+
+  // A timer takes whole milliseconds: Node throws at a fraction on every use, and a browser rounds it down.
+  test.each([0.5, 0.999, 1.5, 1500.5, 10_000 / 3, 2 ** 31 - 1.5])("refuses a timeoutMs that is not a whole number, %s, when the provider is created", (timeoutMs) => {
+    const { fetch, calls } = endpoint();
+    expect(() => remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs })).toThrow(TypeError);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([1, 2, 1500, 10_000, 2 ** 31 - 1])("a timeoutMs the provider accepts, %s, is one the runtime's timer accepts: the first use does not fail for it", async (timeoutMs) => {
+    const { fetch } = endpoint();
+    expect(await remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs })({})).toBe(jwt());
+  });
   test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("refuses refreshAheadSeconds %s", (refreshAheadSeconds) => {
     expect(() => remoteDeveloperToken(ENDPOINT, { fetch: endpoint().fetch, refreshAheadSeconds })).toThrow(TypeError);
   });

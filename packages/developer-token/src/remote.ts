@@ -11,7 +11,7 @@ export interface tRemoteOptions {
   readonly fetch?: typeof fetch | undefined;
   /** Fetch a replacement this long before `exp`, capped at half the token's remaining life. Default one day. */
   readonly refreshAheadSeconds?: number | undefined;
-  /** How long the endpoint may take to answer. Default 10 000; at most 2^31 - 1. */
+  /** How long the endpoint may take to answer, in whole milliseconds. Default 10 000; at most 2^31 - 1. */
   readonly timeoutMs?: number | undefined;
 }
 
@@ -87,8 +87,9 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? 10_000;
   if (typeof fetchImpl !== "function") throw new TypeError(`remoteDeveloperToken: fetch must be a function, got ${typeof fetchImpl}`);
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS)
-    throw new TypeError(`remoteDeveloperToken: timeoutMs must be a number above 0 and at most ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
+  // An integer, because a timer takes nothing else: Node throws at a fraction and a browser rounds it down, to zero if it can.
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS)
+    throw new TypeError(`remoteDeveloperToken: timeoutMs must be an integer from 1 to ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
   /**
    * The endpoint as an absolute URL, or undefined while it is relative and there is nothing to resolve it against.
    * A relative URL resolves against the document's base URL, exactly as fetch would resolve it.
