@@ -5,11 +5,6 @@
 - Node 24 or newer (see `.nvmrc`), pnpm via `corepack enable`.
 - `pnpm install`, then `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`. Each runs through Turborepo.
 
-## Changes to published packages
-
-Add a changeset with `pnpm changeset`. Every package in the `@open-music-sdk/*` family shares one version,
-so any changeset bumps the whole family on the next release.
-
 ## Developer Certificate of Origin
 
 Instead of a contributor license agreement, every commit must be signed off under the
