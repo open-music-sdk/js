@@ -122,12 +122,21 @@ describe("request: params", () => {
     expect(new URL(url() ?? "").searchParams.get(key)).toBe(value);
   });
 
-  test("drops undefined values and sends nothing when there are none", async () => {
+  test.each([
+    ["undefined", undefined],
+    ["null", null],
+  ])("a %s value means the parameter is absent", async (_, absent) => {
     const { music, url } = client();
-    await music.request("v1/catalog/us/search", { params: { term: "x", l: undefined } });
+    await music.request("v1/catalog/us/search", { params: { term: "x", l: absent, include: absent, limit: absent } });
     expect(new URL(url(0) ?? "").search).toBe("?term=x");
-    await music.request("v1/catalog/us/search", { params: {} });
+    await music.request("v1/catalog/us/search", { params: { l: absent } });
     expect(new URL(url(1) ?? "").search).toBe("");
+  });
+
+  test("an empty params object sends no query", async () => {
+    const { music, url } = client();
+    await music.request("v1/catalog/us/search", { params: {} });
+    expect(new URL(url() ?? "").search).toBe("");
   });
 
   test("adds to a query the path already carries", async () => {

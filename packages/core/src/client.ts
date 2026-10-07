@@ -22,8 +22,8 @@ export interface tUserTokenStore {
   delete(userId: string): Promise<void>;
 }
 
-/** Query parameters. Arrays join with commas (`include=albums,artists`); undefined values are dropped. */
-export type tParams = Readonly<Record<string, string | number | boolean | readonly (string | number)[] | undefined>>;
+/** Query parameters. Arrays join with commas (`include=albums,artists`); null and undefined values are dropped. */
+export type tParams = Readonly<Record<string, string | number | boolean | readonly (string | number)[] | null | undefined>>;
 
 /** Anything with a Standard Schema `validate`, such as the validators in @open-music-sdk/validate. */
 export interface tSchemaLike<T> {
@@ -111,7 +111,7 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     // not a scheme-relative one (the URL parser also reads `\\host` as one), not a downgrade to http.
     if (url.origin !== BASE_ORIGIN) throw new TypeError(`Refusing to send Apple Music credentials to ${url.origin}: path ${JSON.stringify(path)} leaves ${BASE_ORIGIN}`);
     for (const [k, v] of Object.entries(init.params ?? {}))
-      if (v !== undefined) url.searchParams.set(k, typeof v === "object" ? v.join(",") : String(v));
+      if (v != null) url.searchParams.set(k, typeof v === "object" ? v.join(",") : String(v));
     const user = init.user ?? isUserPath(url.pathname);
     if (user && !userToken)
       throw new AppleMusicError("UserTokenInvalid", `${url.pathname} needs a Music User Token; pass userToken, or use as() or forUser()`);
