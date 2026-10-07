@@ -235,14 +235,22 @@ describe("cachedMinter", () => {
     expect(claims).toEqual({ iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_SECONDS + 150 * DAY_SECONDS, origin: ["https://example.com"] });
   });
 
-  test("replaces the token a day before it expires by default", async () => {
+  /** The token the minter hands out once the one being signed in the background has replaced `previous`. */
+  const next = (minter: () => Promise<string>, previous: string) =>
+    vi.waitFor(async () => {
+      const token = await minter();
+      expect(token).not.toBe(previous);
+      return token;
+    });
+
+  test("a day before a token expires, by default, the next is signed in the background and then handed out", async () => {
     const minter = cachedMinter(valid);
     const first = await minter({});
     at(149 * DAY_SECONDS * 1000 - 1);
     expect(await minter({})).toBe(first);
     at(149 * DAY_SECONDS * 1000);
-    const second = await minter({});
-    expect(second).not.toBe(first);
+    expect(await minter({})).toBe(first); // good for another day, so nobody waits for the new one
+    const second = await next(minter, first);
     expect((await read(second)).claims.iat).toBe(NOW_SECONDS + 149 * DAY_SECONDS);
   });
 
@@ -256,7 +264,8 @@ describe("cachedMinter", () => {
     at(after * 1000 - 1);
     expect(await minter({})).toBe(first);
     at(after * 1000);
-    expect(await minter({})).not.toBe(first);
+    expect(await minter({})).toBe(first);
+    await next(minter, first);
   });
 
   test("replaces a token Apple rejected once it has been in use, and only that one", async () => {

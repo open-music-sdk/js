@@ -35,8 +35,9 @@ async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undefined): 
 }
 
 /**
- * A token provider over `issue` that issues once and reuses the token until `refreshAheadSeconds` before
- * it expires, or until Apple rejects it. Concurrent callers share one issue. Failures are not cached.
+ * A token provider over `issue` that issues once and reuses the token. From `refreshAheadSeconds` before it
+ * expires the token is replaced in the background while it keeps being handed out; only when there is no
+ * usable token does a caller wait for one, or see the failure to get one. Concurrent callers share one issue.
  *
  * The margin never exceeds half of the life a token had left when it arrived, so a short-lived token is
  * still reused rather than replaced on every call. While a usable token is held, the source is asked at
@@ -65,8 +66,6 @@ export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_
     }
   };
 
-  // ponytail: a failed refresh inside the margin throws although the old token still works;
-  // serve it stale and refresh in the background if token-endpoint outages start to bite.
   return async ({ signal, rejected } = {}) => {
     signal?.throwIfAborted();
     if (current !== undefined && Date.now() < current.expiresAt) {
@@ -75,17 +74,23 @@ export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_
       // An issue already under way is joined. A new one is started only once the interval has passed.
       const mayAsk = flight !== undefined || performance.now() - askedAt >= MIN_ISSUE_INTERVAL_MS;
       if (!replacementWanted || !mayAsk) return held;
-      if (held === rejected) {
-        // Apple's 401 does not prove the token bad (under /v1/me it can be about the listener), so when no
-        // replacement can be had the held token stays the best there is.
-        try {
-          return await orAbort((flight ??= refresh()), signal);
-        } catch {
-          signal?.throwIfAborted();
-          return held;
-        }
+      if (held !== rejected) {
+        // Refreshing ahead: the held token is good until its exp, so nobody waits for the replacement and
+        // a failure to get one disturbs nobody. It is asked for again in a minute.
+        if (flight === undefined) (flight = refresh()).catch(ignore);
+        return held;
+      }
+      // Apple's 401 does not prove the token bad (under /v1/me it can be about the listener), so when no
+      // replacement can be had the held token stays the best there is.
+      try {
+        return await orAbort((flight ??= refresh()), signal);
+      } catch {
+        signal?.throwIfAborted();
+        return held;
       }
     }
     return orAbort((flight ??= refresh()), signal);
   };
 }
+
+const ignore = () => undefined;

@@ -56,6 +56,9 @@ const brokenBody = () =>
     },
   });
 
+/** Lets a fetch that is under way in the background finish. */
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
 /** Moves time to `ms` after the start, on the wall clock and the monotonic clock together. */
 const at = (ms: number) => {
   vi.advanceTimersByTime(NOW + ms - Date.now());
@@ -395,7 +398,7 @@ describe("remoteDeveloperToken: the request", () => {
 });
 
 describe("remoteDeveloperToken: reuse", () => {
-  test("a token is reused until the refresh point before its exp, then fetched again", async () => {
+  test("a token is reused until the refresh point before its exp, then fetched again while it is still handed out", async () => {
     const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(24 * HOUR_SECONDS, "2")];
     const { fetch, calls } = endpoint({ text: first }, { json: { token: second } });
     const provider = remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS });
@@ -403,6 +406,9 @@ describe("remoteDeveloperToken: reuse", () => {
     at(11 * HOUR_SECONDS * 1000 - 1);
     expect(await provider({})).toBe(first);
     at(11 * HOUR_SECONDS * 1000);
+    expect(await provider({})).toBe(first);
+    expect(calls).toHaveLength(2);
+    await flush();
     expect(await provider({})).toBe(second);
     expect(calls).toHaveLength(2);
   });
@@ -492,6 +498,33 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
     expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
     expect(sent).toHaveLength(2);
     expect(tokenCalls).toHaveLength(2);
+  });
+
+  test("an endpoint that is down while a token is refreshed ahead costs requests nothing", async () => {
+    const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(24 * HOUR_SECONDS, "2")];
+    const { fetch, sent, tokenCalls } = world([{ text: first }, new TypeError("fetch failed"), { status: 503, text: "" }, { text: second }], []);
+    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
+    await music.request("v1/test");
+    for (const minute of [0, 1, 2]) {
+      at((11 * HOUR_SECONDS + minute * 60) * 1000);
+      await music.request("v1/test"); // each succeeds with the held token; the endpoint is tried once per minute behind it
+      await flush();
+    }
+    await music.request("v1/test");
+    expect(sent).toEqual([first, first, first, first, second].map((token) => `Bearer ${token}`));
+    expect(tokenCalls).toHaveLength(4);
+  });
+
+  test("an endpoint that is still down when the token expires fails the request then, as DeveloperTokenUnavailable", async () => {
+    const { fetch, sent } = world([{ text: expiring(12 * HOUR_SECONDS, "1") }, new TypeError("fetch failed"), new TypeError("fetch failed")], []);
+    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
+    await music.request("v1/test");
+    at(11 * HOUR_SECONDS * 1000);
+    await music.request("v1/test");
+    await flush();
+    at(12 * HOUR_SECONDS * 1000);
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenUnavailable");
+    expect(sent).toHaveLength(2);
   });
 
   test("when Apple rejects everything, the endpoint is asked once a minute and each request reaches Apple once", async () => {

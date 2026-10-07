@@ -25,6 +25,9 @@ const outcome = (p: Promise<string>) =>
     (error: unknown) => ({ error }),
   );
 
+/** Lets a replacement that is under way in the background finish. */
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
 /** Moves time to `ms` after the start, on the wall clock and the monotonic clock together. */
 const at = (ms: number) => {
   vi.advanceTimersByTime(NOW + ms - Date.now());
@@ -96,9 +99,12 @@ describe("cached: a token is replaced before it expires", () => {
     expect(await provider({})).toBe("t1");
     at(refreshAfter - 1);
     expect(await provider({})).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(1);
     at(refreshAfter);
-    expect(await provider({})).toBe("t2");
+    await provider({});
     expect(issue).toHaveBeenCalledTimes(2);
+    await flush();
+    expect(await provider({})).toBe("t2");
   });
 
   test("concurrent calls at the refresh point share one issue", async () => {
@@ -106,7 +112,125 @@ describe("cached: a token is replaced before it expires", () => {
     const provider = cached(issue, 3600);
     await provider({});
     at(9 * HOUR);
-    expect(await Promise.all([provider({}), provider({}), provider({})])).toEqual(["t2", "t2", "t2"]);
+    await Promise.all([provider({}), provider({}), provider({})]);
+    await flush();
+    expect(await provider({})).toBe("t2");
+    expect(issue).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("cached: past its refresh point a token keeps working while it is replaced", () => {
+  /** A provider holding t1, which lives ten hours and is due for replacement an hour before that. */
+  function held(issue: () => Promise<tIssued>) {
+    const provider = cached(issue, 3600);
+    const first = provider({});
+    return { provider, first };
+  }
+  const t1 = { token: "t1", expiresAt: NOW + 10 * HOUR };
+  const t2 = { token: "t2", expiresAt: NOW + 20 * HOUR };
+
+  test("the call that finds it due gets the held token at once, and the replacement serves the calls after it", async () => {
+    const { issue, pending } = manual();
+    const { provider, first } = held(issue);
+    pending[0]?.resolve(t1);
+    await first;
+    at(9 * HOUR);
+    expect(await provider({})).toBe("t1"); // resolved although the replacement is still pending
+    expect(issue).toHaveBeenCalledTimes(2);
+    pending[1]?.resolve(t2);
+    await flush();
+    expect(await provider({})).toBe("t2");
+  });
+
+  test("calls made while the replacement is under way get the held token and start no second issue", async () => {
+    const { issue, pending } = manual();
+    const { provider, first } = held(issue);
+    pending[0]?.resolve(t1);
+    await first;
+    at(9 * HOUR);
+    expect([await provider({}), await provider({}), await provider({ signal: new AbortController().signal })]).toEqual(["t1", "t1", "t1"]);
+    expect(issue).toHaveBeenCalledTimes(2);
+  });
+
+  test("a replacement that fails disturbs nobody: no call rejects and nothing goes unhandled", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const { issue, pending } = manual();
+    const { provider, first } = held(issue);
+    pending[0]?.resolve(t1);
+    await first;
+    at(9 * HOUR);
+    const during = provider({});
+    pending[1]?.reject(new Error("source down"));
+    await flush();
+    process.off("unhandledRejection", unhandled);
+    expect([await during, await provider({})]).toEqual(["t1", "t1"]);
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  test("after a failed replacement the source is left alone for a minute, then asked again", async () => {
+    const issue = issuer(10 * HOUR);
+    const provider = cached(issue, 3600);
+    await provider({});
+    issue.mockRejectedValue(new Error("source down"));
+    at(9 * HOUR);
+    for (const ms of [0, 1000, 30_000, MINUTE - 1]) {
+      at(9 * HOUR + ms);
+      expect(await provider({})).toBe("t1");
+      await flush();
+    }
+    expect(issue).toHaveBeenCalledTimes(2);
+    at(9 * HOUR + MINUTE);
+    expect(await provider({})).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(3);
+  });
+
+  test("an outage of the source that ends before exp is never seen by a caller", async () => {
+    const issue = issuer(10 * HOUR);
+    const provider = cached(issue, 3600);
+    await provider({});
+    issue.mockRejectedValue(new Error("source down"));
+    const seen: string[] = [];
+    for (let minute = 0; minute < 45; minute++) {
+      at(9 * HOUR + minute * MINUTE);
+      if (minute === 40) issue.mockImplementation(() => Promise.resolve({ token: "t2", expiresAt: NOW + 30 * HOUR }));
+      seen.push(await provider({}));
+      await flush();
+    }
+    expect(new Set(seen.slice(0, 41))).toEqual(new Set(["t1"])); // the call that started the good replacement still got t1
+    expect(new Set(seen.slice(41))).toEqual(new Set(["t2"]));
+  });
+
+  test("it stops at exp: from then the token is not handed out, callers wait, and a failure is theirs to see", async () => {
+    const issue = issuer(10 * HOUR);
+    const provider = cached(issue, 3600);
+    await provider({});
+    issue.mockRejectedValue(new Error("source down"));
+    at(10 * HOUR - 1);
+    expect(await provider({})).toBe("t1");
+    await flush();
+    at(10 * HOUR);
+    await expect(provider({})).rejects.toThrow("source down");
+  });
+
+  test("a token due for replacement that Apple also rejects is replaced before that call returns", async () => {
+    const issue = issuer(10 * HOUR);
+    const provider = cached(issue, 3600);
+    await provider({});
+    at(9 * HOUR);
+    expect(await provider({ rejected: "t1" })).toBe("t2");
+  });
+
+  test("a caller that joins a background replacement because Apple rejected the token waits for it", async () => {
+    const { issue, pending } = manual();
+    const { provider, first } = held(issue);
+    pending[0]?.resolve(t1);
+    await first;
+    at(9 * HOUR);
+    expect(await provider({})).toBe("t1");
+    const rejectedCall = provider({ rejected: "t1" });
+    pending[1]?.resolve(t2);
+    expect(await rejectedCall).toBe("t2");
     expect(issue).toHaveBeenCalledTimes(2);
   });
 });

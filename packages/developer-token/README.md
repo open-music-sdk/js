@@ -106,9 +106,13 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 
 ## Caching
 
-Both providers issue once and reuse the token until `refreshAheadSeconds` before it expires.
-Concurrent requests share one mint or fetch; an abort ends only the request that aborted. A failure
-is never cached: with no usable token, the next request tries again.
+Both providers issue once and reuse the token. From `refreshAheadSeconds` before its `exp` the token
+is replaced in the background: requests keep getting the old one, nobody waits, and a replacement that
+fails is tried again a minute later. An outage of your token endpoint that ends before `exp` is never
+seen by a request. Only when there is no usable token does a request wait for one, or fail for want of
+one, and then the next request tries again.
+
+Concurrent requests share one mint or fetch; an abort ends only the request that aborted.
 
 When Apple answers 401, `core` asks again with the rejected token, and the provider replaces it if it
 is still the current one. While a usable token is held, though, its source is asked at most once a
