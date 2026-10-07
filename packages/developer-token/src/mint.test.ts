@@ -26,8 +26,13 @@ beforeAll(async () => {
   wrongKeys["a P-256 key in SEC1 rather than PKCS8"] = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey.export({ type: "sec1", format: "pem" }).toString();
 });
 
+/** Moves time to `ms` after the start, on the wall clock and the monotonic clock together. */
+const at = (ms: number) => {
+  vi.advanceTimersByTime(NOW + ms - Date.now());
+};
+
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["Date"], now: NOW });
+  vi.useFakeTimers({ toFake: ["Date", "performance"], now: NOW });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -113,7 +118,7 @@ describe("mintDeveloperToken: the token", () => {
   });
 
   test("iat is in whole seconds even when the clock is between them", async () => {
-    vi.setSystemTime(NOW + 999);
+    at(999);
     const { claims } = await read(await mintDeveloperToken(valid));
     expect(claims.iat).toBe(NOW_SECONDS);
   });
@@ -233,9 +238,9 @@ describe("cachedMinter", () => {
   test("replaces the token a day before it expires by default", async () => {
     const minter = cachedMinter(valid);
     const first = await minter({});
-    vi.setSystemTime(NOW + 149 * DAY_SECONDS * 1000 - 1);
+    at(149 * DAY_SECONDS * 1000 - 1);
     expect(await minter({})).toBe(first);
-    vi.setSystemTime(NOW + 149 * DAY_SECONDS * 1000);
+    at(149 * DAY_SECONDS * 1000);
     const second = await minter({});
     expect(second).not.toBe(first);
     expect((await read(second)).claims.iat).toBe(NOW_SECONDS + 149 * DAY_SECONDS);
@@ -248,20 +253,28 @@ describe("cachedMinter", () => {
   ])("with ttl %i and refreshAhead %s, replaces the token after %i seconds", async (ttlSeconds, refreshAheadSeconds, after) => {
     const minter = cachedMinter({ ...valid, ttlSeconds, refreshAheadSeconds });
     const first = await minter({});
-    vi.setSystemTime(NOW + after * 1000 - 1);
+    at(after * 1000 - 1);
     expect(await minter({})).toBe(first);
-    vi.setSystemTime(NOW + after * 1000);
+    at(after * 1000);
     expect(await minter({})).not.toBe(first);
   });
 
-  test("replaces a token Apple rejected, and only that one", async () => {
+  test("replaces a token Apple rejected once it has been in use, and only that one", async () => {
     const minter = cachedMinter(valid);
     const first = await minter({});
+    at(60_000);
     expect(await minter({ rejected: "some other token" })).toBe(first);
     const second = await minter({ rejected: first });
     expect(second).not.toBe(first);
     expect(await minter({ rejected: first })).toBe(second);
     await read(second);
+  });
+
+  test.each([0, 1000, 59_999])("does not mint again for a token Apple rejects %i ms after it was minted: the same key would sign the same claims", async (age) => {
+    const minter = cachedMinter(valid);
+    const first = await minter({});
+    at(age);
+    expect(await minter({ rejected: first })).toBe(first);
   });
 });
 
@@ -290,11 +303,23 @@ describe("cachedMinter as a client's developerToken", () => {
     const { fetch, sent } = apple(200, 401, 200, 200);
     const music = createClient({ developerToken: cachedMinter(valid), fetch, retry: false });
     await music.request("v1/test");
+    at(5 * 60_000);
     await music.request("v1/test");
     await music.request("v1/test");
     expect(sent[1]).toBe(sent[0]);
     expect(sent[2]).not.toBe(sent[0]);
     expect(sent[3]).toBe(sent[2]);
     await read((sent[2] ?? "").slice(7));
+  });
+
+  test("when Apple rejects everything, as with a revoked key, each request reaches Apple once and one token is minted a minute", async () => {
+    const { fetch, sent } = apple(...Array.from({ length: 400 }, () => 401));
+    const music = createClient({ developerToken: cachedMinter(valid), fetch, retry: false });
+    for (let second = 0; second < 120; second++) {
+      at(second * 1000);
+      await expect(music.request("v1/test")).rejects.toMatchObject({ _tag: "DeveloperTokenRejected" });
+    }
+    expect(new Set(sent).size).toBe(2); // the first token, and the one minted at one minute
+    expect(sent).toHaveLength(121); // one per request, plus the single resend that carried the new token
   });
 });

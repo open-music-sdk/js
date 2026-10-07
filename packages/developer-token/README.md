@@ -107,9 +107,19 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 ## Caching
 
 Both providers issue once and reuse the token until `refreshAheadSeconds` before it expires.
-Concurrent requests share one mint or fetch; an abort ends only the request that aborted. When Apple
-answers 401, `core` asks again with the rejected token, and the provider replaces it if it is still
-the current one. A failure is never cached: the next request tries again.
+Concurrent requests share one mint or fetch; an abort ends only the request that aborted. A failure
+is never cached: with no usable token, the next request tries again.
+
+When Apple answers 401, `core` asks again with the rejected token, and the provider replaces it if it
+is still the current one. While a usable token is held, though, its source is asked at most once a
+minute:
+
+- A token Apple rejects within a minute of being issued is handed back, not replaced. The same key or
+  endpoint would only produce the same again, so a revoked key, or a 401 that is really about the
+  listener, costs each request one call to Apple rather than two and a mint.
+- If a replacement cannot be had, the held token stays in service.
+- A token that already looks expired when it arrives, as every token does to a browser whose clock
+  runs fast, is used for a minute rather than fetched again for every request.
 
 ## Not here
 

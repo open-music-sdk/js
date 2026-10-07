@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { cached, type tIssued } from "./cache.js";
 
 const NOW = Date.UTC(2026, 9, 7);
-const HOUR = 3_600_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /** An issuer that hands out t1, t2, … each living for `life` from the moment it is issued. */
@@ -24,8 +25,13 @@ const outcome = (p: Promise<string>) =>
     (error: unknown) => ({ error }),
   );
 
+/** Moves time to `ms` after the start, on the wall clock and the monotonic clock together. */
+const at = (ms: number) => {
+  vi.advanceTimersByTime(NOW + ms - Date.now());
+};
+
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["Date"], now: NOW });
+  vi.useFakeTimers({ toFake: ["Date", "performance"], now: NOW });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -45,10 +51,10 @@ describe("cached: validation", () => {
     const issue = issuer(10 * DAY);
     const provider = cached(issue, undefined);
     await provider({});
-    vi.setSystemTime(NOW + 9 * DAY - 1);
+    at(9 * DAY - 1);
     await provider({});
     expect(issue).toHaveBeenCalledTimes(1);
-    vi.setSystemTime(NOW + 9 * DAY);
+    at(9 * DAY);
     await provider({});
     expect(issue).toHaveBeenCalledTimes(2);
   });
@@ -88,34 +94,29 @@ describe("cached: a token is replaced before it expires", () => {
     const issue = issuer(life);
     const provider = cached(issue, refreshAheadSeconds);
     expect(await provider({})).toBe("t1");
-    vi.setSystemTime(NOW + refreshAfter - 1);
+    at(refreshAfter - 1);
     expect(await provider({})).toBe("t1");
-    vi.setSystemTime(NOW + refreshAfter);
+    at(refreshAfter);
     expect(await provider({})).toBe("t2");
     expect(issue).toHaveBeenCalledTimes(2);
-  });
-
-  test("a token that arrives already expired is never reused", async () => {
-    const issue = issuer(-HOUR);
-    const provider = cached(issue);
-    expect([await provider({}), await provider({})]).toEqual(["t1", "t2"]);
   });
 
   test("concurrent calls at the refresh point share one issue", async () => {
     const issue = issuer(10 * HOUR);
     const provider = cached(issue, 3600);
     await provider({});
-    vi.setSystemTime(NOW + 9 * HOUR);
+    at(9 * HOUR);
     expect(await Promise.all([provider({}), provider({}), provider({})])).toEqual(["t2", "t2", "t2"]);
     expect(issue).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("cached: a rejected token is replaced", () => {
-  test("the current token, once rejected, is issued again", async () => {
+  test("the current token, rejected a minute after it was issued, is issued again", async () => {
     const issue = issuer();
     const provider = cached(issue);
     expect(await provider({})).toBe("t1");
+    at(MINUTE);
     expect(await provider({ rejected: "t1" })).toBe("t2");
     expect(await provider({})).toBe("t2");
     expect(issue).toHaveBeenCalledTimes(2);
@@ -125,6 +126,7 @@ describe("cached: a rejected token is replaced", () => {
     const issue = issuer();
     const provider = cached(issue);
     await provider({});
+    at(MINUTE);
     expect(await Promise.all([provider({ rejected: "t1" }), provider({ rejected: "t1" }), provider({ rejected: "t1" })])).toEqual(["t2", "t2", "t2"]);
     expect(await provider({ rejected: "t1" })).toBe("t2");
     expect(issue).toHaveBeenCalledTimes(2);
@@ -134,8 +136,127 @@ describe("cached: a rejected token is replaced", () => {
     const issue = issuer();
     const provider = cached(issue);
     await provider({});
+    at(MINUTE);
     expect(await provider({ rejected })).toBe("t1");
     expect(issue).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("cached: while a usable token is held, its source is asked at most once a minute", () => {
+  test.each([0, 1, 30_000, MINUTE - 1])("a token rejected %i ms after it was issued is handed back, not replaced", async (age) => {
+    const issue = issuer();
+    const provider = cached(issue);
+    await provider({});
+    at(age);
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(1);
+  });
+
+  test("a storm of rejections costs one issue a minute, however many requests are in it", async () => {
+    const issue = issuer();
+    const provider = cached(issue);
+    let token = await provider({});
+    for (let second = 1; second <= 180; second++) {
+      at(second * 1000);
+      // Each of five requests is answered 401 by Apple and asks for a replacement of whatever it was given.
+      for (let i = 0; i < 5; i++) token = await provider({ rejected: token });
+    }
+    expect(issue).toHaveBeenCalledTimes(4); // the first, then one each at 60, 120 and 180 seconds
+    expect(token).toBe("t4");
+  });
+
+  test("a replacement that cannot be had leaves the held token in service, and the source alone for a minute", async () => {
+    const issue = issuer();
+    const provider = cached(issue);
+    await provider({});
+    at(MINUTE);
+    issue.mockRejectedValueOnce(new Error("source down"));
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    expect(await provider({})).toBe("t1");
+    at(2 * MINUTE - 1);
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(2);
+    at(2 * MINUTE);
+    expect(await provider({ rejected: "t1" })).toBe("t2");
+    expect(issue).toHaveBeenCalledTimes(3);
+  });
+
+  test("an abort while a replacement is awaited is the caller's abort, whether or not the replacement then fails", async () => {
+    const { issue, pending } = manual();
+    const provider = cached(issue);
+    const first = provider({});
+    pending[0]?.resolve({ token: "t1", expiresAt: NOW + DAY });
+    await first;
+    at(MINUTE);
+    const controller = new AbortController();
+    const reason = new Error("gone");
+    const waiting = outcome(provider({ rejected: "t1", signal: controller.signal }));
+    controller.abort(reason);
+    pending[1]?.reject(new Error("source down"));
+    expect(await waiting).toEqual({ error: reason });
+  });
+
+  test("a token that looks expired on arrival is used for a minute rather than fetched for every call", async () => {
+    // To this clock the token is an hour past its exp. If the clock is fast the token is fine; if not, Apple says so.
+    const issue = issuer(-HOUR);
+    const provider = cached(issue);
+    for (const ms of [0, 1000, 30_000, MINUTE - 1]) {
+      at(ms);
+      expect(await provider({})).toBe("t1");
+    }
+    expect(issue).toHaveBeenCalledTimes(1);
+    at(MINUTE);
+    expect(await provider({})).toBe("t2");
+    expect(issue).toHaveBeenCalledTimes(2);
+  });
+
+  test("and when Apple rejects it within that minute, it is handed back rather than fetched again", async () => {
+    const issue = issuer(-HOUR);
+    const provider = cached(issue);
+    await provider({});
+    at(1000);
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(1);
+  });
+
+  test("the minute is not shortened by the wall clock stepping forward", async () => {
+    const issue = issuer();
+    const provider = cached(issue);
+    await provider({});
+    vi.setSystemTime(NOW + HOUR);
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    expect(issue).toHaveBeenCalledTimes(1);
+  });
+
+  test("the minute is not lengthened by the wall clock stepping back", async () => {
+    const issue = issuer();
+    const provider = cached(issue);
+    await provider({});
+    vi.setSystemTime(NOW - HOUR);
+    vi.advanceTimersByTime(MINUTE);
+    expect(await provider({ rejected: "t1" })).toBe("t2");
+  });
+});
+
+describe("cached: an expired token is never handed out", () => {
+  test("once past its exp, a token is replaced before anything is returned", async () => {
+    const issue = issuer(HOUR);
+    const provider = cached(issue, 0);
+    expect(await provider({})).toBe("t1");
+    at(HOUR);
+    expect(await provider({})).toBe("t2");
+  });
+
+  test("with nothing usable to fall back on, every call asks the source and a failure is thrown, minute or no minute", async () => {
+    const issue = issuer(HOUR);
+    const provider = cached(issue, 0);
+    await provider({});
+    at(HOUR);
+    issue.mockRejectedValueOnce(new Error("down")).mockRejectedValueOnce(new Error("still down"));
+    await expect(provider({})).rejects.toThrow("down");
+    await expect(provider({ rejected: "t1" })).rejects.toThrow("still down");
+    expect(await provider({})).toBe("t2");
+    expect(issue).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -152,15 +273,6 @@ describe("cached: failures are not cached", () => {
     pending[1]?.resolve({ token: "t1", expiresAt: NOW + DAY });
     expect(await next).toBe("t1");
     expect(issue).toHaveBeenCalledTimes(2);
-  });
-
-  test("a failed replacement leaves the rejected token rejected", async () => {
-    const issue = issuer();
-    const provider = cached(issue);
-    await provider({});
-    issue.mockRejectedValueOnce(new Error("boom"));
-    await expect(provider({ rejected: "t1" })).rejects.toThrow("boom");
-    expect(await provider({ rejected: "t1" })).toBe("t2");
   });
 });
 
