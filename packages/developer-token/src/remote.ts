@@ -57,8 +57,11 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
   const resolve = (): URL | undefined => {
     const scope = globalThis as { document?: { baseURI?: string }; location?: { href?: string } };
     const endpoint = parse(url, scope.document?.baseURI ?? scope.location?.href);
+    // Neither error quotes the URL: its query or its credentials may be secrets, and errors get logged.
     if (endpoint !== undefined && endpoint.protocol !== "https:" && endpoint.protocol !== "http:")
-      throw new TypeError(`remoteDeveloperToken: "${String(url)}" is not an http(s) URL`);
+      throw new TypeError(`remoteDeveloperToken: the URL must be http or https, not ${endpoint.protocol}`);
+    if (endpoint !== undefined && (endpoint.username !== "" || endpoint.password !== ""))
+      throw new TypeError("remoteDeveloperToken: the URL must not carry a username or password; send credentials through the fetch option");
     return endpoint;
   };
   // What can never work is refused now. A relative URL with no document yet is left for the first call, so a
@@ -68,7 +71,7 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
   const issue = async (): Promise<tIssued> => {
     const endpoint = resolve();
     if (endpoint === undefined) throw new TypeError("remoteDeveloperToken: a relative URL needs a document to resolve against; outside a browser, pass an absolute URL");
-    const where = endpoint.origin + endpoint.pathname;
+    const where = endpoint.origin + endpoint.pathname; // no query, no fragment
     let res: Response;
     let body: string;
     try {
@@ -76,7 +79,8 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
       res = await fetchImpl(endpoint, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
       body = (await res.text()).trim();
     } catch (e) {
-      throw new AppleMusicError("NetworkError", `developer token endpoint ${where}: ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      // Only the kind of failure is repeated. A runtime's own message may spell out the whole URL, query included.
+      throw new AppleMusicError("NetworkError", `developer token endpoint ${where} could not be reached (${e instanceof Error ? e.name : typeof e})`, { cause: e });
     }
     if (!res.ok) throw new AppleMusicError("ApiError", `developer token endpoint ${where} answered ${String(res.status)}`, { status: res.status });
     let token: unknown = body;

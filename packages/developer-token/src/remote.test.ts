@@ -105,6 +105,58 @@ describe("remoteDeveloperToken: configuration", () => {
   });
 });
 
+describe("remoteDeveloperToken: what the URL carries stays out of errors", () => {
+  /** Everything an error shows when it is printed, serialised, or inspected, without its cause. */
+  const said = (e: Error) => `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, ["name", "message", "stack", "status"])}`;
+
+  test.each(["https://user:hunter2@app.example/token", "https://user@app.example/token", "https://:hunter2@app.example/token", "http://user:hunter2@localhost:3000/token?session=s3cret"])(
+    "a URL with a username or password is refused when the provider is created: %s",
+    (url) => {
+      expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
+    },
+  );
+
+  test.each([
+    ["credentials", "https://user:hunter2@app.example/token?session=s3cret"],
+    ["a mistyped scheme", "htps://user:hunter2@app.example/token?session=s3cret"],
+    ["a scheme that is not http", "ftp://app.example/hunter2?session=s3cret"],
+    ["a data URL", "data:text/plain,hunter2-s3cret"],
+  ])("refusing a URL with %s does not quote it", (_name, url) => {
+    let error: unknown;
+    try {
+      remoteDeveloperToken(url, { fetch: endpoint().fetch });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(TypeError);
+    expect(said(error as Error)).not.toMatch(/hunter2|s3cret/);
+  });
+
+  test.each([
+    ["a fetch whose error spells out the URL", new TypeError(`error sending request for url (${ENDPOINT}?session=s3cret)`), "TypeError"],
+    ["a timeout", new DOMException(`${ENDPOINT}?session=s3cret timed out`, "TimeoutError"), "TimeoutError"],
+    ["a thrown string", `${ENDPOINT}?session=s3cret` as unknown as Error, "string"],
+  ])("after %s, the message names the endpoint and the kind of failure, never the query", async (_name, thrown, kind) => {
+    const fetch = () => Promise.reject(thrown);
+    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=s3cret#frag`, { fetch })({}));
+    expect(e.message).toContain(ENDPOINT);
+    expect(e.message).toContain(kind);
+    expect(said(e)).not.toContain("s3cret");
+    expect(e.cause).toBe(thrown); // the runtime's own error is kept for whoever needs the detail
+  });
+
+  test.each([
+    ["a refusal", { status: 403, text: "s3cret" }],
+    ["an answer that is not a token", { text: "s3cret" }],
+    ["a token without exp", { text: jwt({ iat: NOW_SECONDS }, "s3cret") }],
+  ])("after %s, the message names the endpoint without its query and never quotes the body", async (_name, reply) => {
+    const { fetch } = endpoint(reply);
+    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=hunter2#frag`, { fetch })({}));
+    expect(e.message).toContain(ENDPOINT);
+    expect(`${said(e)} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`).not.toMatch(/hunter2|s3cret|frag/);
+  });
+});
+
 describe("remoteDeveloperToken: a relative URL resolves the way fetch would resolve it", () => {
   const relative = ["/api/token", "api/token", "../token", "?fresh=1", "", "app.example/api/token", "//app.example/api/token"];
   /** Runs `fn` as if in a page at `page`, whose base URL is `base` when a <base href> moved it. */
@@ -268,17 +320,6 @@ describe("remoteDeveloperToken: reading the answer", () => {
     const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
     expect(e._tag).toBe("ApiError");
     expect(e.status).toBe(status);
-  });
-
-  test("an error names the endpoint without its query, and never quotes the body", async () => {
-    const secret = jwt({ iat: NOW_SECONDS }, "c2VjcmV0");
-    for (const reply of [{ text: secret }, { status: 500, text: secret }]) {
-      const { fetch } = endpoint(reply);
-      const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=hunter2#frag`, { fetch })({}));
-      expect(e.message).toContain(ENDPOINT);
-      expect(e.message).not.toContain("hunter2");
-      expect(`${e.message} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`).not.toContain("c2VjcmV0");
-    }
   });
 });
 
