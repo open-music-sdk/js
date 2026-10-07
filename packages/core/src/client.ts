@@ -6,6 +6,7 @@ import type { tRateLimiter } from "./rate-limit.js";
 import { parseRetryAfter, retry, type tRetryPolicy } from "./retry.js";
 
 const BASE_URL = "https://api.music.apple.com/";
+const BASE_ORIGIN = new URL(BASE_URL).origin;
 
 export interface tTokenContext {
   readonly signal?: AbortSignal | undefined;
@@ -92,7 +93,10 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
   let storefrontPromise: Promise<string> | undefined;
 
   async function request<T>(path: string, init: tRequestInit<T> = {}): Promise<T> {
-    const url = new URL(path.replace(/^\//, ""), BASE_URL);
+    const url = new URL(path, BASE_URL);
+    // Both tokens ride on every request, so nothing may send one anywhere else: not an absolute URL,
+    // not a scheme-relative one (the URL parser also reads `\\host` as one), not a downgrade to http.
+    if (url.origin !== BASE_ORIGIN) throw new TypeError(`Refusing to send Apple Music credentials to ${url.origin}: path ${JSON.stringify(path)} leaves ${BASE_ORIGIN}`);
     for (const [k, v] of Object.entries(init.params ?? {}))
       if (v !== undefined) url.searchParams.set(k, typeof v === "object" ? v.join(",") : String(v));
     const user = init.user ?? isUserPath(url.pathname);

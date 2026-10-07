@@ -58,6 +58,46 @@ describe("request: paths", () => {
   });
 });
 
+describe("request: credentials never leave the Apple origin", () => {
+  const escapes = [
+    "https://evil.example/v1/me/library/songs",
+    "http://api.music.apple.com/v1/test",
+    "https://api.music.apple.com.evil.example/v1/test",
+    "https://api.music.apple.com:8443/v1/test",
+    "//evil.example/v1/test",
+    "///evil.example/v1/test",
+    "\\\\evil.example/v1/test",
+    "/\\/evil.example/v1/test",
+    "ftp://evil.example/v1/test",
+  ];
+
+  test.each(escapes)("request(%s) is refused before any provider or fetch runs", async (path) => {
+    const developerToken = vi.fn(() => "dev");
+    const { music, calls } = client([], { developerToken, userToken: "user" });
+    await expect(music.request(path)).rejects.toThrow(TypeError);
+    expect(developerToken).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each(escapes)("a next link to %s stops paginate", async (next) => {
+    const { music, calls } = client([{ body: { data: [1], next } }], { userToken: "user" });
+    const seen: unknown[] = [];
+    await expect(
+      (async () => {
+        for await (const item of music.paginate("v1/me/library/songs")) seen.push(item);
+      })(),
+    ).rejects.toThrow(TypeError);
+    expect(seen).toEqual([1]);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("an absolute URL on the Apple origin is allowed", async () => {
+    const { music, url } = client();
+    await music.request("https://api.music.apple.com/v1/test");
+    expect(url()).toBe("https://api.music.apple.com/v1/test");
+  });
+});
+
 describe("request: params", () => {
   test.each([
     [{ term: "beach bunny" }, "term", "beach bunny"],
