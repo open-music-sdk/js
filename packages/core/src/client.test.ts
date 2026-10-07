@@ -5,6 +5,9 @@ import { createRateLimiter } from "./rate-limit.js";
 
 type tReply = { status?: number; body?: unknown; text?: string; headers?: Record<string, string> } | Error;
 
+/** Every Response any fake fetch handed out, so the suite can insist each body was read. */
+const responses: Response[] = [];
+
 /** A fetch that answers from a queue of replies and records every Request it saw. */
 function fakeFetch(...replies: tReply[]) {
   const calls: Request[] = [];
@@ -14,7 +17,9 @@ function fakeFetch(...replies: tReply[]) {
     const reply = replies.shift() ?? { status: 200, body: {} };
     if (reply instanceof Error) return Promise.reject(reply);
     const body = reply.text ?? (reply.body === undefined ? null : JSON.stringify(reply.body));
-    return Promise.resolve(new Response(body, { status: reply.status ?? 200, headers: reply.headers ?? {} }));
+    const res = new Response(body, { status: reply.status ?? 200, headers: reply.headers ?? {} });
+    responses.push(res);
+    return Promise.resolve(res);
   };
   return { fetch, calls };
 }
@@ -43,6 +48,9 @@ const failure = async (p: Promise<unknown>): Promise<AppleMusicError> => {
 
 afterEach(() => {
   vi.useRealTimers();
+  // An unread body holds its connection until garbage collection, so no code path may drop one.
+  expect(responses.filter((r) => r.body !== null && !r.bodyUsed)).toEqual([]);
+  responses.length = 0;
 });
 
 describe("request: paths", () => {
@@ -325,6 +333,21 @@ describe("401 and the developer token", () => {
     expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
     expect(developerToken).toHaveBeenCalledTimes(2);
     expect(calls).toHaveLength(2);
+  });
+
+  test("the replaced 401 response is read before the resend", async () => {
+    let n = 0;
+    const { music } = client([apiError(401, "Unauthorized"), { body: {} }], { developerToken: () => `dev${String(++n)}` });
+    await music.request("v1/test");
+    expect(responses.map((r) => r.bodyUsed)).toEqual([true, true]);
+  });
+
+  test("a provider that fails on refresh still leaves the 401 response read", async () => {
+    const boom = new Error("vault down");
+    const developerToken = (ctx: { rejected?: string | undefined }) => (ctx.rejected ? Promise.reject(boom) : Promise.resolve("dev"));
+    const { music } = client([apiError(401, "Unauthorized")], { developerToken });
+    await expect(music.request("v1/test")).rejects.toBe(boom);
+    expect(responses.map((r) => r.bodyUsed)).toEqual([true]);
   });
 
   test("on a user path the message mentions the subscription", async () => {

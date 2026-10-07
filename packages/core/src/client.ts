@@ -80,6 +80,8 @@ export interface tAppleMusicClient {
   forUser(userId: string): tAppleMusicClient;
 }
 
+type tSettled<T> = { readonly value: T; readonly error?: undefined } | { readonly error: AppleMusicError; readonly value?: undefined };
+
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
 const formatIssues = (issues: readonly tValidationIssue[]) =>
@@ -126,33 +128,37 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     return retry(
       async () => {
         const token = await developerToken({ signal });
-        let res = await send(token);
-        if (res.status === 401) {
+        // Every response is settled, even one about to be replaced: settling reads the body, and an
+        // unread body keeps its connection out of the pool until garbage collection.
+        let outcome = await settle(await send(token), init, user, url);
+        if (outcome.error?._tag === "DeveloperTokenRejected") {
           // One chance for a caching provider to replace a stale token; a plain string gets no retry.
           const fresh = await developerToken({ signal, rejected: token });
-          if (fresh !== token) res = await send(fresh);
+          if (fresh !== token) outcome = await settle(await send(fresh), init, user, url);
         }
-        return settle(res, init, user, url);
+        if (outcome.error) throw outcome.error;
+        return outcome.value;
       },
       policy,
       signal,
     );
   }
 
-  async function settle<T>(res: Response, init: tRequestInit<T>, user: boolean, url: URL): Promise<T> {
+  async function settle<T>(res: Response, init: tRequestInit<T>, user: boolean, url: URL): Promise<tSettled<T>> {
     const text = await res.text();
     if (res.ok) {
-      if (!text) return undefined as T;
+      if (!text) return { value: undefined as T };
       let value: unknown;
       try {
         value = JSON.parse(text);
       } catch (e) {
-        throw new AppleMusicError("ApiError", `${String(res.status)} ${url.pathname}: body is not JSON`, { status: res.status, cause: e });
+        return { error: new AppleMusicError("ApiError", `${String(res.status)} ${url.pathname}: body is not JSON`, { status: res.status, cause: e }) };
       }
-      if (!init.schema) return value as T;
+      if (!init.schema) return { value: value as T };
       const result = await init.schema["~standard"].validate(value);
-      if (result.issues) throw new AppleMusicError("ValidationError", `${url.pathname}: ${formatIssues(result.issues)}`, { status: res.status, issues: result.issues });
-      return result.value;
+      if (result.issues)
+        return { error: new AppleMusicError("ValidationError", `${url.pathname}: ${formatIssues(result.issues)}`, { status: res.status, issues: result.issues }) };
+      return { value: result.value };
     }
 
     let errors: readonly tError[] | undefined;
@@ -166,17 +172,19 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     const details = { status: res.status, errors, retryAfterMs: parseRetryAfter(res.headers.get("retry-after")) };
     switch (res.status) {
       case 401:
-        throw new AppleMusicError(
-          "DeveloperTokenRejected",
-          user ? `${message}. Under /v1/me a 401 can also mean the listener is not signed in or not subscribed` : message,
-          details,
-        );
+        return {
+          error: new AppleMusicError(
+            "DeveloperTokenRejected",
+            user ? `${message}. Under /v1/me a 401 can also mean the listener is not signed in or not subscribed` : message,
+            details,
+          ),
+        };
       case 403:
-        throw new AppleMusicError("UserTokenInvalid", message, details);
+        return { error: new AppleMusicError("UserTokenInvalid", message, details) };
       case 429:
-        throw new AppleMusicError("RateLimited", message, details);
+        return { error: new AppleMusicError("RateLimited", message, details) };
       default:
-        throw new AppleMusicError("ApiError", message, details);
+        return { error: new AppleMusicError("ApiError", message, details) };
     }
   }
 
