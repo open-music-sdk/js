@@ -1,5 +1,1 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "lib": ["ES2023", "ESNext.Disposable", "DOM", "DOM.Iterable"] },
-  "include": ["src", "*.config.ts"]
-}
+{ "extends": "../../tsconfig.base.json", "include": ["src", "*.config.ts"] }

@@ -1,8 +1,10 @@
+/// <reference lib="esnext.disposable" />
 // Stores for core's tUserTokenStore: where forUser(userId) finds a listener's Music User Token.
+// Every store here is disposable, so `await using` works whichever one is behind it.
 import type { tUserTokenStore } from "@open-music-sdk/core";
 
 /** Keeps tokens in a Map: for tests, scripts, and single-process servers. Everything is gone on restart. */
-export class MemoryUserTokenStore implements tUserTokenStore {
+export class MemoryUserTokenStore implements tUserTokenStore, AsyncDisposable {
   // Private, so a logged or serialized store shows no tokens.
   readonly #tokens = new Map<string, string>();
 
@@ -20,7 +22,7 @@ export class MemoryUserTokenStore implements tUserTokenStore {
     return Promise.resolve();
   }
 
-  /** Forgets every token. */
+  /** Forgets every token: the Map is all this store holds. */
   dispose(): void {
     this.#tokens.clear();
   }
@@ -39,7 +41,7 @@ export interface tKvNamespace {
 }
 
 /** Keeps each token under `prefix + userId` in a key-value namespace, as the namespace stores it: wrap `kv` to encrypt. */
-export class KvUserTokenStore implements tUserTokenStore {
+export class KvUserTokenStore implements tUserTokenStore, AsyncDisposable {
   readonly #kv: tKvNamespace;
   readonly #prefix: string;
 
@@ -58,5 +60,13 @@ export class KvUserTokenStore implements tUserTokenStore {
 
   async delete(userId: string): Promise<void> {
     await this.#kv.delete(this.#prefix + userId);
+  }
+
+  dispose(): void {
+    // Nothing to release: the namespace belongs to the platform, and the tokens in it outlive this store.
+  }
+
+  [Symbol.asyncDispose](): Promise<void> {
+    return Promise.resolve();
   }
 }
