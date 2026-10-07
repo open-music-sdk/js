@@ -11,9 +11,8 @@ exist. Use `user-token` directly to assemble your own client or to build one of 
 pnpm add @open-music-sdk/user-token @open-music-sdk/core
 ```
 
-`core` is a peer dependency: this package works on the client you create, so it uses your copy of
-`core` rather than bringing its own. If two copies do end up installed, errors are still recognised
-across them.
+Keep the two on the same version. If your app does end up with a different copy of `core` than the
+one this package resolves, nothing breaks: an `AppleMusicError` is recognised whichever copy made it.
 
 ```ts
 import { createClient, isAppleMusicError } from "@open-music-sdk/core";
