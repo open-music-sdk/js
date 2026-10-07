@@ -4,7 +4,7 @@ import type { tRedacted } from "./redacted.js";
 
 /** Invalid values throw a TypeError. */
 export interface tMintOptions {
-  /** The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Escaped `\n` sequences from an environment variable are accepted. */
+  /** The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Line breaks escaped as `\n`, the way an environment variable holds them, are accepted. */
   readonly pem: string | tRedacted<string>;
   /** Your Apple Developer Team ID; becomes `iss`. */
   readonly teamId: string;
@@ -43,9 +43,9 @@ function check({ pem, teamId, keyId, ttlSeconds = DEFAULT_TTL_SECONDS, origin }:
       text(`origin[${String(i)}]`, o);
     });
   }
-  // An environment variable often carries the PEM with its newlines escaped; a PEM has no backslashes of its own.
+  // An environment variable often carries the PEM with its line breaks escaped; a PEM has no backslashes of its own.
   // jose insists the armor is the very first thing, so a stray newline or a byte order mark is trimmed away.
-  return { pem: key.replaceAll("\\n", "\n").trim(), ttlSeconds };
+  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), ttlSeconds };
 }
 
 async function issue(options: tMintOptions): Promise<tIssued> {

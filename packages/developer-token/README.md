@@ -12,21 +12,23 @@ pnpm add @open-music-sdk/developer-token @open-music-sdk/core
 ```
 
 ```ts
-// On a server, a worker, or a CLI: anywhere the .p8 may live.
+// On a server, a worker, or a CLI: anywhere the private key may live.
 import { createClient } from "@open-music-sdk/core";
-import { cachedMinter } from "@open-music-sdk/developer-token";
-import { fromKeyFile } from "@open-music-sdk/developer-token/node";
+import { cachedMinter, fromEnv } from "@open-music-sdk/developer-token";
 
-const developerToken = cachedMinter({
-  pem: await fromKeyFile("./AuthKey_ABC123DEFG.p8"), // or the PEM itself, from a secret binding or an environment variable
-  teamId: "DEF123GHIJ",
-  keyId: "ABC123DEFG",
-});
-const music = createClient({ developerToken, storefront: "us" });
+const key = fromEnv(process.env); // the key and its two IDs, from your .env file or your platform's secrets
+const music = createClient({ developerToken: cachedMinter(key), storefront: "us" });
 
 // A token endpoint for your own front end: short-lived and bound to your origin.
-const forBrowsers = cachedMinter({ pem, teamId, keyId, ttlSeconds: 3600, origin: ["https://app.example"] });
+const forBrowsers = cachedMinter({ ...key, ttlSeconds: 3600, origin: ["https://app.example"] });
 export const GET = async () => new Response(await forBrowsers());
+```
+
+```sh
+# .env
+APPLE_MUSIC_TEAM_ID=DEF123GHIJ
+APPLE_MUSIC_KEY_ID=ABC123DEFG
+APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END PRIVATE KEY-----"
 ```
 
 ```ts
@@ -41,17 +43,34 @@ const music = createClient({ developerToken: remoteDeveloperToken("/api/token"),
 
 | Export | Does |
 | --- | --- |
+| `fromEnv(env, names?)` | Reads the private key, Team ID and key ID from an environment; the key comes back redacted |
 | `mintDeveloperToken(options)` | Signs one ES256 JWT with [`jose`](https://github.com/panva/jose): `kid` in the header, `iss`, `iat`, `exp`, and `origin` if given |
 | `cachedMinter(options)` | A provider that mints on first use, shares one mint between concurrent requests, and mints again before `exp` |
 | `remoteDeveloperToken(url, options?)` | A provider that fetches the token from your endpoint, with the same caching |
 | `redacted(value)` | Wraps a secret so logging, string conversion, and JSON print `<redacted>`; `unwrap()` returns it |
-| `fromKeyFile(path)` from `./node` | Reads the `.p8` from disk, redacted |
+
+## The key
+
+Apple lets you download `AuthKey_XXXXXXXXXX.p8` once. Put its contents in the environment, not in the
+repository: a `.env` file that is never committed for local work, your platform's secret store in
+production. `fromEnv` reads three variables and takes the environment as an argument, so it works with
+whatever loaded it: `node --env-file=.env`, `process.loadEnvFile()`, a framework's own `.env` support, or
+the `env` a Cloudflare Worker is handed.
+
+| Variable | Holds |
+| --- | --- |
+| `APPLE_MUSIC_PRIVATE_KEY` | The contents of the `.p8`. On one line with `\n` for each line break, or across several lines inside double quotes. |
+| `APPLE_MUSIC_TEAM_ID` | Your Team ID. |
+| `APPLE_MUSIC_KEY_ID` | The key's ID: the ten characters in the file name. |
+
+Other names go in the second argument: `fromEnv(env, { pem: "MUSICKIT_KEY" })`. A variable that is
+missing or empty is a `TypeError` naming the variable. No error quotes a value.
 
 ## Minting
 
 | Option | |
 | --- | --- |
-| `pem` | The contents of `AuthKey_XXXXXXXXXX.p8`, as a string or `redacted`. Escaped `\n` from an environment variable is accepted. |
+| `pem` | The contents of the `.p8`, as `fromEnv` returns it, or a string or `redacted` string of your own. |
 | `teamId`, `keyId` | Your Team ID and the key's ID. |
 | `ttlSeconds` | Lifetime; default 150 days, at most 15 777 000 (Apple's six months). |
 | `origin` | Web origins the token is valid for. Set it, with a short `ttlSeconds`, on any token a browser will see. |
@@ -84,5 +103,4 @@ the current one. A failure is never cached: the next request tries again.
 
 ## Not here
 
-Loading the three settings from the environment belongs to the `server` integration. Music User
-Tokens are a different thing entirely; see `@open-music-sdk/user-token` once it exists.
+Music User Tokens are a different thing entirely; see `@open-music-sdk/user-token` once it exists.
