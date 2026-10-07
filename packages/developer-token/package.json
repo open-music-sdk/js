@@ -39,10 +39,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@open-music-sdk/core": "workspace:*",
     "jose": "catalog:"
   },
+  "peerDependencies": {
+    "@open-music-sdk/core": "workspace:*"
+  },
   "devDependencies": {
+    "@open-music-sdk/core": "workspace:*",
     "@types/node": "catalog:",
     "tooling-tsdown-config": "workspace:*",
     "tooling-vitest-config": "workspace:*",

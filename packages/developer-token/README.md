@@ -11,6 +11,9 @@ exist. Use this package directly to assemble your own client or to build one of 
 pnpm add @open-music-sdk/developer-token @open-music-sdk/core
 ```
 
+`core` is a peer dependency: install it yourself, at the same version. The family is released in
+lockstep, and the two must share one copy of `core` for its errors to be recognised and retried.
+
 ```ts
 // On a server, a worker, or a CLI: anywhere the private key may live.
 import { createClient } from "@open-music-sdk/core";
