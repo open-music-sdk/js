@@ -91,6 +91,9 @@ the signature; Apple does. The request is a plain `GET` with `cache: "no-store"`
 (`timeoutMs`, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
 your `fetch` does not pass the abort signal on.
 
+A redirect is refused, so the token only ever comes from the URL you configured. Point it at the final
+URL: a framework that redirects `/api/token` to `/api/token/` will otherwise fail every fetch.
+
 A relative URL such as `/api/token` resolves against the document's base URL on first use, exactly as
 `fetch` would. Creating the provider never needs a document, so a module that a server also loads can
 create it; using it where there is none throws a `TypeError`. Outside a browser, pass an absolute URL.

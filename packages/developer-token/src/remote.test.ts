@@ -1,5 +1,7 @@
 import { createClient, isAppleMusicError, type AppleMusicError } from "@open-music-sdk/core";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { remoteDeveloperToken } from "./remote.js";
 
 const NOW = Date.UTC(2026, 9, 7);
@@ -414,13 +416,51 @@ describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given 
 });
 
 describe("remoteDeveloperToken: the request", () => {
-  test("goes to the configured URL, uncached, with a timeout and nothing else", async () => {
+  test("is a plain GET of the configured URL: uncached, refusing redirects, and with no headers, credentials or body of its own", async () => {
     const { fetch, calls } = endpoint();
     await remoteDeveloperToken(`${ENDPOINT}?tenant=1`, { fetch })({});
     expect(calls[0]?.url).toBe(`${ENDPOINT}?tenant=1`);
-    expect(Object.keys(calls[0]?.init ?? {}).sort()).toEqual(["cache", "signal"]);
-    expect(calls[0]?.init?.cache).toBe("no-store");
-    expect(calls[0]?.init?.signal).toBeInstanceOf(AbortSignal);
+    const init = calls[0]?.init ?? {};
+    expect(init).toMatchObject({ cache: "no-store", redirect: "error" });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect([init.method, init.headers, init.credentials, init.body, init.mode]).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  describe("against a real server, with the real fetch", () => {
+    let server: Server;
+    let base: string;
+    const token = jwt({ exp: Math.floor(NOW / 1000) + 12 * HOUR_SECONDS }, "real");
+    beforeAll(async () => {
+      server = createServer((req, res) => {
+        const port = String((server.address() as AddressInfo).port);
+        if (req.url === "/token") res.end(token);
+        else if (req.url === "/moved") res.writeHead(302, { location: "/token" }).end();
+        else if (req.url === "/elsewhere") res.writeHead(307, { location: `http://localhost:${port}/token` }).end();
+        else res.writeHead(404).end();
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+    });
+    afterAll(() => {
+      server.closeAllConnections();
+      server.close();
+    });
+
+    test("the token is fetched from the configured URL", async () => {
+      expect(await remoteDeveloperToken(`${base}/token`)()).toBe(token);
+    });
+
+    test.each([
+      ["to another path on the same host", "/moved"],
+      ["to another origin", "/elsewhere"],
+    ])("a redirect %s is refused, though a token waits at the end of it", async (_name, path) => {
+      const e = await failure(remoteDeveloperToken(`${base}${path}`)());
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
+    });
+
+    test("a missing endpoint is its own status, not Apple's", async () => {
+      expect((await failure(remoteDeveloperToken(`${base}/nothing-here`)())).status).toBe(404);
+    });
   });
 
   test("is shared by concurrent callers", async () => {

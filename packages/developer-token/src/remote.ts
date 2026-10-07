@@ -75,7 +75,8 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     // The shared fetch answers to the timeout alone; no caller's signal may cancel it for the others.
     const timeout = AbortSignal.timeout(timeoutMs);
     const exchange = async () => {
-      const answer = await fetchImpl(endpoint, { cache: "no-store", signal: timeout });
+      // A redirect is refused: the token comes from the URL that was configured or from nowhere.
+      const answer = await fetchImpl(endpoint, { cache: "no-store", redirect: "error", signal: timeout });
       return { res: answer, body: (await answer.text()).trim() };
     };
     let res: Response;
