@@ -1,4 +1,5 @@
 // Every failure the SDK raises is one class with a `_tag`. Narrow with isAppleMusicError(e, tag).
+// What makes a value one of these is its shape, so the guard holds across duplicate copies of the package.
 import type { tError } from "@open-music-sdk/types";
 
 /**
@@ -40,6 +41,16 @@ export class AppleMusicError<Tag extends tErrorTag = tErrorTag> extends Error {
     this.errors = details.errors;
     this.issues = details.issues;
     this.retryAfterMs = details.retryAfterMs;
+  }
+
+  /**
+   * `instanceof` goes by shape, not by constructor. Two copies of this package can be installed side
+   * by side, and an error made by one has to be recognised by the other's guard.
+   */
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    // A subclass keeps the ordinary prototype check: not every AppleMusicError is one of those.
+    if (this !== AppleMusicError) return Function.prototype[Symbol.hasInstance].call(this, value);
+    return value instanceof Error && value.name === "AppleMusicError" && typeof (value as { _tag?: unknown })._tag === "string";
   }
 }
 
