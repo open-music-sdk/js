@@ -138,10 +138,50 @@ describe("retry", () => {
     expect(await delays({ maxAttempts: 7 })).toEqual([250, 500, 1000, 2000, 4000, 4000]);
   });
 
-  test("Retry-After on the error wins over the backoff, even past the cap", async () => {
+  test("Retry-After on the error wins over the backoff, even past the backoff cap", async () => {
     vi.spyOn(Math, "random").mockReturnValue(1);
     expect(await delays({ maxAttempts: 3, baseDelayMs: 100, maxDelayMs: 1000 }, fail("RateLimited", { retryAfterMs: 5000 }))).toEqual([5000, 5000]);
     expect(await delays({ maxAttempts: 2, baseDelayMs: 100 }, fail("RateLimited", { retryAfterMs: 0 }))).toEqual([0]);
+  });
+
+  describe("a Retry-After beyond maxRetryAfterMs is not waited for", () => {
+    test.each([
+      ["just over the default ceiling", 60_001, {}],
+      ["far over it", 24 * 60 * 60 * 1000, {}],
+      ["past setTimeout's range, where a wait would fire at once", 2 ** 31, {}],
+      ["absurd", Number.MAX_SAFE_INTEGER, {}],
+      ["over a lower custom ceiling", 2000, { maxRetryAfterMs: 1000 }],
+    ])("%s: the error is thrown immediately, delay attached", async (_, retryAfterMs, policy) => {
+      const e = fail("RateLimited", { retryAfterMs });
+      const fn = vi.fn(failing(e));
+      const start = Date.now();
+      const { error } = await settle(retry(fn, { maxAttempts: 5, ...policy }));
+      expect(error).toBe(e);
+      expect((error as AppleMusicError).retryAfterMs).toBe(retryAfterMs);
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(Date.now() - start).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    test.each([
+      ["at the default ceiling", 60_000, {}],
+      ["under a raised ceiling", 90_000, { maxRetryAfterMs: 120_000 }],
+      ["at setTimeout's limit when the ceiling allows it", 2 ** 31 - 1, { maxRetryAfterMs: 2 ** 31 - 1 }],
+    ])("%s: the wait is honoured", async (_, retryAfterMs, policy) => {
+      expect(await delays({ maxAttempts: 2, ...policy }, fail("RateLimited", { retryAfterMs }))).toEqual([retryAfterMs]);
+    });
+
+    test.each([2 ** 31, -1, Number.NaN, Number.POSITIVE_INFINITY])("maxRetryAfterMs %s is a TypeError", (maxRetryAfterMs) => {
+      expect(() => resolveRetryPolicy({ maxRetryAfterMs })).toThrow(TypeError);
+    });
+
+    test("maxRetryAfterMs 0 disables waiting on Retry-After but keeps the backoff", async () => {
+      vi.spyOn(Math, "random").mockReturnValue(1);
+      const fn = vi.fn(failing(fail("RateLimited", { retryAfterMs: 1 })));
+      await settle(retry(fn, { maxAttempts: 3, maxRetryAfterMs: 0 }));
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(await delays({ maxAttempts: 3, baseDelayMs: 100, maxRetryAfterMs: 0 }, fail("RateLimited"))).toEqual([100, 200]);
+    });
   });
 
   test("an already aborted signal rejects before the first attempt", async () => {
@@ -171,7 +211,7 @@ describe("retry", () => {
 });
 
 describe("retry policy: every field is optional, never silently infinite", () => {
-  const defaults = { maxAttempts: 2, baseDelayMs: 250, maxDelayMs: 4000, retryOn: retryable };
+  const defaults = { maxAttempts: 2, baseDelayMs: 250, maxDelayMs: 4000, maxRetryAfterMs: 60_000, retryOn: retryable };
 
   test.each([
     ["no policy", undefined],
@@ -225,7 +265,7 @@ describe("parseRetryAfter", () => {
   ])("parses %s", (header, ms) => {
     expect(parseRetryAfter(header, now)).toBe(ms);
   });
-  test.each([null, "", "   ", "soon", "5s"])("ignores %s", (header) => {
+  test.each([null, "", "   ", "soon", "5s", "5.5", "-5", "+5", "1e3", "2026-10-07"])("ignores %s", (header) => {
     expect(parseRetryAfter(header, now)).toBeUndefined();
   });
   test("defaults now to the clock", () => {

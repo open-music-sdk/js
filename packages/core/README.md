@@ -57,8 +57,10 @@ try {
 | Other 4xx, 501 | `ApiError` with `status` and Apple's `errors` array. |
 | `fetch` throws | `NetworkError`, retried. An abort is rethrown untouched. |
 
-The default policy makes two attempts with a 250 ms base delay and a 4 s cap. Pass `retry: false`
-to make one, or a `tRetryPolicy` to tune it. Rate limiting is opt-in: Apple publishes no numbers, so
+The default policy makes two attempts with a 250 ms base delay and a 4 s cap, and waits for a
+`Retry-After` of up to 60 s (`maxRetryAfterMs`); a longer one is not waited for, the `RateLimited`
+error reaches you at once with `retryAfterMs` attached. Pass `retry: false` to make one attempt, or
+a `tRetryPolicy` to tune it. Rate limiting is opt-in: Apple publishes no numbers, so
 create a limiter with yours and share one instance across every client on the same developer token.
 
 ## Tokens

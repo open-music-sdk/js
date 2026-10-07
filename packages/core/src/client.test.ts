@@ -411,6 +411,30 @@ describe("retrying", () => {
     expect(() => createClient({ developerToken: "dev", retry: { baseDelayMs: Number.NaN } })).toThrow(TypeError);
   });
 
+  test.each(["3600", "99999999999", new Date(Date.UTC(2099, 0, 1)).toUTCString()])(
+    "Retry-After %s is beyond the ceiling: RateLimited reaches the caller at once with the delay attached",
+    async (retryAfter) => {
+      vi.useFakeTimers();
+      const { music, calls } = client([{ status: 429, headers: { "retry-after": retryAfter } }, { body: {} }], { retry: quick });
+      const out = failure(music.request("v1/test"));
+      await vi.advanceTimersByTimeAsync(0);
+      const e = await out;
+      expect(e._tag).toBe("RateLimited");
+      expect(e.retryAfterMs).toBeGreaterThan(60_000);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  test("the ceiling is configurable per client", async () => {
+    vi.useFakeTimers();
+    const { music, calls } = client([{ status: 429, headers: { "retry-after": "120" } }, { body: { ok: true } }], { retry: { ...quick, maxRetryAfterMs: 180_000 } });
+    const out = music.request("v1/test");
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await out).toEqual({ ok: true });
+  });
+
   test("the limiter is acquired before every attempt", async () => {
     const acquire = vi.fn(() => Promise.resolve());
     const { music } = client([{ status: 500 }, { body: {} }], { retry: quick, rateLimit: { acquire } });
