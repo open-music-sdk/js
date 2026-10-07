@@ -1,5 +1,5 @@
 import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
-import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
+import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 
 /** Invalid values throw a TypeError. */
 export interface tRemoteOptions {
@@ -72,12 +72,18 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     const endpoint = resolve();
     if (endpoint === undefined) throw new TypeError("remoteDeveloperToken: a relative URL needs a document to resolve against; outside a browser, pass an absolute URL");
     const where = endpoint.origin + endpoint.pathname; // no query, no fragment
+    // The shared fetch answers to the timeout alone; no caller's signal may cancel it for the others.
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const exchange = async () => {
+      const answer = await fetchImpl(endpoint, { cache: "no-store", signal: timeout });
+      return { res: answer, body: (await answer.text()).trim() };
+    };
     let res: Response;
     let body: string;
     try {
-      // The shared fetch answers to the timeout alone; no caller's signal may cancel it for the others.
-      res = await fetchImpl(endpoint, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
-      body = (await res.text()).trim();
+      // The signal asks fetch to stop at the timeout. The race makes sure this stops waiting then, even for a
+      // fetch that was wrapped without passing the signal on; whatever it answers later is still read to the end.
+      ({ res, body } = await orAbort(exchange(), timeout));
     } catch (e) {
       // Only the kind of failure is repeated. A runtime's own message may spell out the whole URL, query included.
       throw new AppleMusicError("DeveloperTokenUnavailable", `developer token endpoint ${where} could not be reached (${e instanceof Error ? e.name : typeof e})`, { cause: e });

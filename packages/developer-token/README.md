@@ -88,7 +88,8 @@ never quoted in an error. The private key stays where you put it: only the signe
 `remoteDeveloperToken(url)` expects your endpoint to answer 2xx with the JWT as text or as JSON
 `{ "token": "<jwt>" }`. It reads `exp` from the token to know when to fetch again and does not verify
 the signature; Apple does. The request is a plain `GET` with `cache: "no-store"` and a timeout
-(`timeoutMs`, default 10 s); pass `fetch` to add credentials or headers.
+(`timeoutMs`, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
+your `fetch` does not pass the abort signal on.
 
 A relative URL such as `/api/token` resolves against the document's base URL on first use, exactly as
 `fetch` would. Creating the provider never needs a document, so a module that a server also loads can

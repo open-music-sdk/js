@@ -365,6 +365,54 @@ describe("remoteDeveloperToken: an unreachable endpoint is DeveloperTokenUnavail
   });
 });
 
+describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given does with the signal", () => {
+  const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  /** A response whose body never ends and ignores every signal. */
+  const stalled = () => {
+    const res = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("eyJ"));
+        },
+      }),
+    );
+    responses.push(res);
+    return res;
+  };
+  /** Fetches that take no notice of the signal, as a wrapper that does not pass `init` on makes them. */
+  const deaf: [string, () => Promise<Response>][] = [
+    ["never settles", () => new Promise<Response>(() => undefined)],
+    ["answers, but only after the timeout", () => later(60).then(() => endpoint({ text: jwt() }).fetch(ENDPOINT))],
+    ["fails, but only after the timeout", () => later(60).then(() => Promise.reject(new TypeError("fetch failed")))],
+    ["answers with a body that never ends", () => Promise.resolve(stalled())],
+  ];
+
+  test.each(deaf)("a fetch that %s is given up on at timeoutMs, as DeveloperTokenUnavailable", async (_name, fetch) => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 })({}));
+    expect([e._tag, e.status, (e.cause as Error).name]).toEqual(["DeveloperTokenUnavailable", undefined, "TimeoutError"]);
+    await later(80); // whatever the abandoned fetch does next must be handled, and a late answer must still be read
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  test("giving up frees the provider: the next call starts a new fetch instead of waiting on the dead one", async () => {
+    let n = 0;
+    const fetch = (input: RequestInfo | URL) => (++n === 1 ? new Promise<Response>(() => undefined) : endpoint({ text: jwt() }).fetch(input));
+    const provider = remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 });
+    await failure(provider({}));
+    expect(await provider({})).toBe(jwt());
+    expect(n).toBe(2);
+  });
+
+  test("every caller sharing the fetch is released at the timeout, not only the one that started it", async () => {
+    const provider = remoteDeveloperToken(ENDPOINT, { fetch: () => new Promise<Response>(() => undefined), timeoutMs: 20 });
+    const errors = await Promise.all([failure(provider({})), failure(provider({})), failure(provider({ rejected: "x" }))]);
+    expect(errors.map((e) => (e.cause as Error).name)).toEqual(["TimeoutError", "TimeoutError", "TimeoutError"]);
+  });
+});
+
 describe("remoteDeveloperToken: the request", () => {
   test("goes to the configured URL, uncached, with a timeout and nothing else", async () => {
     const { fetch, calls } = endpoint();

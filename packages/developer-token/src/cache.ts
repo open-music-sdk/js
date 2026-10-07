@@ -16,8 +16,8 @@ const DAY_SECONDS = 86_400;
  */
 const MIN_ISSUE_INTERVAL_MS = 60_000;
 
-/** `flight`, unless the caller's own signal aborts first. The flight is shared, so it is never cancelled. */
-async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+/** `flight`, unless `signal` aborts first, in which case its reason is thrown. The flight itself is left running. */
+export async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
   if (signal === undefined) return flight;
   const settled = new AbortController();
   const aborted = new Promise<void>((resolve) => {
