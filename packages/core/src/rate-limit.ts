@@ -1,8 +1,12 @@
-import { sleep } from "./retry.js";
-
 export interface tRateLimiter {
-  /** Resolves when a request may go. Rejects with the abort reason if `signal` fires first. */
+  /** Resolves when a request may go. Rejects with the abort reason as soon as `signal` fires, wherever the caller is in the queue. */
   acquire(signal?: AbortSignal): Promise<void>;
+}
+
+interface tWaiter {
+  readonly grant: () => void;
+  readonly signal: AbortSignal | undefined;
+  readonly onAbort: () => void;
 }
 
 /**
@@ -11,27 +15,67 @@ export interface tRateLimiter {
  */
 export function createRateLimiter({ capacity, refillPerSecond }: { capacity: number; refillPerSecond: number }): tRateLimiter {
   let tokens = capacity;
-  let refilledAt = Date.now();
-  let queue: Promise<unknown> = Promise.resolve();
+  let refilledAt = performance.now();
+  const queue: tWaiter[] = [];
+  let draining = false;
+  let wake: (() => void) | undefined;
+
   const refill = () => {
-    const now = Date.now();
+    const now = performance.now();
     tokens = Math.min(capacity, tokens + ((now - refilledAt) / 1000) * refillPerSecond);
     refilledAt = now;
   };
-  return {
-    acquire(signal) {
-      // FIFO: each caller waits for the one before it, so a burst drains in order.
-      const turn = queue.then(async () => {
-        signal?.throwIfAborted();
+
+  // One loop serves the queue in order: grant while tokens last, otherwise wait for the next one.
+  // The wait is for a token, not for a particular waiter, so a waiter leaving mid-wait changes nothing
+  // unless the queue is now empty, in which case the loop is woken to stop.
+  async function drain(): Promise<void> {
+    if (draining) return;
+    draining = true;
+    try {
+      while (queue.length > 0) {
         refill();
-        if (tokens < 1) {
-          await sleep(((1 - tokens) / refillPerSecond) * 1000, signal);
-          refill();
+        if (tokens >= 1) {
+          tokens -= 1;
+          const waiter = queue.shift();
+          if (waiter) {
+            waiter.signal?.removeEventListener("abort", waiter.onAbort);
+            waiter.grant();
+          }
+          continue;
         }
-        tokens -= 1;
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, ((1 - tokens) / refillPerSecond) * 1000);
+          wake = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+        wake = undefined;
+      }
+    } finally {
+      draining = false;
+    }
+  }
+
+  return {
+    async acquire(signal) {
+      signal?.throwIfAborted();
+      await new Promise<void>((resolve) => {
+        const waiter: tWaiter = {
+          grant: resolve,
+          signal,
+          onAbort: () => {
+            queue.splice(queue.indexOf(waiter), 1);
+            resolve();
+            if (queue.length === 0) wake?.();
+          },
+        };
+        queue.push(waiter);
+        signal?.addEventListener("abort", waiter.onAbort, { once: true });
+        void drain();
       });
-      queue = turn.catch(() => undefined);
-      return turn;
+      signal?.throwIfAborted();
     },
   };
 }

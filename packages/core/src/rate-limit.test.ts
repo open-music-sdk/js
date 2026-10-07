@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createRateLimiter } from "./rate-limit.js";
 
-// Only the clock and timeouts are faked, so setImmediate still drains microtasks for us.
+// Only the clocks and timeouts are faked, so setImmediate still drains microtasks for us.
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -89,30 +89,75 @@ describe("createRateLimiter", () => {
     expect(next.state).toBe("resolved");
   });
 
-  test("an aborted waiter rejects with the reason and gives its slot to the next", async () => {
-    const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
-    await limiter.acquire();
-    const controller = new AbortController();
-    const aborted = track(limiter.acquire(controller.signal));
-    const next = track(limiter.acquire());
-    await vi.advanceTimersByTimeAsync(100);
-    const reason = new Error("stop");
-    controller.abort(reason);
-    await flush();
-    expect(aborted.state).toBe("rejected");
-    expect(aborted.reason).toBe(reason);
-    expect(next.state).toBe("pending");
-    await vi.advanceTimersByTimeAsync(900);
-    expect(next.state).toBe("resolved");
+  describe("abort leaves the queue at once, from any position, without spending a token", () => {
+    /** capacity 1 at 1/s, drained; waiters a (head, sleeping), b, c queued behind. */
+    async function queued() {
+      const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
+      await limiter.acquire();
+      const controllers = [new AbortController(), new AbortController(), new AbortController()];
+      const waiters = controllers.map((c) => track(limiter.acquire(c.signal)));
+      await vi.advanceTimersByTimeAsync(100);
+      return { limiter, controllers, waiters };
+    }
+
+    test.each([
+      ["the head", 0],
+      ["the middle", 1],
+      ["the tail", 2],
+    ])("aborting %s rejects it immediately and the others keep their timing", async (_, index) => {
+      const { controllers, waiters } = await queued();
+      const reason = new Error("stop");
+      controllers[index]?.abort(reason);
+      await flush();
+      expect(waiters[index]).toEqual({ state: "rejected", reason });
+      const rest = waiters.filter((_, i) => i !== index);
+      expect(rest.map((w) => w.state)).toEqual(["pending", "pending"]);
+      await vi.advanceTimersByTimeAsync(900); // one token after the drain started
+      expect(rest.map((w) => w.state)).toEqual(["resolved", "pending"]);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(rest.map((w) => w.state)).toEqual(["resolved", "resolved"]);
+    });
+
+    test("aborting every waiter empties the queue and leaves no timer running", async () => {
+      const { limiter, controllers, waiters } = await queued();
+      for (const c of controllers) c.abort(new Error("stop"));
+      await flush();
+      expect(waiters.map((w) => w.state)).toEqual(["rejected", "rejected", "rejected"]);
+      expect(vi.getTimerCount()).toBe(0);
+      const later = track(limiter.acquire());
+      await vi.advanceTimersByTimeAsync(899);
+      expect(later.state).toBe("pending");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(later.state).toBe("resolved");
+    });
+
+    test("an already aborted signal rejects before joining the queue", async () => {
+      const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
+      const controller = new AbortController();
+      controller.abort();
+      await expect(limiter.acquire(controller.signal)).rejects.toBe(controller.signal.reason);
+      const next = track(limiter.acquire());
+      await flush();
+      expect(next.state).toBe("resolved");
+    });
+
+    test("a waiter aborted after being granted is unaffected", async () => {
+      const limiter = createRateLimiter({ capacity: 2, refillPerSecond: 1 });
+      const controller = new AbortController();
+      await limiter.acquire(controller.signal);
+      controller.abort();
+      const next = track(limiter.acquire());
+      await flush();
+      expect(next.state).toBe("resolved");
+    });
   });
 
-  test("an already aborted signal rejects without spending a token", async () => {
+  test("a backwards clock step cannot stall the queue", async () => {
     const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
-    const controller = new AbortController();
-    controller.abort();
-    await expect(limiter.acquire(controller.signal)).rejects.toBe(controller.signal.reason);
+    await limiter.acquire();
+    vi.setSystemTime(Date.now() - 60_000);
     const next = track(limiter.acquire());
-    await flush();
+    await vi.advanceTimersByTimeAsync(1000);
     expect(next.state).toBe("resolved");
   });
 

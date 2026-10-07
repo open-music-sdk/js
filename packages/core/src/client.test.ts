@@ -656,7 +656,7 @@ describe("as and forUser", () => {
   });
 
   test("derived clients share the developer token provider, hooks, and limiter", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
     const developerToken = vi.fn(() => "dev");
     const onRequest = vi.fn();
     const rateLimit = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
