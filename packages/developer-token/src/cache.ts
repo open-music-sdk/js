@@ -54,17 +54,25 @@ export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_
 
   const refresh = async (): Promise<string> => {
     askedAt = performance.now();
-    try {
-      const issued = await issue();
-      const now = Date.now();
-      // A token that looks expired on arrival may be sound and the local clock fast. It gets one interval of use:
-      // if it works, the source is asked once a minute instead of once a request; if not, Apple says so.
-      const expiresAt = issued.expiresAt > now ? issued.expiresAt : now + MIN_ISSUE_INTERVAL_MS;
-      current = { token: issued.token, expiresAt, refreshAt: expiresAt - Math.min(refreshAheadSeconds * 1000, (expiresAt - now) / 2) };
-      return issued.token;
-    } finally {
+    const issued = await issue();
+    const now = Date.now();
+    // A token that looks expired on arrival may be sound and the local clock fast. It gets one interval of use:
+    // if it works, the source is asked once a minute instead of once a request; if not, Apple says so.
+    const expiresAt = issued.expiresAt > now ? issued.expiresAt : now + MIN_ISSUE_INTERVAL_MS;
+    current = { token: issued.token, expiresAt, refreshAt: expiresAt - Math.min(refreshAheadSeconds * 1000, (expiresAt - now) / 2) };
+    return issued.token;
+  };
+
+  /**
+   * The issue under way, or a new one. It is forgotten once it settles, from a callback that cannot run before the
+   * flight is stored. Forgetting it inside `refresh` came too soon for an issuer that throws before its first
+   * await: the failed flight was stored after it had been cleared, and stayed for good.
+   */
+  const fly = (): Promise<string> => {
+    flight ??= refresh().finally(() => {
       flight = undefined;
-    }
+    });
+    return flight;
   };
 
   return async ({ signal, rejected } = {}) => {
@@ -78,19 +86,19 @@ export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_
       if (held !== rejected) {
         // Refreshing ahead: the held token is good until its exp, so nobody waits for the replacement and
         // a failure to get one disturbs nobody. It is asked for again in a minute.
-        if (flight === undefined) (flight = refresh()).catch(ignore);
+        if (flight === undefined) fly().catch(ignore);
         return held;
       }
       // Apple's 401 does not prove the token bad (under /v1/me it can be about the listener), so when no
       // replacement can be had the held token stays the best there is.
       try {
-        return await orAbort((flight ??= refresh()), signal);
+        return await orAbort(fly(), signal);
       } catch {
         signal?.throwIfAborted();
         return held;
       }
     }
-    return orAbort((flight ??= refresh()), signal);
+    return orAbort(fly(), signal);
   };
 }
 

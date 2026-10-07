@@ -401,6 +401,77 @@ describe("cached: failures are not cached", () => {
   });
 });
 
+describe("cached: an issuer that throws instead of rejecting is a failed issue like any other", () => {
+  const thrower = (message: string) => () => {
+    throw new Error(message);
+  };
+
+  test("one throw fails that call alone: the next asks the issuer again and gets its token", async () => {
+    const issue = issuer();
+    issue.mockImplementationOnce(thrower("threw"));
+    const provider = cached(issue);
+    await expect(provider({})).rejects.toThrow("threw");
+    expect([await provider({}), await provider({})]).toEqual(["t1", "t1"]);
+    expect(issue).toHaveBeenCalledTimes(2);
+  });
+
+  test("an issuer that always throws is asked on every call, and nothing is remembered between them", async () => {
+    const issue = vi.fn(thrower("always"));
+    const provider = cached(issue);
+    for (let i = 0; i < 4; i++) await expect(provider({})).rejects.toThrow("always");
+    expect(issue).toHaveBeenCalledTimes(4);
+  });
+
+  test("callers that arrive together share the one failed issue, and the caller after them starts a new one", async () => {
+    const issue = issuer();
+    issue.mockImplementationOnce(thrower("threw"));
+    const provider = cached(issue);
+    const together = await Promise.all([outcome(provider({})), outcome(provider({})), outcome(provider({ signal: new AbortController().signal }))]);
+    expect(together.map((o) => ("error" in o ? (o.error as Error).message : o.value))).toEqual(["threw", "threw", "threw"]);
+    expect(issue).toHaveBeenCalledTimes(1);
+    expect(await provider({})).toBe("t1");
+  });
+
+  test("thrown while a token is refreshed ahead, it disturbs nobody and the next minute's attempt replaces the token", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const issue = issuer(10 * HOUR);
+    const provider = cached(issue, 3600);
+    await provider({});
+    issue.mockImplementationOnce(thrower("threw"));
+    at(9 * HOUR);
+    expect(await provider({})).toBe("t1");
+    await flush();
+    at(9 * HOUR + MINUTE);
+    expect(await provider({})).toBe("t1");
+    await flush();
+    process.off("unhandledRejection", unhandled);
+    expect(await provider({})).toBe("t2");
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  test("thrown while a rejected token is replaced, the held token stays in service and is replaced a minute later", async () => {
+    const issue = issuer();
+    const provider = cached(issue);
+    await provider({});
+    issue.mockImplementationOnce(thrower("threw"));
+    at(MINUTE);
+    expect(await provider({ rejected: "t1" })).toBe("t1");
+    at(2 * MINUTE);
+    expect(await provider({ rejected: "t1" })).toBe("t2");
+  });
+
+  test("thrown when the held token has expired, the call fails and the provider is not left broken", async () => {
+    const issue = issuer(HOUR);
+    const provider = cached(issue, 0);
+    await provider({});
+    issue.mockImplementationOnce(thrower("threw"));
+    at(HOUR);
+    await expect(provider({})).rejects.toThrow("threw");
+    expect(await provider({})).toBe("t2");
+  });
+});
+
 describe("cached: a caller's abort is its own", () => {
   test("an already aborted signal rejects without issuing", async () => {
     const issue = issuer();
