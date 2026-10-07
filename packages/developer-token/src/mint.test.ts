@@ -46,8 +46,20 @@ const invalid: [string, Record<string, unknown>][] = [
   ["an empty teamId", { teamId: "" }],
   ["a missing teamId", { teamId: undefined }],
   ["a numeric teamId", { teamId: 1234567890 }],
+  ["a teamId of nine characters", { teamId: "DEF123GHI" }],
+  ["a teamId of eleven characters", { teamId: "DEF123GHIJK" }],
+  ["a teamId in lower case", { teamId: "def123ghij" }],
+  ["a teamId with a trailing newline", { teamId: "DEF123GHIJ\n" }],
+  ["a teamId with a leading space", { teamId: " DEF123GHIJ" }],
+  ["a teamId of ten spaces", { teamId: " ".repeat(10) }],
+  ["a teamId with punctuation", { teamId: "DEF-123-GH" }],
   ["an empty keyId", { keyId: "" }],
   ["a missing keyId", { keyId: undefined }],
+  ["a keyId that is the key's file name", { keyId: "AuthKey_ABC123DEFG.p8" }],
+  ["a keyId of nine characters", { keyId: "ABC123DEF" }],
+  ["a keyId in lower case", { keyId: "abc123defg" }],
+  ["a keyId with a trailing carriage return", { keyId: "ABC123DEFG\r" }],
+  ["a keyId with a letter outside ASCII", { keyId: "ABC123DEFÉ" }],
   ["a zero ttl", { ttlSeconds: 0 }],
   ["a negative ttl", { ttlSeconds: -60 }],
   ["a fractional ttl", { ttlSeconds: 1.5 }],
@@ -61,6 +73,21 @@ const invalid: [string, Record<string, unknown>][] = [
   ["an origin that is a bare string", { origin: "https://example.com" }],
   ["an origin list with an empty entry", { origin: ["https://example.com", ""] }],
   ["an origin list with a non-string", { origin: [42] }],
+  ["an origin list with a null", { origin: ["https://example.com", null] }],
+  ["an origin list with a hole in it", { origin: new Array<string>(2) }],
+  ["a wildcard origin", { origin: ["*"] }],
+  ["an origin without a scheme", { origin: ["app.example"] }],
+  ["an origin with a trailing slash", { origin: ["https://app.example/"] }],
+  ["an origin with a path", { origin: ["https://app.example/music"] }],
+  ["an origin with a query", { origin: ["https://app.example?x=1"] }],
+  ["an origin with whitespace before it", { origin: [" https://app.example"] }],
+  ["an origin with a newline after it", { origin: ["https://app.example\n"] }],
+  ["an origin with capitals in the host", { origin: ["https://App.Example"] }],
+  ["an origin that spells out the default port", { origin: ["https://app.example:443"] }],
+  ["an origin with credentials", { origin: ["https://user:pass@app.example"] }],
+  ["an origin on a scheme browsers do not send", { origin: ["ftp://app.example"] }],
+  ["the opaque origin", { origin: ["null"] }],
+  ["one bad origin after a good one", { origin: ["https://app.example", "https://app.example/"] }],
 ];
 
 describe("mintDeveloperToken: the token", () => {
@@ -91,9 +118,19 @@ describe("mintDeveloperToken: the token", () => {
     expect(claims.iat).toBe(NOW_SECONDS);
   });
 
-  test.each([[["https://example.com"]], [["https://example.com", "https://music.example.com", "http://localhost:3000"]]])("origin %j is carried as given", async (origin) => {
+  test.each([
+    [["https://example.com"]],
+    [["https://example.com", "https://music.example.com", "http://localhost:3000"]],
+    [["https://app.example:8443", "http://127.0.0.1:5173", "http://[::1]:3000"]],
+    [["https://xn--bcher-kva.example"]],
+  ])("origin %j is carried as given", async (origin) => {
     const { claims } = await read(await mintDeveloperToken({ ...valid, origin }));
     expect(claims.origin).toEqual(origin);
+  });
+
+  test.each(["DEF123GHIJ", "0123456789", "ABCDEFGHIJ", "A1B2C3D4E5"])("%s is accepted as a Team ID and as a key ID", async (value) => {
+    const { header, claims } = await read(await mintDeveloperToken({ ...valid, teamId: value, keyId: value }));
+    expect([claims.iss, header.kid]).toEqual([value, value]);
   });
 
   test("an undefined origin leaves the claim out", async () => {
@@ -146,6 +183,25 @@ describe("mintDeveloperToken: the key", () => {
 describe("mintDeveloperToken: invalid options", () => {
   test.each(invalid)("rejects %s with a TypeError", async (_name, bad) => {
     await expect(mintDeveloperToken({ ...valid, ...bad })).rejects.toThrow(TypeError);
+  });
+});
+
+describe("mintDeveloperToken: the key never ends up in a token or an error by being put in the wrong option", () => {
+  const body = () => (valid.pem as string).split("\n").slice(1, -1).join("");
+  /** True when any stretch of the key's body shows up in the text. */
+  const leaks = (text: string) => Array.from({ length: Math.floor((body().length - 12) / 4) }, (_unused, i) => body().slice(i * 4, i * 4 + 12)).some((part) => text.includes(part));
+
+  test.each([
+    ["keyId", (pem: string) => ({ keyId: pem })],
+    ["teamId", (pem: string) => ({ teamId: pem })],
+    ["keyId, with its line breaks escaped", (pem: string) => ({ keyId: pem.replaceAll("\n", "\\n") })],
+    ["origin", (pem: string) => ({ origin: [pem] })],
+    ["origin, after a good entry", (pem: string) => ({ origin: ["https://app.example", pem] })],
+  ])("the key given as %s is refused, not signed, and not quoted", async (_name, misplace) => {
+    const error: unknown = await mintDeveloperToken({ ...valid, ...misplace(valid.pem as string) }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    const e = error as Error;
+    expect(leaks(`${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`)).toBe(false);
   });
 });
 

@@ -71,9 +71,9 @@ missing or empty is a `TypeError` naming the variable. No error quotes a value.
 | Option | |
 | --- | --- |
 | `pem` | The contents of the `.p8`, as `fromEnv` returns it, or a string or `redacted` string of your own. |
-| `teamId`, `keyId` | Your Team ID and the key's ID. |
+| `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. |
 | `ttlSeconds` | Lifetime; default 150 days, at most 15 777 000 (Apple's six months). |
-| `origin` | Web origins the token is valid for. Set it, with a short `ttlSeconds`, on any token a browser will see. |
+| `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it, with a short `ttlSeconds`, on any token a browser will see. |
 | `refreshAheadSeconds` | `cachedMinter` only: how long before `exp` to mint a replacement. Default one day, never more than half the lifetime. |
 
 Invalid options throw a `TypeError`: from `cachedMinter` when it is created, from `mintDeveloperToken`
