@@ -6,6 +6,8 @@ coverage/
 .env
 .env.*
 !.env.example
+# Apple private keys: the contents belong in the environment, never in the repository
+*.p8
 .DS_Store
 
 # codegen: raw Apple documentation pages are cached locally, never committed

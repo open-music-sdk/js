@@ -4,8 +4,9 @@
 
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
 
-> **🚧 Under construction.** Nothing is published to npm yet. The generated type and validator packages
-> exist and pass their tests, but there is no HTTP client, no token handling, and no integration to install.
+> **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core and
+> developer token packages exist and pass their tests, but none has been run against the live API, and there
+> is no Music User Token handling and no integration to install.
 > The table below is the source of truth for what works; expect everything else to be missing or to change.
 
 ## Project status

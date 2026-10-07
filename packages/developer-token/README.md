@@ -22,9 +22,9 @@ import { cachedMinter, fromEnv } from "@open-music-sdk/developer-token";
 const key = fromEnv(process.env); // the key and its two IDs, from your .env file or your platform's secrets
 const music = createClient({ developerToken: cachedMinter(key), storefront: "us" });
 
-// A token endpoint for your own front end: short-lived and bound to your origin.
+// A token endpoint for your own front end: short-lived, bound to your origin, never stored by a cache.
 const forBrowsers = cachedMinter({ ...key, ttlSeconds: 3600, origin: ["https://app.example"] });
-export const GET = async () => new Response(await forBrowsers());
+export const GET = async () => new Response(await forBrowsers(), { headers: { "cache-control": "no-store" } });
 ```
 
 ```sh
@@ -35,7 +35,7 @@ APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END 
 ```
 
 ```ts
-// In a browser: no key, no signing code.
+// In a browser: no key. A bundler drops the signing code, which this import never reaches.
 import { createClient } from "@open-music-sdk/core";
 import { remoteDeveloperToken } from "@open-music-sdk/developer-token";
 
@@ -50,7 +50,7 @@ const music = createClient({ developerToken: remoteDeveloperToken("/api/token"),
 | `mintDeveloperToken(options)` | Signs one ES256 JWT with [`jose`](https://github.com/panva/jose): `kid` in the header, `iss`, `iat`, `exp`, and `origin` if given |
 | `cachedMinter(options)` | A provider that mints on first use, shares one mint between concurrent requests, and mints again before `exp` |
 | `remoteDeveloperToken(url, options?)` | A provider that fetches the token from your endpoint, with the same caching |
-| `redacted(value)` | Wraps a secret so logging, string conversion, and JSON print `<redacted>`; `unwrap()` returns it |
+| `redacted(value)` | Wraps a secret so string conversion and JSON print `<redacted>`, as does `console.log` on Node and any runtime that honours its inspect symbol; `unwrap()` returns it. Elsewhere a console shows an object of functions, never the value. |
 
 ## The key
 
@@ -82,6 +82,22 @@ missing or empty is a `TypeError` naming the variable. No error quotes a value.
 Invalid options throw a `TypeError`: from `cachedMinter` when it is created, from `mintDeveloperToken`
 as a rejection. A key that is not a PKCS8 P-256 private key is a `TypeError` on first use; the key is
 never quoted in an error. The private key stays where you put it: only the signed token travels.
+
+## Your token endpoint
+
+A developer token is a bearer credential for your whole team's quota, and an endpoint that hands one
+to anyone who asks is a public token dispenser. What limits the damage is yours to set:
+
+- **A short `ttlSeconds`.** A token cannot be revoked without revoking the key, so its lifetime is
+  how long a leaked one stays useful. The 150-day default suits a token that never leaves your server.
+- **`origin`.** Apple honours it for requests from browsers. It does not stop a script that sets its
+  own `Origin` header, so it narrows who can use a token, not who can fetch one.
+- **Who may call the endpoint.** Put it behind your own session or rate limit if tokens should only
+  go to your users.
+- **`Cache-Control: no-store`** on the response, so no proxy or CDN keeps a copy.
+
+Nothing in this package logs. `core`'s `onRequest` hook is handed the `Authorization` header along with
+the rest of the request, so a hook that prints requests prints the token.
 
 ## Fetching
 
