@@ -71,31 +71,11 @@ describe("remoteDeveloperToken: configuration", () => {
     expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).not.toThrow();
   });
 
-  test.each(["/api/token", "api/token", "", "app.example/api/token", "//app.example/api/token", "file:///etc/token", "data:text/plain,abc", "javascript:alert(1)", "ftp://app.example/token"])(
-    "outside a browser, refuses %j",
-    (url) => {
-      expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
-    },
-  );
+  const notHttp = ["file:///etc/token", "data:text/plain,abc", "javascript:alert(1)", "ftp://app.example/token", "blob:https://app.example/1", "mailto:token@app.example", "ws://app.example/token"];
 
-  test.each([
-    ["/api/token", "https://app.example/api/token"],
-    ["api/token", "https://app.example/music/api/token"],
-    ["//tokens.example/t", "https://tokens.example/t"],
-    ["https://other.example/t", "https://other.example/t"],
-  ])("in a document, %j resolves against its location to %s", async (url, expected) => {
-    vi.stubGlobal("location", { href: "https://app.example/music/index.html" });
-    try {
-      const { fetch, calls } = endpoint();
-      await remoteDeveloperToken(url, { fetch })({});
-      expect(calls[0]?.url).toBe(expected);
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  test.each(["javascript:alert(1)", "data:text/plain,abc", "blob:https://app.example/1"])("in a document, still refuses %j", (url) => {
-    vi.stubGlobal("location", { href: "https://app.example/music/index.html" });
+  test.each(notHttp)("refuses %j when it is created, with or without a document", (url) => {
+    expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
+    vi.stubGlobal("document", { baseURI: "https://app.example/music/index.html" });
     try {
       expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
     } finally {
@@ -121,6 +101,95 @@ describe("remoteDeveloperToken: configuration", () => {
   test("nothing is fetched until the first call", () => {
     const { fetch, calls } = endpoint();
     remoteDeveloperToken(ENDPOINT, { fetch });
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("remoteDeveloperToken: a relative URL resolves the way fetch would resolve it", () => {
+  const relative = ["/api/token", "api/token", "../token", "?fresh=1", "", "app.example/api/token", "//app.example/api/token"];
+  /** Runs `fn` as if in a page at `page`, whose base URL is `base` when a <base href> moved it. */
+  async function inDocument<T>(page: string, base: string | undefined, fn: () => T | Promise<T>): Promise<T> {
+    vi.stubGlobal("location", { href: page });
+    if (base !== undefined) vi.stubGlobal("document", { baseURI: base });
+    try {
+      return await fn();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  test.each([
+    ["/api/token", "https://app.example/api/token"],
+    ["api/token", "https://app.example/music/api/token"],
+    ["../token", "https://app.example/token"],
+    ["?fresh=1", "https://app.example/music/index.html?fresh=1"],
+    ["//tokens.example/t", "https://tokens.example/t"],
+    ["https://other.example/t", "https://other.example/t"],
+  ])("in a page, %j is fetched from %s", async (url, expected) => {
+    const page = "https://app.example/music/index.html";
+    const { fetch, calls } = endpoint();
+    await inDocument(page, page, () => remoteDeveloperToken(url, { fetch })({}));
+    expect(calls[0]?.url).toBe(expected);
+  });
+
+  test.each([
+    ["/api/token", "https://cdn.example/api/token"],
+    ["api/token", "https://cdn.example/assets/api/token"],
+  ])("under a <base href> on another host, %j is fetched from %s, not from the page's own host", async (url, expected) => {
+    const { fetch, calls } = endpoint();
+    await inDocument("https://app.example/music/index.html", "https://cdn.example/assets/", () => remoteDeveloperToken(url, { fetch })({}));
+    expect(calls[0]?.url).toBe(expected);
+  });
+
+  test("in a worker, which has a location but no document, it resolves against the location", async () => {
+    const { fetch, calls } = endpoint();
+    await inDocument("https://app.example/workers/sync.js", undefined, () => remoteDeveloperToken("/api/token", { fetch })({}));
+    expect(calls[0]?.url).toBe("https://app.example/api/token");
+  });
+
+  test.each(relative)("with no document, creating a provider for %j neither throws nor fetches, so a server can load the module", (url) => {
+    const { fetch, calls } = endpoint();
+    expect(() => remoteDeveloperToken(url, { fetch })).not.toThrow();
+    expect(calls).toEqual([]);
+  });
+
+  test.each(relative)("with no document, using a provider for %j is a TypeError each time, and nothing is fetched", async (url) => {
+    const { fetch, calls } = endpoint();
+    const provider = remoteDeveloperToken(url, { fetch });
+    for (const attempt of [provider({}), provider({})]) {
+      const error: unknown = await attempt.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(TypeError);
+      expect(isAppleMusicError(error)).toBe(false);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  test("a client does not retry it: a URL that cannot be resolved is a mistake, not an outage", async () => {
+    const { fetch, calls } = endpoint();
+    const music = createClient({ developerToken: remoteDeveloperToken("/api/token", { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    await expect(music.request("v1/test")).rejects.toThrow(TypeError);
+    expect(calls).toEqual([]);
+  });
+
+  test("a provider created before there was a document works once there is one", async () => {
+    const { fetch, calls } = endpoint();
+    const provider = remoteDeveloperToken("/api/token", { fetch });
+    await expect(provider({})).rejects.toThrow(TypeError);
+    const page = "https://app.example/";
+    expect(await inDocument(page, page, () => provider({}))).toBe(jwt());
+    expect(calls[0]?.url).toBe("https://app.example/api/token");
+  });
+
+  test.each(["file:///C:/app/index.html", "about:blank", "data:text/html,<p>"])("in a page at %s, where it cannot become an http URL, it is refused", async (page) => {
+    const { fetch, calls } = endpoint();
+    const outcome = await inDocument(page, page, async () => {
+      try {
+        return await remoteDeveloperToken("api/token", { fetch })({});
+      } catch (e) {
+        return e;
+      }
+    });
+    expect(outcome).toBeInstanceOf(TypeError);
     expect(calls).toEqual([]);
   });
 });

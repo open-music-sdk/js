@@ -50,14 +50,25 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
   if (typeof fetchImpl !== "function") throw new TypeError(`remoteDeveloperToken: fetch must be a function, got ${typeof fetchImpl}`);
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS)
     throw new TypeError(`remoteDeveloperToken: timeoutMs must be a number above 0 and at most ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
-  // A relative URL only means something where there is a document to resolve it against.
-  const base = (globalThis as { location?: { href?: string } }).location?.href;
-  const endpoint = parse(url, base);
-  if (endpoint?.protocol !== "https:" && endpoint?.protocol !== "http:")
-    throw new TypeError(`remoteDeveloperToken: "${String(url)}" is not an http(s) URL; outside a browser it must be absolute`);
-  const where = endpoint.origin + endpoint.pathname;
+  /**
+   * The endpoint as an absolute URL, or undefined while it is relative and there is nothing to resolve it against.
+   * A relative URL resolves against the document's base URL, exactly as fetch would resolve it.
+   */
+  const resolve = (): URL | undefined => {
+    const scope = globalThis as { document?: { baseURI?: string }; location?: { href?: string } };
+    const endpoint = parse(url, scope.document?.baseURI ?? scope.location?.href);
+    if (endpoint !== undefined && endpoint.protocol !== "https:" && endpoint.protocol !== "http:")
+      throw new TypeError(`remoteDeveloperToken: "${String(url)}" is not an http(s) URL`);
+    return endpoint;
+  };
+  // What can never work is refused now. A relative URL with no document yet is left for the first call, so a
+  // module that creates the provider can still be loaded on a server.
+  resolve();
 
   const issue = async (): Promise<tIssued> => {
+    const endpoint = resolve();
+    if (endpoint === undefined) throw new TypeError("remoteDeveloperToken: a relative URL needs a document to resolve against; outside a browser, pass an absolute URL");
+    const where = endpoint.origin + endpoint.pathname;
     let res: Response;
     let body: string;
     try {
