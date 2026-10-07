@@ -24,6 +24,32 @@ function track(p: Promise<unknown>) {
   return s;
 }
 
+describe("createRateLimiter: a limiter that cannot limit is refused", () => {
+  test.each([
+    ["capacity 0", { capacity: 0, refillPerSecond: 1 }],
+    ["capacity 0.5", { capacity: 0.5, refillPerSecond: 1 }],
+    ["capacity -1", { capacity: -1, refillPerSecond: 1 }],
+    ["capacity NaN", { capacity: Number.NaN, refillPerSecond: 1 }],
+    ["capacity Infinity", { capacity: Number.POSITIVE_INFINITY, refillPerSecond: 1 }],
+    ["capacity as a string", { capacity: "5" as unknown as number, refillPerSecond: 1 }],
+    ["refill 0", { capacity: 1, refillPerSecond: 0 }],
+    ["refill -1", { capacity: 1, refillPerSecond: -1 }],
+    ["refill NaN", { capacity: 1, refillPerSecond: Number.NaN }],
+    ["refill Infinity", { capacity: 1, refillPerSecond: Number.POSITIVE_INFINITY }],
+    ["refill missing", { capacity: 1 } as { capacity: number; refillPerSecond: number }],
+  ])("%s is a TypeError", (_, options) => {
+    expect(() => createRateLimiter(options)).toThrow(TypeError);
+  });
+
+  test.each([
+    [1, 0.001],
+    [1.5, 1],
+    [1000, 1e6],
+  ])("capacity %s at %s/s is accepted", (capacity, refillPerSecond) => {
+    expect(() => createRateLimiter({ capacity, refillPerSecond })).not.toThrow();
+  });
+});
+
 describe("createRateLimiter", () => {
   test("lets `capacity` requests through at once, then makes the next wait", async () => {
     const limiter = createRateLimiter({ capacity: 3, refillPerSecond: 1 });

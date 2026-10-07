@@ -14,6 +14,11 @@ interface tWaiter {
  * Apple counts its limit per developer token, so share one limiter across every client using that token.
  */
 export function createRateLimiter({ capacity, refillPerSecond }: { capacity: number; refillPerSecond: number }): tRateLimiter {
+  // Anything else either never grants (NaN, capacity 0 with no refill) or waits for Infinity, which
+  // setTimeout silently turns into 1 ms: a limiter that limits nothing.
+  if (!Number.isFinite(capacity) || capacity < 1) throw new TypeError(`createRateLimiter: capacity must be a number of at least 1, got ${String(capacity)}`);
+  if (!Number.isFinite(refillPerSecond) || refillPerSecond <= 0)
+    throw new TypeError(`createRateLimiter: refillPerSecond must be a positive number, got ${String(refillPerSecond)}`);
   let tokens = capacity;
   let refilledAt = performance.now();
   const queue: tWaiter[] = [];
