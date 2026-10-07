@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createClient, type tClientOptions, type tSchemaLike, type tUserTokenStore } from "./client.js";
+import { createClient, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client.js";
 import { AppleMusicError, isAppleMusicError } from "./errors.js";
 import { createRateLimiter } from "./rate-limit.js";
 
@@ -834,38 +834,120 @@ describe("as and forUser", () => {
 });
 
 describe("hooks", () => {
-  test("onRequest and onResponse see the same Request, in order, once per attempt", async () => {
-    const seen: string[] = [];
+  interface tSeen {
+    res: Response;
+    req: Request;
+    outcome: tResponseOutcome;
+    bodyUsed: boolean;
+  }
+  /** Records every onResponse call with what the hook could observe at that moment. */
+  function observed(replies: tReply[], options: Partial<tClientOptions> = {}) {
+    const seen: tSeen[] = [];
     const requests: Request[] = [];
-    const { music, calls } = client([{ status: 500 }, { body: {} }], {
-      retry: { maxAttempts: 2, baseDelayMs: 0 },
+    const events: string[] = [];
+    const built = client(replies, {
+      ...options,
       onRequest: (req) => {
-        seen.push("request");
+        events.push("request");
         requests.push(req);
       },
-      onResponse: (res, req) => {
-        seen.push(`response ${String(res.status)}`);
-        expect(req).toBe(requests.at(-1));
+      onResponse: (res, req, outcome) => {
+        events.push(`response ${String(res.status)}`);
+        seen.push({ res, req, outcome, bodyUsed: res.bodyUsed });
       },
     });
-    await music.request("v1/test");
-    expect(seen).toEqual(["request", "response 500", "request", "response 200"]);
-    expect(requests).toEqual(calls);
-  });
+    return { ...built, seen, requests, events };
+  }
 
-  test("onResponse is skipped when fetch throws", async () => {
-    const onResponse = vi.fn();
-    const { music } = client([new TypeError("down")], { onResponse });
-    await failure(music.request("v1/test"));
-    expect(onResponse).not.toHaveBeenCalled();
-  });
-
-  test("the request handed to the hook carries the final URL and headers", async () => {
-    const onRequest = vi.fn();
-    const { music } = client([{}], { onRequest, userToken: "u" });
+  test("onRequest fires before each attempt with the final Request", async () => {
+    const { music, requests, calls } = observed([{}], { userToken: "u" });
     await music.request("v1/me/library/songs", { params: { limit: 1 } });
-    const req = onRequest.mock.calls[0]?.[0] as Request;
-    expect(req.url).toBe("https://api.music.apple.com/v1/me/library/songs?limit=1");
-    expect(req.headers.get("music-user-token")).toBe("u");
+    expect(requests).toEqual(calls);
+    expect(requests[0]?.url).toBe("https://api.music.apple.com/v1/me/library/songs?limit=1");
+    expect(requests[0]?.headers.get("music-user-token")).toBe("u");
+  });
+
+  describe("onResponse fires once per response, after the client is done with it", () => {
+    test("a success: the parsed body, no error, body already read, before the request resolves", async () => {
+      const { music, seen, events, calls } = observed([{ body: { data: [song] } }]);
+      let resolvedBeforeHook = false;
+      const out = music.request("v1/test").then(() => (resolvedBeforeHook = seen.length === 0));
+      await out;
+      expect(resolvedBeforeHook).toBe(false);
+      expect(events).toEqual(["request", "response 200"]);
+      expect(seen[0]?.req).toBe(calls[0]);
+      expect(seen[0]?.bodyUsed).toBe(true);
+      expect(seen[0]?.outcome).toEqual({ body: { data: [song] }, error: undefined });
+    });
+
+    test("an error status: the parsed error body and the very error the request throws", async () => {
+      const { music, seen } = observed([apiError(404, "Resource Not Found")]);
+      const thrown = await failure(music.request("v1/catalog/us/songs/x"));
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.outcome.error).toBe(thrown);
+      expect(seen[0]?.outcome.body).toEqual(apiError(404, "Resource Not Found").body);
+    });
+
+    test.each([
+      ["a non-JSON 200", { status: 200, text: "<html>" }, "ApiError", undefined],
+      ["a non-JSON 502", { status: 502, text: "<html>" }, "ApiError", undefined],
+      ["an empty 204", { status: 204 }, undefined, undefined],
+      ["a 429", { status: 429, body: { errors: [] } }, "RateLimited", { errors: [] }],
+    ])("%s: body %j", async (_, reply, tag, body) => {
+      const { music, seen } = observed([reply]);
+      await music.request("v1/test").catch(() => undefined);
+      expect(seen[0]?.outcome.body).toEqual(body);
+      expect(seen[0]?.outcome.error?._tag).toBe(tag);
+    });
+
+    test("a schema failure: the parsed body alongside the ValidationError", async () => {
+      const schema: tSchemaLike<never> = { "~standard": { validate: () => ({ issues: [{ message: "nope" }] }) } };
+      const { music, seen } = observed([{ body: { x: 1 } }]);
+      const thrown = await failure(music.request("v1/test", { schema }));
+      expect(seen[0]?.outcome).toEqual({ body: { x: 1 }, error: thrown });
+    });
+
+    test("every attempt of a retried request, each with its own outcome", async () => {
+      const { music, seen, events } = observed([{ status: 500 }, { body: { ok: true } }], { retry: { maxAttempts: 2, baseDelayMs: 0 } });
+      expect(await music.request("v1/test")).toEqual({ ok: true });
+      expect(events).toEqual(["request", "response 500", "request", "response 200"]);
+      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["ApiError", undefined]);
+    });
+
+    test("both responses of a 401 refresh", async () => {
+      let n = 0;
+      const { music, seen } = observed([apiError(401, "Unauthorized"), { body: {} }], { developerToken: () => `dev${String(++n)}` });
+      await music.request("v1/test");
+      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["DeveloperTokenRejected", undefined]);
+      expect(seen.map((s) => s.req.headers.get("authorization"))).toEqual(["Bearer dev1", "Bearer dev2"]);
+    });
+
+    test("a body that fails mid-read still reaches the hook, as a NetworkError with no body", async () => {
+      const seen: tResponseOutcome[] = [];
+      const stream = new ReadableStream({
+        start: (c) => {
+          c.error(new TypeError("terminated"));
+        },
+      });
+      const fetch = () => Promise.resolve(new Response(stream));
+      const music = createClient({
+        developerToken: "dev",
+        fetch,
+        retry: false,
+        onResponse: (_res, _req, outcome) => {
+          seen.push(outcome);
+        },
+      });
+      await failure(music.request("v1/test"));
+      expect(seen[0]?.body).toBeUndefined();
+      expect(seen[0]?.error?._tag).toBe("NetworkError");
+    });
+
+    test("never fires when there was no response", async () => {
+      const { music, seen, events } = observed([new TypeError("down")]);
+      await failure(music.request("v1/test"));
+      expect(events).toEqual(["request"]);
+      expect(seen).toEqual([]);
+    });
   });
 });

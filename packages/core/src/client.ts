@@ -45,8 +45,20 @@ export interface tClientOptions {
   retry?: tRetryPolicy | false | undefined;
   /** Opt-in token bucket. Share one instance across every client using the same developer token. */
   rateLimit?: tRateLimiter | undefined;
+  /** Called just before each attempt is sent, with the final Request. */
   onRequest?: ((req: Request) => void) | undefined;
-  onResponse?: ((res: Response, req: Request) => void) | undefined;
+  /**
+   * Called once per response, after the client is done with it: the body has been read and the
+   * outcome decided. `outcome.error` is what the request will throw unless a retry succeeds.
+   */
+  onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
+}
+
+export interface tResponseOutcome {
+  /** The parsed JSON body; undefined when there was none or it was not JSON. */
+  readonly body: unknown;
+  /** The error this response produced, if any. The request may still be retried after it. */
+  readonly error: AppleMusicError | undefined;
 }
 
 export interface tRequestInit<T = unknown> {
@@ -80,7 +92,7 @@ export interface tAppleMusicClient {
   forUser(userId: string): tAppleMusicClient;
 }
 
-type tSettled<T> = { readonly value: T; readonly error?: undefined } | { readonly error: AppleMusicError; readonly value?: undefined };
+type tSettled<T> = tResponseOutcome & ({ readonly value: T; readonly error: undefined } | { readonly error: AppleMusicError; readonly value?: undefined });
 
 /** A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a last, empty page. */
 function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
@@ -118,7 +130,9 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     const body = init.body === undefined ? null : JSON.stringify(init.body);
     const { signal } = init;
 
-    const send = async (token: string): Promise<Response> => {
+    // One attempt: send, read, classify, then tell the hook. Every response is settled, even one about
+    // to be replaced: settling reads the body, and an unread body keeps its connection out of the pool.
+    const exchange = async (token: string): Promise<tSettled<T>> => {
       await options.rateLimit?.acquire(signal);
       const headers = new Headers({ authorization: `Bearer ${token}` });
       if (user && userToken) headers.set("music-user-token", await userToken({ signal }));
@@ -132,20 +146,19 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
         if (signal?.aborted) throw e;
         throw new AppleMusicError("NetworkError", `${req.method} ${url.pathname}: ${e instanceof Error ? e.message : String(e)}`, { cause: e });
       }
-      options.onResponse?.(res, req);
-      return res;
+      const outcome = await settle(res, init, user, url);
+      options.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
+      return outcome;
     };
 
     return retry(
       async () => {
         const token = await developerToken({ signal });
-        // Every response is settled, even one about to be replaced: settling reads the body, and an
-        // unread body keeps its connection out of the pool until garbage collection.
-        let outcome = await settle(await send(token), init, user, url);
+        let outcome = await exchange(token);
         if (outcome.error?._tag === "DeveloperTokenRejected") {
           // One chance for a caching provider to replace a stale token; a plain string gets no retry.
           const fresh = await developerToken({ signal, rejected: token });
-          if (fresh !== token) outcome = await settle(await send(fresh), init, user, url);
+          if (fresh !== token) outcome = await exchange(fresh);
         }
         if (outcome.error) throw outcome.error;
         return outcome.value;
@@ -162,48 +175,44 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     } catch (e) {
       // The connection can drop after the headers arrive; that is a network failure like any other.
       if (init.signal?.aborted) throw e;
-      return { error: new AppleMusicError("NetworkError", `${init.method ?? "GET"} ${url.pathname}: ${e instanceof Error ? e.message : String(e)}`, { cause: e }) };
+      const message = `${init.method ?? "GET"} ${url.pathname}: ${e instanceof Error ? e.message : String(e)}`;
+      return { body: undefined, error: new AppleMusicError("NetworkError", message, { cause: e }) };
     }
-    if (res.ok) {
-      if (!text) return { value: undefined as T };
-      let value: unknown;
+    let body: unknown;
+    let notJson: unknown;
+    if (text) {
       try {
-        value = JSON.parse(text);
+        body = JSON.parse(text);
       } catch (e) {
-        return { error: new AppleMusicError("ApiError", `${String(res.status)} ${url.pathname}: body is not JSON`, { status: res.status, cause: e }) };
+        notJson = e; // on an error status that is fine: the status is all we have
       }
-      if (!init.schema) return { value: value as T };
-      const result = await init.schema["~standard"].validate(value);
-      if (result.issues)
-        return { error: new AppleMusicError("ValidationError", `${url.pathname}: ${formatIssues(result.issues)}`, { status: res.status, issues: result.issues }) };
-      return { value: result.value };
     }
 
-    let errors: readonly tError[] | undefined;
-    try {
-      errors = (JSON.parse(text) as { errors?: tError[] }).errors;
-    } catch {
-      // not JSON; the status is all we have
+    if (res.ok) {
+      if (!text) return { body, value: undefined as T, error: undefined };
+      if (notJson !== undefined)
+        return { body, error: new AppleMusicError("ApiError", `${String(res.status)} ${url.pathname}: body is not JSON`, { status: res.status, cause: notJson }) };
+      if (!init.schema) return { body, value: body as T, error: undefined };
+      const result = await init.schema["~standard"].validate(body);
+      if (result.issues) {
+        const message = `${url.pathname}: ${formatIssues(result.issues)}`;
+        return { body, error: new AppleMusicError("ValidationError", message, { status: res.status, issues: result.issues }) };
+      }
+      return { body, value: result.value, error: undefined };
     }
+
+    const reported = (body as { errors?: unknown } | null | undefined)?.errors;
+    const errors = Array.isArray(reported) ? (reported as readonly tError[]) : undefined;
     const first = errors?.[0];
     const message = `${String(res.status)} ${url.pathname}${first ? `: ${first.title}${first.detail ? ` (${first.detail})` : ""}` : ""}`;
     const details = { status: res.status, errors, retryAfterMs: parseRetryAfter(res.headers.get("retry-after")) };
-    switch (res.status) {
-      case 401:
-        return {
-          error: new AppleMusicError(
-            "DeveloperTokenRejected",
-            user ? `${message}. Under /v1/me a 401 can also mean the listener is not signed in or not subscribed` : message,
-            details,
-          ),
-        };
-      case 403:
-        return { error: new AppleMusicError("UserTokenInvalid", message, details) };
-      case 429:
-        return { error: new AppleMusicError("RateLimited", message, details) };
-      default:
-        return { error: new AppleMusicError("ApiError", message, details) };
-    }
+    const tag =
+      res.status === 401 ? "DeveloperTokenRejected"
+      : res.status === 403 ? "UserTokenInvalid"
+      : res.status === 429 ? "RateLimited"
+      : "ApiError";
+    const hint = tag === "DeveloperTokenRejected" && user ? ". Under /v1/me a 401 can also mean the listener is not signed in or not subscribed" : "";
+    return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 
   async function* paginate<T>(path: string, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {

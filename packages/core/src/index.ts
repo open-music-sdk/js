@@ -5,6 +5,7 @@ export type {
   tPage,
   tParams,
   tRequestInit,
+  tResponseOutcome,
   tSchemaLike,
   tSchemaResult,
   tTokenContext,

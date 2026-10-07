@@ -70,6 +70,14 @@ A provider is called once per request, and once more with `ctx.rejected` set whe
 so a caching minter can replace a stale token. `as(userToken)` derives a client for one listener;
 `forUser(userId)` does the same by looking the token up in `userTokenStore`.
 
+## Hooks
+
+`onRequest(req)` runs before each attempt with the final `Request`. `onResponse(res, req, outcome)`
+runs once per response, after the client has read the body and decided what it means:
+`outcome.body` is the parsed JSON (or `undefined`) and `outcome.error` is the `AppleMusicError` the
+request will throw, if any; a retry may still follow. The `Response` handed over has already been
+read, so take data from `outcome.body`, not from `res.json()`.
+
 ## Validation
 
 `request` accepts any [Standard Schema](https://standardschema.dev) as `schema`, including the
