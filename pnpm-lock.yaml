@@ -240,13 +240,13 @@ importers:
 
   packages/developer-token:
     dependencies:
+      '@open-music-sdk/core':
+        specifier: workspace:^
+        version: link:../core
       jose:
         specifier: 'catalog:'
         version: 6.2.12
     devDependencies:
-      '@open-music-sdk/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

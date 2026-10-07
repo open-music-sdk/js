@@ -11,8 +11,9 @@ exist. Use this package directly to assemble your own client or to build one of 
 pnpm add @open-music-sdk/developer-token @open-music-sdk/core
 ```
 
-`core` is a peer dependency: install it yourself, at the same version. The family is released in
-lockstep, and the two must share one copy of `core` for its errors to be recognised and retried.
+Keep the two on the same version. If your app does end up with a different copy of `core` than the
+one this package resolves, nothing breaks: an `AppleMusicError` is recognised, and retried, whichever
+copy made it.
 
 ```ts
 // On a server, a worker, or a CLI: anywhere the private key may live.
