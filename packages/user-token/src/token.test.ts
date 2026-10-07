@@ -1,6 +1,6 @@
-import { isAppleMusicError } from "@open-music-sdk/core";
+import { AppleMusicError, isAppleMusicError, type tErrorTag } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { appleError, failure, fakeClient, misshapen, shaped, storefront, type tReply } from "./testing.js";
+import { appleError, failure, fakeClient, foreignClient, misshapen, shaped, storefront, type tReply } from "./testing.js";
 import { isUserTokenShaped, userTokenFromEnv, validateUserToken } from "./token.js";
 
 /** An environment holding one variable. */
@@ -371,5 +371,47 @@ describe("no error quotes a token", () => {
     expect(isAppleMusicError(thrown, "UserTokenInvalid")).toBe(true);
     expect(quoted(thrown)).toContain("MUSIC_USER_TOKEN is not a Music User Token");
     expect(quoted(thrown)).not.toContain("secret");
+  });
+});
+
+describe("a client from another copy of core is validated the same", () => {
+  test("that copy really is another: its error class is not this one", async () => {
+    const { core } = await foreignClient();
+    expect(core.AppleMusicError).not.toBe(AppleMusicError);
+    expect(Object.getPrototypeOf(new core.AppleMusicError("ApiError", "x"))).not.toBe(AppleMusicError.prototype);
+  });
+
+  test("a token Apple accepts resolves to the storefront", async () => {
+    const { music } = await foreignClient([{ body: storefront("jp") }]);
+    await expect(validateUserToken(music, "user-token")).resolves.toBe("jp");
+  });
+
+  test.each<[string, tErrorTag, tReply[]]>([
+    ["403", "UserTokenInvalid", [{ status: 403 }]],
+    ["429", "RateLimited", [{ status: 429 }]],
+    ["500", "ApiError", [{ status: 500 }]],
+    ["failed fetch", "NetworkError", [new TypeError("fetch failed")]],
+    ["401 for the listener", "UserTokenInvalid", [{ status: 401 }, {}]],
+    ["401 for the developer token", "DeveloperTokenRejected", [{ status: 401 }, { status: 401 }]],
+    ["200 naming no storefront", "ApiError", [{ body: {} }]],
+  ])("its %s is a %s to this copy's guard and to its own", async (_, tag, replies) => {
+    const { core, music } = await foreignClient(replies);
+    const e = await validateUserToken(music, "user-token").catch((thrown: unknown) => thrown);
+    expect(isAppleMusicError(e, tag)).toBe(true);
+    expect(core.isAppleMusicError(e, tag)).toBe(true);
+  });
+
+  test("a 401 from that copy's client is still followed by the second request", async () => {
+    const { music, calls } = await foreignClient([{ status: 401 }, {}]);
+    await validateUserToken(music, "user-token").catch(() => undefined);
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/v1/me/storefront", "/v1/test"]);
+  });
+
+  test("the UserTokenInvalid this package makes for a malformed token is one to that copy's guard", async () => {
+    const { core, music, calls } = await foreignClient();
+    const e = await validateUserToken(music, "not a token").catch((thrown: unknown) => thrown);
+    expect(core.isAppleMusicError(e, "UserTokenInvalid")).toBe(true);
+    expect(e instanceof core.AppleMusicError).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 });

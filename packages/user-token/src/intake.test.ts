@@ -2,7 +2,7 @@ import type { tClientOptions } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { isJson, readCapped, userTokenIntake, type tUserTokenIntakeOptions } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
-import { appleError, fakeClient, misshapen, shaped, type tReply } from "./testing.js";
+import { appleError, fakeClient, foreignClient, misshapen, shaped, type tReply } from "./testing.js";
 
 const ENDPOINT = "https://app.example/music/user-token";
 const JSON_TYPE = { "content-type": "application/json" };
@@ -500,5 +500,35 @@ describe("no response carries the token or Apple's error text, and none may be c
     const res = await handler(post({ token: "secret-token" }));
     expect(await res.text()).not.toContain("secret");
     expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+describe("a client from another copy of core is served the same", () => {
+  const foreign = async (replies: tReply[] = []) => {
+    const { music, calls } = await foreignClient(replies);
+    const store = new MemoryUserTokenStore();
+    return { store, calls, handler: userTokenIntake(music, { store, userId: () => "u1" }) };
+  };
+
+  test("a token Apple accepts is stored", async () => {
+    const { handler, store } = await foreign();
+    expect((await handler(post({ token: "user-token" }))).status).toBe(204);
+    expect(await store.get("u1")).toBe("user-token");
+  });
+
+  test.each<[string, number, string, tReply[]]>([
+    ["403", 422, "UserTokenInvalid", [{ status: 403 }]],
+    ["401 for the listener", 422, "UserTokenInvalid", [{ status: 401 }, {}]],
+    ["401 for the developer token", 502, "DeveloperTokenRejected", [{ status: 401 }, { status: 401 }]],
+    ["429", 502, "RateLimited", [{ status: 429 }]],
+    ["500", 502, "ApiError", [{ status: 500 }]],
+    ["200 naming no storefront", 502, "ApiError", [{ body: {} }]],
+    ["failed fetch", 502, "NetworkError", [new TypeError("fetch failed")]],
+  ])("its %s is answered %i %s, not thrown at the framework", async (_, status, tag, replies) => {
+    const { handler, store } = await foreign(replies);
+    const res = await handler(post({ token: "user-token" }));
+    expect(res.status).toBe(status);
+    expect(await errorOf(res)).toBe(tag);
+    expect(await store.get("u1")).toBeUndefined();
   });
 });

@@ -1,5 +1,6 @@
 // Shared by this package's suites: a real core client over a scripted fetch. Not part of the build.
 import { createClient, isAppleMusicError, type AppleMusicError, type tClientOptions } from "@open-music-sdk/core";
+import { vi } from "vitest";
 
 /** One answer from Apple: a response, a fetch that throws, or `"hang"` for one that never answers until the request aborts. */
 export type tReply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error | "hang";
@@ -13,10 +14,10 @@ export const appleError = (status: number, title: string) => ({
 });
 
 /**
- * A client whose fetch answers from a queue of replies, then with a storefront, and records every
- * Request it saw. Like the real fetch it rejects with the abort reason when the request is aborted.
+ * A fetch that answers from a queue of replies, then with a storefront, and records every Request
+ * it saw. Like the real fetch it rejects with the abort reason when the request is aborted.
  */
-export function fakeClient(replies: tReply[] = [], options: Partial<tClientOptions> = {}) {
+export function fakeFetch(replies: tReply[] = []) {
   const calls: Request[] = [];
   const fetch = (input: RequestInfo | URL): Promise<Response> => {
     const req = input instanceof Request ? input : new Request(input);
@@ -33,7 +34,24 @@ export function fakeClient(replies: tReply[] = [], options: Partial<tClientOptio
     const body = reply.body === undefined ? null : JSON.stringify(reply.body);
     return Promise.resolve(new Response(body, { status: reply.status ?? 200, headers: reply.headers ?? {} }));
   };
+  return { fetch, calls };
+}
+
+/** A client over fakeFetch, with retries off unless `options` says otherwise. */
+export function fakeClient(replies: tReply[] = [], options: Partial<tClientOptions> = {}) {
+  const { fetch, calls } = fakeFetch(replies);
   return { music: createClient({ developerToken: "dev", fetch, retry: false, ...options }), calls };
+}
+
+/**
+ * The same client built by a second copy of core, as an app on another version of it would pass in.
+ * That copy's errors are not instances of this copy's class by prototype.
+ */
+export async function foreignClient(replies: tReply[] = []) {
+  vi.resetModules();
+  const core = await import("@open-music-sdk/core");
+  const { fetch, calls } = fakeFetch(replies);
+  return { core, music: core.createClient({ developerToken: "dev", fetch, retry: false }), calls };
 }
 
 /** The AppleMusicError `p` rejects with; anything else fails the test. */
