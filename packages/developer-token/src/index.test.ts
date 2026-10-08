@@ -8,7 +8,7 @@ import * as remoteEntry from "./remote.js";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
-    expect(Object.keys(api).sort()).toEqual(["cachedMinter", "fromEnv", "mintDeveloperToken", "redacted", "remoteDeveloperToken"]);
+    expect(Object.keys(api).sort()).toEqual(["cachedMinter", "mintDeveloperToken", "redacted", "remoteDeveloperToken"]);
   });
 
   test("is one of two: everything, and ./remote for code that must carry no signing code", () => {
@@ -17,14 +17,14 @@ describe("the package entry", () => {
 
   test("from an environment to a request, using nothing but the entry and core", async () => {
     const pair = await generateKeyPair("ES256", { extractable: true });
-    const names = { pem: "KEY", teamId: "TEAM", keyId: "KID" };
-    const key = api.fromEnv(Object.fromEntries([["KEY", await exportPKCS8(pair.privateKey)], ["TEAM", "DEF123GHIJ"], ["KID", "ABC123DEFG"]]), names);
+    const env = Object.fromEntries([["KEY", await exportPKCS8(pair.privateKey)], ["TEAM", "DEF123GHIJ"], ["KID", "ABC123DEFG"]]);
+    const developerToken = api.cachedMinter({ env, variables: { pem: "KEY", teamId: "TEAM", keyId: "KID" } });
     const sent: string[] = [];
     const fetch = (input: RequestInfo | URL): Promise<Response> => {
       sent.push(new Request(input).headers.get("authorization") ?? "");
       return Promise.resolve(new Response("{}"));
     };
-    await createClient({ developerToken: api.cachedMinter(key), fetch, retry: false }).request("v1/test");
+    await createClient({ developerToken, fetch, retry: false }).request("v1/test");
     const { payload, protectedHeader } = await jwtVerify((sent[0] ?? "").replace(/^Bearer /, ""), pair.publicKey);
     expect([payload.iss, protectedHeader.kid]).toEqual(["DEF123GHIJ", "ABC123DEFG"]);
   });

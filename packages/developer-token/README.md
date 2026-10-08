@@ -18,13 +18,13 @@ copy made it.
 ```ts
 // On a server, a worker, or a CLI: anywhere the private key may live.
 import { createClient } from "@open-music-sdk/core";
-import { cachedMinter, fromEnv } from "@open-music-sdk/developer-token";
+import { cachedMinter } from "@open-music-sdk/developer-token";
 
-const key = fromEnv(process.env); // the key and its two IDs, from your .env file or your platform's secrets
-const music = createClient({ developerToken: cachedMinter(key), storefront: "us" });
+// The key and its two IDs are read from the environment: your .env file, or your platform's secrets.
+const music = createClient({ developerToken: cachedMinter({ env: process.env }), storefront: "us" });
 
 // A token endpoint for your own front end: short-lived, bound to your origin, never stored by a cache.
-const forBrowsers = cachedMinter({ ...key, ttlSeconds: 3600, origin: ["https://app.example"] });
+const forBrowsers = cachedMinter({ env: process.env, ttlSeconds: 3600, origin: ["https://app.example"] });
 export const GET = async () => new Response(await forBrowsers(), { headers: { "cache-control": "no-store" } });
 ```
 
@@ -47,7 +47,6 @@ const music = createClient({ developerToken: remoteDeveloperToken("/api/token"),
 
 | Export | Does |
 | --- | --- |
-| `fromEnv(env, names?)` | Reads the private key, Team ID and key ID from an environment; the key comes back redacted |
 | `mintDeveloperToken(options)` | Signs one ES256 JWT with [`jose`](https://github.com/panva/jose): `kid` in the header, `iss`, `iat`, `exp`, and `origin` if given |
 | `cachedMinter(options)` | A provider that mints on first use, shares one mint between concurrent requests, and mints again before `exp` |
 | `remoteDeveloperToken(url, options?)` | A provider that fetches the token from your endpoint, with the same caching. Also the only export of `@open-music-sdk/developer-token/remote`. |
@@ -62,9 +61,10 @@ sign a token even if a private key were handed to it by mistake.
 
 Apple lets you download `AuthKey_XXXXXXXXXX.p8` once. Put its contents in the environment, not in the
 repository: a `.env` file that is never committed for local work, your platform's secret store in
-production. `fromEnv` reads three variables and takes the environment as an argument, so it works with
-whatever loaded it: `node --env-file=.env`, `process.loadEnvFile()`, a framework's own `.env` support, or
-the `env` a Cloudflare Worker is handed.
+production. Pass the environment as `env` and the minter reads three variables from it. The environment
+is an option, not something the package goes looking for, so it works with whatever loaded it:
+`node --env-file=.env`, `process.loadEnvFile()`, a framework's own `.env` support, or the `env` a
+Cloudflare Worker is handed.
 
 | Variable | Holds |
 | --- | --- |
@@ -72,15 +72,18 @@ the `env` a Cloudflare Worker is handed.
 | `APPLE_MUSIC_TEAM_ID` | Your Team ID. |
 | `APPLE_MUSIC_KEY_ID` | The key's ID: the ten characters in the file name. |
 
-Other names go in the second argument: `fromEnv(env, { pem: "MUSICKIT_KEY" })`. A variable that is
-missing or empty is a `TypeError` naming the variable. No error quotes a value.
+Other names go in `variables`: `cachedMinter({ env, variables: { pem: "MUSICKIT_KEY" } })`. Anything
+given outright is used instead of its variable, so `cachedMinter({ env, teamId, keyId })` reads only
+the key from the environment. A variable that is missing or empty is a `TypeError` naming every such
+variable, and an invalid value is reported with the variable it was read from. No error quotes a value.
 
 ## Minting
 
 | Option | |
 | --- | --- |
-| `pem` | The contents of the `.p8`, as `fromEnv` returns it, or a string or `redacted` string of your own. |
-| `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. |
+| `env`, `variables` | An environment to read the key and both IDs from, and other names for its three variables. See [The key](#the-key). |
+| `pem` | The contents of the `.p8`, as a string or a `redacted` string, when it does not come from `env`. |
+| `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. Required unless `env` holds them. |
 | `ttlSeconds` | Lifetime; default 150 days, at most 15 777 000 (Apple's six months). |
 | `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it, with a short `ttlSeconds`, on any token a browser will see. |
 | `refreshAheadSeconds` | `cachedMinter` only: how long before `exp` to mint a replacement. Default one day, never more than half the lifetime. |
@@ -91,8 +94,8 @@ never quoted in an error. The private key stays where you put it: only the signe
 
 `cachedMinter` reads its options once, when it is created, so nothing you do to your object afterwards
 changes what it mints. It imports the key on first use into a form that can sign and cannot be
-exported, and from then on holds no copy of the PEM text. The text is still wherever you got it from,
-`process.env` included.
+exported, and from then on holds no copy of the PEM text or of `env`. The text is still wherever you
+got it from, `process.env` included.
 
 ## Your token endpoint
 
