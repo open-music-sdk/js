@@ -1,3 +1,5 @@
+import { got } from "./got.js";
+
 /** The key and the two IDs that go with it: what a mint needs besides the token's own settings. */
 export type tSetting = "pem" | "teamId" | "keyId";
 
@@ -13,9 +15,6 @@ export interface tEnvVariables {
 
 const DEFAULT_VARIABLES = { pem: "APPLE_MUSIC_PRIVATE_KEY", teamId: "APPLE_MUSIC_TEAM_ID", keyId: "APPLE_MUSIC_KEY_ID" } as const;
 const SETTINGS = ["pem", "teamId", "keyId"] as const;
-
-/** What a value is, without showing it. */
-const got = (value: unknown) => (typeof value === "string" ? `${String(value.length)} characters` : value === null ? "null" : typeof value);
 
 /**
  * Reads the `wanted` settings from an environment: `process.env` once your `.env` file is loaded, a Workers

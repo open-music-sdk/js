@@ -62,7 +62,7 @@ describe("the ./fetcher entry", () => {
   });
 
   test("reaches no signing code: nothing it imports, at any remove, names jose or the minter", () => {
-    expect(reach("./fetcher.ts")).toEqual({ modules: ["./cache.ts", "./fetcher.ts"], packages: ["@open-music-sdk/core"] });
+    expect(reach("./fetcher.ts")).toEqual({ modules: ["./cache.ts", "./fetcher.ts", "./got.ts"], packages: ["@open-music-sdk/core"] });
   });
 
   test("the walk that says so does find jose from the main entry, so its silence means something", () => {

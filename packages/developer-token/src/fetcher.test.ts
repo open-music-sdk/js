@@ -115,6 +115,32 @@ describe("developerTokenFetcher: configuration", () => {
   test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("refuses refreshAheadSeconds %s", (refreshAheadSeconds) => {
     expect(() => developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, refreshAheadSeconds })).toThrow(TypeError);
   });
+  // The fetcher holds no key, but what lands in the wrong option may be a session token or an API key of the caller's.
+  describe.each([
+    ["timeoutMs", (value: unknown) => ({ timeoutMs: value as number })],
+    ["refreshAheadSeconds", (value: unknown) => ({ refreshAheadSeconds: value as number })],
+  ])("%s, where a number is expected", (_option, options) => {
+    test.each<[string, unknown]>([
+      ["a secret", "s3cret-session-token"],
+      ["an array holding a secret", ["s3cret-session-token"]],
+      ["an object that turns into a secret as a string", { toString: () => "s3cret-session-token" }],
+      ["a String object of a secret", new String("s3cret-session-token")],
+    ])("%s is refused with a TypeError that does not show it", (_name, value) => {
+      let error: unknown;
+      try {
+        developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, ...options(value) });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(TypeError);
+      expect(`${(error as Error).message} ${(error as Error).stack ?? ""}`).not.toContain("s3cret");
+    });
+
+    test.each([-1.5, Number.NaN, Number.NEGATIVE_INFINITY])("the number %s is refused with a TypeError that does show it", (value) => {
+      expect(() => developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, ...options(value) })).toThrow(String(value));
+    });
+  });
+
   test("refuses a fetch that is not a function", () => {
     expect(() => developerTokenFetcher(ENDPOINT, { fetch: "fetch" as unknown as typeof fetch })).toThrow(TypeError);
   });

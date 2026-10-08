@@ -1,5 +1,6 @@
 import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
 import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
+import { got } from "./got.js";
 
 // This module is also the package's "./fetcher" entry, for code that must carry no signing code: nothing it
 // imports, directly or through another module, may reach jose or ./mint.js. A test walks the imports.
@@ -89,7 +90,7 @@ export function developerTokenFetcher(url: string | URL, options: tFetcherOption
   if (typeof fetchImpl !== "function") throw new TypeError(`developerTokenFetcher: fetch must be a function, got ${typeof fetchImpl}`);
   // An integer, because a timer takes nothing else: Node throws at a fraction and a browser rounds it down, to zero if it can.
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS)
-    throw new TypeError(`developerTokenFetcher: timeoutMs must be an integer from 1 to ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
+    throw new TypeError(`developerTokenFetcher: timeoutMs must be an integer from 1 to ${String(MAX_TIMEOUT_MS)}, got ${got(timeoutMs)}`);
   /**
    * The endpoint as an absolute URL, or undefined while it is relative and there is nothing to resolve it against.
    * A relative URL resolves against the document's base URL, exactly as fetch would resolve it.

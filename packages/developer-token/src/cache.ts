@@ -1,4 +1,5 @@
 import type { tTokenContext } from "@open-music-sdk/core";
+import { got } from "./got.js";
 
 /** A core `tTokenProvider` that always answers with a promise and needs no context, so it is easy to call directly. */
 export type tDeveloperTokenProvider = (ctx?: tTokenContext) => Promise<string>;
@@ -46,7 +47,7 @@ export async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undef
  */
 export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds?: number): tDeveloperTokenProvider {
   if (refreshAheadSeconds !== undefined && (!Number.isFinite(refreshAheadSeconds) || refreshAheadSeconds < 0))
-    throw new TypeError(`developer token: refreshAheadSeconds must be a number from 0, got ${String(refreshAheadSeconds)}`);
+    throw new TypeError(`developer token: refreshAheadSeconds must be a number from 0, got ${got(refreshAheadSeconds)}`);
   // With no margin asked for, the half-life limit below is the whole rule.
   const margin = refreshAheadSeconds === undefined ? Number.POSITIVE_INFINITY : refreshAheadSeconds * 1000;
   let current: { token: string; refreshAt: number; expiresAt: number } | undefined;

@@ -276,6 +276,45 @@ describe("mintDeveloperToken and developerTokenMinter: a pem that is anything bu
   });
 });
 
+describe("where a number is expected, anything else is described and never printed", () => {
+  /** The key in the shapes a mistake could give it. Each would print the key if it were turned into a string. */
+  const shapes: [string, (pem: string) => unknown][] = [
+    ["the key", (pem) => pem],
+    ["the key with its line breaks escaped", (pem) => pem.replaceAll("\n", "\\n")],
+    ["an array holding the key", (pem) => [pem]],
+    ["an object that turns into the key as a string", (pem) => ({ toString: () => pem })],
+    ["a String object of the key", (pem) => new String(pem)],
+  ];
+  const numeric: [string, (value: unknown) => unknown][] = [
+    ["ttlSeconds, to mintDeveloperToken", (value) => mintDeveloperToken({ ...valid, ttlSeconds: value as number })],
+    ["ttlSeconds, to developerTokenMinter", (value) => developerTokenMinter({ ...valid, ttlSeconds: value as number })],
+    ["refreshAheadSeconds, to developerTokenMinter", (value) => developerTokenMinter({ ...valid, refreshAheadSeconds: value as number })],
+  ];
+  /** However the option fails, thrown or rejected, the error it fails with. */
+  const failure = async (attempt: () => unknown): Promise<Error> => {
+    try {
+      await attempt();
+    } catch (e) {
+      if (e instanceof Error) return e;
+    }
+    throw new Error("expected a failure");
+  };
+
+  describe.each(numeric)("%s", (_option, give) => {
+    test.each(shapes)("given %s: a TypeError that does not show it", async (_name, shape) => {
+      const error = await failure(() => give(shape(valid.pem)));
+      expect(error).toBeInstanceOf(TypeError);
+      expect(leaks(shown(error))).toBe(false);
+    });
+
+    test.each([-1.5, -60, Number.NaN, Number.POSITIVE_INFINITY])("given the number %s: a TypeError that does show it, which is what helps", async (value) => {
+      const error = await failure(() => give(value));
+      expect(error).toBeInstanceOf(TypeError);
+      expect(error.message).toContain(String(value));
+    });
+  });
+});
+
 describe("mintDeveloperToken: the key never ends up in a token or an error by being put in the wrong option", () => {
   test.each([
     ["keyId", (pem: string) => ({ keyId: pem })],

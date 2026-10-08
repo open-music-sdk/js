@@ -1,6 +1,7 @@
 import { importPKCS8, SignJWT } from "jose";
 import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 import { readEnv, type tEnvVariables, type tSetting } from "./env.js";
+import { got } from "./got.js";
 
 /** The key and its two IDs, given outright. */
 interface tKeyGiven {
@@ -48,9 +49,6 @@ const DEFAULT_TTL_SECONDS = 3600;
 // Below a minute, clock drift and the request itself use the lifetime up, and no replacement can be ready in time.
 const MIN_TTL_SECONDS = 60;
 const MAX_TTL_SECONDS = 15_777_000; // Apple's limit
-
-/** What a value is, for an error that must not show what it holds: a value in the wrong place may be the private key. */
-const got = (value: unknown) => (typeof value === "string" ? `${String(value.length)} characters` : value === null ? "null" : typeof value);
 
 /** The PEM, which is a string and nothing else: no wrapper is opened and no object is asked for one. */
 function pemOf(name: string, pem: unknown): string {
@@ -103,7 +101,7 @@ function check(options: tMintOptions): tClaims & { readonly pem: string; readonl
   const teamId = id(named("teamId"), options.teamId ?? read.teamId?.value);
   const keyId = id(named("keyId"), options.keyId ?? read.keyId?.value);
   if (!Number.isInteger(ttlSeconds) || ttlSeconds < MIN_TTL_SECONDS || ttlSeconds > MAX_TTL_SECONDS)
-    throw new TypeError(`developer token: ttlSeconds must be an integer from ${String(MIN_TTL_SECONDS)} to ${String(MAX_TTL_SECONDS)}, got ${String(ttlSeconds)}`);
+    throw new TypeError(`developer token: ttlSeconds must be an integer from ${String(MIN_TTL_SECONDS)} to ${String(MAX_TTL_SECONDS)}, got ${got(ttlSeconds)}`);
   let origins: string[] | undefined;
   if (origin !== undefined) {
     // An empty list is refused rather than sent: whether Apple reads it as "no origin" or "any origin" is undocumented.
