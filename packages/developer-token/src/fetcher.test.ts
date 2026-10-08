@@ -769,13 +769,13 @@ describe("developerTokenFetcher as a client's developerToken", () => {
     expect(sent).toEqual([`Bearer ${first}`, `Bearer ${first}`, `Bearer ${second}`]);
   });
 
-  test("an endpoint that keeps serving the rejected token ends in DeveloperTokenRejected, without a resend", async () => {
+  test("an endpoint that keeps serving the rejected token ends in DeveloperTokenInvalid, without a resend", async () => {
     const token = jwt();
     const { fetch, sent, tokenCalls } = world([{ text: token }, { text: token }], [200, 401]);
     const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     await music.request("v1/test");
     at(5 * 60_000);
-    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenInvalid");
     expect(sent).toHaveLength(2);
     expect(tokenCalls).toHaveLength(2);
   });
@@ -813,7 +813,7 @@ describe("developerTokenFetcher as a client's developerToken", () => {
     const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     for (let second = 0; second < 120; second++) {
       at(second * 1000);
-      expect((await failure(music.request("v1/me/library/songs", { user: false })))._tag).toBe("DeveloperTokenRejected");
+      expect((await failure(music.request("v1/me/library/songs", { user: false })))._tag).toBe("DeveloperTokenInvalid");
     }
     expect(tokenCalls).toHaveLength(2); // the first, and the replacement at one minute
     expect(sent).toHaveLength(121); // one per request, plus the single resend that carried the replacement
@@ -841,7 +841,7 @@ describe("developerTokenFetcher as a client's developerToken", () => {
   });
 
   test.each([
-    [401, "DeveloperTokenRejected"],
+    [401, "DeveloperTokenInvalid"],
     [403, "UserTokenInvalid"],
     [404, "ApiError"],
     [429, "RateLimited"],

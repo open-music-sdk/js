@@ -386,7 +386,7 @@ describe("401 and the developer token", () => {
   test("a fixed token gets no second chance", async () => {
     const { music, calls } = client([apiError(401, "Unauthorized")]);
     const e = await failure(music.request("v1/test"));
-    expect(e._tag).toBe("DeveloperTokenRejected");
+    expect(e._tag).toBe("DeveloperTokenInvalid");
     expect(e.status).toBe(401);
     expect(calls).toHaveLength(1);
   });
@@ -405,7 +405,7 @@ describe("401 and the developer token", () => {
   test("a provider that returns the same token is not resent", async () => {
     const developerToken = vi.fn(() => "same");
     const { music, calls } = client([apiError(401, "Unauthorized")], { developerToken });
-    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenInvalid");
     expect(developerToken).toHaveBeenCalledTimes(2);
     expect(calls).toHaveLength(1);
   });
@@ -414,7 +414,7 @@ describe("401 and the developer token", () => {
     let n = 0;
     const developerToken = vi.fn(() => `dev${String(++n)}`);
     const { music, calls } = client([apiError(401, "Unauthorized"), apiError(401, "Unauthorized")], { developerToken, retry: { maxAttempts: 3, baseDelayMs: 0 } });
-    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenInvalid");
     expect(developerToken).toHaveBeenCalledTimes(2);
     expect(calls).toHaveLength(2);
   });
@@ -1039,7 +1039,7 @@ describe("hooks", () => {
       let n = 0;
       const { music, seen } = observed([apiError(401, "Unauthorized"), { body: {} }], { developerToken: () => `dev${String(++n)}` });
       await music.request("v1/test");
-      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["DeveloperTokenRejected", undefined]);
+      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["DeveloperTokenInvalid", undefined]);
       expect(seen.map((s) => s.req.headers.get("authorization"))).toEqual(["Bearer dev1", "Bearer dev2"]);
     });
 

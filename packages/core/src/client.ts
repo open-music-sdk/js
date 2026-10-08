@@ -167,7 +167,7 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
       async () => {
         const token = await developerToken({ signal });
         let outcome = await exchange(token);
-        if (outcome.error?._tag === "DeveloperTokenRejected") {
+        if (outcome.error?._tag === "DeveloperTokenInvalid") {
           // One chance for a caching provider to replace a stale token; a plain string gets no retry.
           const fresh = await developerToken({ signal, rejected: token });
           if (fresh !== token) outcome = await exchange(fresh);
@@ -219,11 +219,11 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     const message = `${String(res.status)} ${url.pathname}${first ? `: ${first.title}${first.detail ? ` (${first.detail})` : ""}` : ""}`;
     const details = { status: res.status, errors, retryAfterMs: parseRetryAfter(res.headers.get("retry-after")) };
     const tag =
-      res.status === 401 ? "DeveloperTokenRejected"
+      res.status === 401 ? "DeveloperTokenInvalid"
       : res.status === 403 ? "UserTokenInvalid"
       : res.status === 429 ? "RateLimited"
       : "ApiError";
-    const hint = tag === "DeveloperTokenRejected" && user ? ". Under /v1/me a 401 can also mean the listener is not signed in or not subscribed" : "";
+    const hint = tag === "DeveloperTokenInvalid" && user ? ". Under /v1/me a 401 can also mean the listener is not signed in or not subscribed" : "";
     return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 

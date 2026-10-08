@@ -35,7 +35,7 @@ try {
 | Export | Does |
 | --- | --- |
 | `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser` |
-| `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenRejected`, `DeveloperTokenUnavailable`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
+| `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
 | `retry(fn, policy?, signal?)`, `retryable` | Exponential backoff with full jitter; honours `Retry-After` |
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
 | `parseRetryAfter(header)` | Seconds or HTTP date to milliseconds |
@@ -54,7 +54,7 @@ it, so two versions installed side by side do not break your error handling.
 
 | Status | Outcome |
 | --- | --- |
-| 401 | The developer token provider is asked again with the rejected token. A different token is tried once; then `DeveloperTokenRejected`. |
+| 401 | The developer token provider is asked again with the rejected token. A different token is tried once; then `DeveloperTokenInvalid`. |
 | 403 | `UserTokenInvalid`, never retried. |
 | 429 | Retried, waiting for `Retry-After`; then `RateLimited`. |
 | 5xx except 501 | Retried; then `ApiError`. |

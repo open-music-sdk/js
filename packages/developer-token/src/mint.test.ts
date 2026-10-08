@@ -563,7 +563,7 @@ describe("developerTokenMinter as a client's developerToken", () => {
     const music = createClient({ developerToken: developerTokenMinter(valid), fetch, retry: false });
     for (let second = 0; second < 120; second++) {
       at(second * 1000);
-      await expect(music.request("v1/test")).rejects.toMatchObject({ _tag: "DeveloperTokenRejected" });
+      await expect(music.request("v1/test")).rejects.toMatchObject({ _tag: "DeveloperTokenInvalid" });
     }
     expect(new Set(sent).size).toBe(2); // the first token, and the one minted at one minute
     expect(sent).toHaveLength(121); // one per request, plus the single resend that carried the new token
