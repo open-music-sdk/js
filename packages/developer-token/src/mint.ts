@@ -1,12 +1,11 @@
 import { importPKCS8, SignJWT } from "jose";
 import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 import { readEnv, type tEnvVariables, type tSetting } from "./env.js";
-import type { tRedacted } from "./redacted.js";
 
 /** The key and its two IDs, given outright. */
 interface tKeyGiven {
   /** The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Line breaks escaped as `\n` are accepted. */
-  readonly pem: string | tRedacted<string>;
+  readonly pem: string;
   /** Your Apple Developer Team ID; becomes `iss`. */
   readonly teamId: string;
   /** The ID of the MusicKit key; becomes `kid`. */
@@ -25,7 +24,7 @@ interface tKeyFromEnv {
   readonly env: object;
   /** Other names for the three variables. */
   readonly variables?: tEnvVariables | undefined;
-  readonly pem?: string | tRedacted<string> | undefined;
+  readonly pem?: string | undefined;
   readonly teamId?: string | undefined;
   readonly keyId?: string | undefined;
 }
@@ -49,11 +48,10 @@ const DEFAULT_TTL_SECONDS = 150 * 86_400;
 /** What a value is, for an error that must not show what it holds: a value in the wrong place may be the private key. */
 const got = (value: unknown) => (typeof value === "string" ? `${String(value.length)} characters` : value === null ? "null" : typeof value);
 
-/** The PEM out of `pem`: the string itself, or the string a redacted wrapper holds. Anything else is refused by name. */
+/** The PEM, which is a string and nothing else: no wrapper is opened and no object is asked for one. */
 function pemOf(name: string, pem: unknown): string {
-  const value: unknown = typeof pem === "object" && pem !== null && "unwrap" in pem && typeof pem.unwrap === "function" ? (pem.unwrap as () => unknown)() : pem;
-  if (typeof value === "string" && value !== "") return value;
-  throw new TypeError(`developer token: ${name} must be the contents of the .p8 file as a string, or that string redacted; got ${got(value)}`);
+  if (typeof pem === "string" && pem !== "") return pem;
+  throw new TypeError(`developer token: ${name} must be the contents of the .p8 file, as a string; got ${got(pem)}`);
 }
 
 /** Apple's Team IDs and key IDs are ten capital letters and digits. Anything else is refused before it is signed into a token. */

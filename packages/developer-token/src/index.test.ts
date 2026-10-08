@@ -8,7 +8,7 @@ import * as remoteEntry from "./fetcher.js";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
-    expect(Object.keys(api).sort()).toEqual(["developerTokenFetcher", "developerTokenMinter", "mintDeveloperToken", "redacted"]);
+    expect(Object.keys(api).sort()).toEqual(["developerTokenFetcher", "developerTokenMinter", "mintDeveloperToken"]);
   });
 
   test("is one of two: everything, and ./fetcher for code that must carry no signing code", () => {

@@ -54,7 +54,6 @@ needed, and is named for how it gets one.
 | `mintDeveloperToken(options)` | Signs one ES256 JWT with [`jose`](https://github.com/panva/jose): `kid` in the header, `iss`, `iat`, `exp`, and `origin` if given |
 | `developerTokenMinter(options)` | A provider that mints on first use, shares one mint between concurrent requests, and mints again before `exp` |
 | `developerTokenFetcher(url, options?)` | A provider that fetches the token from your endpoint, with the same caching. Also the only export of `@open-music-sdk/developer-token/fetcher`. |
-| `redacted(value)` | Wraps a secret so string conversion and JSON print `<redacted>`, as does `console.log` on Node and any runtime that honours its inspect symbol; `unwrap()` returns it. Elsewhere a console shows an object of functions, never the value. |
 
 The package has two entries. `@open-music-sdk/developer-token` is everything. `/fetcher` is
 `developerTokenFetcher` alone, in a file that imports neither `jose` nor the minter, for code that must
@@ -86,7 +85,7 @@ variable, and an invalid value is reported with the variable it was read from. N
 | Option | |
 | --- | --- |
 | `env`, `variables` | An environment to read the key and both IDs from, and other names for its three variables. See [The key](#the-key). |
-| `pem` | The contents of the `.p8`, as a string or a `redacted` string, when it does not come from `env`. |
+| `pem` | The contents of the `.p8`, as a string, when it does not come from `env`. |
 | `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. Required unless `env` holds them. |
 | `ttlSeconds` | Lifetime; default 150 days, at most 15 777 000 (Apple's six months). |
 | `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it, with a short `ttlSeconds`, on any token a browser will see. |

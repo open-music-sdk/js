@@ -4,7 +4,6 @@ import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
-import { redacted } from "./redacted.js";
 
 // jose as it is, with its key import counted: how often the minter parses the key is part of what it promises.
 vi.mock("jose", async (importOriginal) => {
@@ -17,7 +16,7 @@ const NOW_SECONDS = NOW / 1000;
 const DAY_SECONDS = 86_400;
 
 let publicKey: CryptoKey;
-let valid: tMintOptions;
+let valid: { pem: string; teamId: string; keyId: string };
 /** PEMs that are well formed but are not a PKCS8 P-256 private key. */
 const wrongKeys: Record<string, string> = {};
 
@@ -54,7 +53,7 @@ async function read(token: string) {
 
 /** True when any stretch of the private key's body shows up in the text. */
 function leaks(text: string): boolean {
-  const body = (valid.pem as string).split("\n").slice(1, -1).join("");
+  const body = valid.pem.split("\n").slice(1, -1).join("");
   for (let i = 0; i + 12 <= body.length; i += 4) if (text.includes(body.slice(i, i + 12))) return true;
   return false;
 }
@@ -64,7 +63,6 @@ const shown = (e: unknown) => `${inspect(e, { depth: null, showHidden: true })} 
 const invalid: [string, Record<string, unknown>][] = [
   ["a missing pem", { pem: undefined }],
   ["an empty pem", { pem: "" }],
-  ["a redacted pem holding nothing", { pem: redacted(undefined) }],
   ["an empty teamId", { teamId: "" }],
   ["a missing teamId", { teamId: undefined }],
   ["a numeric teamId", { teamId: 1234567890 }],
@@ -174,9 +172,8 @@ describe("mintDeveloperToken: the key", () => {
     ["with Windows line endings", (pem: string) => pem.replaceAll("\n", "\r\n")],
     ["with whitespace around it", (pem: string) => `\n  ${pem}\n\n`],
     ["with a byte order mark, as some editors save it", (pem: string) => String.fromCharCode(0xfeff) + pem],
-    ["redacted", (pem: string) => redacted(pem)],
   ])("accepts the PEM %s", async (_name, wrap) => {
-    await read(await mintDeveloperToken({ ...valid, pem: wrap(valid.pem as string) }));
+    await read(await mintDeveloperToken({ ...valid, pem: wrap(valid.pem) }));
   });
 
   test.each(["a public key", "a P-384 key", "an Ed25519 key", "an RSA key", "a P-256 key in SEC1 rather than PKCS8"])("rejects %s", async (name) => {
@@ -202,14 +199,14 @@ describe("mintDeveloperToken: the key", () => {
     ["quotes left around it", (pem: string) => JSON.stringify(pem)],
     ["its line breaks escaped twice", (pem: string) => pem.replaceAll("\n", "\\\\n")],
   ])("a key rejected for having %s is not quoted anywhere in the error, from its first line to its last", async (_name, damage) => {
-    const error: unknown = await mintDeveloperToken({ ...valid, pem: damage((valid.pem as string).trim()) }).catch((e: unknown) => e);
+    const error: unknown = await mintDeveloperToken({ ...valid, pem: damage(valid.pem.trim()) }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
     expect(leaks(shown(error))).toBe(false);
   });
 
   test("the check itself can see a key when one is shown", () => {
-    expect(leaks(shown(new Error(`bad key ${valid.pem as string}`)))).toBe(true);
-    expect(leaks(shown(new Error("bad key", { cause: new Error((valid.pem as string).split("\n").at(-2)) })))).toBe(true);
+    expect(leaks(shown(new Error(`bad key ${valid.pem}`)))).toBe(true);
+    expect(leaks(shown(new Error("bad key", { cause: new Error(valid.pem.split("\n").at(-2)) })))).toBe(true);
   });
 });
 
@@ -219,7 +216,7 @@ describe("mintDeveloperToken: invalid options", () => {
   });
 });
 
-describe("mintDeveloperToken and developerTokenMinter: a pem that is not a string, plain or redacted, is refused by name", () => {
+describe("mintDeveloperToken and developerTokenMinter: a pem that is anything but a string is refused by name", () => {
   const wrong: [string, (pem: string) => unknown][] = [
     ["null", () => null],
     ["undefined", () => undefined],
@@ -232,14 +229,13 @@ describe("mintDeveloperToken and developerTokenMinter: a pem that is not a strin
     ["an object holding the key", (pem) => ({ pem })],
     ["an object whose unwrap is the key, not a function", (pem) => ({ unwrap: pem })],
     ["a function returning the key", (pem) => () => pem],
-    ["a redacted number", () => redacted(42)],
-    ["a redacted empty string", () => redacted("")],
-    ["a redacted Buffer of the key", (pem) => redacted(Buffer.from(pem))],
-    ["a redacted wrapper around a redacted key", (pem) => redacted(redacted(pem))],
+    ["a wrapper that would hand the key back from unwrap()", (pem) => ({ unwrap: () => pem, toString: () => "<redacted>" })],
+    ["an object that turns into the key as a string", (pem) => ({ toString: () => pem })],
+    ["a String object of the key", (pem) => new String(pem)],
   ];
 
   test.each(wrong)("%s, to mintDeveloperToken: a TypeError about pem that does not show what it was given", async (_name, make) => {
-    const error: unknown = await mintDeveloperToken({ ...valid, pem: make(valid.pem as string) as string }).catch((e: unknown) => e);
+    const error: unknown = await mintDeveloperToken({ ...valid, pem: make(valid.pem) as string }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
     expect((error as Error).message).toMatch(/^developer token: pem must be the contents of the \.p8 file/);
     expect(leaks(shown(error))).toBe(false);
@@ -248,7 +244,7 @@ describe("mintDeveloperToken and developerTokenMinter: a pem that is not a strin
   test.each(wrong)("%s, to developerTokenMinter: the same, when the minter is created", (_name, make) => {
     let error: unknown;
     try {
-      developerTokenMinter({ ...valid, pem: make(valid.pem as string) as string });
+      developerTokenMinter({ ...valid, pem: make(valid.pem) as string });
     } catch (e) {
       error = e;
     }
@@ -284,7 +280,7 @@ describe("mintDeveloperToken: the key never ends up in a token or an error by be
     ["origin", (pem: string) => ({ origin: [pem] })],
     ["origin, after a good entry", (pem: string) => ({ origin: ["https://app.example", pem] })],
   ])("the key given as %s is refused, not signed, and not quoted", async (_name, misplace) => {
-    const error: unknown = await mintDeveloperToken({ ...valid, ...misplace(valid.pem as string) }).catch((e: unknown) => e);
+    const error: unknown = await mintDeveloperToken({ ...valid, ...misplace(valid.pem) }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
     expect(leaks(shown(error))).toBe(false);
   });
@@ -482,12 +478,11 @@ describe("developerTokenMinter: the key is parsed once and the PEM not gone back
     expect([key.type, key.extractable, key.usages]).toEqual(["private", false, ["sign"]]);
   });
 
-  test("a redacted key is opened once, when the minter is created, and never again", async () => {
-    const unwrap = vi.fn(() => valid.pem as string);
-    const minter = developerTokenMinter({ ...valid, pem: { unwrap, toString: () => "<redacted>", toJSON: () => "<redacted>" } });
-    expect(unwrap).toHaveBeenCalledTimes(1);
-    await mintAgain(minter, 3);
-    expect(unwrap).toHaveBeenCalledTimes(1);
+  test("nothing is called on a pem that is not a string: no wrapper is opened and no object asked to turn into one", () => {
+    const [unwrap, asString] = [vi.fn(() => valid.pem), vi.fn(() => valid.pem)];
+    expect(() => developerTokenMinter({ ...valid, pem: { unwrap, toString: asString, toJSON: asString, valueOf: asString } as unknown as string })).toThrow(TypeError);
+    expect(unwrap).not.toHaveBeenCalled();
+    expect(asString).not.toHaveBeenCalled();
   });
 
   test("mintDeveloperToken, which keeps nothing, imports the key each time it is called", async () => {
