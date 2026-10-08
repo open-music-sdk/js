@@ -14,30 +14,133 @@ pnpm add @open-music-sdk/user-token @open-music-sdk/core
 Keep the two on the same version. If your app does end up with a different copy of `core` than the
 one this package resolves, nothing breaks: an `AppleMusicError` is recognised whichever copy made it.
 
+## Taking a token in
+
+Only Apple's sign-in can produce a Music User Token. What differs between apps is where the token
+goes next, and so where this package runs. Every block below is headed by where its code runs.
+
+| | The token arrives | Validated | Kept | Fits |
+| --- | --- | --- | --- | --- |
+| [Server only](#server-only) | In the environment of the process | On the server | In the process | A CLI, a job, a script |
+| [Client only](#client-only) | From Apple's sign-in, on the page | In the browser | In the page's memory | A site that calls Apple straight from the page |
+| [Hybrid](#hybrid) | From Apple's sign-in, on the page | On the server | In a store on the server | A full-stack app |
+
+`sessionUserId`, `fetchDeveloperToken`, `showSignInAgain`, and `askListenerToReconnect` stand for
+your own code.
+
+### Server only
+
+No browser takes part. Whoever runs the program supplies a token they already hold.
+
+**Runs on the server** (`sync-library.ts`):
+
 ```ts
 import { createClient, isAppleMusicError } from "@open-music-sdk/core";
-import { MemoryUserTokenStore, userTokenFromEnv, userTokenIntake, validateUserToken } from "@open-music-sdk/user-token";
+import { userTokenFromEnv, validateUserToken } from "@open-music-sdk/user-token";
 
-const store = new MemoryUserTokenStore();
-const music = createClient({ developerToken, userTokenStore: store });
+const music = createClient({ developerToken: process.env.APPLE_MUSIC_TOKEN! });
 
-// Intake over HTTP: a web-standard handler. Validates with GET /v1/me/storefront, then stores.
-export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
-
-// Intake out of band: a CLI or job reads the token from the environment, if one is set.
-const token = userTokenFromEnv("MUSIC_USER_TOKEN");
-if (token !== undefined) {
-  const storefront = await validateUserToken(music, token); // throws UserTokenInvalid before any work starts
-  await store.set(userId, token);
-}
-
-// Rejection: core maps 403 to UserTokenInvalid. Forget only the token that was rejected: the
-// listener may have reconnected, and a new token been stored, while the request was in flight.
-const sent = await store.get(userId);
 try {
-  await music.forUser(userId).request("v1/me/library/playlists");
+  // undefined when the variable is unset; throws when it is set to something that is not a token
+  const token = userTokenFromEnv("MUSIC_USER_TOKEN");
+  if (token === undefined) throw new Error("Set MUSIC_USER_TOKEN to a Music User Token");
+  await validateUserToken(music, token); // one request to Apple, before any work starts
+
+  const listener = music.as(token); // a client bound to this listener
+  for await (const playlist of listener.paginate("v1/me/library/playlists")) console.log(playlist);
 } catch (e) {
   if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
+  console.error("MUSIC_USER_TOKEN is not a working Music User Token. Get a new one and set it again.");
+  process.exitCode = 1;
+}
+```
+
+### Client only
+
+Everything about the listener runs in the page. It asks Apple about the token directly and keeps it
+in memory; your server never sees it.
+
+**Runs in the browser** (`music.ts`):
+
+```ts
+import { createClient, isAppleMusicError, type tAppleMusicClient } from "@open-music-sdk/core";
+import { validateUserToken } from "@open-music-sdk/user-token";
+
+// A browser cannot mint a developer token: fetchDeveloperToken gets a short-lived one from an
+// endpoint you host. That endpoint is the only server involved, and it knows nothing of the listener.
+const music = createClient({ developerToken: fetchDeveloperToken });
+
+// In memory only, never localStorage: the token is as sensitive as a session cookie.
+let listener: tAppleMusicClient | undefined;
+
+/** Call with the token Apple's sign-in gave this page. */
+export async function connect(musicUserToken: string): Promise<void> {
+  try {
+    await validateUserToken(music, musicUserToken); // from the page straight to Apple
+    listener = music.as(musicUserToken); // every /v1/me call the page makes goes through this
+  } catch (e) {
+    if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
+    listener = undefined;
+    showSignInAgain();
+  }
+}
+```
+
+### Hybrid
+
+The page gets the token and hands it to your server. The server validates it, stores it under the
+signed-in user, and makes every later Apple call itself.
+
+**Runs in the browser** (`connect.ts`). It posts the token and keeps nothing:
+
+```ts
+/** Call with the token Apple's sign-in gave this page. */
+export async function connect(musicUserToken: string): Promise<void> {
+  const res = await fetch("/music/user-token", {
+    method: "POST",
+    headers: { "content-type": "application/json" }, // required: anything else is answered 415
+    body: JSON.stringify({ token: musicUserToken }),
+  });
+  if (res.status === 204) return; // validated and stored
+  if (res.status === 422) return showSignInAgain(); // Apple would not take it
+  throw new Error(`Could not connect Apple Music: ${res.status}`);
+}
+```
+
+**Runs on the server** (`music.ts`). One client and one store, shared by every route:
+
+```ts
+import { createClient } from "@open-music-sdk/core";
+import { MemoryUserTokenStore } from "@open-music-sdk/user-token";
+
+export const store = new MemoryUserTokenStore(); // or new KvUserTokenStore(env.TOKENS), or a store of your own
+export const music = createClient({ developerToken: process.env.APPLE_MUSIC_TOKEN!, userTokenStore: store });
+```
+
+**Runs on the server** (`routes/music/user-token.ts`). The handler the page posts to; mount it
+wherever your framework takes `(Request) => Response`:
+
+```ts
+import { userTokenIntake } from "@open-music-sdk/user-token";
+import { music, store } from "../../music.js";
+
+// userId is your own session lookup, and the only thing that decides whose token this is.
+export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
+```
+
+**Runs on the server**, in any later request. It acts for a listener by your own user id:
+
+```ts
+import { isAppleMusicError } from "@open-music-sdk/core";
+import { music, store } from "./music.js";
+
+const sent = await store.get(userId);
+try {
+  await music.forUser(userId).request("v1/me/library/playlists"); // the token is looked up in the store
+} catch (e) {
+  if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
+  // Forget only the token that was rejected: the listener may have reconnected, and a new token
+  // been stored, while this request was in flight.
   if ((await store.get(userId)) === sent) {
     await store.delete(userId);
     askListenerToReconnect(userId);
