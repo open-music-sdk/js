@@ -78,7 +78,8 @@ Cloudflare Worker is handed.
 Other names go in `variables`: `developerTokenMinter({ env, variables: { pem: "MUSICKIT_KEY" } })`. Anything
 given outright is used instead of its variable, so `developerTokenMinter({ env, teamId, keyId })` reads only
 the key from the environment. A variable that is missing or empty is a `TypeError` naming every such
-variable, and an invalid value is reported with the variable it was read from. No error quotes a value.
+variable, and an invalid value is reported with the variable it was read from. No error quotes a value:
+a string is described by its length and anything else by its kind. Only a number is printed as given.
 
 ## Minting
 
@@ -89,7 +90,7 @@ variable, and an invalid value is reported with the variable it was read from. N
 | `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. Required unless `env` holds them. |
 | `ttlSeconds` | The token's lifetime in whole seconds. Default 3600, one hour; from 60 to 15 777 000 (Apple's six months). |
 | `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it on any token a browser will see. |
-| `refreshAheadSeconds` | `developerTokenMinter` only: how long before `exp` to mint a replacement. Default, and at most, half the lifetime. |
+| `refreshAheadSeconds` | For `developerTokenMinter`, not `mintDeveloperToken`: how long before `exp` to mint a replacement. Default, and at most, half the lifetime. |
 
 Invalid options throw a `TypeError`: from `developerTokenMinter` when it is created, from `mintDeveloperToken`
 as a rejection. A key that is not a PKCS8 P-256 private key is a `TypeError` on first use; the key is
@@ -122,18 +123,20 @@ the rest of the request, so a hook that prints requests prints the token.
 `developerTokenFetcher(url)` expects your endpoint to answer 2xx with the JWT as text or as JSON
 `{ "token": "<jwt>" }`. It reads `exp` from the token to know when to fetch again and does not verify
 the signature; Apple does. The request is a plain `GET` with `cache: "no-store"` and a timeout
-(`timeoutMs`, whole milliseconds, default 10 s); pass `fetch` to add credentials or headers. The timeout holds even if
-your `fetch` does not pass the abort signal on.
+(`timeoutMs`, whole milliseconds, default 10 s); pass `fetch` to add credentials or headers. The
+timeout holds even if your `fetch` does not pass the abort signal on. `refreshAheadSeconds` works as
+it does for the minter, measured against the life the token had left when it arrived.
 
 The answer is read up to 16 KB and no further, counted after any decompression; the rest is cancelled.
 A token longer than 8 KB is not believed either: a real one is a few hundred bytes. What answers at
-your URL decides how much is sent, not how much is kept.
+your URL decides how much is sent, not how much is kept. The one exception is a runtime whose
+responses have no body stream to count: there the answer is read whole and then held to the same limit.
 
 A redirect is refused, so the token only ever comes from the URL you configured. Point it at the final
 URL: a framework that redirects `/api/token` to `/api/token/` will otherwise fail every fetch.
 
-A relative URL such as `/api/token` resolves against the document's base URL on first use, exactly as
-`fetch` would. Creating the provider never needs a document, so a module that a server also loads can
+A relative URL such as `/api/token` resolves against the document's base URL each time a token is
+fetched, exactly as `fetch` would. Creating the provider never needs a document, so a module that a server also loads can
 create it; using it where there is none throws a `TypeError`. Outside a browser, pass an absolute URL.
 
 Whatever goes wrong at the endpoint is an `AppleMusicError` tagged `DeveloperTokenUnavailable`, so it is
@@ -141,7 +144,7 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 
 | Endpoint | `status` | Retried by the client |
 | --- | --- | --- |
-| Unreachable, timed out, or dropped mid-body | none | Yes |
+| Unreachable, redirecting, timed out, or dropped mid-body | none | Yes |
 | 429, or 5xx other than 501 | The endpoint's | Yes, after its `Retry-After` if it sent one |
 | Any other status that is not 2xx | The endpoint's | No |
 | 2xx without a JWT that has an `exp`, or with more than 16 KB | The endpoint's | No |
@@ -149,9 +152,9 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 ## Caching
 
 Both providers issue once and reuse the token. Halfway through its life, or `refreshAheadSeconds`
-before its `exp` if you set that and it is later, the token is replaced in the background: requests keep getting the old one, nobody waits, and a replacement that
-fails is tried again a minute later. An outage of your token endpoint that ends before `exp` is never
-seen by a request. Only when there is no usable token does a request wait for one, or fail for want of
+before its `exp` if you set that and it is later, the token is replaced in the background: requests
+keep getting the old one, nobody waits, and a replacement that fails is tried again a minute later. An
+outage of your token endpoint that ends before `exp` is never seen by a request. Only when there is no usable token does a request wait for one, or fail for want of
 one, and then the next request tries again.
 
 Concurrent requests share one mint or fetch; an abort ends only the request that aborted.

@@ -145,8 +145,8 @@ export async function mintDeveloperToken(options: tMintOptions): Promise<string>
 }
 
 /**
- * A `developerToken` provider that mints on first use and reuses the token until shortly before it expires.
- * Concurrent requests share one mint, and a token Apple answers 401 to is replaced.
+ * A `developerToken` provider that mints on first use and reuses the token, replacing it in the background
+ * halfway through its life. Concurrent requests share one mint, and a token Apple answers 401 to is replaced.
  *
  * The options are read once, here. The key is imported on first use and the PEM let go of: from then on the
  * minter holds a key that can sign and cannot be exported, and no copy of the text it came from.

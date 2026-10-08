@@ -77,7 +77,7 @@ so a caching minter can replace a stale token. A provider that cannot get a toke
 throws reaches the caller untouched. `as(userToken)` derives a client for one listener;
 `forUser(userId)` does the same by looking the token up in `userTokenStore`.
 
-A token is printable characters with no spaces or line breaks inside; whitespace around it, as a token
+A token is printable ASCII with no spaces or line breaks inside; whitespace around it, as a token
 read from a file has, is dropped. Anything else is a `TypeError` before the request is sent, and the
 error describes the value rather than repeating it.
 

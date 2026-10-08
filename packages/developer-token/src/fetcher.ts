@@ -80,8 +80,8 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * A `developerToken` provider that fetches the token from an endpoint you host, for code that must not hold
  * the private key. The endpoint answers 2xx with the JWT as text, or as JSON `{ "token": "<jwt>" }`.
  *
- * The token is reused until shortly before its `exp`, concurrent requests share one fetch, and a token Apple
- * answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
+ * The token is reused and replaced in the background halfway through the life it had left, concurrent requests
+ * share one fetch, and a token Apple answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
  * the endpoint's status when it answered, so it is never mistaken for an answer from Apple.
  */
 export function developerTokenFetcher(url: string | URL, options: tFetcherOptions = {}): tDeveloperTokenProvider {
