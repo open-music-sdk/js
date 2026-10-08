@@ -675,7 +675,25 @@ describe("developerTokenFetcher: reuse", () => {
     expect(calls).toHaveLength(2);
   });
 
-  test("with the default margin of a day, a shorter-lived token is reused for half its life", async () => {
+  test.each([
+    ["an hour", HOUR_SECONDS],
+    ["twelve hours", 12 * HOUR_SECONDS],
+    ["a hundred days", 2400 * HOUR_SECONDS],
+  ])("with no margin given, a token with %s left is fetched again halfway through that", async (_name, life) => {
+    const { fetch, calls } = endpoint({ text: expiring(life, "1") }, { text: expiring(2 * life, "2") });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
+    const first = await provider({});
+    at((life / 2) * 1000 - 1);
+    expect(await provider({})).toBe(first);
+    expect(calls).toHaveLength(1);
+    at((life / 2) * 1000);
+    expect(await provider({})).toBe(first);
+    await flush();
+    expect(await provider({})).not.toBe(first);
+    expect(calls).toHaveLength(2);
+  });
+
+  test("a token with two hours left is reused for one of them", async () => {
     const { fetch, calls } = endpoint({ text: expiring(2 * HOUR_SECONDS, "1") }, { text: expiring(4 * HOUR_SECONDS, "2") });
     const provider = developerTokenFetcher(ENDPOINT, { fetch });
     await provider({});

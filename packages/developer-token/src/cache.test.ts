@@ -51,16 +51,23 @@ describe("cached: validation", () => {
       expect(() => cached(issuer(), seconds)).toThrow(TypeError);
     },
   );
-  test("undefined means the default of one day", async () => {
-    const issue = issuer(10 * DAY);
-    const provider = cached(issue, undefined);
-    await provider({});
-    at(9 * DAY - 1);
-    await provider({});
-    expect(issue).toHaveBeenCalledTimes(1);
-    at(9 * DAY);
-    await provider({});
-    expect(issue).toHaveBeenCalledTimes(2);
+  test.each([
+    ["an hour", HOUR],
+    ["ten days", 10 * DAY],
+    ["150 days", 150 * DAY],
+  ])("with no margin given, a token that lives %s is replaced halfway through its life", async (_name, life) => {
+    for (const provider of [cached(issuer(life)), cached(issuer(life), undefined)]) {
+      vi.setSystemTime(NOW);
+      const first = await provider({});
+      at(life / 2 - 1);
+      expect(await provider({})).toBe(first);
+      await flush();
+      expect(await provider({})).toBe(first); // nothing was replaced behind that call
+      at(life / 2);
+      await provider({});
+      await flush();
+      expect(await provider({})).not.toBe(first);
+    }
   });
 });
 

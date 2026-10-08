@@ -23,8 +23,8 @@ import { developerTokenMinter } from "@open-music-sdk/developer-token";
 // The key and its two IDs are read from the environment: your .env file, or your platform's secrets.
 const music = createClient({ developerToken: developerTokenMinter({ env: process.env }), storefront: "us" });
 
-// A token endpoint for your own front end: short-lived, bound to your origin, never stored by a cache.
-const forBrowsers = developerTokenMinter({ env: process.env, ttlSeconds: 3600, origin: ["https://app.example"] });
+// A token endpoint for your own front end: bound to your origin, never stored by a cache.
+const forBrowsers = developerTokenMinter({ env: process.env, origin: ["https://app.example"] });
 export const GET = async () => new Response(await forBrowsers(), { headers: { "cache-control": "no-store" } });
 ```
 
@@ -87,9 +87,9 @@ variable, and an invalid value is reported with the variable it was read from. N
 | `env`, `variables` | An environment to read the key and both IDs from, and other names for its three variables. See [The key](#the-key). |
 | `pem` | The contents of the `.p8`, as a string, when it does not come from `env`. |
 | `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. Required unless `env` holds them. |
-| `ttlSeconds` | Lifetime; default 150 days, at most 15 777 000 (Apple's six months). |
-| `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it, with a short `ttlSeconds`, on any token a browser will see. |
-| `refreshAheadSeconds` | `developerTokenMinter` only: how long before `exp` to mint a replacement. Default one day, never more than half the lifetime. |
+| `ttlSeconds` | The token's lifetime in whole seconds. Default 3600, one hour; from 60 to 15 777 000 (Apple's six months). |
+| `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it on any token a browser will see. |
+| `refreshAheadSeconds` | `developerTokenMinter` only: how long before `exp` to mint a replacement. Default, and at most, half the lifetime. |
 
 Invalid options throw a `TypeError`: from `developerTokenMinter` when it is created, from `mintDeveloperToken`
 as a rejection. A key that is not a PKCS8 P-256 private key is a `TypeError` on first use; the key is
@@ -105,8 +105,9 @@ got it from, `process.env` included.
 A developer token is a bearer credential for your whole team's quota, and an endpoint that hands one
 to anyone who asks is a public token dispenser. What limits the damage is yours to set:
 
-- **A short `ttlSeconds`.** A token cannot be revoked without revoking the key, so its lifetime is
-  how long a leaked one stays useful. The 150-day default suits a token that never leaves your server.
+- **`ttlSeconds`.** A token cannot be revoked without revoking the key, so its lifetime is how long a
+  leaked one stays useful. The default is one hour, and since the minter replaces tokens on its own a
+  longer one buys nothing. Raise it only for a token that has to be embedded where nothing can mint.
 - **`origin`.** Apple honours it for requests from browsers. It does not stop a script that sets its
   own `Origin` header, so it narrows who can use a token, not who can fetch one.
 - **Who may call the endpoint.** Put it behind your own session or rate limit if tokens should only
@@ -147,8 +148,8 @@ never mistaken for an answer from Apple: a 404 from your endpoint is not "no suc
 
 ## Caching
 
-Both providers issue once and reuse the token. From `refreshAheadSeconds` before its `exp` the token
-is replaced in the background: requests keep getting the old one, nobody waits, and a replacement that
+Both providers issue once and reuse the token. Halfway through its life, or `refreshAheadSeconds`
+before its `exp` if you set that and it is later, the token is replaced in the background: requests keep getting the old one, nobody waits, and a replacement that
 fails is tried again a minute later. An outage of your token endpoint that ends before `exp` is never
 seen by a request. Only when there is no usable token does a request wait for one, or fail for want of
 one, and then the next request tries again.

@@ -81,6 +81,8 @@ const invalid: [string, Record<string, unknown>][] = [
   ["a keyId with a trailing carriage return", { keyId: "ABC123DEFG\r" }],
   ["a keyId with a letter outside ASCII", { keyId: "ABC123DEFÉ" }],
   ["a zero ttl", { ttlSeconds: 0 }],
+  ["a ttl of one second", { ttlSeconds: 1 }],
+  ["a ttl one second short of a minute", { ttlSeconds: 59 }],
   ["a negative ttl", { ttlSeconds: -60 }],
   ["a fractional ttl", { ttlSeconds: 1.5 }],
   ["a NaN ttl", { ttlSeconds: Number.NaN }],
@@ -114,7 +116,7 @@ describe("mintDeveloperToken: the token", () => {
   test("is an ES256 JWT naming the key and the team, with nothing else in it", async () => {
     const { header, claims } = await read(await mintDeveloperToken(valid));
     expect(header).toEqual({ alg: "ES256", kid: "ABC123DEFG" });
-    expect(claims).toEqual({ iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_SECONDS + 150 * DAY_SECONDS });
+    expect(claims).toEqual({ iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_SECONDS + 3600 });
   });
 
   test("carries a raw 64-byte signature, not DER", async () => {
@@ -122,14 +124,16 @@ describe("mintDeveloperToken: the token", () => {
     expect(Buffer.from(signature, "base64url")).toHaveLength(64);
   });
 
-  test.each([1, 60, 3600, 150 * DAY_SECONDS, 15_777_000])("ttlSeconds %i puts exp that many seconds after iat", async (ttlSeconds) => {
+  test.each([60, 61, 3600, DAY_SECONDS, 150 * DAY_SECONDS, 15_777_000])("ttlSeconds %i puts exp that many seconds after iat", async (ttlSeconds) => {
     const { claims } = await read(await mintDeveloperToken({ ...valid, ttlSeconds }));
     expect(claims.exp).toBe(NOW_SECONDS + ttlSeconds);
   });
 
-  test("an undefined ttlSeconds means the default", async () => {
-    const { claims } = await read(await mintDeveloperToken({ ...valid, ttlSeconds: undefined }));
-    expect(claims.exp).toBe(NOW_SECONDS + 150 * DAY_SECONDS);
+  test("with no ttlSeconds, or an undefined one, a token lives one hour", async () => {
+    for (const options of [valid, { ...valid, ttlSeconds: undefined }]) {
+      const { claims } = await read(await mintDeveloperToken(options));
+      expect((claims.exp ?? 0) - (claims.iat ?? 0)).toBe(3600);
+    }
   });
 
   test("iat is in whole seconds even when the clock is between them", async () => {
@@ -308,7 +312,7 @@ describe("developerTokenMinter", () => {
     expect(new Set(tokens).size).toBe(1);
     const { header, claims } = await read(tokens[0]);
     expect(header.kid).toBe("ABC123DEFG");
-    expect(claims).toEqual({ iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_SECONDS + 150 * DAY_SECONDS, origin: ["https://example.com"] });
+    expect(claims).toEqual({ iss: "DEF123GHIJ", iat: NOW_SECONDS, exp: NOW_SECONDS + 3600, origin: ["https://example.com"] });
   });
 
   /** The token the minter hands out once the one being signed in the background has replaced `previous`. */
@@ -319,20 +323,24 @@ describe("developerTokenMinter", () => {
       return token;
     });
 
-  test("a day before a token expires, by default, the next is signed in the background and then handed out", async () => {
+  test("by default a token lives an hour, and halfway through it the next is signed in the background and then handed out", async () => {
     const minter = developerTokenMinter(valid);
     const first = await minter({});
-    at(149 * DAY_SECONDS * 1000 - 1);
+    at(1800 * 1000 - 1);
     expect(await minter({})).toBe(first);
-    at(149 * DAY_SECONDS * 1000);
-    expect(await minter({})).toBe(first); // good for another day, so nobody waits for the new one
+    at(1800 * 1000);
+    expect(await minter({})).toBe(first); // good for another half hour, so nobody waits for the new one
     const second = await next(minter, first);
-    expect((await read(second)).claims.iat).toBe(NOW_SECONDS + 149 * DAY_SECONDS);
+    expect((await read(second)).claims).toMatchObject({ iat: NOW_SECONDS + 1800, exp: NOW_SECONDS + 1800 + 3600 });
   });
 
   test.each([
     [3600, 60, 3540],
     [3600, undefined, 1800],
+    [3600, 3000, 1800],
+    [DAY_SECONDS, undefined, DAY_SECONDS / 2],
+    [150 * DAY_SECONDS, undefined, 75 * DAY_SECONDS],
+    [150 * DAY_SECONDS, DAY_SECONDS, 149 * DAY_SECONDS],
     [7 * DAY_SECONDS, 2 * DAY_SECONDS, 5 * DAY_SECONDS],
   ])("with ttl %i and refreshAhead %s, replaces the token after %i seconds", async (ttlSeconds, refreshAheadSeconds, after) => {
     const minter = developerTokenMinter({ ...valid, ttlSeconds, refreshAheadSeconds });
@@ -342,6 +350,30 @@ describe("developerTokenMinter", () => {
     at(after * 1000);
     expect(await minter({})).toBe(first);
     await next(minter, first);
+  });
+
+  // The source is asked at most once a minute, so under two minutes of life the halfway point comes too soon to be used.
+  test("a token that lives 90 seconds is replaced a minute in, not at 45 seconds", async () => {
+    const minter = developerTokenMinter({ ...valid, ttlSeconds: 90 });
+    const first = await minter();
+    for (const ms of [45_000, 59_999]) {
+      at(ms);
+      expect(await minter()).toBe(first);
+    }
+    at(60_000);
+    expect(await minter()).toBe(first); // still good for half a minute, while the next is signed behind it
+    await next(minter, first);
+  });
+
+  test("a token at the one-minute minimum is used to its end and replaced then", async () => {
+    const minter = developerTokenMinter({ ...valid, ttlSeconds: 60 });
+    const first = await minter();
+    at(59_999);
+    expect(await minter()).toBe(first);
+    at(60_000);
+    const second = await minter();
+    expect(second).not.toBe(first);
+    expect((await read(second)).claims.iat).toBe(NOW_SECONDS + 60);
   });
 
   test("replaces a token Apple rejected once it has been in use, and only that one", async () => {

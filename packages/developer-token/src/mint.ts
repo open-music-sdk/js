@@ -31,19 +31,23 @@ interface tKeyFromEnv {
 
 /** Invalid values throw a TypeError. No error quotes a value. */
 export type tMintOptions = (tKeyGiven | tKeyFromEnv) & {
-  /** Lifetime in whole seconds, at most 15 777 000 (Apple's six months). Default 150 days. */
+  /** Lifetime in whole seconds, from 60 to 15 777 000 (Apple's six months). Default one hour. */
   readonly ttlSeconds?: number | undefined;
   /** Web origins the token is valid for. Set it on any token a browser will see. */
   readonly origin?: readonly string[] | undefined;
 };
 
 export type tMinterOptions = tMintOptions & {
-  /** Mint a replacement this long before `exp`, capped at half the lifetime. Default one day. */
+  /** Mint a replacement this long before `exp`. Default, and at most, half the lifetime. */
   readonly refreshAheadSeconds?: number | undefined;
 };
 
-const MAX_TTL_SECONDS = 15_777_000;
-const DEFAULT_TTL_SECONDS = 150 * 86_400;
+// A token cannot be taken back without revoking the key, so its lifetime is how long a leaked one stays useful.
+// Minting is local and the minter replaces tokens in the background, so a short life costs nothing.
+const DEFAULT_TTL_SECONDS = 3600;
+// Below a minute, clock drift and the request itself use the lifetime up, and no replacement can be ready in time.
+const MIN_TTL_SECONDS = 60;
+const MAX_TTL_SECONDS = 15_777_000; // Apple's limit
 
 /** What a value is, for an error that must not show what it holds: a value in the wrong place may be the private key. */
 const got = (value: unknown) => (typeof value === "string" ? `${String(value.length)} characters` : value === null ? "null" : typeof value);
@@ -98,8 +102,8 @@ function check(options: tMintOptions): tClaims & { readonly pem: string; readonl
   const key = pemOf(named("pem"), options.pem ?? read.pem?.value);
   const teamId = id(named("teamId"), options.teamId ?? read.teamId?.value);
   const keyId = id(named("keyId"), options.keyId ?? read.keyId?.value);
-  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > MAX_TTL_SECONDS)
-    throw new TypeError(`developer token: ttlSeconds must be an integer from 1 to ${String(MAX_TTL_SECONDS)}, got ${String(ttlSeconds)}`);
+  if (!Number.isInteger(ttlSeconds) || ttlSeconds < MIN_TTL_SECONDS || ttlSeconds > MAX_TTL_SECONDS)
+    throw new TypeError(`developer token: ttlSeconds must be an integer from ${String(MIN_TTL_SECONDS)} to ${String(MAX_TTL_SECONDS)}, got ${String(ttlSeconds)}`);
   let origins: string[] | undefined;
   if (origin !== undefined) {
     // An empty list is refused rather than sent: whether Apple reads it as "no origin" or "any origin" is undocumented.

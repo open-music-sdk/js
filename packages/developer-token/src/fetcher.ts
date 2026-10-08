@@ -9,7 +9,7 @@ export type { tDeveloperTokenProvider } from "./cache.js";
 export interface tFetcherOptions {
   /** Default: the global fetch. Wrap it to add credentials or headers your endpoint needs. */
   readonly fetch?: typeof fetch | undefined;
-  /** Fetch a replacement this long before `exp`, capped at half the token's remaining life. Default one day. */
+  /** Fetch a replacement this long before `exp`. Default, and at most, half the life the token had left when it arrived. */
   readonly refreshAheadSeconds?: number | undefined;
   /** How long the endpoint may take to answer, in whole milliseconds. Default 10 000; at most 2^31 - 1. */
   readonly timeoutMs?: number | undefined;

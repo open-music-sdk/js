@@ -9,7 +9,6 @@ export interface tIssued {
   readonly expiresAt: number;
 }
 
-const DAY_SECONDS = 86_400;
 /**
  * While a usable token is held, its source is asked at most this often. A token issued moments ago would only be
  * issued the same again, so Apple rejecting it is no reason to ask; and a source that just failed is left alone.
@@ -36,17 +35,20 @@ export async function orAbort<T>(flight: Promise<T>, signal: AbortSignal | undef
 }
 
 /**
- * A token provider over `issue` that issues once and reuses the token. From `refreshAheadSeconds` before it
- * expires the token is replaced in the background while it keeps being handed out; only when there is no
- * usable token does a caller wait for one, or see the failure to get one. Concurrent callers share one issue.
+ * A token provider over `issue` that issues once and reuses the token. Halfway through the life a token had
+ * left when it arrived, or `refreshAheadSeconds` before it expires if that is later, the token is replaced in
+ * the background while it keeps being handed out; only when there is no usable token does a caller wait for
+ * one, or see the failure to get one. Concurrent callers share one issue.
  *
- * The margin never exceeds half of the life a token had left when it arrived, so a short-lived token is
- * still reused rather than replaced on every call. While a usable token is held, the source is asked at
- * most once a minute, whatever Apple or the local clock say about the token.
+ * Half the life is the most the margin can be, so a token is always reused rather than replaced on every
+ * call. While a usable token is held, the source is asked at most once a minute, whatever Apple or the
+ * local clock say about the token.
  */
-export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_SECONDS): tDeveloperTokenProvider {
-  if (!Number.isFinite(refreshAheadSeconds) || refreshAheadSeconds < 0)
+export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds?: number): tDeveloperTokenProvider {
+  if (refreshAheadSeconds !== undefined && (!Number.isFinite(refreshAheadSeconds) || refreshAheadSeconds < 0))
     throw new TypeError(`developer token: refreshAheadSeconds must be a number from 0, got ${String(refreshAheadSeconds)}`);
+  // With no margin asked for, the half-life limit below is the whole rule.
+  const margin = refreshAheadSeconds === undefined ? Number.POSITIVE_INFINITY : refreshAheadSeconds * 1000;
   let current: { token: string; refreshAt: number; expiresAt: number } | undefined;
   let flight: Promise<string> | undefined;
   // When the source was last asked, on the clock that cannot step: the interval must not depend on the wall clock.
@@ -59,7 +61,7 @@ export function cached(issue: () => Promise<tIssued>, refreshAheadSeconds = DAY_
     // A token that looks expired on arrival may be sound and the local clock fast. It gets one interval of use:
     // if it works, the source is asked once a minute instead of once a request; if not, Apple says so.
     const expiresAt = issued.expiresAt > now ? issued.expiresAt : now + MIN_ISSUE_INTERVAL_MS;
-    current = { token: issued.token, expiresAt, refreshAt: expiresAt - Math.min(refreshAheadSeconds * 1000, (expiresAt - now) / 2) };
+    current = { token: issued.token, expiresAt, refreshAt: expiresAt - Math.min(margin, (expiresAt - now) / 2) };
     return issued.token;
   };
 
