@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { remoteDeveloperToken } from "./remote.js";
+import { developerTokenFetcher } from "./fetcher.js";
 
 const NOW = Date.UTC(2026, 9, 7);
 const NOW_SECONDS = NOW / 1000;
@@ -77,65 +77,65 @@ afterEach(() => {
   responses.length = 0;
 });
 
-describe("remoteDeveloperToken: configuration", () => {
+describe("developerTokenFetcher: configuration", () => {
   test.each(["https://app.example/api/token", "http://localhost:3000/token", new URL("https://app.example/token?tenant=1")])("accepts %s", (url) => {
-    expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).not.toThrow();
+    expect(() => developerTokenFetcher(url, { fetch: endpoint().fetch })).not.toThrow();
   });
 
   const notHttp = ["file:///etc/token", "data:text/plain,abc", "javascript:alert(1)", "ftp://app.example/token", "blob:https://app.example/1", "mailto:token@app.example", "ws://app.example/token"];
 
   test.each(notHttp)("refuses %j when it is created, with or without a document", (url) => {
-    expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
+    expect(() => developerTokenFetcher(url, { fetch: endpoint().fetch })).toThrow(TypeError);
     vi.stubGlobal("document", { baseURI: "https://app.example/music/index.html" });
     try {
-      expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
+      expect(() => developerTokenFetcher(url, { fetch: endpoint().fetch })).toThrow(TypeError);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
   test.each([1, 250, 10_000, 2 ** 31 - 1])("accepts timeoutMs %s", (timeoutMs) => {
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch: endpoint().fetch, timeoutMs })).not.toThrow();
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, timeoutMs })).not.toThrow();
   });
   test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31, "1000" as unknown as number])("refuses timeoutMs %s", (timeoutMs) => {
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch: endpoint().fetch, timeoutMs })).toThrow(TypeError);
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, timeoutMs })).toThrow(TypeError);
   });
 
   // A timer takes whole milliseconds: Node throws at a fraction on every use, and a browser rounds it down.
   test.each([0.5, 0.999, 1.5, 1500.5, 10_000 / 3, 2 ** 31 - 1.5])("refuses a timeoutMs that is not a whole number, %s, when the provider is created", (timeoutMs) => {
     const { fetch, calls } = endpoint();
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs })).toThrow(TypeError);
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch, timeoutMs })).toThrow(TypeError);
     expect(calls).toEqual([]);
   });
 
   test.each([1, 2, 1500, 10_000, 2 ** 31 - 1])("a timeoutMs the provider accepts, %s, is one the runtime's timer accepts: the first use does not fail for it", async (timeoutMs) => {
     const { fetch } = endpoint();
-    expect(await remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs })({})).toBe(jwt());
+    expect(await developerTokenFetcher(ENDPOINT, { fetch, timeoutMs })({})).toBe(jwt());
   });
   test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("refuses refreshAheadSeconds %s", (refreshAheadSeconds) => {
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch: endpoint().fetch, refreshAheadSeconds })).toThrow(TypeError);
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch: endpoint().fetch, refreshAheadSeconds })).toThrow(TypeError);
   });
   test("refuses a fetch that is not a function", () => {
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch: "fetch" as unknown as typeof fetch })).toThrow(TypeError);
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch: "fetch" as unknown as typeof fetch })).toThrow(TypeError);
   });
   test("undefined options mean the defaults", () => {
-    expect(() => remoteDeveloperToken(ENDPOINT, { fetch: undefined, timeoutMs: undefined, refreshAheadSeconds: undefined })).not.toThrow();
+    expect(() => developerTokenFetcher(ENDPOINT, { fetch: undefined, timeoutMs: undefined, refreshAheadSeconds: undefined })).not.toThrow();
   });
   test("nothing is fetched until the first call", () => {
     const { fetch, calls } = endpoint();
-    remoteDeveloperToken(ENDPOINT, { fetch });
+    developerTokenFetcher(ENDPOINT, { fetch });
     expect(calls).toEqual([]);
   });
 });
 
-describe("remoteDeveloperToken: what the URL carries stays out of errors", () => {
+describe("developerTokenFetcher: what the URL carries stays out of errors", () => {
   /** Everything an error shows when it is printed, serialised, or inspected, without its cause. */
   const said = (e: Error) => `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, ["name", "message", "stack", "status"])}`;
 
   test.each(["https://user:hunter2@app.example/token", "https://user@app.example/token", "https://:hunter2@app.example/token", "http://user:hunter2@localhost:3000/token?session=s3cret"])(
     "a URL with a username or password is refused when the provider is created: %s",
     (url) => {
-      expect(() => remoteDeveloperToken(url, { fetch: endpoint().fetch })).toThrow(TypeError);
+      expect(() => developerTokenFetcher(url, { fetch: endpoint().fetch })).toThrow(TypeError);
     },
   );
 
@@ -147,7 +147,7 @@ describe("remoteDeveloperToken: what the URL carries stays out of errors", () =>
   ])("refusing a URL with %s does not quote it", (_name, url) => {
     let error: unknown;
     try {
-      remoteDeveloperToken(url, { fetch: endpoint().fetch });
+      developerTokenFetcher(url, { fetch: endpoint().fetch });
     } catch (e) {
       error = e;
     }
@@ -161,7 +161,7 @@ describe("remoteDeveloperToken: what the URL carries stays out of errors", () =>
     ["a thrown string", `${ENDPOINT}?session=s3cret` as unknown as Error, "string"],
   ])("after %s, the message names the endpoint and the kind of failure, never the query", async (_name, thrown, kind) => {
     const fetch = () => Promise.reject(thrown);
-    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=s3cret#frag`, { fetch })({}));
+    const e = await failure(developerTokenFetcher(`${ENDPOINT}?session=s3cret#frag`, { fetch })({}));
     expect(e.message).toContain(ENDPOINT);
     expect(e.message).toContain(kind);
     expect(said(e)).not.toContain("s3cret");
@@ -174,13 +174,13 @@ describe("remoteDeveloperToken: what the URL carries stays out of errors", () =>
     ["a token without exp", { text: jwt({ iat: NOW_SECONDS }, "s3cret") }],
   ])("after %s, the message names the endpoint without its query and never quotes the body", async (_name, reply) => {
     const { fetch } = endpoint(reply);
-    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=hunter2#frag`, { fetch })({}));
+    const e = await failure(developerTokenFetcher(`${ENDPOINT}?session=hunter2#frag`, { fetch })({}));
     expect(e.message).toContain(ENDPOINT);
     expect(`${said(e)} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`).not.toMatch(/hunter2|s3cret|frag/);
   });
 });
 
-describe("remoteDeveloperToken: a relative URL resolves the way fetch would resolve it", () => {
+describe("developerTokenFetcher: a relative URL resolves the way fetch would resolve it", () => {
   const relative = ["/api/token", "api/token", "../token", "?fresh=1", "", "app.example/api/token", "//app.example/api/token"];
   /** Runs `fn` as if in a page at `page`, whose base URL is `base` when a <base href> moved it. */
   async function inDocument<T>(page: string, base: string | undefined, fn: () => T | Promise<T>): Promise<T> {
@@ -203,7 +203,7 @@ describe("remoteDeveloperToken: a relative URL resolves the way fetch would reso
   ])("in a page, %j is fetched from %s", async (url, expected) => {
     const page = "https://app.example/music/index.html";
     const { fetch, calls } = endpoint();
-    await inDocument(page, page, () => remoteDeveloperToken(url, { fetch })({}));
+    await inDocument(page, page, () => developerTokenFetcher(url, { fetch })({}));
     expect(calls[0]?.url).toBe(expected);
   });
 
@@ -212,25 +212,25 @@ describe("remoteDeveloperToken: a relative URL resolves the way fetch would reso
     ["api/token", "https://cdn.example/assets/api/token"],
   ])("under a <base href> on another host, %j is fetched from %s, not from the page's own host", async (url, expected) => {
     const { fetch, calls } = endpoint();
-    await inDocument("https://app.example/music/index.html", "https://cdn.example/assets/", () => remoteDeveloperToken(url, { fetch })({}));
+    await inDocument("https://app.example/music/index.html", "https://cdn.example/assets/", () => developerTokenFetcher(url, { fetch })({}));
     expect(calls[0]?.url).toBe(expected);
   });
 
   test("in a worker, which has a location but no document, it resolves against the location", async () => {
     const { fetch, calls } = endpoint();
-    await inDocument("https://app.example/workers/sync.js", undefined, () => remoteDeveloperToken("/api/token", { fetch })({}));
+    await inDocument("https://app.example/workers/sync.js", undefined, () => developerTokenFetcher("/api/token", { fetch })({}));
     expect(calls[0]?.url).toBe("https://app.example/api/token");
   });
 
   test.each(relative)("with no document, creating a provider for %j neither throws nor fetches, so a server can load the module", (url) => {
     const { fetch, calls } = endpoint();
-    expect(() => remoteDeveloperToken(url, { fetch })).not.toThrow();
+    expect(() => developerTokenFetcher(url, { fetch })).not.toThrow();
     expect(calls).toEqual([]);
   });
 
   test.each(relative)("with no document, using a provider for %j is a TypeError each time, and nothing is fetched", async (url) => {
     const { fetch, calls } = endpoint();
-    const provider = remoteDeveloperToken(url, { fetch });
+    const provider = developerTokenFetcher(url, { fetch });
     for (const attempt of [provider({}), provider({})]) {
       const error: unknown = await attempt.catch((e: unknown) => e);
       expect(error).toBeInstanceOf(TypeError);
@@ -241,14 +241,14 @@ describe("remoteDeveloperToken: a relative URL resolves the way fetch would reso
 
   test("a client does not retry it: a URL that cannot be resolved is a mistake, not an outage", async () => {
     const { fetch, calls } = endpoint();
-    const music = createClient({ developerToken: remoteDeveloperToken("/api/token", { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const music = createClient({ developerToken: developerTokenFetcher("/api/token", { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
     await expect(music.request("v1/test")).rejects.toThrow(TypeError);
     expect(calls).toEqual([]);
   });
 
   test("a provider created before there was a document works once there is one", async () => {
     const { fetch, calls } = endpoint();
-    const provider = remoteDeveloperToken("/api/token", { fetch });
+    const provider = developerTokenFetcher("/api/token", { fetch });
     await expect(provider({})).rejects.toThrow(TypeError);
     const page = "https://app.example/";
     expect(await inDocument(page, page, () => provider({}))).toBe(jwt());
@@ -259,7 +259,7 @@ describe("remoteDeveloperToken: a relative URL resolves the way fetch would reso
     const { fetch, calls } = endpoint();
     const outcome = await inDocument(page, page, async () => {
       try {
-        return await remoteDeveloperToken("api/token", { fetch })({});
+        return await developerTokenFetcher("api/token", { fetch })({});
       } catch (e) {
         return e;
       }
@@ -269,7 +269,7 @@ describe("remoteDeveloperToken: a relative URL resolves the way fetch would reso
   });
 });
 
-describe("remoteDeveloperToken: runs on browsers older than its newest built-ins", () => {
+describe("developerTokenFetcher: runs on browsers older than its newest built-ins", () => {
   // Each of these arrived after 2022 and is missing from browsers still in wide use.
   const recent: [string, object, string][] = [
     ["URL.parse", URL, "parse"],
@@ -284,24 +284,24 @@ describe("remoteDeveloperToken: runs on browsers older than its newest built-ins
     Reflect.deleteProperty(owner, method);
     try {
       const { fetch } = endpoint({ text: jwt() }, { status: 503, text: "" });
-      const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+      const provider = developerTokenFetcher(ENDPOINT, { fetch });
       expect(await provider({})).toBe(jwt());
-      expect(() => remoteDeveloperToken("javascript:alert(1)", { fetch })).toThrow(TypeError);
-      await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+      expect(() => developerTokenFetcher("javascript:alert(1)", { fetch })).toThrow(TypeError);
+      await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     } finally {
       if (original) Object.defineProperty(owner, method, original);
     }
   });
 });
 
-describe("remoteDeveloperToken: reading the answer", () => {
+describe("developerTokenFetcher: reading the answer", () => {
   const token = jwt();
   // Chosen so the encoded claims contain "-" and "_", which plain base64 decoding does not understand.
   const urlSafe = jwt({ exp: NOW_SECONDS + 12 * HOUR_SECONDS, note: "???>>>~~~" });
   test("a token whose claims use both characters that set base64url apart from base64 is read like any other", async () => {
     expect(urlSafe.split(".")[1]).toMatch(/-.*_|_.*-/); // or the fixture proves nothing
     const { fetch, calls } = endpoint({ text: urlSafe });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     expect([await provider({}), await provider({})]).toEqual([urlSafe, urlSafe]);
     expect(calls).toHaveLength(1); // its exp was understood, so it was cached
   });
@@ -314,7 +314,7 @@ describe("remoteDeveloperToken: reading the answer", () => {
     ["a 201", { status: 201, text: token }],
   ])("takes the token from %s", async (_name, reply) => {
     const { fetch } = endpoint(reply);
-    expect(await remoteDeveloperToken(ENDPOINT, { fetch })({})).toBe(token);
+    expect(await developerTokenFetcher(ENDPOINT, { fetch })({})).toBe(token);
   });
 
   test.each([
@@ -345,45 +345,45 @@ describe("remoteDeveloperToken: reading the answer", () => {
     ["a token whose exp is nested", { text: jwt({ claims: { exp: NOW_SECONDS + 60 } }) }],
   ])("%s is DeveloperTokenUnavailable with the answer's status, not a token", async (_name, reply) => {
     const { fetch } = endpoint(reply);
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(e.status).toBe(200);
   });
 
   test.each([301, 400, 401, 403, 404, 429, 500, 503])("a %i is DeveloperTokenUnavailable carrying the status, whatever the body", async (status) => {
     const { fetch } = endpoint({ status, text: jwt() });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(e.status).toBe(status);
   });
 });
 
-describe("remoteDeveloperToken: an unreachable endpoint is DeveloperTokenUnavailable with no status", () => {
+describe("developerTokenFetcher: an unreachable endpoint is DeveloperTokenUnavailable with no status", () => {
   test("fetch throwing", async () => {
     const cause = new TypeError("fetch failed");
     const { fetch } = endpoint(cause);
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect(e.cause).toBe(cause);
   });
 
   test("the connection dropping while the body is read", async () => {
     const { fetch } = endpoint({ body: brokenBody() });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect((e.cause as Error).message).toBe("connection reset");
   });
 
   test("an endpoint that never answers, once timeoutMs has passed", async () => {
     const { fetch } = endpoint("hang");
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch, timeoutMs: 20 })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     expect((e.cause as Error).name).toBe("TimeoutError");
   });
 
   test("a failure is not remembered: the next call fetches again", async () => {
     const { fetch, calls } = endpoint(new TypeError("fetch failed"), { status: 503, text: "" }, { text: "<html>" }, { text: jwt() });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     await failure(provider({}));
     await failure(provider({}));
     await failure(provider({}));
@@ -392,7 +392,7 @@ describe("remoteDeveloperToken: an unreachable endpoint is DeveloperTokenUnavail
   });
 });
 
-describe("remoteDeveloperToken: an answer larger than any token is refused without being read to the end", () => {
+describe("developerTokenFetcher: an answer larger than any token is refused without being read to the end", () => {
   const LIMIT = 16_384;
   const token = jwt();
   /** The token followed by enough whitespace to make the body exactly `bytes` long. */
@@ -417,19 +417,19 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
 
   test.each([token.length, 1000, LIMIT - 1, LIMIT])("a body of %i bytes is read and its token taken", async (bytes) => {
     const { fetch } = endpoint({ text: padded(bytes) });
-    expect(await remoteDeveloperToken(ENDPOINT, { fetch })({})).toBe(token);
+    expect(await developerTokenFetcher(ENDPOINT, { fetch })({})).toBe(token);
   });
 
   test.each([LIMIT + 1, 2 * LIMIT, 1_000_000])("a body of %i bytes is DeveloperTokenUnavailable, though a good token opens it", async (bytes) => {
     const { fetch } = endpoint({ text: padded(bytes) });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
   });
 
   test("a body that never ends is given up on at the limit, not at the timeout, and the rest is cancelled", async () => {
     const { stream, seen } = endless();
     const { fetch } = endpoint({ body: stream });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 60_000 })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch, timeoutMs: 60_000 })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
     expect(seen.chunks).toBeLessThanOrEqual(6); // 16 KB at 4 KB a chunk, and little more
     expect(seen.cancelled).toBe(true);
@@ -438,7 +438,7 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
   test("an answer that declares itself too long is refused without a byte of it being read", async () => {
     const { stream, seen } = endless();
     const { fetch } = endpoint({ body: stream, headers: { "content-length": String(LIMIT + 1) } });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
     expect(seen).toEqual({ chunks: 0, cancelled: true });
   });
@@ -446,7 +446,7 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
   test("a declared length within the limit does not excuse a body that runs past it", async () => {
     const { stream, seen } = endless();
     const { fetch } = endpoint({ body: stream, headers: { "content-length": "300" } });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(seen.cancelled).toBe(true);
   });
@@ -454,7 +454,7 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
   test.each([404, 500, 503])("an error page of any size is still reported as its status, %i, and is not read past the limit either", async (status) => {
     const { stream, seen } = endless();
     const { fetch } = endpoint({ status, body: stream });
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", status]);
     expect(seen.chunks).toBeLessThanOrEqual(6);
     expect(seen.cancelled).toBe(true);
@@ -462,7 +462,7 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
 
   test("the error for an oversized answer says what was wrong and quotes none of it", async () => {
     const { fetch } = endpoint({ text: `${jwt({ exp: NOW_SECONDS + 60 }, "s3cret")}${" ".repeat(LIMIT)}` });
-    const e = await failure(remoteDeveloperToken(`${ENDPOINT}?session=hunter2`, { fetch })({}));
+    const e = await failure(developerTokenFetcher(`${ENDPOINT}?session=hunter2`, { fetch })({}));
     expect(e.message).toContain(ENDPOINT);
     expect(e.message).toContain("16384 bytes");
     expect(`${e.message} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`).not.toMatch(/s3cret|hunter2/);
@@ -477,13 +477,13 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
 
     test.each([200, 1000, 8191, 8192])("a token of %i characters is taken", async (length) => {
       const { fetch } = endpoint({ text: sized(length) });
-      expect(await remoteDeveloperToken(ENDPOINT, { fetch })({})).toHaveLength(length);
+      expect(await developerTokenFetcher(ENDPOINT, { fetch })({})).toHaveLength(length);
     });
 
     test.each([8193, 12_000, LIMIT])("a token of %i characters is refused, well formed though it is, as text or as JSON", async (length) => {
       for (const reply of [{ text: sized(length) }, { json: { token: sized(Math.min(length, LIMIT - 20)) } }]) {
         const { fetch } = endpoint(reply);
-        const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}));
+        const e = await failure(developerTokenFetcher(ENDPOINT, { fetch })({}));
         expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
       }
     });
@@ -494,21 +494,21 @@ describe("remoteDeveloperToken: an answer larger than any token is refused witho
       Promise.resolve({ ok: status >= 200 && status < 300, status, headers: new Headers(), body: undefined, text: () => Promise.resolve(text) } as unknown as Response);
 
     test.each([token.length, LIMIT])("an answer of %i characters is read whole and its token taken", async (length) => {
-      expect(await remoteDeveloperToken(ENDPOINT, { fetch: streamless(padded(length)) })({})).toBe(token);
+      expect(await developerTokenFetcher(ENDPOINT, { fetch: streamless(padded(length)) })({})).toBe(token);
     });
 
     test.each([LIMIT + 1, 1_000_000])("an answer of %i characters is refused all the same", async (length) => {
-      const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch: streamless(padded(length)) })({}));
+      const e = await failure(developerTokenFetcher(ENDPOINT, { fetch: streamless(padded(length)) })({}));
       expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
     });
 
     test("an error answer is still its status", async () => {
-      expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch: streamless("nope", 503) })({}))).status).toBe(503);
+      expect((await failure(developerTokenFetcher(ENDPOINT, { fetch: streamless("nope", 503) })({}))).status).toBe(503);
     });
   });
 });
 
-describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given does with the signal", () => {
+describe("developerTokenFetcher: timeoutMs holds whatever the fetch it was given does with the signal", () => {
   const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   /** A response whose body never ends and ignores every signal. */
   const stalled = () => {
@@ -533,7 +533,7 @@ describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given 
   test.each(deaf)("a fetch that %s is given up on at timeoutMs, as DeveloperTokenUnavailable", async (_name, fetch) => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
-    const e = await failure(remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 })({}));
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch, timeoutMs: 20 })({}));
     expect([e._tag, e.status, (e.cause as Error).name]).toEqual(["DeveloperTokenUnavailable", undefined, "TimeoutError"]);
     await later(80); // whatever the abandoned fetch does next must be handled, and a late answer must still be read
     process.off("unhandledRejection", unhandled);
@@ -543,23 +543,23 @@ describe("remoteDeveloperToken: timeoutMs holds whatever the fetch it was given 
   test("giving up frees the provider: the next call starts a new fetch instead of waiting on the dead one", async () => {
     let n = 0;
     const fetch = (input: RequestInfo | URL) => (++n === 1 ? new Promise<Response>(() => undefined) : endpoint({ text: jwt() }).fetch(input));
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 20 });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch, timeoutMs: 20 });
     await failure(provider({}));
     expect(await provider({})).toBe(jwt());
     expect(n).toBe(2);
   });
 
   test("every caller sharing the fetch is released at the timeout, not only the one that started it", async () => {
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch: () => new Promise<Response>(() => undefined), timeoutMs: 20 });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch: () => new Promise<Response>(() => undefined), timeoutMs: 20 });
     const errors = await Promise.all([failure(provider({})), failure(provider({})), failure(provider({ rejected: "x" }))]);
     expect(errors.map((e) => (e.cause as Error).name)).toEqual(["TimeoutError", "TimeoutError", "TimeoutError"]);
   });
 });
 
-describe("remoteDeveloperToken: the request", () => {
+describe("developerTokenFetcher: the request", () => {
   test("is a plain GET of the configured URL: uncached, refusing redirects, and with no headers, credentials or body of its own", async () => {
     const { fetch, calls } = endpoint();
-    await remoteDeveloperToken(`${ENDPOINT}?tenant=1`, { fetch })({});
+    await developerTokenFetcher(`${ENDPOINT}?tenant=1`, { fetch })({});
     expect(calls[0]?.url).toBe(`${ENDPOINT}?tenant=1`);
     const init = calls[0]?.init ?? {};
     expect(init).toMatchObject({ cache: "no-store", redirect: "error" });
@@ -575,7 +575,7 @@ describe("remoteDeveloperToken: the request", () => {
     const timeout = vi.spyOn(AbortSignal, "timeout");
     try {
       const { fetch, calls } = endpoint();
-      await remoteDeveloperToken(ENDPOINT, { fetch, ...options })({});
+      await developerTokenFetcher(ENDPOINT, { fetch, ...options })({});
       expect(timeout).toHaveBeenCalledExactlyOnceWith(expected);
       expect(calls[0]?.init?.signal).toBe(timeout.mock.results[0]?.value);
     } finally {
@@ -608,45 +608,45 @@ describe("remoteDeveloperToken: the request", () => {
     });
 
     test("the token is fetched from the configured URL", async () => {
-      expect(await remoteDeveloperToken(`${base}/token`)()).toBe(token);
+      expect(await developerTokenFetcher(`${base}/token`)()).toBe(token);
     });
 
     test.each([
       ["to another path on the same host", "/moved"],
       ["to another origin", "/elsewhere"],
     ])("a redirect %s is refused, though a token waits at the end of it", async (_name, path) => {
-      const e = await failure(remoteDeveloperToken(`${base}${path}`)());
+      const e = await failure(developerTokenFetcher(`${base}${path}`)());
       expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
     });
 
     test("a compressed answer is measured as it inflates: 64 MB behind 64 KB on the wire is refused, and little of it kept", async () => {
       expect(bomb.byteLength).toBeLessThan(128 * 1024);
       const before = process.memoryUsage().rss;
-      const e = await failure(remoteDeveloperToken(`${base}/bomb`)());
+      const e = await failure(developerTokenFetcher(`${base}/bomb`)());
       expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 200]);
       expect(e.message).toContain("more than 16384 bytes"); // refused for its size, not read whole and found wanting
       expect(process.memoryUsage().rss - before).toBeLessThan(32 * 1024 * 1024);
     });
 
     test("a compressed answer within the limit is read like any other", async () => {
-      expect(await remoteDeveloperToken(`${base}/squeezed`)()).toBe(token);
+      expect(await developerTokenFetcher(`${base}/squeezed`)()).toBe(token);
     });
 
     test("a missing endpoint is its own status, not Apple's", async () => {
-      expect((await failure(remoteDeveloperToken(`${base}/nothing-here`)())).status).toBe(404);
+      expect((await failure(developerTokenFetcher(`${base}/nothing-here`)())).status).toBe(404);
     });
   });
 
   test("is shared by concurrent callers", async () => {
     const { fetch, calls } = endpoint();
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     expect(new Set(await Promise.all([provider({}), provider({}), provider({})])).size).toBe(1);
     expect(calls).toHaveLength(1);
   });
 
   test("is not cancelled by the caller that started it; the caller alone is rejected", async () => {
     const { fetch, calls } = endpoint("hang");
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch, timeoutMs: 50 });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch, timeoutMs: 50 });
     const controller = new AbortController();
     const reason = new Error("navigated away");
     const first = provider({ signal: controller.signal }).catch((e: unknown) => e);
@@ -659,11 +659,11 @@ describe("remoteDeveloperToken: the request", () => {
   });
 });
 
-describe("remoteDeveloperToken: reuse", () => {
+describe("developerTokenFetcher: reuse", () => {
   test("a token is reused until the refresh point before its exp, then fetched again while it is still handed out", async () => {
     const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(24 * HOUR_SECONDS, "2")];
     const { fetch, calls } = endpoint({ text: first }, { json: { token: second } });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS });
     expect(await provider({})).toBe(first);
     at(11 * HOUR_SECONDS * 1000 - 1);
     expect(await provider({})).toBe(first);
@@ -677,7 +677,7 @@ describe("remoteDeveloperToken: reuse", () => {
 
   test("with the default margin of a day, a shorter-lived token is reused for half its life", async () => {
     const { fetch, calls } = endpoint({ text: expiring(2 * HOUR_SECONDS, "1") }, { text: expiring(4 * HOUR_SECONDS, "2") });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     await provider({});
     at(HOUR_SECONDS * 1000 - 1);
     await provider({});
@@ -690,7 +690,7 @@ describe("remoteDeveloperToken: reuse", () => {
   test("a token that this clock calls expired on arrival is fetched once a minute, not once a call", async () => {
     // A browser whose clock runs an hour fast sees every token this way, and the tokens are fine.
     const { fetch, calls } = endpoint({ text: expiring(-HOUR_SECONDS, "1") }, { text: expiring(-HOUR_SECONDS, "2") });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     const first = await provider({});
     for (const ms of [1, 20_000, 59_999]) {
       at(ms);
@@ -705,7 +705,7 @@ describe("remoteDeveloperToken: reuse", () => {
   test("a token Apple rejected is fetched again, once it is a minute old", async () => {
     const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(12 * HOUR_SECONDS, "2")];
     const { fetch, calls } = endpoint({ text: first }, { text: second });
-    const provider = remoteDeveloperToken(ENDPOINT, { fetch });
+    const provider = developerTokenFetcher(ENDPOINT, { fetch });
     expect(await provider({})).toBe(first);
     at(59_999);
     expect(await provider({ rejected: first })).toBe(first);
@@ -718,7 +718,7 @@ describe("remoteDeveloperToken: reuse", () => {
   });
 });
 
-describe("remoteDeveloperToken as a client's developerToken", () => {
+describe("developerTokenFetcher as a client's developerToken", () => {
   /** One fetch for both hosts: the token endpoint answers from `tokens`, Apple from `statuses`. */
   function world(tokens: tReply[], statuses: number[]) {
     const tokenEndpoint = endpoint(...tokens);
@@ -734,7 +734,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("every request carries the one fetched token as a Bearer", async () => {
     const token = jwt();
     const { fetch, sent, tokenCalls } = world([{ text: token }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     await Promise.all([music.request("v1/test"), music.request("v1/test")]);
     await music.request("v1/test");
     expect(sent).toEqual([`Bearer ${token}`, `Bearer ${token}`, `Bearer ${token}`]);
@@ -744,7 +744,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("a 401 from Apple for a token that has been in use fetches a fresh one and resends with it", async () => {
     const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(12 * HOUR_SECONDS, "2")];
     const { fetch, sent } = world([{ text: first }, { text: second }], [200, 401, 200]);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     await music.request("v1/test");
     at(5 * 60_000);
     await music.request("v1/test");
@@ -754,7 +754,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("an endpoint that keeps serving the rejected token ends in DeveloperTokenRejected, without a resend", async () => {
     const token = jwt();
     const { fetch, sent, tokenCalls } = world([{ text: token }, { text: token }], [200, 401]);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     await music.request("v1/test");
     at(5 * 60_000);
     expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
@@ -765,7 +765,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("an endpoint that is down while a token is refreshed ahead costs requests nothing", async () => {
     const [first, second] = [expiring(12 * HOUR_SECONDS, "1"), expiring(24 * HOUR_SECONDS, "2")];
     const { fetch, sent, tokenCalls } = world([{ text: first }, new TypeError("fetch failed"), { status: 503, text: "" }, { text: second }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
     await music.request("v1/test");
     for (const minute of [0, 1, 2]) {
       at((11 * HOUR_SECONDS + minute * 60) * 1000);
@@ -779,7 +779,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
 
   test("an endpoint that is still down when the token expires fails the request then, as DeveloperTokenUnavailable", async () => {
     const { fetch, sent } = world([{ text: expiring(12 * HOUR_SECONDS, "1") }, new TypeError("fetch failed"), new TypeError("fetch failed")], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch, refreshAheadSeconds: HOUR_SECONDS }), fetch, retry: false });
     await music.request("v1/test");
     at(11 * HOUR_SECONDS * 1000);
     await music.request("v1/test");
@@ -792,7 +792,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("when Apple rejects everything, the endpoint is asked once a minute and each request reaches Apple once", async () => {
     const tokens = Array.from({ length: 10 }, (_unused, i) => ({ text: expiring(12 * HOUR_SECONDS, String(i)) }));
     const { fetch, sent, tokenCalls } = world(tokens, Array.from({ length: 400 }, () => 401));
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false });
     for (let second = 0; second < 120; second++) {
       at(second * 1000);
       expect((await failure(music.request("v1/me/library/songs", { user: false })))._tag).toBe("DeveloperTokenRejected");
@@ -804,7 +804,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("a token endpoint that is briefly down is retried by the client's policy", async () => {
     const { fetch, sent, tokenCalls } = world([new TypeError("fetch failed"), { status: 503, text: "" }, { text: jwt() }], []);
     const music = createClient({
-      developerToken: remoteDeveloperToken(ENDPOINT, { fetch }),
+      developerToken: developerTokenFetcher(ENDPOINT, { fetch }),
       fetch,
       retry: { maxAttempts: 3, baseDelayMs: 0 },
     });
@@ -815,7 +815,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
 
   test("a token endpoint that refuses is not retried: the request fails with its status", async () => {
     const { fetch, sent, tokenCalls } = world([{ status: 403, text: "" }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
     const e = await failure(music.request("v1/test"));
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 403]);
     expect(tokenCalls).toHaveLength(1);
@@ -830,7 +830,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
     [500, "ApiError"],
   ] as const)("the endpoint's own %i is never reported under %s, the tag the same status from Apple would get", async (status, applesTag) => {
     const { fetch } = world([{ status, text: "" }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: false, userToken: "user" });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: false, userToken: "user" });
     const e = await failure(music.request("v1/me/library/songs"));
     expect(e._tag).toBe("DeveloperTokenUnavailable");
     expect(isAppleMusicError(e, applesTag)).toBe(false);
@@ -839,7 +839,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
 
   test("a rate-limited endpoint is retried, as Apple's 429 would be", async () => {
     const { fetch, sent, tokenCalls } = world([{ status: 429, text: "", headers: { "retry-after": "0" } }, { text: jwt() }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2, baseDelayMs: 0 } });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2, baseDelayMs: 0 } });
     await music.request("v1/test");
     expect(tokenCalls).toHaveLength(2);
     expect(sent).toHaveLength(1);
@@ -848,7 +848,7 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   test("the endpoint's Retry-After decides how long the client waits before asking it again", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"], now: NOW });
     const { fetch, sent, tokenCalls } = world([{ status: 503, text: "", headers: { "retry-after": "3" } }, { text: jwt() }], []);
-    const music = createClient({ developerToken: remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2 } });
+    const music = createClient({ developerToken: developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 2 } });
     const done = music.request("v1/test");
     await vi.advanceTimersByTimeAsync(2999);
     expect(tokenCalls).toHaveLength(1);
@@ -859,14 +859,14 @@ describe("remoteDeveloperToken as a client's developerToken", () => {
   });
 });
 
-describe("remoteDeveloperToken: Retry-After", () => {
+describe("developerTokenFetcher: Retry-After", () => {
   test.each([
     ["seconds", "120", 120_000],
     ["zero", "0", 0],
     ["an HTTP date", new Date(NOW + 90_000).toUTCString(), 90_000],
   ])("given as %s is carried on the error in milliseconds", async (_name, header, expected) => {
     const { fetch } = endpoint({ status: 503, text: "", headers: { "retry-after": header } });
-    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBe(expected);
+    expect((await failure(developerTokenFetcher(ENDPOINT, { fetch })({}))).retryAfterMs).toBe(expected);
   });
 
   test.each([
@@ -875,11 +875,11 @@ describe("remoteDeveloperToken: Retry-After", () => {
     ["negative", { "retry-after": "-5" }],
   ])("%s leaves retryAfterMs undefined", async (_name, headers) => {
     const { fetch } = endpoint({ status: 503, text: "", headers });
-    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
+    expect((await failure(developerTokenFetcher(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
   });
 
   test("on an answer that is not a failure, it is ignored", async () => {
     const { fetch } = endpoint({ text: "not a token", headers: { "retry-after": "120" } });
-    expect((await failure(remoteDeveloperToken(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
+    expect((await failure(developerTokenFetcher(ENDPOINT, { fetch })({}))).retryAfterMs).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@ import { inspect, parseEnv } from "node:util";
 import { exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import { beforeAll, describe, expect, test } from "vitest";
 import { readEnv, type tSetting } from "./env.js";
-import { cachedMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
+import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
 
 let pem: string;
 let publicKey: CryptoKey;
@@ -182,7 +182,7 @@ describe("env as an option: from a .env file to a token", () => {
   });
 
   test("a minter takes the environment beside its other options", async () => {
-    const minter = cachedMinter({ env: env(), ttlSeconds: 3600, origin: ["https://app.example"] });
+    const minter = developerTokenMinter({ env: env(), ttlSeconds: 3600, origin: ["https://app.example"] });
     expect(await read(await minter())).toEqual({ iss: "DEF123GHIJ", kid: "ABC123DEFG", origin: ["https://app.example"], life: 3600 });
   });
 
@@ -194,7 +194,7 @@ describe("env as an option: from a .env file to a token", () => {
 
   test("the environment is read once, when the minter is created: emptying it afterwards changes nothing", async () => {
     const mine: Record<string, unknown> = env();
-    const minter = cachedMinter({ env: mine });
+    const minter = developerTokenMinter({ env: mine });
     for (const name of Object.keys(mine)) Reflect.deleteProperty(mine, name);
     expect(await read(await minter())).toMatchObject({ iss: "DEF123GHIJ", kid: "ABC123DEFG" });
   });
@@ -220,14 +220,14 @@ describe("env as an option: what is given outright is used instead of its variab
     ["nothing at all, when all three are given", () => ({ env: {}, pem, teamId: "DEF123GHIJ", keyId: "ABC123DEFG" })],
   ])("the environment has to hold %s", async (_name, options) => {
     expect(await read(await mintDeveloperToken(options()))).toMatchObject({ iss: "DEF123GHIJ", kid: "ABC123DEFG" });
-    expect(() => cachedMinter(options())).not.toThrow();
+    expect(() => developerTokenMinter(options())).not.toThrow();
   });
 });
 
 describe("env as an option: mistakes are TypeErrors when the options are read, naming a variable and never its value", () => {
-  /** The same mistake as mintDeveloperToken rejects it and as cachedMinter throws it. */
+  /** The same mistake as mintDeveloperToken rejects it and as developerTokenMinter throws it. */
   async function both(options: () => unknown): Promise<Error[]> {
-    return [await rejected(mintDeveloperToken(options() as tMintOptions)), thrown(() => cachedMinter(options() as tMintOptions))];
+    return [await rejected(mintDeveloperToken(options() as tMintOptions)), thrown(() => developerTokenMinter(options() as tMintOptions))];
   }
 
   test.each([

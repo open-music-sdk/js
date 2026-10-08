@@ -3,7 +3,7 @@ import { inspect } from "node:util";
 import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { cachedMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
+import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
 import { redacted } from "./redacted.js";
 
 // jose as it is, with its key import counted: how often the minter parses the key is part of what it promises.
@@ -219,7 +219,7 @@ describe("mintDeveloperToken: invalid options", () => {
   });
 });
 
-describe("mintDeveloperToken and cachedMinter: a pem that is not a string, plain or redacted, is refused by name", () => {
+describe("mintDeveloperToken and developerTokenMinter: a pem that is not a string, plain or redacted, is refused by name", () => {
   const wrong: [string, (pem: string) => unknown][] = [
     ["null", () => null],
     ["undefined", () => undefined],
@@ -245,10 +245,10 @@ describe("mintDeveloperToken and cachedMinter: a pem that is not a string, plain
     expect(leaks(shown(error))).toBe(false);
   });
 
-  test.each(wrong)("%s, to cachedMinter: the same, when the minter is created", (_name, make) => {
+  test.each(wrong)("%s, to developerTokenMinter: the same, when the minter is created", (_name, make) => {
     let error: unknown;
     try {
-      cachedMinter({ ...valid, pem: make(valid.pem as string) as string });
+      developerTokenMinter({ ...valid, pem: make(valid.pem as string) as string });
     } catch (e) {
       error = e;
     }
@@ -266,7 +266,7 @@ describe("mintDeveloperToken and cachedMinter: a pem that is not a string, plain
     const error: unknown = await mintDeveloperToken(options as unknown as tMintOptions).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
     expect((error as Error).message).toMatch(/^developer token: expected an options object/);
-    expect(() => cachedMinter(options as unknown as tMintOptions)).toThrow(/^developer token: expected an options object/);
+    expect(() => developerTokenMinter(options as unknown as tMintOptions)).toThrow(/^developer token: expected an options object/);
   });
 
   test("the key itself in place of the options is refused without being quoted", async () => {
@@ -290,23 +290,23 @@ describe("mintDeveloperToken: the key never ends up in a token or an error by be
   });
 });
 
-describe("cachedMinter", () => {
+describe("developerTokenMinter", () => {
   test.each(invalid)("refuses %s when it is created, not on first use", (_name, bad) => {
-    expect(() => cachedMinter({ ...valid, ...bad })).toThrow(TypeError);
+    expect(() => developerTokenMinter({ ...valid, ...bad })).toThrow(TypeError);
   });
 
   test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("refuses refreshAheadSeconds %s when it is created", (refreshAheadSeconds) => {
-    expect(() => cachedMinter({ ...valid, refreshAheadSeconds })).toThrow(TypeError);
+    expect(() => developerTokenMinter({ ...valid, refreshAheadSeconds })).toThrow(TypeError);
   });
 
   test("a key that cannot be parsed fails each call, and is never cached as a token", async () => {
-    const minter = cachedMinter({ ...valid, pem: "not a key" });
+    const minter = developerTokenMinter({ ...valid, pem: "not a key" });
     await expect(minter({})).rejects.toThrow(TypeError);
     await expect(minter({})).rejects.toThrow(TypeError);
   });
 
   test("mints once and hands every caller the same valid token", async () => {
-    const minter = cachedMinter({ ...valid, origin: ["https://example.com"] });
+    const minter = developerTokenMinter({ ...valid, origin: ["https://example.com"] });
     const tokens = await Promise.all([minter({}), minter({}), minter({})]);
     tokens.push(await minter({}));
     expect(new Set(tokens).size).toBe(1);
@@ -324,7 +324,7 @@ describe("cachedMinter", () => {
     });
 
   test("a day before a token expires, by default, the next is signed in the background and then handed out", async () => {
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     const first = await minter({});
     at(149 * DAY_SECONDS * 1000 - 1);
     expect(await minter({})).toBe(first);
@@ -339,7 +339,7 @@ describe("cachedMinter", () => {
     [3600, undefined, 1800],
     [7 * DAY_SECONDS, 2 * DAY_SECONDS, 5 * DAY_SECONDS],
   ])("with ttl %i and refreshAhead %s, replaces the token after %i seconds", async (ttlSeconds, refreshAheadSeconds, after) => {
-    const minter = cachedMinter({ ...valid, ttlSeconds, refreshAheadSeconds });
+    const minter = developerTokenMinter({ ...valid, ttlSeconds, refreshAheadSeconds });
     const first = await minter({});
     at(after * 1000 - 1);
     expect(await minter({})).toBe(first);
@@ -349,7 +349,7 @@ describe("cachedMinter", () => {
   });
 
   test("replaces a token Apple rejected once it has been in use, and only that one", async () => {
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     const first = await minter({});
     at(60_000);
     expect(await minter({ rejected: "some other token" })).toBe(first);
@@ -360,20 +360,20 @@ describe("cachedMinter", () => {
   });
 
   test.each([0, 1000, 59_999])("does not mint again for a token Apple rejects %i ms after it was minted: the same key would sign the same claims", async (age) => {
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     const first = await minter({});
     at(age);
     expect(await minter({ rejected: first })).toBe(first);
   });
 });
 
-describe("cachedMinter: what it mints is settled when it is created", () => {
+describe("developerTokenMinter: what it mints is settled when it is created", () => {
   type tLoose = Record<string, unknown> & { origin?: string[] };
   /** The caller's own object, which it is free to do anything to once the minter exists. */
   const mine = (): tLoose => ({ ...valid, ttlSeconds: 3600, origin: ["https://app.example"] });
   /** Makes the minter mint again, a minute further on each time, and returns what it mints. */
   let minute = 0;
-  const again = async (minter: ReturnType<typeof cachedMinter>) => {
+  const again = async (minter: ReturnType<typeof developerTokenMinter>) => {
     const held = await minter();
     at(++minute * 60_000);
     return minter({ rejected: held });
@@ -407,7 +407,7 @@ describe("cachedMinter: what it mints is settled when it is created", () => {
   ])("the caller's object changed %s", (_when, early) => {
     test.each(meddling)("%s changes no token the minter goes on to mint", async (_name, meddle) => {
       const options = mine();
-      const minter = cachedMinter(options as unknown as tMintOptions);
+      const minter = developerTokenMinter(options as unknown as tMintOptions);
       if (!early) await minter();
       meddle(options);
       for (const token of [await minter(), await again(minter), await again(minter)]) {
@@ -424,19 +424,19 @@ describe("cachedMinter: what it mints is settled when it is created", () => {
 
   test("two minters made from one object, changed in between, each keep what they were given", async () => {
     const options = mine();
-    const first = cachedMinter(options as unknown as tMintOptions);
+    const first = developerTokenMinter(options as unknown as tMintOptions);
     options.ttlSeconds = 7200;
     options.origin = ["https://other.example"];
-    const second = cachedMinter(options as unknown as tMintOptions);
+    const second = developerTokenMinter(options as unknown as tMintOptions);
     const [a, b] = [await read(await first()), await read(await second())];
     expect([(a.claims.exp ?? 0) - (a.claims.iat ?? 0), a.claims.origin]).toEqual([3600, ["https://app.example"]]);
     expect([(b.claims.exp ?? 0) - (b.claims.iat ?? 0), b.claims.origin]).toEqual([7200, ["https://other.example"]]);
   });
 });
 
-describe("cachedMinter: the key is parsed once and the PEM not gone back to", () => {
+describe("developerTokenMinter: the key is parsed once and the PEM not gone back to", () => {
   /** Makes the minter mint a new token `times` times, a minute apart. */
-  async function mintAgain(minter: ReturnType<typeof cachedMinter>, times: number) {
+  async function mintAgain(minter: ReturnType<typeof developerTokenMinter>, times: number) {
     let held = await minter();
     for (let i = 1; i <= times; i++) {
       at(i * 60_000);
@@ -445,24 +445,24 @@ describe("cachedMinter: the key is parsed once and the PEM not gone back to", ()
   }
 
   test("nothing is parsed until a token is wanted", () => {
-    cachedMinter(valid);
+    developerTokenMinter(valid);
     expect(importPKCS8).not.toHaveBeenCalled();
   });
 
   test.each([1, 2, 5])("after %i further mints the key has still been imported once", async (times) => {
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     await mintAgain(minter, times);
     expect(importPKCS8).toHaveBeenCalledTimes(1);
   });
 
   test("callers arriving together on a new minter cause one import", async () => {
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     await Promise.all([minter(), minter(), minter()]);
     expect(importPKCS8).toHaveBeenCalledTimes(1);
   });
 
   test("a key that cannot be imported is tried again on the next call, not remembered as broken", async () => {
-    const minter = cachedMinter({ ...valid, pem: "not a key" });
+    const minter = developerTokenMinter({ ...valid, pem: "not a key" });
     await expect(minter()).rejects.toThrow(TypeError);
     await expect(minter()).rejects.toThrow(TypeError);
     expect(importPKCS8).toHaveBeenCalledTimes(2);
@@ -470,21 +470,21 @@ describe("cachedMinter: the key is parsed once and the PEM not gone back to", ()
 
   test("an import that fails once for a reason of the moment does not cost the minter its key", async () => {
     vi.mocked(importPKCS8).mockRejectedValueOnce(new Error("crypto busy"));
-    const minter = cachedMinter(valid);
+    const minter = developerTokenMinter(valid);
     await expect(minter()).rejects.toThrow(TypeError);
     await read(await minter());
     expect(importPKCS8).toHaveBeenCalledTimes(2);
   });
 
   test("the imported key can sign and cannot be exported", async () => {
-    await cachedMinter(valid)();
+    await developerTokenMinter(valid)();
     const key = (await vi.mocked(importPKCS8).mock.results[0]?.value) as CryptoKey;
     expect([key.type, key.extractable, key.usages]).toEqual(["private", false, ["sign"]]);
   });
 
   test("a redacted key is opened once, when the minter is created, and never again", async () => {
     const unwrap = vi.fn(() => valid.pem as string);
-    const minter = cachedMinter({ ...valid, pem: { unwrap, toString: () => "<redacted>", toJSON: () => "<redacted>" } });
+    const minter = developerTokenMinter({ ...valid, pem: { unwrap, toString: () => "<redacted>", toJSON: () => "<redacted>" } });
     expect(unwrap).toHaveBeenCalledTimes(1);
     await mintAgain(minter, 3);
     expect(unwrap).toHaveBeenCalledTimes(1);
@@ -497,7 +497,7 @@ describe("cachedMinter: the key is parsed once and the PEM not gone back to", ()
   });
 });
 
-describe("cachedMinter as a client's developerToken", () => {
+describe("developerTokenMinter as a client's developerToken", () => {
   /** A fetch that answers with the given statuses in turn and records each Authorization header. */
   function apple(...statuses: number[]) {
     const sent: string[] = [];
@@ -510,7 +510,7 @@ describe("cachedMinter as a client's developerToken", () => {
 
   test("every request carries the one minted token as a Bearer", async () => {
     const { fetch, sent } = apple();
-    const music = createClient({ developerToken: cachedMinter(valid), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenMinter(valid), fetch, retry: false });
     await Promise.all([music.request("v1/test"), music.request("v1/test")]);
     await music.request("v1/test");
     expect(new Set(sent).size).toBe(1);
@@ -520,7 +520,7 @@ describe("cachedMinter as a client's developerToken", () => {
 
   test("a 401 is answered with a fresh token, which later requests keep using", async () => {
     const { fetch, sent } = apple(200, 401, 200, 200);
-    const music = createClient({ developerToken: cachedMinter(valid), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenMinter(valid), fetch, retry: false });
     await music.request("v1/test");
     at(5 * 60_000);
     await music.request("v1/test");
@@ -533,7 +533,7 @@ describe("cachedMinter as a client's developerToken", () => {
 
   test("when Apple rejects everything, as with a revoked key, each request reaches Apple once and one token is minted a minute", async () => {
     const { fetch, sent } = apple(...Array.from({ length: 400 }, () => 401));
-    const music = createClient({ developerToken: cachedMinter(valid), fetch, retry: false });
+    const music = createClient({ developerToken: developerTokenMinter(valid), fetch, retry: false });
     for (let second = 0; second < 120; second++) {
       at(second * 1000);
       await expect(music.request("v1/test")).rejects.toMatchObject({ _tag: "DeveloperTokenRejected" });

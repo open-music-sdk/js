@@ -1,12 +1,12 @@
 import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
 import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 
-// This module is also the package's "./remote" entry, for code that must carry no signing code: nothing it
+// This module is also the package's "./fetcher" entry, for code that must carry no signing code: nothing it
 // imports, directly or through another module, may reach jose or ./mint.js. A test walks the imports.
 export type { tDeveloperTokenProvider } from "./cache.js";
 
 /** Invalid values throw a TypeError. */
-export interface tRemoteOptions {
+export interface tFetcherOptions {
   /** Default: the global fetch. Wrap it to add credentials or headers your endpoint needs. */
   readonly fetch?: typeof fetch | undefined;
   /** Fetch a replacement this long before `exp`, capped at half the token's remaining life. Default one day. */
@@ -83,13 +83,13 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
  * the endpoint's status when it answered, so it is never mistaken for an answer from Apple.
  */
-export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions = {}): tDeveloperTokenProvider {
+export function developerTokenFetcher(url: string | URL, options: tFetcherOptions = {}): tDeveloperTokenProvider {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? 10_000;
-  if (typeof fetchImpl !== "function") throw new TypeError(`remoteDeveloperToken: fetch must be a function, got ${typeof fetchImpl}`);
+  if (typeof fetchImpl !== "function") throw new TypeError(`developerTokenFetcher: fetch must be a function, got ${typeof fetchImpl}`);
   // An integer, because a timer takes nothing else: Node throws at a fraction and a browser rounds it down, to zero if it can.
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS)
-    throw new TypeError(`remoteDeveloperToken: timeoutMs must be an integer from 1 to ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
+    throw new TypeError(`developerTokenFetcher: timeoutMs must be an integer from 1 to ${String(MAX_TIMEOUT_MS)}, got ${String(timeoutMs)}`);
   /**
    * The endpoint as an absolute URL, or undefined while it is relative and there is nothing to resolve it against.
    * A relative URL resolves against the document's base URL, exactly as fetch would resolve it.
@@ -99,9 +99,9 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
     const endpoint = parse(url, scope.document?.baseURI ?? scope.location?.href);
     // Neither error quotes the URL: its query or its credentials may be secrets, and errors get logged.
     if (endpoint !== undefined && endpoint.protocol !== "https:" && endpoint.protocol !== "http:")
-      throw new TypeError(`remoteDeveloperToken: the URL must be http or https, not ${endpoint.protocol}`);
+      throw new TypeError(`developerTokenFetcher: the URL must be http or https, not ${endpoint.protocol}`);
     if (endpoint !== undefined && (endpoint.username !== "" || endpoint.password !== ""))
-      throw new TypeError("remoteDeveloperToken: the URL must not carry a username or password; send credentials through the fetch option");
+      throw new TypeError("developerTokenFetcher: the URL must not carry a username or password; send credentials through the fetch option");
     return endpoint;
   };
   // What can never work is refused now. A relative URL with no document yet is left for the first call, so a
@@ -110,7 +110,7 @@ export function remoteDeveloperToken(url: string | URL, options: tRemoteOptions 
 
   const issue = async (): Promise<tIssued> => {
     const endpoint = resolve();
-    if (endpoint === undefined) throw new TypeError("remoteDeveloperToken: a relative URL needs a document to resolve against; outside a browser, pass an absolute URL");
+    if (endpoint === undefined) throw new TypeError("developerTokenFetcher: a relative URL needs a document to resolve against; outside a browser, pass an absolute URL");
     const where = endpoint.origin + endpoint.pathname; // no query, no fragment
     // The shared fetch answers to the timeout alone; no caller's signal may cancel it for the others.
     const timeout = AbortSignal.timeout(timeoutMs);

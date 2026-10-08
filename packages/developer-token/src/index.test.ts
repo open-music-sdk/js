@@ -4,21 +4,21 @@ import { exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import { describe, expect, test, vi } from "vitest";
 import manifest from "../package.json" with { type: "json" };
 import * as api from "./index.js";
-import * as remoteEntry from "./remote.js";
+import * as remoteEntry from "./fetcher.js";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
-    expect(Object.keys(api).sort()).toEqual(["cachedMinter", "mintDeveloperToken", "redacted", "remoteDeveloperToken"]);
+    expect(Object.keys(api).sort()).toEqual(["developerTokenFetcher", "developerTokenMinter", "mintDeveloperToken", "redacted"]);
   });
 
-  test("is one of two: everything, and ./remote for code that must carry no signing code", () => {
-    expect(Object.keys(manifest.exports)).toEqual([".", "./remote"]);
+  test("is one of two: everything, and ./fetcher for code that must carry no signing code", () => {
+    expect(Object.keys(manifest.exports)).toEqual([".", "./fetcher"]);
   });
 
   test("from an environment to a request, using nothing but the entry and core", async () => {
     const pair = await generateKeyPair("ES256", { extractable: true });
     const env = Object.fromEntries([["KEY", await exportPKCS8(pair.privateKey)], ["TEAM", "DEF123GHIJ"], ["KID", "ABC123DEFG"]]);
-    const developerToken = api.cachedMinter({ env, variables: { pem: "KEY", teamId: "TEAM", keyId: "KID" } });
+    const developerToken = api.developerTokenMinter({ env, variables: { pem: "KEY", teamId: "TEAM", keyId: "KID" } });
     const sent: string[] = [];
     const fetch = (input: RequestInfo | URL): Promise<Response> => {
       sent.push(new Request(input).headers.get("authorization") ?? "");
@@ -30,13 +30,13 @@ describe("the package entry", () => {
   });
 
   test("the errors it throws are the ones core recognises", async () => {
-    const provider = api.remoteDeveloperToken("https://app.example/token", { fetch: () => Promise.reject(new TypeError("fetch failed")) });
+    const provider = api.developerTokenFetcher("https://app.example/token", { fetch: () => Promise.reject(new TypeError("fetch failed")) });
     const error: unknown = await provider().catch((e: unknown) => e);
     expect(isAppleMusicError(error, "DeveloperTokenUnavailable")).toBe(true);
   });
 });
 
-describe("the ./remote entry", () => {
+describe("the ./fetcher entry", () => {
   /** Every module reachable from `entry` through static imports and re-exports, and every package those name. */
   function reach(entry: string) {
     const modules = new Set<string>();
@@ -56,13 +56,13 @@ describe("the ./remote entry", () => {
     return { modules: [...modules].sort(), packages: [...packages].sort() };
   }
 
-  test("exports remoteDeveloperToken and nothing else", () => {
-    expect(Object.keys(remoteEntry)).toEqual(["remoteDeveloperToken"]);
-    expect(remoteEntry.remoteDeveloperToken).toBe(api.remoteDeveloperToken);
+  test("exports developerTokenFetcher and nothing else", () => {
+    expect(Object.keys(remoteEntry)).toEqual(["developerTokenFetcher"]);
+    expect(remoteEntry.developerTokenFetcher).toBe(api.developerTokenFetcher);
   });
 
   test("reaches no signing code: nothing it imports, at any remove, names jose or the minter", () => {
-    expect(reach("./remote.ts")).toEqual({ modules: ["./cache.ts", "./remote.ts"], packages: ["@open-music-sdk/core"] });
+    expect(reach("./fetcher.ts")).toEqual({ modules: ["./cache.ts", "./fetcher.ts"], packages: ["@open-music-sdk/core"] });
   });
 
   test("the walk that says so does find jose from the main entry, so its silence means something", () => {
@@ -72,7 +72,7 @@ describe("the ./remote entry", () => {
   });
 
   test("is built and published under its own path", () => {
-    expect(manifest.exports["./remote"]).toEqual({ types: "./dist/remote.d.ts", default: "./dist/remote.js" });
+    expect(manifest.exports["./fetcher"]).toEqual({ types: "./dist/fetcher.d.ts", default: "./dist/fetcher.js" });
   });
 });
 
@@ -107,7 +107,7 @@ describe("an app whose copy of core is not the one this package resolves", () =>
     const foreign = await foreignCore();
     expect(foreign.AppleMusicError).not.toBe(AppleMusicError);
     const { fetch } = world(503);
-    const error: unknown = await api.remoteDeveloperToken(ENDPOINT, { fetch })().catch((e: unknown) => e);
+    const error: unknown = await api.developerTokenFetcher(ENDPOINT, { fetch })().catch((e: unknown) => e);
     expect(Object.getPrototypeOf(error)).toBe(AppleMusicError.prototype);
     expect(Object.getPrototypeOf(error)).not.toBe(foreign.AppleMusicError.prototype);
   });
@@ -120,7 +120,7 @@ describe("an app whose copy of core is not the one this package resolves", () =>
   ] as const)("%s is DeveloperTokenUnavailable to that copy's guard, status and all", async (_name, reply, status) => {
     const foreign = await foreignCore();
     const { fetch } = world(reply);
-    const error: unknown = await api.remoteDeveloperToken(ENDPOINT, { fetch })().catch((e: unknown) => e);
+    const error: unknown = await api.developerTokenFetcher(ENDPOINT, { fetch })().catch((e: unknown) => e);
     expect(foreign.isAppleMusicError(error, "DeveloperTokenUnavailable")).toBe(true);
     expect(foreign.isAppleMusicError(error, "ApiError")).toBe(false);
     expect((error as { status?: number }).status).toBe(status);
@@ -129,7 +129,7 @@ describe("an app whose copy of core is not the one this package resolves", () =>
   test("that copy's client retries an endpoint that is briefly down, as this copy's would", async () => {
     const foreign = await foreignCore();
     const { fetch, seen } = world(new TypeError("fetch failed"), 503, token);
-    const music = foreign.createClient({ developerToken: api.remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const music = foreign.createClient({ developerToken: api.developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
     await music.request("v1/test");
     expect(seen.tokenCalls).toBe(3);
     expect(seen.sent).toEqual([`Bearer ${token}`]);
@@ -138,7 +138,7 @@ describe("an app whose copy of core is not the one this package resolves", () =>
   test("that copy's client does not retry a refusal, and hands the error over with its tag", async () => {
     const foreign = await foreignCore();
     const { fetch, seen } = world(403);
-    const music = foreign.createClient({ developerToken: api.remoteDeveloperToken(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const music = foreign.createClient({ developerToken: api.developerTokenFetcher(ENDPOINT, { fetch }), fetch, retry: { maxAttempts: 3, baseDelayMs: 0 } });
     const error: unknown = await music.request("v1/test").catch((e: unknown) => e);
     expect(foreign.isAppleMusicError(error, "DeveloperTokenUnavailable")).toBe(true);
     expect(seen.tokenCalls).toBe(1);
@@ -149,7 +149,7 @@ describe("an app whose copy of core is not the one this package resolves", () =>
     const foreign = await foreignCore();
     const pair = await generateKeyPair("ES256", { extractable: true });
     const { fetch, seen } = world();
-    const developerToken = api.cachedMinter({ pem: await exportPKCS8(pair.privateKey), teamId: "DEF123GHIJ", keyId: "ABC123DEFG" });
+    const developerToken = api.developerTokenMinter({ pem: await exportPKCS8(pair.privateKey), teamId: "DEF123GHIJ", keyId: "ABC123DEFG" });
     await foreign.createClient({ developerToken, fetch, retry: false }).request("v1/test");
     expect((await jwtVerify((seen.sent[0] ?? "").replace(/^Bearer /, ""), pair.publicKey)).payload.iss).toBe("DEF123GHIJ");
   });

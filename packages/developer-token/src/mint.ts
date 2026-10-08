@@ -38,7 +38,7 @@ export type tMintOptions = (tKeyGiven | tKeyFromEnv) & {
   readonly origin?: readonly string[] | undefined;
 };
 
-export type tCachedMinterOptions = tMintOptions & {
+export type tMinterOptions = tMintOptions & {
   /** Mint a replacement this long before `exp`, capped at half the lifetime. Default one day. */
   readonly refreshAheadSeconds?: number | undefined;
 };
@@ -151,7 +151,7 @@ export async function mintDeveloperToken(options: tMintOptions): Promise<string>
  * The options are read once, here. The key is imported on first use and the PEM let go of: from then on the
  * minter holds a key that can sign and cannot be exported, and no copy of the text it came from.
  */
-export function cachedMinter(options: tCachedMinterOptions): tDeveloperTokenProvider {
+export function developerTokenMinter(options: tMinterOptions): tDeveloperTokenProvider {
   const { pem, pemName, ...claims } = check(options);
   let key: string | CryptoKey = pem; // the PEM until it has been imported, then the key in its place
   return cached(async () => {

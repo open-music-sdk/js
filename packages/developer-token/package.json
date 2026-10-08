@@ -1,7 +1,7 @@
 {
   "name": "@open-music-sdk/developer-token",
   "version": "0.0.0",
-  "description": "Developer tokens for the Apple Music API: ES256 JWT minting with jose, a caching minter, and a remote token provider.",
+  "description": "Developer tokens for the Apple Music API: sign one with jose, or get a provider that mints or fetches them and keeps them fresh.",
   "license": "MIT",
   "keywords": [
     "apple-music-api",
@@ -31,9 +31,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./remote": {
-      "types": "./dist/remote.d.ts",
-      "default": "./dist/remote.js"
+    "./fetcher": {
+      "types": "./dist/fetcher.d.ts",
+      "default": "./dist/fetcher.js"
     }
   },
   "scripts": {
