@@ -1,6 +1,5 @@
-import { AppleMusicError, parseRetryAfter } from "@open-music-sdk/core";
+import { AppleMusicError, got, parseRetryAfter } from "@open-music-sdk/core";
 import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
-import { got } from "./got.js";
 
 // This module is also the package's "./fetcher" entry, for code that must carry no signing code: nothing it
 // imports, directly or through another module, may reach jose or ./mint.js. A test walks the imports.

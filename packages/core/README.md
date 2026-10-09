@@ -39,6 +39,7 @@ try {
 | `retry(fn, policy?, signal?)`, `retryable` | Exponential backoff with full jitter; honours `Retry-After` |
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
 | `parseRetryAfter(header)` | Seconds or HTTP date to milliseconds |
+| `got(value)` | What a value is, for an error that must not show it: a string by its length, anything else by its kind, a number as it is |
 
 `isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
 with a string `_tag`, not by constructor. An error is recognised whichever copy of this package made

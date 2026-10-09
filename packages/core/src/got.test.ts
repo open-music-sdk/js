@@ -37,7 +37,7 @@ describe("got", () => {
     ["an array holding a secret", [SECRET], "object"],
     ["a String object of a secret", new String(SECRET), "object"],
     ["a Number object", new Number(5), "object"],
-    ["a Buffer of a secret", Buffer.from(SECRET), "object"],
+    ["the bytes of a secret", new TextEncoder().encode(SECRET), "object"],
     ["an Error whose message is a secret", new Error(SECRET), "object"],
     ["a promise of a secret", Promise.resolve(SECRET), "object"],
   ])("%s is named by its kind", (_name, value, text) => {

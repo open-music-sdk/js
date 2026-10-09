@@ -2,6 +2,7 @@
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
 import { AppleMusicError, type tValidationIssue } from "./errors.js";
+import { got } from "./got.js";
 import type { tRateLimiter } from "./rate-limit.js";
 import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from "./retry.js";
 
@@ -116,8 +117,7 @@ const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
 function credential(name: string, token: unknown): string {
   const value = typeof token === "string" ? token.trim() : "";
   if (/^[\x21-\x7e]+$/.test(value)) return value;
-  const got = typeof token === "string" ? `${String(token.length)} characters` : typeof token;
-  throw new TypeError(`${name} is not a token: expected printable characters with no spaces or line breaks inside, got ${got}`);
+  throw new TypeError(`${name} is not a token: expected printable characters with no spaces or line breaks inside, got ${got(token)}`);
 }
 const formatIssues = (issues: readonly tValidationIssue[]) =>
   issues.map((i) => `${(i.path ?? []).map((s) => String(typeof s === "object" ? s.key : s)).join(".") || "<root>"}: ${i.message}`).join("; ");
