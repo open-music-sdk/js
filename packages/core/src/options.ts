@@ -1,6 +1,6 @@
 // The options a function for an endpoint takes, and how they become what `request` takes. Written once, so that
 // the same option means the same thing whichever function it is handed to.
-import { MAX_ITEMS, MAX_LENGTH, listOf, optionsOf } from "./check";
+import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, listOf, optionsOf } from "./check";
 import type { tParams, tRequestInit, tSchemaLike } from "./client";
 import { got } from "./got";
 
@@ -35,7 +35,8 @@ const MAX_PARAMS = 100;
 
 type tValue = NonNullable<tParams[string]>;
 
-const isText = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_LENGTH;
+const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
+const isCursor = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_LENGTH;
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
 /** A list an option may hold: nothing, when it was not given or holds nothing. */
@@ -45,8 +46,8 @@ function namesOf(fn: string, name: string, value: unknown): readonly string[] | 
 }
 
 function languageOf(fn: string, value: unknown): string | undefined {
-  if (value === undefined || isText(value)) return value;
-  throw new TypeError(`${fn}: language must be a string of 1 to ${String(MAX_LENGTH)} characters; got ${got(value)}`);
+  if (value === undefined || isName(value)) return value;
+  throw new TypeError(`${fn}: language must be a string of 1 to ${String(MAX_NAME)} characters; got ${got(value)}`);
 }
 
 function limitOf(fn: string, value: unknown): number | undefined {
@@ -55,7 +56,7 @@ function limitOf(fn: string, value: unknown): number | undefined {
 }
 
 function offsetOf(fn: string, value: unknown): number | string | undefined {
-  if (value === undefined || isText(value) || (Number.isSafeInteger(value) && (value as number) >= 0)) return value as number | string | undefined;
+  if (value === undefined || isCursor(value) || (Number.isSafeInteger(value) && (value as number) >= 0)) return value as number | string | undefined;
   throw new TypeError(`${fn}: offset must be a whole number from 0, or a cursor of 1 to ${String(MAX_LENGTH)} characters; got ${got(value)}`);
 }
 
@@ -68,8 +69,8 @@ function schemaOf<T>(fn: string, value: unknown): tSchemaLike<T> | undefined {
 /** An option a function takes beyond the ones above, such as `views`: one value, or a list of them. */
 function alsoOf(fn: string, name: string, value: unknown): tValue | undefined {
   if (Array.isArray(value)) return namesOf(fn, name, value);
-  if (value === undefined || isText(value) || isNumber(value) || typeof value === "boolean") return value;
-  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters, a number, true or false, or a list of strings; got ${got(value)}`);
+  if (value === undefined || isName(value) || isNumber(value) || typeof value === "boolean") return value;
+  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, a number, true or false, or a list of strings; got ${got(value)}`);
 }
 
 /** One of the caller's own parameters as it can be sent, a list as this call's copy; `undefined` when it cannot be. */

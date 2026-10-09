@@ -26,7 +26,14 @@ export function clientOf(fn: string, client: unknown, methods: readonly (keyof t
   throw new TypeError(`${fn}: client must be a client from createClient; got ${got(client)}`);
 }
 
-/** Longer than any identifier or code Apple gives out, which run to a few dozen characters. */
+/**
+ * The longest an id, a name or a code may be. Apple's run to a few dozen characters, and a token to some two
+ * hundred, so this takes every one of the first and none of the second: a token put where an id belongs is refused
+ * here, and is neither sent to Apple nor repeated in the error Apple's answer to it would become.
+ */
+export const MAX_NAME = 64;
+
+/** The longest a piece of text that is no name may be, such as a cursor Apple gave. */
 export const MAX_LENGTH = 256;
 
 /**
@@ -36,21 +43,21 @@ export const MAX_LENGTH = 256;
  * request for another, where a different token may be sent.
  */
 export function segmentOf(fn: string, name: string, value: unknown): string {
-  if (typeof value === "string" && value !== "" && value.length <= MAX_LENGTH && value !== "." && value !== "..") {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== "..") {
     try {
       return encodeURIComponent(value);
     } catch {
       // Half of a surrogate pair: not text that can be sent, and refused like anything else that is no segment.
     }
   }
-  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters, and not "." or ".."; got ${got(value)}`);
+  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, and not "." or ".."; got ${got(value)}`);
 }
 
 /** The most Apple documents taking in one request, which is for songs by id. Each item is a URL made longer, so the list is not left open. */
 export const MAX_ITEMS = 300;
 
 /** One value of a list: a list is sent joined by commas, so an item with a comma in it would arrive as two. */
-const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_LENGTH && !item.includes(",");
+const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_NAME && !item.includes(",");
 
 /**
  * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken
@@ -61,5 +68,5 @@ export function listOf(fn: string, name: string, value: unknown): readonly strin
   const bad = items.findIndex((item) => !isItem(item));
   if (items.length > 0 && bad === -1) return items as string[];
   const what = !Array.isArray(value) ? got(value) : bad === -1 ? `a list of ${String(value.length)}` : `${got(items[bad])} at index ${String(bad)}`;
-  throw new TypeError(`${fn}: ${name} must be a list of 1 to ${String(MAX_ITEMS)} strings, each of 1 to ${String(MAX_LENGTH)} characters with no comma in it; got ${what}`);
+  throw new TypeError(`${fn}: ${name} must be a list of 1 to ${String(MAX_ITEMS)} strings, each of 1 to ${String(MAX_NAME)} characters with no comma in it; got ${what}`);
 }

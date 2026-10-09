@@ -128,7 +128,7 @@ describe("clientOf", () => {
 });
 
 describe("segmentOf", () => {
-  test.each(["1613600188", "pl.u-8aAVZAbCdEf", "i.eoDlqXxsaz8Nb", "ra.985484166", "us", "music-videos", "a.b", "...", ".a", "a..", "A_b-c~1!*'()", "s".repeat(256)])(
+  test.each(["1613600188", "pl.u-8aAVZAbCdEf", "i.eoDlqXxsaz8Nb", "ra.985484166", "us", "music-videos", "a.b", "...", ".a", "a..", "A_b-c~1!*'()", "s".repeat(64)])(
     "%s is a segment, and comes back as it is",
     (value) => {
       expect(segmentOf("fn", "id", value)).toBe(value);
@@ -193,7 +193,7 @@ describe("segmentOf", () => {
     ["an empty string", "", "0 characters"],
     ["a single dot, which a URL reads as here", ".", "1 characters"],
     ["two dots, which a URL reads as one up", "..", "2 characters"],
-    ["one character too many", "s".repeat(257), "257 characters"],
+    ["one character too many", "s".repeat(65), "65 characters"],
     ["half of a surrogate pair", "a\uD800", "2 characters"],
     ["undefined", undefined, "undefined"],
     ["null", null, "null"],
@@ -205,16 +205,23 @@ describe("segmentOf", () => {
   ])("%s is a TypeError naming the function and the argument, and saying what it got", (_name, value, what) => {
     const error = thrown(() => segmentOf("getSong", "id", value));
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toBe(`getSong: id must be a string of 1 to 256 characters, and not "." or ".."; got ${what}`);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${what}`);
   });
 
   test("the argument is named as the caller names it", () => {
     expect(thrown(() => segmentOf("getAlbumRelationship", "name", "")).message).toMatch(/^getAlbumRelationship: name must be /);
   });
 
-  test("a value that is refused is not shown: an id slot is where a pasted token ends up", () => {
-    const error = thrown(() => segmentOf("getSong", "id", `${SECRET}${"x".repeat(300)}`));
-    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  test("a token is too long to be an id: one put where an id belongs is refused, so it is never sent, and it is not shown", () => {
+    // The size and shape of a developer token: three runs of base64url with dots between, every character one a segment may hold.
+    const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
+    const error = thrown(() => segmentOf("getSong", "id", token));
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${String(token.length)} characters`);
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
+  });
+
+  test("the longest id Apple gives out is well inside the limit", () => {
+    for (const id of ["pl.f4d106fed2bd41149aaacabb233eb5eb", "ra.u-f4d106fed2bd41149aaacabb233eb5eb", "library-playlist-folders"]) expect(segmentOf("fn", "id", id)).toBe(id);
   });
 
   test("nothing is called on a value that is not a string: it is not asked to become one", () => {
@@ -225,7 +232,7 @@ describe("segmentOf", () => {
 });
 
 describe("listOf", () => {
-  const MESSAGE = "getSongs: ids must be a list of 1 to 300 strings, each of 1 to 256 characters with no comma in it; got ";
+  const MESSAGE = "getSongs: ids must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
   /** Three long with nothing at index 1: a hole is not an item. */
   const holed = new Array<string>(3);
   holed[0] = "1";
@@ -237,7 +244,7 @@ describe("listOf", () => {
     ["the same one twice", ["1", "1"]],
     ["types", ["songs", "music-videos"]],
     ["what a path could not hold, which a query can", ["a/b", "..", ".", "a b", "a?b#c", "é"]],
-    ["an item of the longest length", ["s".repeat(256)]],
+    ["an item of the longest length", ["s".repeat(64)]],
     ["as many as Apple takes", Array.from({ length: 300 }, (_, i) => String(i))],
   ])("%s is a list, and comes back item for item", (_name, value) => {
     expect(listOf("fn", "ids", value)).toEqual(value);
@@ -266,7 +273,7 @@ describe("listOf", () => {
     ["one item too many", Array.from({ length: 301 }, (_, i) => String(i)), "a list of 301"],
     ["an empty string in it", ["1", ""], "0 characters at index 1"],
     ["an item with a comma, which would arrive as two", ["1", "2,3"], "3 characters at index 1"],
-    ["an item one character too long", ["s".repeat(257)], "257 characters at index 0"],
+    ["an item one character too long", ["s".repeat(65)], "65 characters at index 0"],
     ["a number in it", ["1", 2], "2 at index 1"],
     ["null in it", [null], "null at index 0"],
     ["undefined in it", ["1", undefined, "3"], "undefined at index 1"],
@@ -303,6 +310,13 @@ describe("listOf", () => {
   test("an item that is refused is not shown", () => {
     const error = thrown(() => listOf("getSongs", "ids", [`${SECRET},${SECRET}`, { token: SECRET }]));
     expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  });
+
+  test("a token is too long to be an item: one put among the ids is refused, so it is never sent, and it is not shown", () => {
+    const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
+    const error = thrown(() => listOf("getSongs", "ids", ["1", token]));
+    expect(error.message).toBe(`${MESSAGE}${String(token.length)} characters at index 1`);
+    expect(error.message).not.toContain(token);
   });
 
   test("nothing is called on an item that is not a string", () => {

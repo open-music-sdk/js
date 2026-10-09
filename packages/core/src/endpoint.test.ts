@@ -491,8 +491,8 @@ describe("the resource patterns: what a function is handed is checked before any
   const several = resourcesGetter<tSongsResponse>("getSongs", collection);
   const whole = resourceLister<tLibrarySongsResponse>("listLibrarySongs", collection);
   const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
-  const SEGMENT = 'must be a string of 1 to 256 characters, and not "." or ".."; got ';
-  const LIST = "must be a list of 1 to 300 strings, each of 1 to 256 characters with no comma in it; got ";
+  const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+  const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 
   test.each<[string, (music: tAppleMusicClient) => Promise<unknown>, string]>([
     ["an empty id", (music) => one(music, ""), `getSong: id ${SEGMENT}0 characters`],
@@ -505,7 +505,7 @@ describe("the resource patterns: what a function is handed is checked before any
     ["one id where a list belongs", (music) => several(music, "1" as unknown as string[]), `getSongs: ids ${LIST}1 characters`],
     ["no ids", (music) => several(music, []), `getSongs: ids ${LIST}a list of 0`],
     ["two ids in one", (music) => several(music, ["1,2"]), `getSongs: ids ${LIST}3 characters at index 0`],
-    ["a wrong option beside good ids", (music) => several(music, ["1"], { language: "" }), "getSongs: language must be a string of 1 to 256 characters; got 0 characters"],
+    ["a wrong option beside good ids", (music) => several(music, ["1"], { language: "" }), "getSongs: language must be a string of 1 to 64 characters; got 0 characters"],
     ["a wrong option for a collection", (music) => whole(music, { offset: -1 }), "listLibrarySongs: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got -1"],
     ["an empty id for a relationship", (music) => related(music, "", "tracks"), `getAlbumRelationship: id ${SEGMENT}0 characters`],
     ["an empty name", (music) => related(music, "1", "" as "tracks"), `getAlbumRelationship: name ${SEGMENT}0 characters`],
@@ -521,10 +521,27 @@ describe("the resource patterns: what a function is handed is checked before any
     expect(calls).toHaveLength(0);
   });
 
-  test("a token in the wrong place is not shown", async () => {
+  test("a token put where an id, a name or a list of ids belongs is refused for its length: it is not sent, and not shown", async () => {
+    // The size and shape of a developer token: three runs of base64url with dots between.
+    const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
+    const { music, calls } = apple();
+    for (const call of [one(music, token), several(music, [token]), several(music, ["1", token]), related(music, token, "tracks"), related(music, "1", token as "tracks"), one(music, "1", { language: token })]) {
+      const error = await rejection(call);
+      expect(error).toBeInstanceOf(TypeError);
+      expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the check that says so can catch it: a token that did reach a path is in the error Apple's answer becomes", async () => {
+    const { music } = apple([{ status: 404 }]);
+    const error = await rejection(music.request(`${SONGS}/${SECRET}`));
+    expect(error.message).toContain(SECRET);
+  });
+
+  test("a value that is refused for another reason is not shown either", async () => {
     const { music } = apple();
-    const long = `${SECRET}${"x".repeat(300)}`;
-    for (const call of [one(music, long), several(music, [`${SECRET},${SECRET}`]), related(music, long, "tracks"), related(music, "1", long as "tracks"), one(music, "1", SECRET as unknown as tReadOptions<tSongsResponse>)]) {
+    for (const call of [several(music, [`${SECRET},${SECRET}`]), one(music, "1", SECRET as unknown as tReadOptions<tSongsResponse>), one(music, "1", { limit: SECRET as unknown as number })]) {
       const error = await rejection(call);
       expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
     }

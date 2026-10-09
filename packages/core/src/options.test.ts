@@ -113,7 +113,7 @@ describe("initOf: a further option is sent only by a function that names it", ()
   test.each<[string, unknown, string]>([
     ["null", null, "null"],
     ["an empty string", "", "0 characters"],
-    ["a string one character too long", "s".repeat(257), "257 characters"],
+    ["a string one character too long", "s".repeat(65), "65 characters"],
     ["not a number", Number.NaN, "NaN"],
     ["infinity", Number.POSITIVE_INFINITY, "Infinity"],
     ["an object", { name: "top-songs" }, "object"],
@@ -121,12 +121,12 @@ describe("initOf: a further option is sent only by a function that names it", ()
   ])("%s is a TypeError naming the option", (_name, views, what) => {
     const error = thrown(() => initOf("getArtist", loose({ views }), {}, ["views"]));
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toBe(`getArtist: views must be a string of 1 to 256 characters, a number, true or false, or a list of strings; got ${what}`);
+    expect(error.message).toBe(`getArtist: views must be a string of 1 to 64 characters, a number, true or false, or a list of strings; got ${what}`);
   });
 
   test("a list is held to what a list of ids is", () => {
     expect(thrown(() => initOf("getArtist", loose({ views: ["a", 2] }), {}, ["views"])).message).toBe(
-      "getArtist: views must be a list of 1 to 300 strings, each of 1 to 256 characters with no comma in it; got 2 at index 1",
+      "getArtist: views must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got 2 at index 1",
     );
   });
 });
@@ -174,17 +174,17 @@ describe("initOf: what it gives is this call's own", () => {
 });
 
 describe("initOf: what it is handed is checked, and a mistake names the function and the option", () => {
-  const LIST = "must be a list of 1 to 300 strings, each of 1 to 256 characters with no comma in it; got ";
+  const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
   const PARAM = "getSong: params.a must be a string, a number, true or false, or a list of at most 300 strings and numbers; got ";
 
   test.each<[string, unknown, string]>([
     ["options that are null", null, "getSong: expected an options object; got null"],
     ["options that are a string", "en-GB", "getSong: expected an options object; got 5 characters"],
     ["options that are a number", 25, "getSong: expected an options object; got 25"],
-    ["an empty language", { language: "" }, "getSong: language must be a string of 1 to 256 characters; got 0 characters"],
-    ["a language one character too long", { language: "l".repeat(257) }, "getSong: language must be a string of 1 to 256 characters; got 257 characters"],
-    ["a language that is null", { language: null }, "getSong: language must be a string of 1 to 256 characters; got null"],
-    ["a language that is a list", { language: ["en"] }, "getSong: language must be a string of 1 to 256 characters; got object"],
+    ["an empty language", { language: "" }, "getSong: language must be a string of 1 to 64 characters; got 0 characters"],
+    ["a language one character too long", { language: "l".repeat(65) }, "getSong: language must be a string of 1 to 64 characters; got 65 characters"],
+    ["a language that is null", { language: null }, "getSong: language must be a string of 1 to 64 characters; got null"],
+    ["a language that is a list", { language: ["en"] }, "getSong: language must be a string of 1 to 64 characters; got object"],
     ["include as one string", { include: "albums" }, `getSong: include ${LIST}6 characters`],
     ["include holding a number", { include: [1] }, `getSong: include ${LIST}1 at index 0`],
     ["include holding two in one", { include: ["albums,artists"] }, `getSong: include ${LIST}14 characters at index 0`],
