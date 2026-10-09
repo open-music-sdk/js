@@ -254,15 +254,15 @@ export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipRe
 /**
  * A function for a resource's relationships: `GET {collection}/{id}/{name}`. `Rels` is the resource's relationships
  * as the generated types have them, such as `tAlbumRelationships`: its keys are the names that may be asked for,
- * and the name asked for decides what comes back.
+ * and the name asked for decides what comes back, and so what a `schema` for it has to be a schema of.
  */
-export interface tRelationshipEndpoint<Rels, O> {
-  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: O): Promise<tRelationshipPage<Rels, K>>;
-  readonly bound: (client: tAppleMusicClient) => <K extends keyof Rels & string>(id: string, name: K, options?: O) => AsyncIterable<tRelated<Rels, K>>;
+export interface tRelationshipEndpoint<Rels, C = tNone> {
+  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>): Promise<tRelationshipPage<Rels, K>>;
+  readonly bound: (client: tAppleMusicClient) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>) => AsyncIterable<tRelated<Rels, K>>;
 }
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
-export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, tEndpointOptions<tRelationshipResponse, C>> {
+export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
   const [locate] = given<C>("relationshipGetter", collection, undefined);
   const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C>) => {
     const bag = optionsOf(fn, options, OPTIONS);
@@ -271,7 +271,7 @@ export function relationshipGetter<Rels = never, C extends object = tNone>(fn: s
     return located<tRelationshipResponse>(fn, locate(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.
-  return declared as unknown as tRelationshipEndpoint<Rels, tEndpointOptions<tRelationshipResponse, C>>;
+  return declared as unknown as tRelationshipEndpoint<Rels, C>;
 }
 
 /**

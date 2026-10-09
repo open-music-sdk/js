@@ -1,7 +1,31 @@
-import type { tAlbumRelationships, tArtist, tGenre, tLibrarySong, tLibrarySongsResponse, tMusicVideo, tRelationshipResponse, tSong, tSongsResponse } from "@open-music-sdk/types";
+import type {
+  tAlbumRelationships,
+  tAlbumRelationshipsAlbumArtistsRelationship,
+  tAlbumRelationshipsAlbumTracksRelationship,
+  tArtist,
+  tGenre,
+  tLibrarySong,
+  tLibrarySongsResponse,
+  tMusicVideo,
+  tRelationshipResponse,
+  tSong,
+  tSongsResponse,
+} from "@open-music-sdk/types";
 import { afterEach, describe, expect, expectTypeOf, test, vi } from "vitest";
 import { createClient, type tAppleMusicClient, type tClientOptions, type tSchemaLike } from "./client";
-import { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter, type tCollection, type tEndpointOptions, type tNone, type tRequestPlan } from "./endpoint";
+import {
+  endpoint,
+  endpointNamespace,
+  relationshipGetter,
+  resourceGetter,
+  resourceLister,
+  resourcesGetter,
+  type tCollection,
+  type tEndpointOptions,
+  type tNone,
+  type tRelationshipPage,
+  type tRequestPlan,
+} from "./endpoint";
 import { isAppleMusicError, type tErrorTag } from "./errors";
 import type { tReadOptions } from "./options";
 
@@ -107,6 +131,29 @@ describe("the types: one declaration gives both forms, and the name asked for de
     expectTypeOf(boundTracks).returns.toEqualTypeOf<AsyncIterable<tMusicVideo | tSong>>();
     expectTypeOf(boundArtists).returns.toEqualTypeOf<AsyncIterable<tArtist>>();
     expectTypeOf(boundGenres).returns.toEqualTypeOf<AsyncIterable<tGenre>>();
+  });
+
+  test("a relationship's schema is a schema of what its name gives, in both forms", () => {
+    const music = apple().music;
+    const artists = {} as tSchemaLike<tRelationshipPage<tAlbumRelationships, "artists">>;
+    // What @open-music-sdk/validate has for this relationship: a validator of the relationship as a resource carries it.
+    const generated = {} as tSchemaLike<tAlbumRelationshipsAlbumArtistsRelationship>;
+    const tracks = {} as tSchemaLike<tAlbumRelationshipsAlbumTracksRelationship>;
+    const anything = {} as tSchemaLike<tRelationshipResponse>;
+    const calls = [
+      () => getAlbumRelationship(music, "1", "artists", { schema: artists }),
+      () => getAlbumRelationship(music, "1", "artists", { schema: generated }),
+      () => getAlbumRelationship(music, "1", "tracks", { schema: tracks }),
+      () => bound.getAlbumRelationship("1", "artists", { schema: artists }),
+      () => bound.getAlbumRelationship("1", "artists", { schema: generated }),
+      // @ts-expect-error -- a schema of tracks says nothing of artists
+      () => getAlbumRelationship(music, "1", "artists", { schema: tracks }),
+      // @ts-expect-error -- and so it is for the bound form
+      () => bound.getAlbumRelationship("1", "artists", { schema: tracks }),
+      // @ts-expect-error -- a schema of any relationship at all would leave artists typed as artists and checked as nothing in particular
+      () => getAlbumRelationship(music, "1", "artists", { schema: anything }),
+    ];
+    expect(calls).toHaveLength(8);
   });
 
   test("a name the resource has no relationship of is refused by the types, in both forms", () => {
@@ -663,6 +710,15 @@ describe("the resource patterns: what each asks Apple for", () => {
     await getArtist(music, "1", { views: ["top-songs", "singles"] });
     await getSong(music, "1", { views: ["top-songs"] } as tReadOptions<tSongsResponse>);
     expect(sent()).toEqual(["GET /v1/catalog/us/artists/1?views=top-songs,singles", "GET /v1/catalog/us/songs/1"]);
+  });
+
+  test("a relationship's schema is what its answer is held to, called with a client or walked", async () => {
+    const failing: tSchemaLike<never> = { "~standard": { validate: () => ({ issues: [{ message: "expected artists" }] }) } };
+    const runs = [(music: tAppleMusicClient) => getAlbumRelationship(music, "1", "artists", { schema: failing }), (music: tAppleMusicClient) => all(getAlbumRelationship.bound(music)("1", "artists", { schema: failing }))];
+    for (const run of runs) {
+      const { music } = apple([{ body: { data: [song("1")] } }]);
+      expect(isAppleMusicError(await rejection(run(music)), "ValidationError")).toBe(true);
+    }
   });
 
   test("a relationship answers with a page, and bound it is walked", async () => {
