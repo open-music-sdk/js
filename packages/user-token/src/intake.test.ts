@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { createClient, type tAppleMusicClient, type tClientOptions, type tUserTokenStore } from "@open-music-sdk/core";
+import { AppleMusicError, createClient, type tAppleMusicClient, type tClientOptions, type tUserTokenStore } from "@open-music-sdk/core";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { isJson, userTokenIntake, type tIntakeOptions, type tUserTokenIntake } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
@@ -270,6 +270,15 @@ describe("userTokenIntake: one status per outcome", () => {
     const res = await handler(post({ token: "user-token" }));
     expect(res.status).toBe(502);
     expect(await errorOf(res)).toBe(tag);
+  });
+
+  test("502 DeveloperTokenUnavailable when the client's developer token could not be had, before Apple is asked", async () => {
+    const unavailable = new AppleMusicError("DeveloperTokenUnavailable", "developer token endpoint https://app.example/api/token answered 503", { status: 503 });
+    const { handler, set, calls } = intake([], {}, { developerToken: () => Promise.reject(unavailable) });
+    const res = await handler(post({ token: "user-token" }));
+    expect([res.status, await errorOf(res)]).toEqual([502, "DeveloperTokenUnavailable"]);
+    expect(calls).toHaveLength(0);
+    expect(set).not.toHaveBeenCalled();
   });
 });
 
