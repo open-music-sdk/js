@@ -84,6 +84,20 @@ function image({ template, max, width, height, format, crop }: tRequest, density
 }
 
 /**
+ * A URL as one `srcset` candidate can carry it: white space would end it early, and a comma at either end would
+ * be taken for a separator, so those are percent-encoded.
+ *
+ * The ends are walked, not matched. A pattern that looks for commas at the end starts over inside every run of
+ * them, which takes time by the square of the run's length, and the URL is not ours to trust with that.
+ */
+export function inSrcset(url: string): string {
+  let [start, end] = [0, url.length];
+  while (start < end && url.charCodeAt(start) === 0x2c) start++;
+  while (end > start && url.charCodeAt(end - 1) === 0x2c) end--;
+  return "%2C".repeat(start) + url.slice(start, end).replace(/[\t\n\f\r ]/g, encodeURIComponent) + "%2C".repeat(url.length - end);
+}
+
+/**
  * The URL of an artwork image `width` CSS pixels wide: the template with `{w}` and `{h}` filled in.
  *
  * The image keeps the artwork's own shape unless `height` says otherwise, and is never asked for larger than
@@ -110,8 +124,7 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
   for (let i = 0; i < count; i++) {
     const { url, pixels } = image(request, length(`densities[${String(i)}]`, (densities as unknown[])[i]));
     const descriptor = `${String(Math.max(0.01, Number((pixels / request.width).toFixed(2))))}x`;
-    // In a srcset white space ends a URL and a comma at either end of one is a separator, so those are escaped.
-    const candidate = url.replace(/[\t\n\f\r ]+|^,+|,+$/g, encodeURIComponent);
+    const candidate = inSrcset(url);
     // A browser keeps the first candidate of each density, and an image offered twice is offered once.
     if (!candidates.has(candidate) && ![...candidates.values()].includes(descriptor)) candidates.set(candidate, descriptor);
   }

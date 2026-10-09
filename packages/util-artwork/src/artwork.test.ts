@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test } from "vitest";
-import { artworkSrcSet, artworkUrl, type tArtworkSource } from "./artwork.js";
+import { artworkSrcSet, artworkUrl, inSrcset, type tArtworkSource } from "./artwork.js";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */
@@ -79,6 +79,45 @@ describe("the srcset reader these tests check against", () => {
     ["a comma starting a URL", ",a.jpg 1x", [["a.jpg", "1x"]]],
   ])("is thrown by %s, which is why those are escaped", (_name, srcset, expected) => {
     expect(parseSrcset(srcset).map((c) => [c.url, ...c.descriptors])).toEqual(expected);
+  });
+});
+
+describe("inSrcset", () => {
+  test.each([
+    ["nothing to escape", "https://example.com/a,b/300x300bb.jpg?x=1,2#f", "https://example.com/a,b/300x300bb.jpg?x=1,2#f"],
+    ["a space", "a b", "a%20b"],
+    ["each kind of white space a srcset splits on", "a\tb\nc\fd\re f", "a%09b%0Ac%0Cd%0De%20f"],
+    ["a run of spaces", "a   b", "a%20%20%20b"],
+    ["a comma at the start", ",a", "%2Ca"],
+    ["a comma at the end", "a,", "a%2C"],
+    ["commas at both ends and in the middle", ",,a,b,,", "%2C%2Ca,b%2C%2C"],
+    ["nothing but commas", ",,,", "%2C%2C%2C"],
+    ["nothing at all", "", ""],
+  ])("%s: %j becomes %j", (_name, url, expected) => {
+    expect(inSrcset(url)).toBe(expected);
+  });
+
+  test.each([
+    ["white space a srcset does not split on", "a b c　d\u000be"],
+    ["percent signs and existing escapes", "a%20b%2Cc%"],
+    ["a comma next to a space inside", "a, b"],
+  ])("%s is left alone, but for the spaces", (_name, url) => {
+    expect(inSrcset(url)).toBe(url.replaceAll(" ", "%20"));
+  });
+
+  // A pattern that retries inside each run takes four times as long for twice the length: about fifteen seconds
+  // here, where walking the ends takes a millisecond.
+  test.each([
+    ["commas inside the URL", (n: number) => `https://example.com/${",".repeat(n)}/{w}x{h}.jpg`],
+    ["commas inside it, then one more character", (n: number) => `https://example.com/?${",".repeat(n)}x`],
+    ["spaces inside it", (n: number) => `https://example.com/${" ".repeat(n)}/{w}x{h}.jpg`],
+    ["commas at both ends", (n: number) => `${",".repeat(n)}{w}x{h}${",".repeat(n)}`],
+    ["commas and spaces by turns", (n: number) => `https://example.com/${", ".repeat(n / 2)}{w}x{h}`],
+  ])("100 KB of %s costs time in step with its length, not with its square", (_name, make) => {
+    const url = make(100_000);
+    const start = performance.now();
+    artworkSrcSet({ url }, 300);
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });
 
