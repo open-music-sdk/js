@@ -21,7 +21,7 @@ goes next, and so where this package runs. Every block below is headed by where 
 
 | | The token arrives | Validated | Kept | Fits |
 | --- | --- | --- | --- | --- |
-| [Server only](#server-only) | In the environment of the process | On the server | In the process | A CLI, a job, a script |
+| [Server only](#server-only) | From whoever runs the program | On the server | In the process | A CLI, a job, a script |
 | [Client only](#client-only) | From Apple's sign-in, on the page | In the browser | In the page's memory | A site that calls Apple straight from the page |
 | [Hybrid](#hybrid) | From Apple's sign-in, on the page | On the server | In a store on the server | A full-stack app |
 
@@ -36,21 +36,21 @@ No browser takes part. Whoever runs the program supplies a token they already ho
 
 ```ts
 import { createClient, isAppleMusicError } from "@open-music-sdk/core";
-import { userTokenFromEnv, validateUserToken } from "@open-music-sdk/user-token";
+import { validateUserToken } from "@open-music-sdk/user-token";
 
 const music = createClient({ developerToken: process.env.APPLE_MUSIC_TOKEN! });
 
+// The token, from wherever your app keeps it. Here, an environment variable of your naming.
+const token = process.env.APPLE_MUSIC_USER_TOKEN!;
+
 try {
-  // undefined when the variable is unset; throws when it is set to something that is not a token
-  const token = userTokenFromEnv("MUSIC_USER_TOKEN");
-  if (token === undefined) throw new Error("Set MUSIC_USER_TOKEN to a Music User Token");
   await validateUserToken(music, token); // one request to Apple, before any work starts
 
   const listener = music.as(token); // a client bound to this listener
   for await (const playlist of listener.paginate("v1/me/library/playlists")) console.log(playlist);
 } catch (e) {
   if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
-  console.error("MUSIC_USER_TOKEN is not a working Music User Token. Get a new one and set it again.");
+  console.error("Apple would not take the Music User Token. Get a new one and run this again.");
   process.exitCode = 1;
 }
 ```
@@ -153,7 +153,6 @@ try {
 | Export | Does |
 | --- | --- |
 | `validateUserToken(client, token, { signal }?)` | Asks Apple with `GET /v1/me/storefront`; resolves to the listener's storefront, rejects with `UserTokenInvalid` |
-| `userTokenFromEnv(name?, env?)` | Reads and trims `MUSIC_USER_TOKEN` from `process.env` or the object you pass; `undefined` when it is not set |
 | `userTokenIntake(client, { store, userId })` | `(req: Request) => Promise<Response>` that validates and stores a posted token |
 | `MemoryUserTokenStore` | A `Map`; disposing it forgets everything |
 | `KvUserTokenStore(kv, { prefix }?)` | Workers KV, or anything with `get`, `put`, and `delete`; disposing it leaves the namespace alone |
@@ -178,9 +177,8 @@ signed in or has no Apple Music subscription. So after a 401, one more request i
 developer token alone (`GET /v1/test`). If Apple accepts it, the listener was the problem; if that
 request fails in any way, its error is the one you get. No error message quotes the token.
 
-`userTokenFromEnv` treats a missing token as no token, not as an error: an unset, empty, or blank
-variable is `undefined`. A variable that is set has to pass the same header check, and throws
-`UserTokenInvalid` naming the variable, never its value, when it does not.
+This package reads no environment and no file. Where a token is kept, and how it is loaded, is your
+app's business: it hands the token over as an argument, and the package looks after it from there.
 
 ## The intake handler
 

@@ -1,4 +1,5 @@
-// Getting a Music User Token in: read it from the environment, and ask Apple about it before anything depends on it.
+// A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
+// file. What this does is ask Apple about it before anything depends on it.
 import { AppleMusicError, isAppleMusicError, type tAppleMusicClient, type tErrorDetails } from "@open-music-sdk/core";
 
 // A token is opaque, but it has to travel as a header value: visible ASCII, no whitespace, bounded.
@@ -40,19 +41,4 @@ export async function validateUserToken(client: tAppleMusicClient, token: unknow
   // A 2xx that names no storefront is not Apple accepting the token.
   if (typeof id !== "string") throw new AppleMusicError("ApiError", "/v1/me/storefront returned no storefront", { status: 200 });
   return id;
-}
-
-/**
- * The token from an environment variable, for a CLI or job with no HTTP surface; undefined when the
- * variable is unset or blank. `env` defaults to process.env; on Workers pass the bindings object.
- * A value that is set but could not be a token throws UserTokenInvalid, naming the variable.
- */
-export function userTokenFromEnv(name = "MUSIC_USER_TOKEN", env?: object): string | undefined {
-  const source = env ?? (globalThis as { process?: { env?: object } }).process?.env ?? {};
-  const value = (source as Record<string, unknown>)[name];
-  // Surrounding whitespace is what pasting into a .env file or a secret manager leaves behind.
-  const token = typeof value === "string" ? value.trim() : value;
-  if (token == null || token === "") return undefined;
-  if (!isUserTokenShaped(token)) throw invalid(`${name} is not a Music User Token: ${SHAPE}`);
-  return token;
 }

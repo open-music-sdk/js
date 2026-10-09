@@ -1,24 +1,10 @@
 import { AppleMusicError, isAppleMusicError, type tErrorTag } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { appleError, failure, fakeClient, foreignClient, misshapen, shaped, storefront, type tReply } from "./testing.js";
-import { isUserTokenShaped, userTokenFromEnv, validateUserToken } from "./token.js";
-
-/** An environment holding one variable. */
-const env = (value: unknown, name = "TOKEN") => ({ [name]: value });
-
-const thrownBy = (fn: () => unknown): unknown => {
-  try {
-    fn();
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-};
+import { isUserTokenShaped, validateUserToken } from "./token.js";
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
 });
 
 describe("isUserTokenShaped", () => {
@@ -147,73 +133,6 @@ describe("validateUserToken", () => {
     const reason = new Error("stop");
     controller.abort(reason);
     await expect(out).rejects.toBe(reason);
-  });
-});
-
-describe("userTokenFromEnv", () => {
-  test("reads the named variable from the object it is given", () => {
-    expect(userTokenFromEnv("TOKEN", env("abc"))).toBe("abc");
-  });
-
-  test("the name defaults to MUSIC_USER_TOKEN", () => {
-    expect(userTokenFromEnv(undefined, env("abc", "MUSIC_USER_TOKEN"))).toBe("abc");
-  });
-
-  test("the source defaults to process.env", () => {
-    vi.stubEnv("MUSIC_USER_TOKEN", "from-process");
-    expect(userTokenFromEnv()).toBe("from-process");
-  });
-
-  test.each(shaped)("%s is returned as it is", (_, value) => {
-    expect(userTokenFromEnv("TOKEN", env(value))).toBe(value);
-  });
-
-  test.each([" abc", "abc ", "abc\n", "\tabc\r\n", "\n\n abc \n"])("surrounding whitespace is dropped: %j", (value) => {
-    expect(userTokenFromEnv("TOKEN", env(value))).toBe("abc");
-  });
-
-  describe("a token that is not there is not an error", () => {
-    test.each([
-      ["missing", {}],
-      ["undefined", env(undefined)],
-      ["null", env(null)],
-      ["empty", env("")],
-      ["blank", env(" \t\r\n")],
-      ["set under another name", env("abc", "OTHER")],
-    ])("a variable that is %s is undefined", (_, source) => {
-      expect(userTokenFromEnv("TOKEN", source)).toBeUndefined();
-    });
-
-    test("a variable unset in process.env is undefined", () => {
-      expect(userTokenFromEnv("OPEN_MUSIC_SDK_TEST_UNSET")).toBeUndefined();
-    });
-
-    test("so is any variable where there is no process", () => {
-      vi.stubGlobal("process", undefined);
-      const token = userTokenFromEnv();
-      vi.unstubAllGlobals();
-      expect(token).toBeUndefined();
-    });
-  });
-
-  describe("a token that is there has to look like one", () => {
-    test.each([
-      ["an inner space", "to ken"],
-      ["two lines", "first-line\nsecond-line"],
-      ["quotes left by a .env file", '"abc def"'],
-      ["non-ASCII", "tokén"],
-      ["4097 characters", "a".repeat(4097)],
-      ["a number", 12345],
-      ["true", true],
-      ["an object", { token: "abc" }],
-      ["a function", () => "abc"],
-    ])("%s is UserTokenInvalid", (_, value) => {
-      expect(isAppleMusicError(thrownBy(() => userTokenFromEnv("TOKEN", env(value))), "UserTokenInvalid")).toBe(true);
-    });
-
-    test("an inherited member is not a token either", () => {
-      expect(() => userTokenFromEnv("toString", {})).toThrow(/^toString is not a Music User Token/);
-    });
   });
 });
 
@@ -366,12 +285,6 @@ describe("no error quotes a token", () => {
     expect(quoted(await failure(validateUserToken(music, token)))).not.toContain("secret");
   });
 
-  test("one found malformed in the environment: the variable is named, the value is not", () => {
-    const thrown = thrownBy(() => userTokenFromEnv("MUSIC_USER_TOKEN", env("secret-one\nsecret-two", "MUSIC_USER_TOKEN")));
-    expect(isAppleMusicError(thrown, "UserTokenInvalid")).toBe(true);
-    expect(quoted(thrown)).toContain("MUSIC_USER_TOKEN is not a Music User Token");
-    expect(quoted(thrown)).not.toContain("secret");
-  });
 });
 
 describe("a client from another copy of core is validated the same", () => {

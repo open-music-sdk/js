@@ -23,7 +23,7 @@ libs, and the integrations people actually install. Every package ships the same
 | `@open-music-sdk/validate` | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
 | `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
 | `@open-music-sdk/developer-token` | 🚧 In progress | 80% | JWT minting · minter and fetcher providers · untested against the live API |
-| `@open-music-sdk/user-token` | 🚧 In progress | 80% | Intake handler · environment intake · validation · memory and KV stores · untested against the live API |
+| `@open-music-sdk/user-token` | 🚧 In progress | 80% | Intake handler · validation · memory and KV stores · untested against the live API |
 | `@open-music-sdk/util-artwork` | ⬜ Not started | 0% | Artwork URL templates · srcset helpers · browser only |
 | `@open-music-sdk/client-catalog` | ⬜ Not started | 0% | Catalog, storefront, search, and chart endpoints · developer token only |
 | `@open-music-sdk/client-user` | ⬜ Not started | 0% | Library, ratings, recommendations, history, and replay endpoints · both tokens |
