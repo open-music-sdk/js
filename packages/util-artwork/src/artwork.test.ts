@@ -62,6 +62,26 @@ function parseSrcset(input: string): { url: string; descriptors: string[] }[] {
   }
 }
 
+/**
+ * The image a browser fetches for an `<img>` on a screen of `dpr` device pixels to the CSS pixel, by the HTML
+ * Standard's steps for a srcset of densities: a candidate whose descriptors are not one density is dropped, one
+ * with none counts as 1x, a `src` stands in as the 1x candidate where there is no other, and a density given
+ * twice keeps its first image. Of what is left the browser takes the least dense that is dense enough for the
+ * screen, or failing that the densest. That last step is the browser's own to decide: this is what Chrome and
+ * Firefox both did when this package was reviewed.
+ */
+function fetched(srcset: string, dpr: number, src?: string): string | undefined {
+  const sources: { url: string; density: number }[] = [];
+  for (const { url, descriptors } of parseSrcset(srcset)) {
+    const [descriptor = "1x", ...more] = descriptors;
+    const density = more.length === 0 && /^(\d+(\.\d+)?|\.\d+)(e[+-]?\d+)?x$/i.test(descriptor) ? Number.parseFloat(descriptor) : Number.NaN;
+    if (density > 0 && !sources.some((source) => source.density === density)) sources.push({ url, density });
+  }
+  if (src !== undefined && !sources.some((source) => source.density === 1)) sources.push({ url: src, density: 1 });
+  sources.sort((a, b) => a.density - b.density);
+  return (sources.find((source) => source.density >= dpr) ?? sources.at(-1))?.url;
+}
+
 describe("the srcset reader these tests check against", () => {
   test.each([
     ["a.jpg 1x, b.jpg 2x", [["a.jpg", "1x"], ["b.jpg", "2x"]]],
@@ -77,8 +97,44 @@ describe("the srcset reader these tests check against", () => {
     ["a space inside a URL", "a b.jpg 1x", [["a", "b.jpg", "1x"]]],
     ["a comma ending a URL", "a.jpg, 1x", [["a.jpg"], ["1x"]]],
     ["a comma starting a URL", ",a.jpg 1x", [["a.jpg", "1x"]]],
-  ])("is thrown by %s, which is why those are escaped", (_name, srcset, expected) => {
+  ])("is thrown by %s, which is why a URL is normalised", (_name, srcset, expected) => {
     expect(parseSrcset(srcset).map((c) => [c.url, ...c.descriptors])).toEqual(expected);
+  });
+});
+
+describe("the browser these tests check against", () => {
+  test.each([
+    [1, "a"],
+    [1.5, "b"],
+    [2, "b"],
+    [2.5, "c"],
+    [3, "c"],
+    [4, "c"],
+  ])("on a screen of density %s, takes the least dense image that is dense enough, or the densest there is: %s", (dpr, expected) => {
+    expect(fetched("a 1x, b 2x, c 3x", dpr)).toBe(expected);
+  });
+
+  test("takes them in order of density, not in the order written", () => {
+    expect(fetched("c 3x, a 1x, b 2x", 2)).toBe("b");
+  });
+
+  test("passes over an image labelled a hair short of the screen, however close: this is what a wrong label costs", () => {
+    expect(fetched("small 0.99x, large 2x", 1)).toBe("large");
+    expect(fetched("small 1x, large 2x", 1)).toBe("small");
+  });
+
+  test.each([
+    ["no descriptor is 1x", "a, b 2x", 1, undefined, "a"],
+    ["a density given twice keeps its first image", "a 1x, b 1x, c 2x", 1, undefined, "a"],
+    ["a descriptor that is no number is dropped", "a Infinityx, b 2x", 1, undefined, "b"],
+    ["a descriptor of zero is dropped", "a 0x, b 2x", 1, undefined, "b"],
+    ["two descriptors on one candidate drop it", "a 1x 2x, b 3x", 1, undefined, "b"],
+    ["a density written with an exponent is read", "a 1e-3x, b 1x", 0.001, undefined, "a"],
+    ["a src stands in for a missing 1x", "small 0.67x", 1, "from-src", "from-src"],
+    ["a src is ignored where there is a 1x", "a 1x, b 2x", 1, "from-src", "a"],
+    ["without a src, the only candidate is taken whatever it says", "small 0.67x", 1, undefined, "small"],
+  ])("%s", (_name, srcset, dpr, src, expected) => {
+    expect(fetched(srcset, dpr, src)).toBe(expected);
   });
 });
 
@@ -406,22 +462,41 @@ describe("artworkUrl: what it refuses", () => {
   });
 });
 
-describe("artworkSrcSet: one candidate per density", () => {
-  const at = (pixels: number) => TEMPLATE.replace("{w}x{h}", `${String(pixels)}x${String(pixels)}`);
+/** `["300 1x", "600 2x"]` as the srcset of square images those sizes and densities. */
+const squares = (...short: string[]) => short.map((c) => `${TEMPLATE.replace("{w}x{h}", `${c.split(" ")[0] ?? ""}x${c.split(" ")[0] ?? ""}`)} ${c.split(" ")[1] ?? ""}`).join(", ");
 
+describe("artworkSrcSet: one candidate per density, labelled with the density asked for", () => {
   test("by default offers 1x, 2x and 3x", () => {
-    expect(artworkSrcSet(cover(), 300)).toBe(`${at(300)} 1x, ${at(600)} 2x, ${at(900)} 3x`);
+    expect(artworkSrcSet(cover(), 300)).toBe(squares("300 1x", "600 2x", "900 3x"));
   });
 
-  test.each<[string, number[], string[]]>([
-    ["one density", [2], ["600 2x"]],
-    ["two", [1, 2], ["300 1x", "600 2x"]],
-    ["fractional densities", [1, 1.5, 2.25], ["300 1x", "450 1.5x", "675 2.25x"]],
-    ["densities below one", [0.5, 1], ["150 0.5x", "300 1x"]],
-    ["densities in an order of the caller's choosing", [3, 1, 2], ["900 3x", "300 1x", "600 2x"]],
-    ["a density given twice", [1, 2, 2, 1], ["300 1x", "600 2x"]],
-  ])("with %s, %j, the candidates are those and in that order", (_name, densities, expected) => {
-    expect(artworkSrcSet(cover(), 300, { densities })).toBe(expected.map((c) => `${at(Number(c.split(" ")[0]))} ${c.split(" ")[1] ?? ""}`).join(", "));
+  test.each<[string, number, number[], string[]]>([
+    ["one density", 300, [2], ["600 2x"]],
+    ["two", 300, [1, 2], ["300 1x", "600 2x"]],
+    ["fractional densities", 300, [1, 1.5, 2.25], ["300 1x", "450 1.5x", "675 2.25x"]],
+    ["densities below one", 300, [0.5, 1], ["150 0.5x", "300 1x"]],
+    ["densities in an order of the caller's choosing", 300, [3, 1, 2], ["900 3x", "300 1x", "600 2x"]],
+    ["a density given twice", 300, [1, 2, 2, 1], ["300 1x", "600 2x"]],
+    ["densities a hair apart", 1000, [1, 1.001, 2], ["1000 1x", "1001 1.001x", "2000 2x"]],
+    ["a width that rounds down", 50.4, [1, 2, 3], ["50 1x", "101 2x", "151 3x"]],
+    ["a width that rounds up", 66.6667, [1, 2, 3], ["67 1x", "133 2x", "200 3x"]],
+    ["a width and density whose product rounds down", 45, [1, 1.25, 2], ["45 1x", "56 1.25x", "90 2x"]],
+    ["a width below one pixel", 0.2, [1, 2, 3], ["1 1x"]],
+  ])("with %s (width %s, densities %j) the candidates are %j", (_name, width, densities, expected) => {
+    expect(artworkSrcSet(cover(), width, { densities })).toBe(squares(...expected));
+  });
+
+  test("whatever the width, each label is the density asked for and a screen of that density is given the image made for it", () => {
+    for (let width = 20; width < 120; width += 0.37)
+      for (const densities of [[1, 2, 3], [1, 1.25, 1.5, 2], [0.5, 1, 4]]) {
+        const srcset = artworkSrcSet(cover(), width, { densities });
+        const candidates = parseSrcset(srcset);
+        expect(candidates.map((c) => c.descriptors.join())).toEqual(densities.map((density) => `${String(density)}x`));
+        densities.forEach((density, i) => {
+          expect(fetched(srcset, density)).toBe(candidates[i]?.url);
+          expect(fetched(srcset, density, artworkUrl(cover(), width))).toBe(candidates[i]?.url);
+        });
+      }
   });
 
   test("the 1x candidate is the URL artworkUrl gives for the same width and options", () => {
@@ -458,36 +533,54 @@ describe("artworkSrcSet: one candidate per density", () => {
   });
 });
 
-describe("artworkSrcSet: where the artwork does not come large enough", () => {
-  const at = (pixels: number) => TEMPLATE.replace("{w}x{h}", `${String(pixels)}x${String(pixels)}`);
-
+describe("artworkSrcSet: where the artwork does not come large enough for a density", () => {
   test.each<[string, number, number, string[]]>([
     ["large enough for every density", 900, 300, ["300 1x", "600 2x", "900 3x"]],
     ["large enough for two", 600, 300, ["300 1x", "600 2x"]],
     ["between two densities", 500, 300, ["300 1x", "500 1.67x"]],
     ["exactly the width shown", 300, 300, ["300 1x"]],
-    ["smaller than the width shown", 200, 300, ["200 0.67x"]],
-    ["far smaller than the width shown", 1, 1000, ["1 0.01x"]],
-  ])("artwork %s (%i wide, shown at %i) offers %j: each image once, under the density it really has", (_name, side, width, expected) => {
-    expect(artworkSrcSet(cover(side), width)).toBe(expected.map((c) => `${at(Number(c.split(" ")[0]))} ${c.split(" ")[1] ?? ""}`).join(", "));
+    ["smaller than the width shown", 200, 300, ["200 0.667x"]],
+    ["far smaller than the width shown", 1, 1000, ["1 0.001x"]],
+    ["just large enough for a width that is not a whole number", 100, 33.3333, ["33 1x", "67 2x", "100 3x"]],
+    ["a hair short of three times a width that is not a whole number", 100, 100 / 3, ["33 1x", "67 2x", "100 3x"]],
+  ])("artwork %s (%i wide, shown at %s) offers %j: its largest once, under the density that image amounts to", (_name, side, width, expected) => {
+    expect(artworkSrcSet(cover(side), width)).toBe(squares(...expected));
+  });
+
+  test.each([
+    [1, "300x300"],
+    [1.5, "500x500"],
+    [2, "500x500"],
+    [3, "500x500"],
+  ])("a 500 pixel cover shown at 300: a screen of density %s is given the %s image", (dpr, expected) => {
+    expect(size(fetched(artworkSrcSet(cover(500), 300), dpr) ?? "")).toBe(expected);
+  });
+
+  test.each<[string, number[], string]>([
+    ["the image made for it first", [2, 3], "600 2x"],
+    ["the artwork's largest first", [3, 2], "601 2x"],
+  ])("two images that amount to one density are offered as one, the first: with %s, %j gives %s", (_name, densities, expected) => {
+    // A 601 pixel cover at 300: the 3x box shrinks to 601 pixels, which is 2x to three figures, as the 600 pixel image is.
+    expect(artworkSrcSet(cover(601), 300, { densities })).toBe(squares(expected));
   });
 
   test("a URL with no placeholders is offered once: every density would be the same image", () => {
     expect(artworkSrcSet({ url: "https://example.com/fixed.jpg" }, 300)).toBe("https://example.com/fixed.jpg 1x");
   });
 
-  test("no two candidates share a density, even when the densities asked for round to the same one", () => {
-    const candidates = parseSrcset(artworkSrcSet(cover(), 1000, { densities: [1, 1.001, 1.002, 2] }));
-    expect(candidates.map((c) => c.descriptors[0])).toEqual(["1x", "2x"]);
-  });
-
-  test("every density a candidate claims is one a browser accepts: a number above zero followed by x", () => {
-    for (const side of [1, 7, 199, 300, 3000])
-      for (const width of [1, 33, 300, 1234])
-        for (const { descriptors } of parseSrcset(artworkSrcSet(cover(side), width, { densities: [0.3, 1, 1.5, 2, 3, 4.75] }))) {
-          expect(descriptors).toHaveLength(1);
-          expect(descriptors[0]).toMatch(/^\d+(\.\d+)?x$/);
-          expect(Number.parseFloat(descriptors[0] ?? "")).toBeGreaterThan(0);
+  test("whatever the artwork, width and densities: no two candidates share a density or an image, and a browser accepts every one", () => {
+    for (const side of [1, 7, 199, 300, 601, 3000])
+      for (const width of [0.3, 1, 33, 100 / 3, 300, 1234])
+        for (const densities of [[1, 2, 3], [0.3, 1, 1.5, 2, 3, 4.75], [3, 2, 1], [2, 2.0001, 2.0002]]) {
+          const candidates = parseSrcset(artworkSrcSet(cover(side), width, { densities }));
+          expect(candidates.length).toBeGreaterThan(0);
+          expect(new Set(candidates.map((c) => c.url)).size).toBe(candidates.length);
+          expect(new Set(candidates.map((c) => c.descriptors.join())).size).toBe(candidates.length);
+          for (const { url, descriptors } of candidates) {
+            expect(descriptors).toHaveLength(1);
+            // What the browser model takes for a density: this candidate alone is fetched, so its label was read.
+            expect(fetched(`${url} ${descriptors.join()}`, 1)).toBe(url);
+          }
         }
   });
 });

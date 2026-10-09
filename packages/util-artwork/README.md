@@ -54,10 +54,11 @@ A `width`, `height` or density that is not a number above zero is a `TypeError`,
 
 ## srcset
 
-Each candidate is the image at `width` times a density, labelled with the density it really has.
-Where the artwork does not come large enough, the largest it has is offered once: a 500 pixel cover
-shown at 300 gives `…/300x300bb.jpg 1x, …/500x500bb.jpg 1.67x`, so a browser neither downloads the
-same image twice nor mistakes its size.
+Each candidate is the image at `width` times a density, labelled with that density. Where the
+artwork does not come large enough for one, the largest it has is offered once, under the density
+that image amounts to: a 500 pixel cover shown at 300 gives
+`…/300x300bb.jpg 1x, …/500x500bb.jpg 1.67x`, so a browser neither downloads the same image twice nor
+mistakes its size.
 
 Give the `<img>` its `width` and `height` as well. The `srcset` says which file to fetch; the
 attributes say how much room to keep for it.

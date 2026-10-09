@@ -70,10 +70,10 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
 }
 
 /**
- * The template filled in for the box at `density`, and how many pixels wide the image asked for is. The box
- * keeps its shape and shrinks to what the artwork has when it asks for more.
+ * The template filled in for the box at `density`, and how far the box had to shrink: it keeps its shape and
+ * shrinks to what the artwork has when it asks for more. A `scale` of 1 is a box that got what it asked for.
  */
-function image({ template, max, width, height, format, crop }: tRequest, density: number): { url: string; pixels: number } {
+function image({ template, max, width, height, format, crop }: tRequest, density: number): { url: string; scale: number } {
   const boxWidth = width * density;
   const boxHeight = height === undefined ? (max ? (boxWidth * max.height) / max.width : boxWidth) : height * density;
   const scale = max ? Math.min(1, max.width / boxWidth, max.height / boxHeight) : 1;
@@ -81,7 +81,7 @@ function image({ template, max, width, height, format, crop }: tRequest, density
   // Past this a number prints with an exponent, and what goes into the URL has to be digits.
   if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h)) throw new TypeError("artwork: the size asked for is too large");
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
-  return { url, pixels: w };
+  return { url, scale };
 }
 
 /**
@@ -123,9 +123,9 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
 
 /**
  * A `srcset` for an image shown `width` CSS pixels wide: one candidate per pixel density, so a dense screen
- * gets a sharper image and nobody downloads more than their screen can show.
+ * gets a sharper image and a plain one a smaller file.
  *
- * Each candidate says the density it really has. Where the artwork does not come large enough for a density,
+ * Each candidate carries the density it was asked for. Where the artwork does not come large enough for one,
  * the largest it has is offered once, under the density that image amounts to.
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
@@ -136,8 +136,12 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
   if (count === 0) throw new TypeError("artwork: densities must be a non-empty array of numbers above 0");
   const candidates = new Map<string, string>();
   for (let i = 0; i < count; i++) {
-    const { url, pixels } = image(request, length(`densities[${String(i)}]`, (densities as unknown[])[i]));
-    const descriptor = `${String(Math.max(0.01, Number((pixels / request.width).toFixed(2))))}x`;
+    const density = length(`densities[${String(i)}]`, (densities as unknown[])[i]);
+    const { url, scale } = image(request, density);
+    // The density as it was asked for, never worked back from the pixels: those are rounded, and 50 pixels for
+    // a width of 50.4 would say 0.99x, which a 1x screen passes over for the next size up. Only a box that had
+    // to shrink says something else, and then to three figures, which is as fine as a screen's density gets.
+    const descriptor = `${String(scale < 1 ? Number((density * scale).toPrecision(3)) : density)}x`;
     // A browser keeps the first candidate of each density, and an image offered twice is offered once.
     if (!candidates.has(url) && ![...candidates.values()].includes(descriptor)) candidates.set(url, descriptor);
   }
