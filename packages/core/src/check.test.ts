@@ -291,6 +291,51 @@ describe("listOf", () => {
     expect(error.message).toBe(MESSAGE + what);
   });
 
+  describe("a list is asked how long it is once, and read by index as far as it said", () => {
+    /** A list whose answers to `key` come from `answers`, one per asking, and which counts the askings. */
+    function shifting<T>(list: T[], key: string, answers: unknown[]) {
+      const asked = { times: 0 };
+      const proxy = new Proxy(list, { get: (target, name, receiver) => (name === key ? answers[Math.min(asked.times++, answers.length - 1)] : (Reflect.get(target, name, receiver) as unknown)) });
+      return { proxy, asked };
+    }
+
+    test("a list given an iterator of its own is read by its length, not by what the iterator hands over", () => {
+      const odd = Object.defineProperty(["1"], Symbol.iterator, {
+        value: function* () {
+          for (let i = 0; i < 5000; i++) yield String(i);
+        },
+      });
+      expect(listOf("fn", "ids", odd)).toEqual(["1"]);
+    });
+
+    test("a list that grows after it has said how long it is, is read as far as it said", () => {
+      const { proxy, asked } = shifting(["1", "2", "3"], "length", [2, 3]);
+      expect(listOf("fn", "ids", proxy)).toEqual(["1", "2"]);
+      expect(asked.times).toBe(1);
+    });
+
+    test("a list refused for its length is described by the length it gave, not one it gives later", () => {
+      const { proxy, asked } = shifting<string>([], "length", [301, 7]);
+      expect(thrown(() => listOf("getSongs", "ids", proxy)).message).toBe(`${MESSAGE}a list of 301`);
+      expect(asked.times).toBe(1);
+    });
+
+    test("an item that is wrong is described as it was when it was read, and is read once", () => {
+      const { proxy, asked } = shifting([""], "0", ["", SECRET]);
+      expect(thrown(() => listOf("getSongs", "ids", proxy)).message).toBe(`${MESSAGE}0 characters at index 0`);
+      expect(asked.times).toBe(1);
+    });
+
+    test.each<[string, unknown]>([
+      ["not a number", "2"],
+      ["below zero", -1],
+      ["not whole", 1.5],
+    ])("a list whose length is %s is no list of one or more", (_name, length) => {
+      const { proxy } = shifting(["1", "2"], "length", [length]);
+      expect(() => listOf("fn", "ids", proxy)).toThrow(TypeError);
+    });
+  });
+
   test("the first item that is wrong is the one named", () => {
     expect(thrown(() => listOf("getSongs", "ids", ["1", "", 3, ""])).message).toBe(`${MESSAGE}0 characters at index 1`);
   });

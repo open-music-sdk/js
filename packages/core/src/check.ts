@@ -60,13 +60,32 @@ export const MAX_ITEMS = 300;
 const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_NAME && !item.includes(",");
 
 /**
+ * How long a caller's list says it is, asked once; `undefined` for what is no list. Everything after goes by this
+ * answer, so a list that would answer differently a second time is not asked a second time.
+ */
+export function lengthOf(value: unknown): number | undefined {
+  const length: unknown = Array.isArray(value) ? value.length : undefined;
+  return typeof length === "number" ? length : undefined;
+}
+
+/**
+ * The first `length` items of a caller's list, each read once, by index: not through the list's iterator, which a
+ * list can be given to hand over more than its length said.
+ */
+export const copyOf = (list: unknown, length: number): unknown[] => Array.from({ length }, (_, index) => (list as readonly unknown[])[index]);
+
+/**
  * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken
  * before it is checked, so what was checked is what is sent.
  */
-export function listOf(fn: string, name: string, value: unknown): readonly string[] {
-  const items: unknown[] = Array.isArray(value) && value.length <= MAX_ITEMS ? [...(value as unknown[])] : [];
+export const listOf = (fn: string, name: string, value: unknown): readonly string[] => listed(fn, name, value, 1);
+
+/** As `listOf`, for a list that may also hold nothing when `least` is 0: an option's list, where nothing means none. */
+export function listed(fn: string, name: string, value: unknown, least: 0 | 1): readonly string[] {
+  const length = lengthOf(value);
+  const items = length !== undefined && length <= MAX_ITEMS ? copyOf(value, length) : [];
   const bad = items.findIndex((item) => !isItem(item));
-  if (items.length > 0 && bad === -1) return items as string[];
-  const what = !Array.isArray(value) ? got(value) : bad === -1 ? `a list of ${String(value.length)}` : `${got(items[bad])} at index ${String(bad)}`;
+  if (length !== undefined && items.length === length && length >= least && bad === -1) return items as string[];
+  const what = length === undefined ? got(value) : bad === -1 ? `a list of ${String(length)}` : `${got(items[bad])} at index ${String(bad)}`;
   throw new TypeError(`${fn}: ${name} must be a list of 1 to ${String(MAX_ITEMS)} strings, each of 1 to ${String(MAX_NAME)} characters with no comma in it; got ${what}`);
 }

@@ -1,6 +1,6 @@
 // The options a function for an endpoint takes, and how they become what `request` takes. Written once, so that
 // the same option means the same thing whichever function it is handed to.
-import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, listOf, optionsOf } from "./check";
+import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, copyOf, lengthOf, listed, optionsOf } from "./check";
 import type { tParams, tRequestInit, tSchemaLike } from "./client";
 import { got } from "./got";
 
@@ -41,8 +41,8 @@ const isNumber = (value: unknown): value is number => typeof value === "number" 
 
 /** A list an option may hold: nothing, when it was not given or holds nothing. */
 function namesOf(fn: string, name: string, value: unknown): readonly string[] | undefined {
-  if (value === undefined || (Array.isArray(value) && value.length === 0)) return undefined;
-  return listOf(fn, name, value);
+  const names = value === undefined ? [] : listed(fn, name, value, 0);
+  return names.length === 0 ? undefined : names;
 }
 
 function languageOf(fn: string, value: unknown): string | undefined {
@@ -76,8 +76,9 @@ function alsoOf(fn: string, name: string, value: unknown): tValue | undefined {
 /** One of the caller's own parameters as it can be sent, a list as this call's copy; `undefined` when it cannot be. */
 function sendable(given: unknown): tValue | undefined {
   if (!Array.isArray(given)) return typeof given === "string" || isNumber(given) || typeof given === "boolean" ? given : undefined;
-  // A list too long is not read: its length is all that is asked for.
-  const list: unknown[] = given.length <= MAX_ITEMS ? [...(given as unknown[])] : [undefined];
+  // A list too long is not read: its length is all that is asked for, and asked once.
+  const length = lengthOf(given);
+  const list = length !== undefined && length <= MAX_ITEMS ? copyOf(given, length) : [undefined];
   return list.every((each) => typeof each === "string" || isNumber(each)) ? list : undefined;
 }
 

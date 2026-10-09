@@ -162,6 +162,34 @@ describe("initOf: what it gives is this call's own", () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
+  test("a list given an iterator of its own is read by its length, as an option and among the params", () => {
+    const odd = () =>
+      Object.defineProperty(["albums"], Symbol.iterator, {
+        value: function* () {
+          for (let i = 0; i < 5000; i++) yield String(i);
+        },
+      });
+    expect(initOf("fn", { include: odd(), params: { ids: odd() } }).params).toEqual({ include: ["albums"], ids: ["albums"] });
+  });
+
+  test("a list is asked how long it is once, as an option and among the params", () => {
+    const counted = () => {
+      const asked = { times: 0 };
+      const list = new Proxy(["a"], {
+        get: (target, key, receiver) => {
+          if (key === "length") asked.times++;
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+      return { list, asked };
+    };
+    const [include, ids, none] = [counted(), counted(), counted()];
+    none.list.pop();
+    none.asked.times = 0;
+    initOf("fn", { include: include.list, extend: none.list, params: { ids: ids.list } });
+    expect([include.asked.times, ids.asked.times, none.asked.times]).toEqual([1, 1, 1]);
+  });
+
   test("a parameter named __proto__ is one more parameter and nothing else", () => {
     const init = initOf("fn", { params: JSON.parse('{"__proto__": ["polluted"], "x": 1}') as Record<string, string[] | number> });
     expect(Object.entries(init.params ?? {})).toEqual([
