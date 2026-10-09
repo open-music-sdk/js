@@ -63,6 +63,9 @@ it, so two versions installed side by side do not break your error handling.
 - The Music User Token is sent under `/v1/me` by default; `user: true | false` overrides.
 - `body` is JSON-encoded with `Content-Type: application/json`.
 - An empty body resolves to `undefined`; otherwise the parsed JSON, run through `schema` if given.
+- An option is one that was passed. `createClient`, `request` and `paginate` read what the object they
+  are handed holds itself, so an option it inherits, or that other code has put on `Object.prototype`,
+  is not one.
 
 | Status | Outcome |
 | --- | --- |
@@ -83,7 +86,7 @@ create a limiter with yours and share one instance across every client on the sa
 ## Pages
 
 `paginate(from, init?)` gives the items of `data` across every `next` link, one page at a time, and
-stops asking when the loop is left. `from` is a path, or a page already in hand, or a promise of one:
+stops asking when the loop is left. `from` is a path, or a page already in hand:
 
 ```ts
 for await (const song of listener.paginate("v1/me/library/songs", { params: { limit: 100 } })) { /* … */ }
@@ -93,10 +96,25 @@ const tracks = album.data[0]?.relationships?.tracks; // { data, next }: the firs
 if (tracks) for await (const track of music.paginate(tracks)) { /* that page's tracks, then the rest */ }
 ```
 
-A page's own items come first, and Apple is not asked until they run out. With a page, `init.params`
-is not sent, since its `next` link already carries the query; `schema` and `signal` apply to the pages
-that are fetched. Handing over something that is neither a path nor an object is a `TypeError`. A `next`
-link is held to Apple's origin like any other path.
+A page's own items come first, as they were when the walk reached the page, and Apple is not asked
+until they run out. With a page, `init.params` is not sent, since its `next` link already carries the
+query; `schema` and `signal` apply to the pages that are fetched. Nothing at all, which is what an
+empty answer comes to, is a last, empty page. Anything else that is no object is a `TypeError`, and so
+is a promise of a page: await it first, so that what it rejects with is caught where the request was
+made.
+
+| Option | |
+| --- | --- |
+| `maxPages` | The most pages to ask Apple for: a whole number above zero. Default: no limit. A page handed over is not counted, since it was not asked for. |
+| Any other | What `request` takes, used for each page that is asked for. |
+
+With no `maxPages`, a walk goes on asking for as long as each page names a next one. At the limit it
+ends, whether or not there are more.
+
+A `next` link is held to Apple's origin like any other path, and within it is followed wherever it
+points, with the Music User Token when that is under `/v1/me`. So a page or a path that comes from
+outside your app is as trusted as you make it. For one that should stay in the catalog, pass
+`user: false`, which sends no Music User Token wherever the links point, and give it a `maxPages`.
 
 What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and
 a relationship's are. A search or a chart answers with its pages nested under `results`, and is not
@@ -122,6 +140,10 @@ runs once per response, after the client has read the body and decided what it m
 `outcome.body` is the parsed JSON (or `undefined`) and `outcome.error` is the `AppleMusicError` the
 request will throw, if any; a retry may still follow. The `Response` handed over has already been
 read, so take data from `outcome.body`, not from `res.json()`.
+
+`request` and `paginate` take an `onResponse` of their own in `init`, called the same way and after
+the client's, for that request alone. It is how to learn what `request` does not resolve to: the
+status of an answer, or one of its headers.
 
 ## Validation
 
@@ -155,32 +177,96 @@ client and hands over what the answer holds:
 
 | Declared with | Asks for | Bound, it gives |
 | --- | --- | --- |
-| `resourceGetter(fn, collection, also?)` | `GET {collection}/{id}` | The resource. A success that holds none is an `ApiError`, not `undefined`. |
-| `resourcesGetter(fn, collection, also?)` | `GET {collection}?ids=` | The list of them, empty when Apple sent none |
-| `resourceLister(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
-| `relationshipGetter<Rels>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back. |
+| `resourceGetter<R, C, E>(fn, collection, also?)` | `GET {collection}/{id}` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
+| `resourcesGetter<R, C, E>(fn, collection, also?)` | `GET {collection}?ids=` | The list of them as Apple sent it, empty when Apple sent none |
+| `resourceLister<R, C, E>(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
+| `relationshipGetter<Rels, C>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back, and of a `schema` for it. |
 | `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, or the `answer` as it is |
 
-`collection` is a function from the call's options to a path, so a catalog can put a storefront in it.
 `endpoint` is what the other four are made with, for anything they do not cover.
 
-A bound function that walks pages asks for nothing, and checks nothing, until its loop starts. Every
-other mistake in what a function is handed is a `TypeError` naming the function and the argument,
-raised before Apple or `collection` is asked. A function is known by its shape, a function with a
-`bound` method, so a namespace binds one made by another copy of this package. A namespace is frozen.
+### A declaration
+
+`R` is the type of Apple's answer, and has to be said: a declaration that leaves it out does not
+compile. `C` is the options the collection reads, such as a storefront. `E` is the options the
+function adds that are sent as parameters under their own names, such as `views`, and `also` names
+every one of them:
+
+```ts
+import { resourceGetter, segmentOf, type tCollection } from "@open-music-sdk/core";
+import type { tArtistViews, tArtistsResponse } from "@open-music-sdk/types";
+
+interface tStorefront { readonly storefront?: string }
+interface tViews { readonly views?: readonly (keyof tArtistViews)[] }
+
+const artists: tCollection<tStorefront> = async (fn, client, options) =>
+  `v1/catalog/${segmentOf(fn, "storefront", options.storefront ?? (await client.storefront()))}/artists`;
+
+export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: true });
+
+await getArtist(music, "178834", { storefront: "gb", views: ["top-songs"] });
+```
+
+An option of `E` that `also` leaves out, or misspells, does not compile, so an option that is typed is
+an option that is sent. A declaration is checked as it is made: a name with something in it, a
+`collection` that is a function, an `also` that is an object, one of the four `unwrap`s, a `plan` that
+is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
+called. What a declaration gives is frozen.
+
+### The collection
+
+`collection` is `(fn, client, options) => string | Promise<string>`: where the collection is for one
+call, so that a catalog can put a storefront in its path. What it gives is checked before it is asked
+for, and refused with the reason:
+
+| A path that | Is refused because |
+| --- | --- |
+| holds a segment that is `.` or `..`, written out or as `%2e` | a URL reads them as "here" and "one up", so the request would go to another path |
+| holds a backslash | a URL reads it as a slash, so it would begin another segment |
+| holds a question mark | it begins the query, so what follows would not be part of the path |
+| holds a hash | it begins a fragment, so what follows would not be sent |
+| holds a space, a tab, a line break or another control character | a URL drops or trims it, joining what was on either side |
+| holds a character outside ASCII | a URL rewrites it |
+| holds an empty segment | two slashes together, or one at the end, leave out what was meant to be there |
+| begins with a name and a colon | a URL reads it as a scheme, and the rest as another address |
+| is longer than 256 characters, or is no string | no collection's path is |
+
+So a storefront from outside cannot move a request under `/v1/me`, where the client sends the Music
+User Token. The path is described by what is wrong with it and never shown. A collection that checks
+its own parts with `segmentOf` gets to name the option that was wrong.
+
+### When a function is called
+
+Everything a function is handed is checked before Apple or `collection` is asked, in the order it was
+handed over, and a mistake is a `TypeError` naming the function and the argument.
+
+- Called with a client, or bound and resolving to a resource or a list, a function is async, and a
+  mistake is its rejection.
+- Bound and walking pages, a function checks and takes what it is handed as it is called, and a
+  mistake is thrown there. What it gives asks Apple for nothing until a loop starts, and can be looped
+  again, each loop asking afresh.
+- Where the collection has to be waited for, as for a storefront no option named, it is asked as the
+  function is called. If that fails before a loop starts, the loop is where it is heard.
+
+A function is known by its shape, a function with a `bound` method, so a namespace binds one made by
+another copy of this package. A namespace is frozen, and its type holds what it holds.
 
 ### What a function is handed
 
 | Check | Takes |
 | --- | --- |
-| `segmentOf(fn, name, value)` | A string of 1 to 256 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
-| `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 256 characters with no comma in it, since a list is sent joined by commas. It comes back as a copy. |
-| `optionsOf(fn, options, what)` | An object, or nothing, which is an empty bag |
+| `segmentOf(fn, name, value)` | A string of 1 to 64 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
+| `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
+| `optionsOf(fn, options, what)` | An object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |
 
 `segmentOf` is what keeps a caller's id from moving a request: put into a path as it is,
 `../../../me/library/songs` after `v1/catalog/us/songs/` is a request for the listener's library, and
 under `/v1/me` the client sends the Music User Token.
+
+Sixty-four characters is longer than any id, name or code Apple gives out, and well short of a token.
+A token put where an id belongs is therefore refused before it is sent, and is not repeated in the
+error Apple's answer to it would have become.
 
 ### Options
 
@@ -189,13 +275,13 @@ option read once and copied.
 
 | Option | |
 | --- | --- |
-| `language` | The language to answer in, as a tag such as `"en-GB"`. Sent as `l`. |
-| `include`, `extend` | Lists of names. A list of nothing is not sent. |
+| `language` | The language to answer in, as a tag such as `"en-GB"`, of 1 to 64 characters. Sent as `l`. |
+| `include`, `extend` | Lists of names, as `listOf` takes them. A list of nothing is not sent. |
 | `limit` | A whole number above zero. |
-| `offset` | A whole number from zero, or a cursor as Apple gave it. |
+| `offset` | A whole number from zero, or a cursor as Apple gave it, of 1 to 256 characters. |
 | `params` | Any other query parameter, sent as given: at most 100, each a string, a number, `true` or `false`, or a list of at most 300 strings and numbers. Null, undefined and a list of nothing are not sent. |
-| `schema` | A Standard Schema the answer is held to. |
-| `signal` | Aborts the request. |
+| `schema` | A Standard Schema the answer is held to: an object or a function with a `validate` under `~standard`. |
+| `signal` | An `AbortSignal`. Aborts the request. |
 
 Three things fill the query, and the later wins: the caller's `params`; then the options that are
 given; then `set`, which is what the function itself puts there, such as the ids it was handed.
