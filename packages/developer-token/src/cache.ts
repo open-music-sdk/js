@@ -1,5 +1,4 @@
-import type { tTokenContext } from "@open-music-sdk/core";
-import { got } from "./got.js";
+import { got, type tTokenContext } from "@open-music-sdk/core";
 
 /** A core `tTokenProvider` that always answers with a promise and needs no context, so it is easy to call directly. */
 export type tDeveloperTokenProvider = (ctx?: tTokenContext) => Promise<string>;
