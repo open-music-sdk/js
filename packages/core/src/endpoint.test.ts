@@ -334,14 +334,90 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       expect(sent()).toEqual(["GET /v1/me/library/songs?l=en-GB&limit=2", "GET /v1/me/library/songs?offset=2&limit=2"]);
     });
 
-    test("nothing is asked for, and nothing checked, until the loop starts", async () => {
+    test("what the call is handed is checked as it is called: a mistake is thrown there, and is not kept for a loop that may never come", () => {
       const { music, calls } = apple(pages(), { userToken: "user" });
-      const walk = listLibrarySongs.bound(music)({ limit: 0 });
+      const list = listLibrarySongs.bound(music);
+      const related = getAlbumRelationship.bound(music);
+      expect(() => list({ limit: 0 })).toThrow(new TypeError("listLibrarySongs: limit must be a whole number above 0; got 0"));
+      expect(() => list("en-GB" as unknown as tReadOptions<tLibrarySongsResponse>)).toThrow(new TypeError("listLibrarySongs: expected an options object; got 5 characters"));
+      expect(() => related("..", "tracks")).toThrow(new TypeError('getAlbumRelationship: id must be a string of 1 to 64 characters, and not "." or ".."; got 2 characters'));
+      expect(() => related("1", "" as "tracks")).toThrow(new TypeError('getAlbumRelationship: name must be a string of 1 to 64 characters, and not "." or ".."; got 0 characters'));
       expect(calls).toHaveLength(0);
-      const error = await rejection(all(walk));
-      expect(error).toBeInstanceOf(TypeError);
-      expect(error.message).toMatch(/^listLibrarySongs: limit must be /);
+    });
+
+    test("it is taken as it is called: changing the options before the loop starts changes nothing", async () => {
+      const { music, sent } = apple([{ body: { data: [] } }], { userToken: "user" });
+      const options = { limit: 5, include: ["albums"] };
+      const walk = listLibrarySongs.bound(music)(options);
+      options.limit = 50;
+      options.include.push("artists");
+      await all(walk);
+      expect(sent()).toEqual(["GET /v1/me/library/songs?include=albums&limit=5"]);
+    });
+
+    test("Apple is asked for nothing until a loop starts", async () => {
+      const { music, calls } = apple(pages(), { userToken: "user" });
+      const walk = listLibrarySongs.bound(music)({ limit: 2 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(calls).toHaveLength(0);
+      expect(await all(walk)).toEqual([1, 2, 3]);
+      expect(calls).toHaveLength(2);
+    });
+
+    test("what a call gives can be looped over again, and each loop asks afresh", async () => {
+      const { music, sent } = apple([{ body: { data: [1] } }, { body: { data: [1, 2] } }], { userToken: "user" });
+      const walk = listLibrarySongs.bound(music)({ limit: 9 });
+      expect([await all(walk), await all(walk)]).toEqual([[1], [1, 2]]);
+      expect(sent()).toEqual(["GET /v1/me/library/songs?limit=9", "GET /v1/me/library/songs?limit=9"]);
+    });
+
+    describe("where the collection has to be waited for", () => {
+      /** What rejected with nobody listening while `run` ran and for a turn after, with the test runner's own listeners set aside. */
+      async function unheard(run: () => unknown): Promise<unknown[]> {
+        const kept = process.listeners("unhandledRejection");
+        const heard: unknown[] = [];
+        process.removeAllListeners("unhandledRejection");
+        process.on("unhandledRejection", (reason) => heard.push(reason));
+        try {
+          await run();
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        } finally {
+          process.removeAllListeners("unhandledRejection");
+          for (const listener of kept) process.on("unhandledRejection", listener);
+        }
+        return heard;
+      }
+      const down = new Error("the storefront could not be had");
+      const failing = () => resourceLister<tLibrarySongsResponse>("listSongs", () => Promise.reject(down));
+
+      test("it is asked as the function is called, so a storefront is being fetched before any loop", async () => {
+        const collection = vi.fn<tCollection<tReadOptions>>(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, sent } = apple();
+        const walk = resourceLister<tLibrarySongsResponse>("listSongs", collection).bound(music)();
+        expect(collection).toHaveBeenCalledTimes(1);
+        await all(walk);
+        await all(walk);
+        expect(collection).toHaveBeenCalledTimes(1);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs", "GET /v1/catalog/gb/songs"]);
+      });
+
+      test("a failure there while no loop is listening is nobody's unhandled rejection", async () => {
+        const { music } = apple();
+        expect(await unheard(() => failing().bound(music)())).toEqual([]);
+      });
+
+      test("and it is kept for the loop, which hears it however late it starts, every time it starts", async () => {
+        const { music, calls } = apple();
+        const walk = failing().bound(music)();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(await rejection(all(walk))).toBe(down);
+        expect(await rejection(all(walk))).toBe(down);
+        expect(calls).toHaveLength(0);
+      });
+
+      test("the check that says so can catch one: a promise that rejects with nobody listening is heard", async () => {
+        expect(await unheard(() => void Promise.reject(down))).toEqual([down]);
+      });
     });
 
     test("pages are fetched one at a time, and breaking out of the loop stops fetching", async () => {
@@ -530,15 +606,16 @@ describe("the resource patterns: what a collection gives is checked, so that wha
     ["a slash and a host", "/evil.example", EMPTY],
   ])("a storefront that is %s is refused, and the reason is given", async (_name, storefront, reason) => {
     const { music, calls } = apple([], { userToken: "user" });
+    // Each is async, so that a function which refuses as it is called and one which rejects are met the same way.
     const attempts: [string, () => Promise<unknown>][] = [
-      ["getSong", () => one(music, "1", { storefront })],
-      ["getSong", () => one.bound(music)("1", { storefront })],
-      ["getSongs", () => several(music, ["1"], { storefront })],
-      ["getSongs", () => several.bound(music)(["1"], { storefront })],
-      ["listSongs", () => whole(music, { storefront })],
-      ["listSongs", () => all(whole.bound(music)({ storefront }))],
-      ["getSongRelationship", () => related(music, "1", "tracks", { storefront })],
-      ["getSongRelationship", () => all(related.bound(music)("1", "tracks", { storefront }))],
+      ["getSong", async () => one(music, "1", { storefront })],
+      ["getSong", async () => one.bound(music)("1", { storefront })],
+      ["getSongs", async () => several(music, ["1"], { storefront })],
+      ["getSongs", async () => several.bound(music)(["1"], { storefront })],
+      ["listSongs", async () => whole(music, { storefront })],
+      ["listSongs", async () => all(whole.bound(music)({ storefront }))],
+      ["getSongRelationship", async () => related(music, "1", "tracks", { storefront })],
+      ["getSongRelationship", async () => all(related.bound(music)("1", "tracks", { storefront }))],
     ];
     for (const [fn, attempt] of attempts) expect(await rejection(attempt())).toEqual(new TypeError(`${fn}: the path of the collection ${reason}`));
     expect(calls).toHaveLength(0);

@@ -48,7 +48,9 @@ type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...arg
  * goes: it is where a mistake becomes a TypeError naming `fn`, before Apple is asked. `unwrap` says what the bound
  * form hands over.
  *
- * A bound function that walks pages asks for nothing, and checks nothing, until its loop starts.
+ * A bound function that walks pages is planned when it is called, like any other, so what it is handed is checked
+ * and taken then: a mistake the plan throws is thrown from the call. Apple is asked for nothing until a loop
+ * starts, and each loop over what the call gave asks afresh.
  */
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>>;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>>;
@@ -64,9 +66,17 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
     const music = clientOf(fn, client, METHODS);
     if (unwrap === "answer") return (...args: unknown[]) => send(music, ...args);
     if (unwrap === "pages")
-      return async function* (...args: unknown[]): AsyncIterable<unknown> {
-        const [path, init] = await plan(music, ...args);
-        yield* music.paginate(path, init as tRequestInit<tPage<unknown>>);
+      return (...args: unknown[]): AsyncIterable<unknown> => {
+        const planned = plan(music, ...args);
+        // A plan that has to wait, for a storefront say, may fail while no loop is listening. That is kept for
+        // the loop to hear, and is nobody's unhandled rejection in the meantime.
+        void Promise.resolve(planned).catch(() => undefined);
+        return {
+          async *[Symbol.asyncIterator]() {
+            const [path, init] = await planned;
+            yield* music.paginate(path, init as tRequestInit<tPage<unknown>>);
+          },
+        };
       };
     return async (...args: unknown[]): Promise<unknown> => {
       const { data } = pageOf(await send(music, ...args), fn);
@@ -125,31 +135,41 @@ function collectionOf(fn: string, path: unknown): string {
   throw new TypeError(`${fn}: the path of the collection ${hazard}`);
 }
 
+/**
+ * A plan finished with the collection's path: there and then when the collection gives it at once, and when it
+ * comes when it has to be waited for. Either way the path is checked before it is used. The plans below are not
+ * async for this reason: what they check, they check as they are called, and throw there.
+ */
+function located<R>(fn: string, path: string | Promise<string>, finish: (collection: string) => tRequestPlan<R>): tRequestPlan<R> | Promise<tRequestPlan<R>> {
+  const waited = typeof (path as { then?: unknown } | null | undefined)?.then === "function";
+  return waited ? Promise.resolve(path).then((given) => finish(collectionOf(fn, given))) : finish(collectionOf(fn, path));
+}
+
 /** A function for the resource with one id in a collection: `GET {collection}/{id}`. `also` names any options it takes beyond `tReadOptions`. */
 export function resourceGetter<R extends tResources, O extends tReadOptions<R> = tReadOptions<R>>(fn: string, collection: tCollection<O>, also?: readonly string[]): tEndpoint<[id: string, options?: O], R, Promise<tItem<R>>> {
-  return endpoint(fn, "resource", async (client, id: string, options?: O) => {
+  return endpoint(fn, "resource", (client, id: string, options?: O) => {
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<R>(fn, bag, {}, also);
     const segment = segmentOf(fn, "id", id);
-    return [`${collectionOf(fn, await collection(fn, client, bag))}/${segment}`, init];
+    return located<R>(fn, collection(fn, client, bag), (path) => [`${path}/${segment}`, init]);
   });
 }
 
 /** A function for the resources with the ids given: `GET {collection}?ids=`. */
 export function resourcesGetter<R extends tResources, O extends tReadOptions<R> = tReadOptions<R>>(fn: string, collection: tCollection<O>, also?: readonly string[]): tEndpoint<[ids: readonly string[], options?: O], R, Promise<tItem<R>[]>> {
-  return endpoint(fn, "resources", async (client, ids: readonly string[], options?: O) => {
+  return endpoint(fn, "resources", (client, ids: readonly string[], options?: O) => {
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<R>(fn, bag, { ids: listOf(fn, "ids", ids) }, also);
-    return [collectionOf(fn, await collection(fn, client, bag)), init];
+    return located<R>(fn, collection(fn, client, bag), (path) => [path, init]);
   });
 }
 
 /** A function for a whole collection, a page at a time: `GET {collection}`. */
 export function resourceLister<R extends tResources, O extends tReadOptions<tPaged<R>> = tReadOptions<tPaged<R>>>(fn: string, collection: tCollection<O>, also?: readonly string[]): tEndpoint<[options?: O], tPaged<R>, AsyncIterable<tItem<R>>> {
-  return endpoint(fn, "pages", async (client, options?: O) => {
+  return endpoint(fn, "pages", (client, options?: O) => {
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<tPaged<R>>(fn, bag, {}, also);
-    return [collectionOf(fn, await collection(fn, client, bag)), init];
+    return located<tPaged<R>>(fn, collection(fn, client, bag), (path) => [path, init]);
   });
 }
 
@@ -171,11 +191,11 @@ export interface tRelationshipEndpoint<Rels, O> {
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
 export function relationshipGetter<Rels, O extends tReadOptions<tRelationshipResponse> = tReadOptions<tRelationshipResponse>>(fn: string, collection: tCollection<O>): tRelationshipEndpoint<Rels, O> {
-  const declared = endpoint(fn, "pages", async (client, id: string, name: string, options?: O) => {
+  const declared = endpoint(fn, "pages", (client, id: string, name: string, options?: O) => {
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<tRelationshipResponse>(fn, bag);
     const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
-    return [`${collectionOf(fn, await collection(fn, client, bag))}/${segments}`, init];
+    return located<tRelationshipResponse>(fn, collection(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.
   return declared as unknown as tRelationshipEndpoint<Rels, O>;
