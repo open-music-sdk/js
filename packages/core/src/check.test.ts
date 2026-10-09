@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, optionsOf } from "./check";
+import { clientOf, has, optionsOf, segmentOf } from "./check";
 import { createClient } from "./client";
 
 const SECRET = "s3cretT0ken";
@@ -124,5 +124,102 @@ describe("clientOf", () => {
     const request = vi.fn();
     clientOf("fn", { request }, ["request"]);
     expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe("segmentOf", () => {
+  test.each(["1613600188", "pl.u-8aAVZAbCdEf", "i.eoDlqXxsaz8Nb", "ra.985484166", "us", "music-videos", "a.b", "...", ".a", "a..", "A_b-c~1!*'()", "s".repeat(256)])(
+    "%s is a segment, and comes back as it is",
+    (value) => {
+      expect(segmentOf("fn", "id", value)).toBe(value);
+    },
+  );
+
+  test.each([
+    ["a/b", "a%2Fb"],
+    ["../../me/library/songs", "..%2F..%2Fme%2Flibrary%2Fsongs"],
+    ["a\\b", "a%5Cb"],
+    ["a?b=1&c", "a%3Fb%3D1%26c"],
+    ["a#b", "a%23b"],
+    ["a b", "a%20b"],
+    ["a\tb\n", "a%09b%0A"],
+    ["%2e%2e", "%252e%252e"],
+    ["%2F", "%252F"],
+    ["a;b", "a%3Bb"],
+    ["a:b@c", "a%3Ab%40c"],
+    ["é", "%C3%A9"],
+    ["😀", "%F0%9F%98%80"],
+  ])("what would mean something in a path is encoded: %j becomes %s", (value, encoded) => {
+    expect(segmentOf("fn", "id", value)).toBe(encoded);
+  });
+
+  describe("whatever a segment holds, the request still goes where it was going", () => {
+    const BASE = "https://api.music.apple.com/";
+    const hostile = [
+      "../../../me/library/songs",
+      "..\\..\\..\\me\\library\\songs",
+      "%2e%2e/%2e%2e/%2e%2e/me",
+      ".%2e",
+      "%2E%2E",
+      "/v1/me/storefront",
+      "//evil.example/x",
+      "https://evil.example/x",
+      "1?include=library",
+      "1#fragment",
+      "1/../../../me",
+      " ",
+      "\t",
+      "a\r\nb",
+    ];
+
+    test.each(hostile)("%j stays the one segment after /v1/catalog/us/songs", (value) => {
+      const url = new URL(`v1/catalog/us/songs/${segmentOf("getSong", "id", value)}`, BASE);
+      const segments = url.pathname.split("/");
+      expect(url.origin).toBe("https://api.music.apple.com");
+      expect(segments.slice(0, 5)).toEqual(["", "v1", "catalog", "us", "songs"]);
+      expect(segments).toHaveLength(6);
+      expect(decodeURIComponent(segments[5] ?? "")).toBe(value);
+      expect([url.search, url.hash]).toEqual(["", ""]);
+    });
+
+    test("the check that says so can tell: put in as they are, the same values do leave", () => {
+      expect(new URL("v1/catalog/us/songs/../../../me/library/songs", BASE).pathname).toBe("/v1/me/library/songs");
+      expect(new URL("v1/catalog/us/songs/%2e%2e/%2e%2e/%2e%2e/me", BASE).pathname).toBe("/v1/me");
+      expect(new URL("v1/catalog/us/songs/1?include=library", BASE).search).toBe("?include=library");
+    });
+  });
+
+  test.each<[string, unknown, string]>([
+    ["an empty string", "", "0 characters"],
+    ["a single dot, which a URL reads as here", ".", "1 characters"],
+    ["two dots, which a URL reads as one up", "..", "2 characters"],
+    ["one character too many", "s".repeat(257), "257 characters"],
+    ["half of a surrogate pair", "a\uD800", "2 characters"],
+    ["undefined", undefined, "undefined"],
+    ["null", null, "null"],
+    ["a number", 1613600188, "1613600188"],
+    ["true", true, "boolean"],
+    ["an object", { id: "1" }, "object"],
+    ["an array", ["1"], "object"],
+    ["a String object", new String("1"), "object"],
+  ])("%s is a TypeError naming the function and the argument, and saying what it got", (_name, value, what) => {
+    const error = thrown(() => segmentOf("getSong", "id", value));
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 256 characters, and not "." or ".."; got ${what}`);
+  });
+
+  test("the argument is named as the caller names it", () => {
+    expect(thrown(() => segmentOf("getAlbumRelationship", "name", "")).message).toMatch(/^getAlbumRelationship: name must be /);
+  });
+
+  test("a value that is refused is not shown: an id slot is where a pasted token ends up", () => {
+    const error = thrown(() => segmentOf("getSong", "id", `${SECRET}${"x".repeat(300)}`));
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  });
+
+  test("nothing is called on a value that is not a string: it is not asked to become one", () => {
+    const asked = vi.fn(() => SECRET);
+    thrown(() => segmentOf("fn", "id", { toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }));
+    expect(asked).not.toHaveBeenCalled();
   });
 });

@@ -25,3 +25,23 @@ export function clientOf(fn: string, client: unknown, methods: readonly (keyof t
   if (has(client, methods)) return client as tAppleMusicClient;
   throw new TypeError(`${fn}: client must be a client from createClient; got ${got(client)}`);
 }
+
+/** Longer than any identifier or code Apple gives out, which run to a few dozen characters. */
+const MAX_LENGTH = 256;
+
+/**
+ * `value` as one segment of a path, percent-encoded. Whatever it holds stays inside the segment: a slash, a
+ * question mark or a hash is encoded, and "." and "..", which no encoding protects because a URL parser reads
+ * them as "here" and "one up", are refused. So a value from outside cannot turn a request for one endpoint into a
+ * request for another, where a different token may be sent.
+ */
+export function segmentOf(fn: string, name: string, value: unknown): string {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_LENGTH && value !== "." && value !== "..") {
+    try {
+      return encodeURIComponent(value);
+    } catch {
+      // Half of a surrogate pair: not text that can be sent, and refused like anything else that is no segment.
+    }
+  }
+  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters, and not "." or ".."; got ${got(value)}`);
+}
