@@ -1,5 +1,5 @@
 import type { tArtwork } from "@open-music-sdk/types";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork.js";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
@@ -319,11 +319,19 @@ describe("artworkUrl: the template", () => {
     expect(size(artworkUrl(artwork, 300))).toBe("300x300");
   });
 
-  test("the artwork object is only read: a frozen one works and is not changed", () => {
-    const artwork = Object.freeze({ url: TEMPLATE, width: 3000, height: 3000 });
-    artworkUrl(artwork, 300);
-    artworkSrcSet(artwork, 300);
-    expect(artwork).toEqual({ url: TEMPLATE, width: 3000, height: 3000 });
+  test("the artwork and the options are only read: frozen ones give what unfrozen ones do", () => {
+    const [artwork, options] = [{ url: TEMPLATE, width: 3000, height: 3000 }, { height: 150, format: "webp", crop: "cc", densities: [1, 2], hosts: ["mzstatic.com"] }] as const;
+    const frozen = [Object.freeze({ ...artwork }), Object.freeze({ ...options, densities: Object.freeze([...options.densities]), hosts: Object.freeze([...options.hosts]) })] as const;
+    expect(artworkUrl(frozen[0], 300, frozen[1])).toBe(artworkUrl(artwork, 300, options));
+    expect(artworkSrcSet(frozen[0], 300, frozen[1])).toBe(artworkSrcSet(artwork, 300, options));
+    expect(artworkImage(frozen[0], 300, frozen[1])).toEqual(artworkImage(artwork, 300, options));
+  });
+
+  test("an artwork whose properties cannot be written still works, and any write to it would have thrown", () => {
+    const written = vi.fn(() => true);
+    const artwork = new Proxy<tArtworkSource>({ url: TEMPLATE, width: 3000, height: 3000 }, { set: written, defineProperty: written, deleteProperty: written });
+    artworkImage(artwork, 300);
+    expect(written).not.toHaveBeenCalled();
   });
 });
 
@@ -581,6 +589,9 @@ describe("fit", () => {
     ["far wider than a cover", 99_999, [1500, 1500], "1500x1500"],
     ["wider than tall artwork", 5000, [600, 900], "600x900"],
     ["a hair wider than a still whose shape does not divide evenly", 3702, [3701, 1912], "3701x1912"],
+    // 1400 times 933/1400 is 933.0000000000001 in floating point, which rounded up as it stands is 934.
+    ["exactly as wide as artwork whose height the arithmetic lands a hair above", 1400, [1400, 933], "1400x933"],
+    ["twice as wide as that artwork", 2800, [1400, 933], "1400x933"],
   ])("with no height, a box %s shrinks to exactly the artwork's size: %s on %j is %s", (_name, width, [maxWidth, maxHeight], expected) => {
     for (const inside of [false, true]) {
       const got = fit({ width }, { width: maxWidth, height: maxHeight }, inside);
@@ -1112,6 +1123,8 @@ describe("artworkImage: everything an <img> needs, worked out together", () => {
     ["a cover smaller than it is shown is still laid out at the size asked for", cover(200), 300, {}, [300, 300]],
     ["artwork too small for the box is laid out at the size asked for, past what the server gives", { url: TEMPLATE }, 20_000, {}, [20_000, 20_000]],
     ["a crop that fills the box is laid out as the box", cover(), 300, { height: 150, crop: "cc" }, [300, 150]],
+    ["a crop that fills, with no height, is laid out in the artwork's shape", { url: TEMPLATE, width: 1920, height: 1080 }, 320, { crop: "sr" }, [320, 180]],
+    ["a URL that does not say how it is cut, with no height, likewise", { url: "https://example.com/w_{w},h_{h}/still.jpg", width: 1920, height: 1080 }, 320, {}, [320, 180]],
     ["a URL that does not say how it is cut is laid out as the box", { url: "https://example.com/fixed.jpg", width: 600, height: 600 }, 300, { height: 150 }, [300, 150]],
     ["a cover fitted inside a wide slot is laid out as the cover standing in it", cover(1500), 1200, { height: 300 }, [300, 300]],
     ["a cover fitted inside a tall slot likewise", cover(1500), 300, { height: 1200 }, [300, 300]],
@@ -1254,6 +1267,7 @@ describe("hosts: where the artwork may come from, for a caller who says", () => 
     ["an allowed host on another port", "https://is1-ssl.mzstatic.com:8443/image/{w}x{h}bb.jpg"],
     ["an allowed host with a user name and password", "https://user:pass@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
     ["an allowed host with a user name alone", "https://user@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host with a password alone", "https://:pass@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
     ["an allowed host as the user name of another", "https://is1-ssl.mzstatic.com@evil.example/{w}x{h}bb.jpg"],
     ["an allowed host after backslashes a parser reads as slashes", "https:\\\\evil.example\\@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
     ["an allowed host in the fragment", "https://evil.example/#@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
