@@ -5,6 +5,7 @@ export type {
   tAppleMusicClient,
   tClientOptions,
   tPage,
+  tPaginateInit,
   tParams,
   tRequestInit,
   tResponseOutcome,

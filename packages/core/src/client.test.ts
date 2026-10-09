@@ -1042,6 +1042,66 @@ describe("paginate", () => {
       expect(calls).toHaveLength(0);
     });
   });
+
+  describe("maxPages: how many pages a walk may ask for", () => {
+    /** Apple, answering every request with one item and a link to the next, without end. */
+    const endless = () => {
+      let page = 0;
+      return Array.from({ length: 50 }, () => ({ body: { data: [++page], next: `/v1/x?offset=${String(page)}` } }));
+    };
+
+    test("with no limit, a walk asks for as long as each page names a next one", async () => {
+      const { music, calls } = client(endless());
+      const seen: number[] = [];
+      for await (const item of music.paginate<number>("v1/x")) {
+        seen.push(item);
+        if (seen.length === 40) break;
+      }
+      expect(calls).toHaveLength(40);
+    });
+
+    test.each([1, 2, 5])("with a limit of %i, that many pages are asked for and the walk ends there, though there are more", async (maxPages) => {
+      const { music, calls } = client(endless());
+      expect(await items(music.paginate<number>("v1/x", { maxPages }))).toEqual(Array.from({ length: maxPages }, (_, i) => i + 1));
+      expect(calls).toHaveLength(maxPages);
+    });
+
+    test("a limit the walk never reaches changes nothing", async () => {
+      const { music, calls } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2] } }]);
+      expect(await items(music.paginate<number>("v1/x", { maxPages: 10 }))).toEqual([1, 2]);
+      expect(calls).toHaveLength(2);
+    });
+
+    test("a page handed over is not counted: it was not asked for", async () => {
+      const { music, calls } = client(endless());
+      expect(await items(music.paginate({ data: [0], next: "/v1/x?offset=0" }, { maxPages: 2 }))).toEqual([0, 1, 2]);
+      expect(calls).toHaveLength(2);
+    });
+
+    test("the limit is the walk's own: it is not sent to Apple, and the rest of init is", async () => {
+      const { music, url } = client([{ body: { data: [1] } }]);
+      await items(music.paginate("v1/x", { maxPages: 3, params: { limit: 1 } }));
+      expect(url()).toBe("https://api.music.apple.com/v1/x?limit=1");
+    });
+
+    test.each<[string, unknown, string]>([
+      ["zero", 0, "0"],
+      ["below zero", -1, "-1"],
+      ["not whole", 1.5, "1.5"],
+      ["not a number", Number.NaN, "NaN"],
+      ["without end", Number.POSITIVE_INFINITY, "Infinity"],
+      ["past what a number can count", 2 ** 53, String(2 ** 53)],
+      ["a string", "3", "1 characters"],
+      ["null", null, "null"],
+    ])("a limit that is %s is a TypeError, and nothing is asked for", async (_, maxPages, what) => {
+      for (const from of ["v1/x", { data: [1], next: "/v1/x?offset=1" }]) {
+        const { music, calls } = client(endless());
+        const error: unknown = await items(music.paginate(from, { maxPages: maxPages as number })).catch((e: unknown) => e);
+        expect(error).toEqual(new TypeError(`paginate: maxPages must be a whole number above 0; got ${what}`));
+        expect(calls).toHaveLength(0);
+      }
+    });
+  });
 });
 
 describe("storefront", () => {

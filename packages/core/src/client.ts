@@ -80,6 +80,16 @@ export interface tPage<T> {
   readonly next?: string | undefined;
 }
 
+/** What `paginate` takes: what `request` takes, for each page it asks for, and how many pages that may be. */
+export interface tPaginateInit<T> extends tRequestInit<tPage<T>> {
+  /**
+   * The most pages to ask Apple for: a whole number above zero. Default: no limit, so a walk goes on asking for as
+   * long as each page names a next one. At the limit the walk ends, whether or not there are more. A page handed
+   * over is not counted, since it was not asked for.
+   */
+  readonly maxPages?: number | undefined;
+}
+
 export interface tAppleMusicClient {
   /** `path` is "v1/...", "/v1/...", or a `next` subpath from a response. Resolves to the parsed body, or undefined when there is none. */
   request<T>(path: string, init?: tRequestInit<T>): Promise<T>;
@@ -92,8 +102,11 @@ export interface tAppleMusicClient {
    *
    * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
    * relationship's are. A search or a chart answers with its pages nested under `results`, and is not walked.
+   *
+   * A walk has no end but the last page unless `init.maxPages` gives it one. A `next` link is followed wherever on
+   * Apple's origin it points, so a page or a path from outside your app is as trusted as you make it.
    */
-  paginate<T>(from: string | tPage<T>, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
+  paginate<T>(from: string | tPage<T>, init?: tPaginateInit<T>): AsyncIterable<T>;
   /** The configured storefront, or the listener's, resolved once. */
   storefront(): Promise<string>;
   /** A client for one listener. Shares the developer token, limiter, retry policy, and hooks. */
@@ -245,9 +258,12 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 
-  async function* paginate<T>(from: string | tPage<T>, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
+  async function* paginate<T>(from: string | tPage<T>, init: tPaginateInit<T> = {}): AsyncIterable<T> {
+    // The limit is the walk's own: what is left is what each page is asked for with.
+    const { maxPages, ...each } = init;
+    if (maxPages !== undefined && !(Number.isSafeInteger(maxPages) && maxPages > 0)) throw new TypeError(`paginate: maxPages must be a whole number above 0; got ${got(maxPages)}`);
     let next: string | undefined;
-    let params = init.params;
+    let params = each.params;
     if (typeof from === "string") next = from;
     else {
       // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else that is no object is the caller's mistake.
@@ -260,8 +276,8 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
       next = first.next;
       params = undefined;
     }
-    while (next !== undefined) {
-      const page = pageOf(await request<unknown>(next, { ...init, params }), next);
+    for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {
+      const page = pageOf(await request<unknown>(next, { ...each, params }), next);
       yield* page.data as readonly T[];
       next = page.next;
       params = undefined; // a next link already carries the query
