@@ -1,6 +1,6 @@
 // acceptUserToken: taking a token in for one of your users, without an HTTP request in sight.
 import type { tAppleMusicClient, tUserTokenStore } from "@open-music-sdk/core";
-import { tokenOf } from "./check.js";
+import { clientOf, optionsOf, storeOf, tokenOf, userIdOf } from "./check.js";
 import { validateUserToken, type tValidateOptions } from "./token.js";
 
 /**
@@ -13,9 +13,14 @@ import { validateUserToken, type tValidateOptions } from "./token.js";
  * web-standard Request.
  */
 export async function acceptUserToken(client: tAppleMusicClient, store: tUserTokenStore, userId: string, token: string, options: tValidateOptions = {}): Promise<string> {
+  // Everything is checked before Apple is asked: a mistake here must not cost a request, or leave a token
+  // validated and nowhere to put it.
+  const music = clientOf("acceptUserToken", client);
+  const kept = storeOf("acceptUserToken", store);
+  const id = userIdOf("acceptUserToken", userId);
   // The token is stored as it was validated and will be sent: with the whitespace around it dropped.
   const value = tokenOf("acceptUserToken", token);
-  const storefront = await validateUserToken(client, value, options);
-  await store.set(userId, value);
+  const storefront = await validateUserToken(music, value, optionsOf("acceptUserToken", options, "an options object"));
+  await kept.set(id, value);
   return storefront;
 }

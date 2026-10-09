@@ -1,8 +1,9 @@
 // A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
 // file. What this does is ask Apple about it before anything depends on it.
 import { AppleMusicError, isAppleMusicError, type tAppleMusicClient } from "@open-music-sdk/core";
-import { tokenOf } from "./check.js";
+import { clientOf, optionsOf, tokenOf } from "./check.js";
 
+/** Invalid values throw a TypeError. No error quotes a token. */
 export interface tValidateOptions {
   /** Aborts the requests to Apple. */
   readonly signal?: AbortSignal | undefined;
@@ -20,18 +21,19 @@ export interface tValidateOptions {
  * storefront) is the client's usual error and says nothing about the token.
  */
 export async function validateUserToken(client: tAppleMusicClient, token: string, options: tValidateOptions = {}): Promise<string> {
+  const music = clientOf("validateUserToken", client);
   const value = tokenOf("validateUserToken", token);
-  const { signal } = options;
+  const { signal } = optionsOf("validateUserToken", options, "an options object");
   let body: unknown;
   try {
     // Not client.storefront(): that answers from configuration, without asking Apple, when a storefront is set.
-    body = await client.as(value).request<unknown>("v1/me/storefront", { signal });
+    body = await music.as(value).request<unknown>("v1/me/storefront", { signal });
   } catch (e) {
     if (!isAppleMusicError(e, "DeveloperTokenInvalid")) throw e;
     // Apple documents two causes for a 401 on a personal endpoint: the developer token, or a listener
     // who is not signed in or has no subscription. One request without the user token tells them
     // apart: if the developer token is the problem this throws, as it would have anyway.
-    await client.request("v1/test", { user: false, signal });
+    await music.request("v1/test", { user: false, signal });
     throw new AppleMusicError("UserTokenInvalid", "Apple answered 401 for the listener while accepting the developer token: not signed in, or no Apple Music subscription", {
       status: e.status,
       errors: e.errors,

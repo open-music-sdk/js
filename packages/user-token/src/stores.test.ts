@@ -1,6 +1,6 @@
 import { isAppleMusicError } from "@open-music-sdk/core";
-import { describe, expect, test } from "vitest";
-import { KvUserTokenStore, MemoryUserTokenStore, type tKvNamespace } from "./stores.js";
+import { describe, expect, test, vi } from "vitest";
+import { KvUserTokenStore, MemoryUserTokenStore, type tKvNamespace, type tKvStoreOptions } from "./stores.js";
 import { fakeClient } from "./testing.js";
 
 /** A namespace over a Map that answers null for a missing key, as Workers KV does. */
@@ -334,5 +334,58 @@ describe("a store that cannot answer is not a store with no token", () => {
     const { music, calls } = fakeClient([], { userTokenStore: new KvUserTokenStore({ get: down, put: down, delete: down }) });
     await expect(music.forUser("u1").request("v1/me/library/songs")).rejects.toThrow("kv down");
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("KvUserTokenStore: what it is handed is checked when it is created, not on first use", () => {
+  const make = (kv: unknown, options?: unknown) => () => new KvUserTokenStore(kv as tKvNamespace, options as tKvStoreOptions);
+
+  test.each<[string, unknown]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["a token in its place", "secret-token"],
+    ["an empty object", {}],
+    ["a Map, which has set where a namespace has put", new Map()],
+    ["a namespace with no delete", { get: () => null, put: () => null }],
+    ["a store of this package's", new MemoryUserTokenStore()],
+  ])("a namespace that is %s is a TypeError", (_name, kv) => {
+    expect(make(kv)).toThrow(/^KvUserTokenStore: kv must have get, put and delete; got /);
+  });
+
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["the prefix itself, where an options object belongs", "tenant-7:"],
+    ["a number", 42],
+  ])("options that are %s are a TypeError", (_name, options) => {
+    expect(make(fakeKv().kv, options)).toThrow(/^KvUserTokenStore: expected an options object; got /);
+  });
+
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["a number", 42],
+    ["an object", { value: "tenant-7:" }],
+    ["an array", ["tenant-7:"]],
+  ])("a prefix that is %s is a TypeError", (_name, prefix) => {
+    expect(make(fakeKv().kv, { prefix })).toThrow(/^KvUserTokenStore: prefix must be a string; got /);
+  });
+
+  test("a token handed over as the namespace is described and never shown", () => {
+    expect(make("secret-token")).toThrow(/got 12 characters$/);
+    expect(make("secret-token")).not.toThrow(/secret/);
+  });
+
+  test("a store is made without asking the namespace for anything", () => {
+    const kv = { get: vi.fn(), put: vi.fn(), delete: vi.fn() };
+    new KvUserTokenStore(kv);
+    expect([kv.get, kv.put, kv.delete].some((method) => method.mock.calls.length > 0)).toBe(false);
+  });
+
+  test("the options object is not looked at again: changing its prefix afterwards moves no key", async () => {
+    const { kv, entries } = fakeKv();
+    const options = { prefix: "a:" };
+    const store = new KvUserTokenStore(kv, options);
+    options.prefix = "b:";
+    await store.set("u1", "token-1");
+    expect([...entries.keys()]).toEqual(["a:u1"]);
   });
 });

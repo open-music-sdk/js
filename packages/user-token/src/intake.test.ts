@@ -1,6 +1,6 @@
-import type { tClientOptions } from "@open-music-sdk/core";
+import type { tAppleMusicClient, tClientOptions, tUserTokenStore } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { isJson, userTokenIntake, type tUserTokenIntakeOptions } from "./intake.js";
+import { isJson, userTokenIntake, type tIntakeOptions } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
 import { appleError, fakeClient, foreignClient, misshapen, padded, shaped, type tReply } from "./testing.js";
 
@@ -8,11 +8,11 @@ const ENDPOINT = "https://app.example/music/user-token";
 const JSON_TYPE = { "content-type": "application/json" };
 
 /** An intake over a scripted client, the store behind it, and a spy on every write to that store. */
-function intake(replies: tReply[] = [], options: Partial<tUserTokenIntakeOptions> = {}, clientOptions: Partial<tClientOptions> = {}) {
+function intake(replies: tReply[] = [], options: Partial<tIntakeOptions> = {}, clientOptions: Partial<tClientOptions> = {}) {
   const { music, calls } = fakeClient(replies, clientOptions);
   const store = new MemoryUserTokenStore();
   const set = vi.spyOn(store, "set");
-  const userId = vi.fn<tUserTokenIntakeOptions["userId"]>(() => "u1");
+  const userId = vi.fn<tIntakeOptions["userId"]>(() => "u1");
   const handler = userTokenIntake(music, { store, userId, ...options });
   return { handler, store, set, userId, calls };
 }
@@ -425,5 +425,90 @@ describe("a client from another copy of core is served the same", () => {
     expect(res.status).toBe(status);
     expect(await errorOf(res)).toBe(tag);
     expect(await store.get("u1")).toBeUndefined();
+  });
+});
+
+describe("userTokenIntake: what it is handed is checked when it is created, not on the first request", () => {
+  const store = new MemoryUserTokenStore();
+  const good = { store, userId: () => "u1" };
+  const make = (client: unknown, options: unknown) => () => userTokenIntake(client as tAppleMusicClient, options as tIntakeOptions);
+
+  test.each<[string, unknown]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["a token in its place", "secret-token"],
+    ["an object that is no client", {}],
+    ["a store", store],
+  ])("a client that is %s is a TypeError", (_name, client) => {
+    expect(make(client, good)).toThrow(/^userTokenIntake: client must be a client from createClient; got /);
+  });
+
+  test.each<[string, unknown]>([
+    ["missing", undefined],
+    ["null", null],
+    ["a token", "secret-token"],
+    ["a function", () => good],
+  ])("options that are %s are a TypeError", (_name, options) => {
+    expect(make(fakeClient().music, options)).toThrow(/^userTokenIntake: expected an options object with store and userId; got /);
+  });
+
+  test.each<[string, unknown]>([
+    ["missing", undefined],
+    ["null", null],
+    ["a key-value namespace, which has put where a store has set", { get: () => null, put: () => null, delete: () => null }],
+    ["a token", "secret-token"],
+  ])("a store that is %s is a TypeError", (_name, bad) => {
+    expect(make(fakeClient().music, { ...good, store: bad })).toThrow(/^userTokenIntake: store must have get, set and delete; got /);
+  });
+
+  test.each<[string, unknown]>([
+    ["missing", undefined],
+    ["null", null],
+    ["the id itself, where a function that finds it belongs", "u1"],
+    ["a number", 42],
+    ["an object", { id: "u1" }],
+  ])("a userId that is %s is a TypeError", (_name, bad) => {
+    expect(make(fakeClient().music, { ...good, userId: bad })).toThrow(/^userTokenIntake: userId must be a function that returns the signed-in user's id; got /);
+  });
+
+  test.each<[string, unknown, unknown]>([
+    ["client", "secret-token", good],
+    ["options", fakeClient().music, "secret-token"],
+    ["store", fakeClient().music, { ...good, store: "secret-token" }],
+    ["userId", fakeClient().music, { ...good, userId: "secret-token" }],
+  ])("a token handed over as the %s is described and never shown", (_name, client, options) => {
+    let error: unknown;
+    try {
+      make(client, options)();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/got 12 characters$/);
+    expect((error as Error).message).not.toContain("secret");
+  });
+
+  test("a handler is made without asking Apple, the store, or the session for anything", () => {
+    const { music, calls } = fakeClient();
+    const set = vi.spyOn(store, "set");
+    const userId = vi.fn(() => "u1");
+    userTokenIntake(music, { store, userId });
+    expect(calls).toHaveLength(0);
+    expect(set).not.toHaveBeenCalled();
+    expect(userId).not.toHaveBeenCalled();
+  });
+});
+
+describe("userTokenIntake: its options are taken once", () => {
+  test("changing the options object afterwards changes neither where a token goes nor whose it is", async () => {
+    const first = new MemoryUserTokenStore();
+    const second = new MemoryUserTokenStore();
+    const options: { store: tUserTokenStore; userId: () => string } = { store: first, userId: () => "u1" };
+    const handler = userTokenIntake(fakeClient().music, options);
+    options.store = second;
+    options.userId = () => "someone-else";
+    expect((await handler(post({ token: "user-token" }))).status).toBe(204);
+    expect(await first.get("u1")).toBe("user-token");
+    expect([await second.get("u1"), await second.get("someone-else"), await first.get("someone-else")]).toEqual([undefined, undefined, undefined]);
   });
 });

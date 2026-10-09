@@ -191,3 +191,67 @@ describe("acceptUserToken: what is no token is the caller's mistake, and reaches
     expect(set).not.toHaveBeenCalled();
   });
 });
+
+describe("acceptUserToken: what it is handed is checked before Apple is asked", () => {
+  /** A call with one argument replaced, and what it rejected with, what it asked Apple, and what it stored. */
+  async function handed(replace: { client?: unknown; store?: unknown; userId?: unknown; options?: unknown }) {
+    const { music, calls } = apple();
+    const { store, set } = kept();
+    const args = { client: music, store, userId: "u1", options: undefined, ...replace };
+    const error = await failed(acceptUserToken(args.client as typeof music, args.store as tUserTokenStore, args.userId as string, "user-token", args.options as undefined));
+    return { error: error as Error, calls, set };
+  }
+
+  test.each<[string, unknown]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["a token in its place", "secret-token"],
+    ["an object that is no client", {}],
+  ])("a client that is %s is a TypeError, and nothing is stored", async (_name, client) => {
+    const { error, set } = await handed({ client });
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toMatch(/^acceptUserToken: client must be a client from createClient; got /);
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  test.each<[string, unknown]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["a key-value namespace, which has put where a store has set", { get: () => null, put: () => null, delete: () => null }],
+  ])("a store that is %s is a TypeError, and Apple is not asked", async (_name, store) => {
+    const { error, calls } = await handed({ store });
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toMatch(/^acceptUserToken: store must have get, set and delete; got /);
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each<[string, unknown]>([
+    ["an empty string", ""],
+    ["undefined", undefined],
+    ["null", null],
+    ["a number", 42],
+    ["an object", { id: "u1" }],
+  ])("a userId that is %s is a TypeError: a token is never validated with nowhere to put it", async (_name, userId) => {
+    const { error, calls, set } = await handed({ userId });
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toMatch(/^acceptUserToken: userId must be a string with something in it; got /);
+    expect(calls).toHaveLength(0);
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["a signal, where an options object holding one belongs", "signal"],
+    ["a number", 42],
+  ])("options that are %s are a TypeError", async (_name, options) => {
+    const { error, calls } = await handed({ options });
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toMatch(/^acceptUserToken: expected an options object; got /);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a mistake is a rejection, not a throw: the function is async all the way", () => {
+    const { music } = apple();
+    expect(() => void acceptUserToken(music, kept().store, "", "user-token").catch(() => undefined)).not.toThrow();
+  });
+});

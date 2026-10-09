@@ -1,4 +1,4 @@
-import { AppleMusicError, isAppleMusicError, type tErrorTag } from "@open-music-sdk/core";
+import { AppleMusicError, isAppleMusicError, type tAppleMusicClient, type tErrorTag } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { appleError, failure, fakeClient, foreignClient, misshapen, padded, shaped, storefront, type tReply } from "./testing.js";
 import { validateUserToken } from "./token.js";
@@ -320,5 +320,42 @@ describe("a client from another copy of core is validated the same", () => {
     const e = await validateUserToken(music, "user-token").catch((thrown: unknown) => thrown);
     expect(Object.getPrototypeOf(e)).toBe(AppleMusicError.prototype);
     expect(e instanceof core.AppleMusicError).toBe(true);
+  });
+});
+
+describe("validateUserToken: what it is handed is checked before Apple is asked", () => {
+  test.each<[string, unknown]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["a token in its place", "secret-token"],
+    ["an object that is no client", {}],
+    ["an object with request but no as", { request: () => undefined }],
+  ])("a client that is %s is a TypeError", async (_name, client) => {
+    const error: unknown = await validateUserToken(client as tAppleMusicClient, "user-token").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^validateUserToken: client must be a client from createClient; got /);
+    expect((error as Error).message).not.toContain("secret");
+  });
+
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["a signal, where an options object holding one belongs", "signal"],
+    ["a number", 42],
+  ])("options that are %s are a TypeError, and Apple is not asked", async (_name, options) => {
+    const { music, calls } = fakeClient();
+    const error: unknown = await validateUserToken(music, "user-token", options as undefined).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^validateUserToken: expected an options object; got /);
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each([undefined, {}, { signal: undefined }])("options of %j mean no signal", async (options) => {
+    const { music } = fakeClient();
+    await expect(validateUserToken(music, "user-token", options)).resolves.toBe("us");
+  });
+
+  test("the client is checked before the token: with both wrong, the error is about the client", async () => {
+    const error: unknown = await validateUserToken(undefined as unknown as tAppleMusicClient, "not a token").catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/^validateUserToken: client /);
   });
 });
