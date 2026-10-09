@@ -1,3 +1,4 @@
+export { readBounded } from "./body.js";
 export { createClient, parseToken } from "./client.js";
 export type {
   tAppleMusicClient,

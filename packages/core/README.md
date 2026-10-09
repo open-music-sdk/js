@@ -40,6 +40,7 @@ try {
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
 | `parseRetryAfter(header)` | Seconds or HTTP date to milliseconds |
 | `parseToken(value)` | The value as a token, trimmed, or `undefined` when it could not be sent as one |
+| `readBounded(message, maxBytes)` | The body of a `Request` or `Response` as text, or `undefined` once it runs past the limit; the rest is cancelled, not read |
 | `got(value)` | What a value is, for an error that must not show it: a string by its length, anything else by its kind, a number as it is |
 
 `isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
