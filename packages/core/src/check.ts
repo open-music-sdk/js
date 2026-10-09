@@ -27,7 +27,7 @@ export function clientOf(fn: string, client: unknown, methods: readonly (keyof t
 }
 
 /** Longer than any identifier or code Apple gives out, which run to a few dozen characters. */
-const MAX_LENGTH = 256;
+export const MAX_LENGTH = 256;
 
 /**
  * `value` as one segment of a path, percent-encoded. Whatever it holds stays inside the segment: a slash, a
@@ -47,7 +47,7 @@ export function segmentOf(fn: string, name: string, value: unknown): string {
 }
 
 /** The most Apple documents taking in one request, which is for songs by id. Each item is a URL made longer, so the list is not left open. */
-const MAX_ITEMS = 300;
+export const MAX_ITEMS = 300;
 
 /** One value of a list: a list is sent joined by commas, so an item with a comma in it would arrive as two. */
 const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_LENGTH && !item.includes(",");
