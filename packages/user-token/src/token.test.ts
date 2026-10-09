@@ -1,24 +1,10 @@
 import { AppleMusicError, isAppleMusicError, type tErrorTag } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { appleError, failure, fakeClient, foreignClient, misshapen, shaped, storefront, type tReply } from "./testing.js";
-import { isUserTokenShaped, validateUserToken } from "./token.js";
+import { appleError, failure, fakeClient, foreignClient, misshapen, padded, shaped, storefront, type tReply } from "./testing.js";
+import { validateUserToken } from "./token.js";
 
 afterEach(() => {
   vi.useRealTimers();
-});
-
-describe("isUserTokenShaped", () => {
-  test.each(shaped)("%s could be a header value", (_, value) => {
-    expect(isUserTokenShaped(value)).toBe(true);
-  });
-
-  test.each(misshapen)("%s could not", (_, value) => {
-    expect(isUserTokenShaped(value)).toBe(false);
-  });
-
-  test.each(shaped)("%s goes through Headers unchanged", (_, value) => {
-    expect(new Headers({ "music-user-token": value }).get("music-user-token")).toBe(value);
-  });
 });
 
 describe("validateUserToken", () => {
@@ -102,12 +88,19 @@ describe("validateUserToken", () => {
     expect((await failure(validateUserToken(music, "user-token")))._tag).toBe("NetworkError");
   });
 
-  test.each(misshapen)("%s is UserTokenInvalid without asking Apple", async (_, token) => {
+  test.each(misshapen)("%s is the caller's mistake: a TypeError before Apple is asked, not a verdict on a token", async (_, token) => {
     const { music, calls } = fakeClient();
-    const e = await failure(validateUserToken(music, token));
-    expect(e._tag).toBe("UserTokenInvalid");
-    expect(e.status).toBeUndefined();
+    const error: unknown = await validateUserToken(music, token as string).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(isAppleMusicError(error)).toBe(false);
+    expect((error as Error).message).toMatch(/^validateUserToken: token must be printable characters with no spaces or line breaks inside; got /);
     expect(calls).toHaveLength(0);
+  });
+
+  test.each(padded)("%s around a token is dropped before it is sent, as core drops it", async (_, token) => {
+    const { music, calls } = fakeClient();
+    await validateUserToken(music, token);
+    expect(calls[0]?.headers.get("music-user-token")).toBe("token");
   });
 
   test.each(shaped)("%s is sent as it is", async (_, token) => {
@@ -271,10 +264,11 @@ describe("Apple is asked under the client's retry policy, whatever it is", () =>
 });
 
 describe("no error quotes a token", () => {
-  const quoted = (e: unknown) => JSON.stringify(isAppleMusicError(e) ? [e.message, e.errors, String(e.cause)] : String(e));
+  /** Everything an error shows when it is printed or serialised. */
+  const shown = (e: unknown) => (e instanceof Error ? `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))} ${String(e.cause)}` : String(e));
 
   test.each<[string, string, tReply[]]>([
-    ["rejected for its shape", "secret token", []],
+    ["refused for what it is", "secret token", []],
     ["rejected by Apple", "secret-token", [appleError(403, "Forbidden")]],
     ["rejected for the listener's account", "secret-token", [appleError(401, "Unauthorized"), {}]],
     ["sent with a developer token Apple refuses", "secret-token", [appleError(401, "Unauthorized"), appleError(401, "Unauthorized")]],
@@ -282,9 +276,10 @@ describe("no error quotes a token", () => {
     ["Apple named no storefront for", "secret-token", [{ body: {} }]],
   ])("one %s", async (_, token, replies) => {
     const { music } = fakeClient(replies);
-    expect(quoted(await failure(validateUserToken(music, token)))).not.toContain("secret");
+    const error: unknown = await validateUserToken(music, token).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(shown(error)).not.toContain("secret");
   });
-
 });
 
 describe("a client from another copy of core is validated the same", () => {
@@ -320,11 +315,10 @@ describe("a client from another copy of core is validated the same", () => {
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/v1/me/storefront", "/v1/test"]);
   });
 
-  test("the UserTokenInvalid this package makes for a malformed token is one to that copy's guard", async () => {
-    const { core, music, calls } = await foreignClient();
-    const e = await validateUserToken(music, "not a token").catch((thrown: unknown) => thrown);
-    expect(core.isAppleMusicError(e, "UserTokenInvalid")).toBe(true);
+  test("the UserTokenInvalid this package makes, for a 401 that was the listener's, is an instance of that copy's class", async () => {
+    const { core, music } = await foreignClient([{ status: 401 }, {}]);
+    const e = await validateUserToken(music, "user-token").catch((thrown: unknown) => thrown);
+    expect(Object.getPrototypeOf(e)).toBe(AppleMusicError.prototype);
     expect(e instanceof core.AppleMusicError).toBe(true);
-    expect(calls).toHaveLength(0);
   });
 });

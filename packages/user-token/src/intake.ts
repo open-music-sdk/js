@@ -1,6 +1,6 @@
 // userTokenIntake: the one place a Music User Token enters over HTTP. A web-standard handler that
 // checks who is sending, asks Apple whether the token works, and only then stores it.
-import { isAppleMusicError, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
+import { isAppleMusicError, parseToken, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
 import { validateUserToken } from "./token.js";
 
 // A token is a few hundred characters; nothing honest comes near this.
@@ -58,13 +58,17 @@ export function userTokenIntake(client: tAppleMusicClient, options: tUserTokenIn
 
     const text = await readCapped(req.body, MAX_BODY_BYTES);
     if (text === undefined) return reply(413, "PayloadTooLarge");
-    let token: unknown;
+    let posted: unknown;
     try {
-      token = (JSON.parse(text) as { token?: unknown } | null)?.token;
+      posted = (JSON.parse(text) as { token?: unknown } | null)?.token;
     } catch {
       return reply(400, "BadRequest");
     }
-    if (typeof token !== "string") return reply(400, "BadRequest");
+    if (typeof posted !== "string") return reply(400, "BadRequest");
+    // What is posted is input, not a caller's mistake: a string that is no token is answered, not thrown.
+    // The token goes on as core will send it, with the whitespace around it dropped.
+    const token = parseToken(posted);
+    if (token === undefined) return reply(422, "UserTokenInvalid");
 
     try {
       await validateUserToken(client, token, { signal: req.signal });

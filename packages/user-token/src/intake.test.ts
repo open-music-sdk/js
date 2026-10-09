@@ -2,7 +2,7 @@ import type { tClientOptions } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { isJson, readCapped, userTokenIntake, type tUserTokenIntakeOptions } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
-import { appleError, fakeClient, foreignClient, misshapen, shaped, type tReply } from "./testing.js";
+import { appleError, fakeClient, foreignClient, misshapen, padded, shaped, type tReply } from "./testing.js";
 
 const ENDPOINT = "https://app.example/music/user-token";
 const JSON_TYPE = { "content-type": "application/json" };
@@ -267,7 +267,14 @@ describe("userTokenIntake: one status per outcome", () => {
     expect(await errorOf(res)).toBe("UserTokenInvalid");
   });
 
-  test.each(misshapen.filter((row): row is [string, string] => typeof row[1] === "string"))("422 UserTokenInvalid for a token with %s, without asking Apple", async (_, token) => {
+  test.each(padded)("204 for a token posted with %s, which is validated and stored without it", async (_, token) => {
+    const { handler, store, calls } = intake();
+    expect((await handler(post({ token }))).status).toBe(204);
+    expect(calls[0]?.headers.get("music-user-token")).toBe("token");
+    expect(await store.get("u1")).toBe("token");
+  });
+
+  test.each(misshapen.filter((row): row is [string, string] => typeof row[1] === "string"))("422 UserTokenInvalid for a posted string that is %s, without asking Apple", async (_, token) => {
     const { handler, calls } = intake();
     const res = await handler(post({ token }));
     expect(res.status).toBe(422);

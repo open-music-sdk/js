@@ -65,21 +65,25 @@ export const failure = async (p: Promise<unknown>): Promise<AppleMusicError> => 
   throw new Error("expected a rejection");
 };
 
-/** Strings that could be a Music-User-Token header value, and values that could not. */
+/** Tokens by core's rule, tokens once the whitespace around them is dropped, and values that are no token at all. */
 export const shaped: [string, string][] = [
   ["one character", "a"],
-  ["4096 characters", "a".repeat(4096)],
+  ["four thousand characters", "a".repeat(4000)],
   ["base64 with padding", "Ab+/9w=="],
   ["base64url", "Ab-_9w"],
   ["dotted segments", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJBIn0.c2ln"],
   ["every visible ASCII character", Array.from({ length: 94 }, (_, i) => String.fromCharCode(0x21 + i)).join("")],
 ];
+export const padded: [string, string][] = [
+  ["a leading space", " token"],
+  ["a trailing newline", "token\n"],
+  ["a tab before and a Windows line ending after", "\ttoken\r\n"],
+];
 export const misshapen: [string, unknown][] = [
   ["empty", ""],
   ["a space", " "],
-  ["a leading space", " token"],
   ["an inner space", "to ken"],
-  ["a trailing newline", "token\n"],
+  ["an inner newline", "to\nken"],
   ["a header injection", "token\r\nx-injected: 1"],
   ["a tab", "to\tken"],
   ["a NUL", "to\0ken"],
@@ -87,7 +91,6 @@ export const misshapen: [string, unknown][] = [
   ["Latin-1", "tokén"],
   ["beyond Latin-1", "tokĀn"],
   ["an emoji", "tok\u{1f3b5}n"],
-  ["4097 characters", "a".repeat(4097)],
   ["undefined", undefined],
   ["null", null],
   ["a number", 12345],

@@ -1,37 +1,38 @@
 // A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
 // file. What this does is ask Apple about it before anything depends on it.
-import { AppleMusicError, isAppleMusicError, type tAppleMusicClient, type tErrorDetails } from "@open-music-sdk/core";
+import { AppleMusicError, got, isAppleMusicError, parseToken, type tAppleMusicClient } from "@open-music-sdk/core";
 
-// A token is opaque, but it has to travel as a header value: visible ASCII, no whitespace, bounded.
-const HEADER_SAFE = /^[\x21-\x7e]{1,4096}$/;
-const SHAPE = "expected 1 to 4096 visible ASCII characters with no whitespace";
-
-/** Whether `value` could be sent as a Music-User-Token header. Says nothing about whether Apple accepts it. */
-export const isUserTokenShaped = (value: unknown): value is string => typeof value === "string" && HEADER_SAFE.test(value);
-
-// Messages name where a token came from, never the token: errors end up in logs.
-const invalid = (message: string, details?: tErrorDetails) => new AppleMusicError("UserTokenInvalid", message, details);
+export interface tValidateOptions {
+  /** Aborts the requests to Apple. */
+  readonly signal?: AbortSignal | undefined;
+}
 
 /**
- * Asks Apple whether `token` works, with GET /v1/me/storefront, and resolves to the listener's
- * storefront. Rejects with UserTokenInvalid when it does not: Apple answered 403, or answered 401
- * for the listener while accepting the developer token. Any other failure (developer token, rate
- * limit, network, a reply with no storefront) is the client's usual error.
+ * Asks Apple whether `token` works, with GET /v1/me/storefront, and resolves to the listener's storefront.
+ *
+ * What a token is, is core's rule: printable characters with no spaces or line breaks inside, and whitespace
+ * around it dropped. A `token` that is not one is the caller's mistake and a TypeError, before Apple is asked;
+ * the error describes the value and never repeats it.
+ *
+ * `UserTokenInvalid` is Apple's verdict and nothing else: Apple answered 403, or answered 401 for the listener
+ * while accepting the developer token. Any other failure (developer token, rate limit, network, a reply with no
+ * storefront) is the client's usual error and says nothing about the token.
  */
-export async function validateUserToken(client: tAppleMusicClient, token: unknown, init: { readonly signal?: AbortSignal | undefined } = {}): Promise<string> {
-  if (!isUserTokenShaped(token)) throw invalid(`Not a Music User Token: ${SHAPE}`);
-  const { signal } = init;
+export async function validateUserToken(client: tAppleMusicClient, token: string, options: tValidateOptions = {}): Promise<string> {
+  const value = parseToken(token);
+  if (value === undefined) throw new TypeError(`validateUserToken: token must be printable characters with no spaces or line breaks inside; got ${got(token)}`);
+  const { signal } = options;
   let body: unknown;
   try {
     // Not client.storefront(): that answers from configuration, without asking Apple, when a storefront is set.
-    body = await client.as(token).request<unknown>("v1/me/storefront", { signal });
+    body = await client.as(value).request<unknown>("v1/me/storefront", { signal });
   } catch (e) {
     if (!isAppleMusicError(e, "DeveloperTokenInvalid")) throw e;
     // Apple documents two causes for a 401 on a personal endpoint: the developer token, or a listener
     // who is not signed in or has no subscription. One request without the user token tells them
     // apart: if the developer token is the problem this throws, as it would have anyway.
     await client.request("v1/test", { user: false, signal });
-    throw invalid("Apple answered 401 for the listener while accepting the developer token: not signed in, or no Apple Music subscription", {
+    throw new AppleMusicError("UserTokenInvalid", "Apple answered 401 for the listener while accepting the developer token: not signed in, or no Apple Music subscription", {
       status: e.status,
       errors: e.errors,
       cause: e,
