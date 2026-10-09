@@ -172,4 +172,4 @@ minute:
 
 ## Not here
 
-Music User Tokens are a different thing entirely; see `@open-music-sdk/user-token` once it exists.
+Music User Tokens are a different thing entirely; see [`@open-music-sdk/user-token`](../user-token).
