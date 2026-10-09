@@ -1,4 +1,4 @@
-import { AppleMusicError, got, parseRetryAfter } from "@open-music-sdk/core";
+import { AppleMusicError, got, parseRetryAfter, readBounded } from "@open-music-sdk/core";
 import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 
 // This module is also the package's "./fetcher" entry, for code that must carry no signing code: nothing it
@@ -32,37 +32,6 @@ function expiry(token: unknown): number | undefined {
     return typeof exp === "number" && Number.isFinite(exp) ? exp * 1000 : undefined;
   } catch {
     return undefined;
-  }
-}
-
-/**
- * The body as text, or undefined once it has run past MAX_BODY_BYTES. It is counted as it arrives, after any
- * decompression, and what lies beyond the limit is cancelled rather than read.
- */
-async function bounded(res: Response): Promise<string | undefined> {
-  const stream = res.body as ReadableStream<Uint8Array> | null | undefined;
-  if (Number(res.headers.get("content-length")) > MAX_BODY_BYTES) {
-    await stream?.cancel();
-    return undefined;
-  }
-  if (typeof stream?.getReader !== "function") {
-    // Nothing to count: an empty answer, or a runtime whose responses have no body stream. Read whole, then judge.
-    const text = await res.text();
-    return text.length > MAX_BODY_BYTES ? undefined : text;
-  }
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  let bytes = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return text + decoder.decode();
-    bytes += value.byteLength;
-    if (bytes > MAX_BODY_BYTES) {
-      await reader.cancel();
-      return undefined;
-    }
-    text += decoder.decode(value, { stream: true });
   }
 }
 
@@ -117,7 +86,8 @@ export function developerTokenFetcher(url: string | URL, options: tFetcherOption
     const exchange = async () => {
       // A redirect is refused: the token comes from the URL that was configured or from nowhere.
       const answer = await fetchImpl(endpoint, { cache: "no-store", redirect: "error", signal: timeout });
-      return { res: answer, body: await bounded(answer) };
+      // Counted as it arrives, after any decompression; what lies beyond the limit is cancelled rather than read.
+      return { res: answer, body: await readBounded(answer, MAX_BODY_BYTES) };
     };
     let res: Response;
     let body: string | undefined;
