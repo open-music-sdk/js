@@ -57,6 +57,14 @@ function cropOf(value: unknown): string | undefined {
 }
 
 const SIZE = "{w}x{h}";
+const DEFAULT_CROP = "bb";
+
+/**
+ * Whether a crop code fits the whole image inside the box, never enlarging it: `bb`, `bb` at a given JPEG
+ * quality, and a file name with no code at all. Every other code Apple's image server was tried with fills the
+ * box, enlarging the image if it must.
+ */
+const fitsInside = (cut: string) => cut === "" || /^bb(?:-|$)/.test(cut);
 
 /**
  * The template with a crop or format that was asked for written where the template names one.
@@ -65,16 +73,38 @@ const SIZE = "{w}x{h}";
  * cut `bb` and encoded `jpg`. Some templates leave those open as `{c}` and `{f}`, which are filled in like the
  * size. Most name them, and asking for another means writing over what is there. A URL whose file name is not of
  * that form says nothing about cut or encoding, and is left as it is.
+ *
+ * `cut` is the crop code the file name ends up with, where it has the form to name one.
  */
-function tailored(template: string, crop: string | undefined, format: string | undefined): string {
+function tailored(template: string, crop: string | undefined, format: string | undefined): { template: string; cut: string | undefined } {
   const end = /[?#]/.exec(template)?.index ?? template.length;
   const start = template.lastIndexOf("/", end) + 1;
   const name = template.slice(start, end);
   const dot = name.lastIndexOf(".");
-  if (!name.startsWith(SIZE) || dot < SIZE.length || dot === name.length - 1) return template;
+  if (!name.startsWith(SIZE) || dot < SIZE.length || dot === name.length - 1) return { template, cut: undefined };
   const [cut, encoding] = [name.slice(SIZE.length, dot), name.slice(dot + 1)];
   const [newCut, newEncoding] = [crop !== undefined && !cut.includes("{c}") ? crop : cut, format !== undefined && !encoding.includes("{f}") ? format : encoding];
-  return `${template.slice(0, start)}${SIZE}${newCut}.${newEncoding}${template.slice(end)}`;
+  return { template: `${template.slice(0, start)}${SIZE}${newCut}.${newEncoding}${template.slice(end)}`, cut: newCut.replaceAll("{c}", crop ?? DEFAULT_CROP) };
+}
+
+/**
+ * The pixel size to ask for, given the box wanted in device pixels and how large the artwork comes, and how far
+ * the box had to shrink to get there. A `scale` of 1 is a box that got what it asked for.
+ *
+ * A box never asks for more than the artwork has, and it shrinks in its own shape. What "more" means depends on
+ * the crop. An image that fills the box needs the artwork to cover the box both ways. An image fitted `inside`
+ * the box touches two of its sides and leaves the others clear unless the shapes match, so the box may run past
+ * the artwork one way and still hold a smaller image: it shrinks only once the image inside it would be larger
+ * than the artwork comes. Shrinking it sooner gets a smaller image back, not the same one.
+ */
+export function fit(
+  box: { readonly width: number; readonly height: number },
+  max: { readonly width: number; readonly height: number } | undefined,
+  inside: boolean,
+): { width: number; height: number; scale: number } {
+  const [across, down] = max ? [max.width / box.width, max.height / box.height] : [Infinity, Infinity];
+  const scale = Math.min(1, inside ? Math.max(across, down) : Math.min(across, down));
+  return { width: Math.max(1, Math.round(box.width * scale)), height: Math.max(1, Math.round(box.height * scale)), scale };
 }
 
 /** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
@@ -87,6 +117,8 @@ interface tRequest {
   readonly height: number | undefined;
   readonly format: string;
   readonly crop: string;
+  /** Whether the image is fitted inside the box and never enlarged, so far as the template says how it is cut. */
+  readonly inside: boolean;
 }
 
 /**
@@ -101,25 +133,24 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
   if (typeof options !== "object" || (options as unknown) === null) throw new TypeError("artwork: options must be an object");
   const { height } = options;
   const [format, crop] = [formatOf(options.format), cropOf(options.crop)];
+  const named = tailored(template, crop, format);
   return {
-    template: tailored(template, crop, format),
+    template: named.template,
     max: positive(maxWidth) && positive(maxHeight) ? { width: maxWidth, height: maxHeight } : undefined,
     width: length("width", width),
     height: height === undefined ? undefined : length("height", height),
     format: format ?? "jpg",
-    crop: crop ?? "bb",
+    crop: crop ?? DEFAULT_CROP,
+    // A URL that does not say how the image is cut is taken to fill the box: that never asks for an enlargement.
+    inside: named.cut !== undefined && fitsInside(named.cut),
   };
 }
 
-/**
- * The template filled in for the box at `density`, and how far the box had to shrink: it keeps its shape and
- * shrinks to what the artwork has when it asks for more. A `scale` of 1 is a box that got what it asked for.
- */
-function image({ template, max, width, height, format, crop }: tRequest, density: number): { url: string; scale: number } {
+/** The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has. */
+function image({ template, max, width, height, format, crop, inside }: tRequest, density: number): { url: string; scale: number } {
   const boxWidth = width * density;
   const boxHeight = height === undefined ? (max ? (boxWidth * max.height) / max.width : boxWidth) : height * density;
-  const scale = max ? Math.min(1, max.width / boxWidth, max.height / boxHeight) : 1;
-  const [w, h] = [Math.max(1, Math.round(boxWidth * scale)), Math.max(1, Math.round(boxHeight * scale))];
+  const { width: w, height: h, scale } = fit({ width: boxWidth, height: boxHeight }, max, inside);
   // Past this a number prints with an exponent, and what goes into the URL has to be digits.
   if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h)) throw new TypeError("artwork: the size asked for is too large");
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
