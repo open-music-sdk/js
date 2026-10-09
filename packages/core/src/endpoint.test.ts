@@ -1,7 +1,7 @@
 import type { tAlbumRelationships, tArtist, tGenre, tLibrarySong, tLibrarySongsResponse, tMusicVideo, tRelationshipResponse, tSong, tSongsResponse } from "@open-music-sdk/types";
 import { afterEach, describe, expect, expectTypeOf, test, vi } from "vitest";
 import { createClient, type tAppleMusicClient, type tClientOptions, type tSchemaLike } from "./client";
-import { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter, type tCollection, type tRequestPlan } from "./endpoint";
+import { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter, type tCollection, type tPaged, type tRequestPlan } from "./endpoint";
 import { isAppleMusicError, type tErrorTag } from "./errors";
 import type { tReadOptions } from "./options";
 
@@ -482,6 +482,129 @@ describe("the resource patterns: where the collection is", () => {
     });
     expect(await rejection(fn(music, "1"))).toBe(mistake);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("the resource patterns: what a collection gives is checked, so that what goes into it cannot move the request", () => {
+  type tIn<T> = tReadOptions<T> & { readonly storefront?: string | undefined };
+  /** A collection that puts a storefront into its path as it comes, which is what the check is there for. */
+  const catalog: tCollection<{ readonly storefront?: string | undefined }> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/songs`;
+  const one = resourceGetter<tSongsResponse, tIn<tSongsResponse>>("getSong", catalog);
+  const several = resourcesGetter<tSongsResponse, tIn<tSongsResponse>>("getSongs", catalog);
+  const whole = resourceLister<tSongsResponse, tIn<tPaged<tSongsResponse>>>("listSongs", catalog);
+  const related = relationshipGetter<tAlbumRelationships, tIn<tRelationshipResponse>>("getSongRelationship", catalog);
+
+  const DOTS = 'holds a segment that is "." or "..", written out or percent-encoded, which a URL reads as "here" and "one up", so that the request would go to another path';
+  const BACKSLASH = "holds a backslash, which a URL reads as a slash, so that it would begin another segment";
+  const QUESTION = "holds a question mark, which begins the query, so that what follows it would not be part of the path";
+  const HASH = "holds a hash, which begins a fragment, so that what follows it would not be sent at all";
+  const CONTROL = "holds a space, a tab, a line break or another control character, which a URL drops or trims, joining what was on either side of it";
+  const FOREIGN = "holds a character outside ASCII, which a URL rewrites, so that what is asked for would not be what was written";
+  const EMPTY = "holds an empty segment, from two slashes together or a slash at its end, so that what was meant to fill it is missing";
+  const SCHEME = "begins with a name and a colon, which a URL reads as a scheme, so that the rest would be read as another address";
+
+  test.each<[string, string, string]>([
+    ["one up", "..", DOTS],
+    ["one up and into the listener's library", "../me/library", DOTS],
+    ["here", ".", DOTS],
+    ["a real one, then two up", "us/../../me/library", DOTS],
+    ["one up, percent-encoded", "%2e%2e", DOTS],
+    ["one up, percent-encoded in capitals", "%2E%2E", DOTS],
+    ["one up, half encoded", ".%2e", DOTS],
+    ["one up, the other half encoded", "%2E.", DOTS],
+    ["here, percent-encoded", "%2e", DOTS],
+    ["one up by backslashes", "..\\me\\library", BACKSLASH],
+    ["a real one and a backslash", "us\\", BACKSLASH],
+    ["a real one and a query", "us?x=", QUESTION],
+    ["a real one and a fragment", "us#", HASH],
+    ["one up with a tab inside it, which a URL would drop", ".\t.", CONTROL],
+    ["one up with a line break inside it", ".\n.", CONTROL],
+    ["one with a carriage return", "u\rs", CONTROL],
+    ["one with a space", "u s", CONTROL],
+    ["one with a null", "u\u0000s", CONTROL],
+    ["one with a delete", "u\u007fs", CONTROL],
+    ["a letter outside ASCII", "é", FOREIGN],
+    ["dots that only look like dots", "．．", FOREIGN],
+    ["nothing", "", EMPTY],
+    ["a real one and a slash", "us/", EMPTY],
+    ["a slash and a host", "/evil.example", EMPTY],
+  ])("a storefront that is %s is refused, and the reason is given", async (_name, storefront, reason) => {
+    const { music, calls } = apple([], { userToken: "user" });
+    const attempts: [string, () => Promise<unknown>][] = [
+      ["getSong", () => one(music, "1", { storefront })],
+      ["getSong", () => one.bound(music)("1", { storefront })],
+      ["getSongs", () => several(music, ["1"], { storefront })],
+      ["getSongs", () => several.bound(music)(["1"], { storefront })],
+      ["listSongs", () => whole(music, { storefront })],
+      ["listSongs", () => all(whole.bound(music)({ storefront }))],
+      ["getSongRelationship", () => related(music, "1", "tracks", { storefront })],
+      ["getSongRelationship", () => all(related.bound(music)("1", "tracks", { storefront }))],
+    ];
+    for (const [fn, attempt] of attempts) expect(await rejection(attempt())).toEqual(new TypeError(`${fn}: the path of the collection ${reason}`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["a number", 5, "must be a string with something in it; got 5"],
+    ["nothing", undefined, "must be a string with something in it; got undefined"],
+    ["null", null, "must be a string with something in it; got null"],
+    ["an empty string", "", "must be a string with something in it; got 0 characters"],
+    ["an address of its own", "https://evil.example/v1/catalog/us/songs", SCHEME],
+    ["a scheme with no slashes after it, which a URL reads as a path on Apple's own origin", "https:v1/me/library/songs", SCHEME],
+    ["a blob of Apple's origin", "blob:https://api.music.apple.com/v1/me/library/songs", SCHEME],
+    ["another host, by two slashes", "//evil.example/v1/catalog/us/songs", EMPTY],
+    ["a path with a slash at its end", "v1/catalog/us/songs/", EMPTY],
+    ["a path longer than any collection's", `v1/${"x".repeat(254)}`, "is longer than 256 characters, which no collection's path is"],
+  ])("a collection that gives %s is refused", async (_name, path, reason) => {
+    const { music, calls } = apple([], { userToken: "user" });
+    const fn = resourceGetter<tSongsResponse>("getSong", () => path as string);
+    expect(await rejection(fn(music, "1"))).toEqual(new TypeError(`getSong: the path of the collection ${reason}`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each(["v1/catalog/us/songs", "/v1/catalog/us/songs", "v1/me/library/songs", "v1/a.b/c..d/...", "v1/x:y/z", "v1/a%2Fb/c", "v1/A_b-c~1!*'()/d", `v1/${"x".repeat(253)}`])("%s is a path, and is asked for as it is written", async (path) => {
+    const { music, calls } = apple([], { userToken: "user" });
+    await resourceGetter<tSongsResponse>("getSong", () => path)(music, "1");
+    expect(new URL(calls[0]?.url ?? "").pathname).toBe(`/${path.replace(/^\//, "")}/1`);
+  });
+
+  test("a collection that takes its time is checked when it answers", async () => {
+    const { music, calls } = apple();
+    const late = resourceGetter<tSongsResponse>("getSong", () => Promise.resolve("v1/catalog/../me/library"));
+    expect(await rejection(late(music, "1"))).toEqual(new TypeError(`getSong: the path of the collection ${DOTS}`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test("whatever a storefront holds, a request is refused or it stays in the catalog, without the listener's token", async () => {
+    const storefronts = ["us", "gb", "a.b", "...", "a%2Fb", "x:y", "..", "../me/library", "%2e%2e/me", "..%2f..%2fme", "us/../..", "us/songs/1/../../../../me", "\\..\\me", "?", "#", "\t", " us", "us ", "é", "", "/", "//", "/v1/me", "https://evil.example", "me/../../me"];
+    for (const storefront of storefronts) {
+      const { music, calls, userTokens } = apple([], { userToken: "user" });
+      const outcome: unknown = await one(music, "1", { storefront }).catch((e: unknown) => e);
+      if (outcome instanceof Error) {
+        expect(outcome, storefront).toBeInstanceOf(TypeError);
+        expect(calls, storefront).toHaveLength(0);
+      } else {
+        const segments = new URL(calls[0]?.url ?? "").pathname.split("/");
+        expect(segments.slice(0, 3), storefront).toEqual(["", "v1", "catalog"]);
+        expect(segments.at(-1), storefront).toBe("1");
+        expect(userTokens(), storefront).toEqual([null]);
+      }
+    }
+  });
+
+  test("the check that says so can catch it: the same storefront put into a path with no check does reach the listener's library, token and all", async () => {
+    const { music, sent, userTokens } = apple([], { userToken: "user" });
+    await music.request(await catalog("getSong", music, { storefront: "../me/library" }));
+    expect(sent()).toEqual(["GET /v1/me/library/songs"]);
+    expect(userTokens()).toEqual(["user"]);
+  });
+
+  test("what was wrong with the path is said, and the path is not shown", async () => {
+    const { music } = apple();
+    for (const storefront of [`${SECRET}?`, `${SECRET}/..`, `${SECRET} `, `${SECRET}\\`]) {
+      const error = await rejection(one(music, "1", { storefront }));
+      expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+    }
   });
 });
 
