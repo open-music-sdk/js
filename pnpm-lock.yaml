@@ -176,6 +176,9 @@ catalogs:
     globals:
       specifier: ^17.13.0
       version: 17.13.0
+    jose:
+      specifier: ^6
+      version: 6.2.12
     tsdown:
       specifier: ^0.23.0
       version: 0.23.0
@@ -222,6 +225,31 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      tooling-tsdown-config:
+        specifier: workspace:*
+        version: link:../../tooling/tsdown-config
+      tooling-vitest-config:
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
+
+  packages/developer-token:
+    dependencies:
+      '@open-music-sdk/core':
+        specifier: workspace:^
+        version: link:../core
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
       tooling-tsdown-config:
         specifier: workspace:*
         version: link:../../tooling/tsdown-config
@@ -986,6 +1014,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   json-schema-traverse@0.4.1:
     resolution: {integrity: sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==}
@@ -1976,6 +2007,8 @@ snapshots:
       is-extglob: 2.1.1
 
   isexe@2.0.0: {}
+
+  jose@6.2.12: {}
 
   json-schema-traverse@0.4.1: {}
 
