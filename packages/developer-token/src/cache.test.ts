@@ -1,6 +1,6 @@
 import { getEventListeners } from "node:events";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { cached, orAbort, type tIssued } from "./cache.js";
+import { cached, orAbort, type tIssued } from "./cache";
 
 const NOW = Date.UTC(2026, 9, 7);
 const MINUTE = 60_000;

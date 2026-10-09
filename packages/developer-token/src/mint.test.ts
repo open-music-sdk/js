@@ -3,8 +3,8 @@ import { inspect, parseEnv } from "node:util";
 import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
-import { redacted } from "./redacted.js";
+import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint";
+import { redacted } from "./redacted";
 
 // jose as it is, with its key import counted: how often the minter parses the key is part of what it promises.
 vi.mock("jose", async (importOriginal) => {
@@ -14,8 +14,8 @@ vi.mock("jose", async (importOriginal) => {
 
 // The wrapper as it is, with every opening counted: the key is to be held wrapped and opened only to be imported.
 const opened = vi.hoisted(() => ({ times: 0 }));
-vi.mock("./redacted.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./redacted.js")>();
+vi.mock("./redacted", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./redacted")>();
   return {
     redacted: vi.fn(<T>(value: T) => {
       const wrapper = actual.redacted(value);

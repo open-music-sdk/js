@@ -1,5 +1,5 @@
 // readBounded: a body someone else chose the size of, read up to a limit this side chose.
-import { got } from "./got.js";
+import { got } from "./got";
 
 /**
  * The body of a request or a response as text, or undefined once it has run past `maxBytes`. It is counted as it

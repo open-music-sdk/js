@@ -2,8 +2,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { AppleMusicError, createClient, type tAppleMusicClient, type tClientOptions, type tUserTokenStore } from "@open-music-sdk/core";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { isJson, userTokenIntake, type tIntakeOptions, type tUserTokenIntake } from "./intake.js";
-import { MemoryUserTokenStore } from "./stores.js";
+import { isJson, userTokenIntake, type tIntakeOptions, type tUserTokenIntake } from "./intake";
+import { MemoryUserTokenStore } from "./stores";
 
 const ENDPOINT = "https://app.example/music/user-token";
 const JSON_TYPE = { "content-type": "application/json" };

@@ -1,7 +1,7 @@
 import { AppleMusicError, createClient, isAppleMusicError, type tErrorTag } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import manifest from "../package.json" with { type: "json" };
-import * as api from "./index.js";
+import * as api from "./index";
 
 /** One answer from Apple: a response, or a fetch that throws. */
 type tReply = { status?: number; body?: unknown } | Error;

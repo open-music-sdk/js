@@ -1,8 +1,8 @@
 // userTokenIntake: acceptUserToken behind a web-standard handler. It checks who is sending, reads what was sent
 // up to a limit, and answers with a status; validating and storing are acceptUserToken's.
 import { got, isAppleMusicError, parseToken, readBounded, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
-import { acceptUserToken } from "./accept.js";
-import { clientOf, storeOf } from "./check.js";
+import { acceptUserToken } from "./accept";
+import { clientOf, storeOf } from "./check";
 
 // A token is a few hundred characters; nothing honest comes near this.
 const MAX_BODY_BYTES = 8192;

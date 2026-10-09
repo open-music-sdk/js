@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { AppleMusicError, type tErrorDetails, type tErrorTag } from "./errors.js";
-import { parseRetryAfter, resolveRetryPolicy, retry, retryable, sleep, type tRetryPolicy } from "./retry.js";
+import { AppleMusicError, type tErrorDetails, type tErrorTag } from "./errors";
+import { parseRetryAfter, resolveRetryPolicy, retry, retryable, sleep, type tRetryPolicy } from "./retry";
 
 const fail = (tag: tErrorTag, details?: tErrorDetails) => new AppleMusicError(tag, tag, details);
 /** Rejects with the nth value on the nth attempt, then keeps rejecting with the last. Non-Errors are deliberate. */

@@ -1,7 +1,7 @@
 import { got } from "@open-music-sdk/core";
 import { importPKCS8, SignJWT } from "jose";
-import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
-import { redacted, type tRedacted } from "./redacted.js";
+import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache";
+import { redacted, type tRedacted } from "./redacted";
 
 /**
  * Where the key and its two IDs are kept, and how they are loaded, is the caller's business: nothing here reads an

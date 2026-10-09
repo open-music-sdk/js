@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { readBounded } from "./body.js";
+import { readBounded } from "./body";
 
 /** A body stream of the given chunks that records whether it was cancelled and how often it was pulled. */
 function streamOf(...chunks: (string | Uint8Array)[]) {

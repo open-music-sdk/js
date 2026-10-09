@@ -1,4 +1,4 @@
-import { type AppleMusicError, isAppleMusicError } from "./errors.js";
+import { type AppleMusicError, isAppleMusicError } from "./errors";
 
 /** Every field is optional and an explicit `undefined` means the default. Invalid values throw a TypeError. */
 export interface tRetryPolicy {

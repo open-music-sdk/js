@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { AppleMusicError, isAppleMusicError, type tErrorTag } from "./errors.js";
+import { AppleMusicError, isAppleMusicError, type tErrorTag } from "./errors";
 
 const TAGS: tErrorTag[] = ["DeveloperTokenInvalid", "DeveloperTokenUnavailable", "UserTokenInvalid", "RateLimited", "ApiError", "ValidationError", "NetworkError"];
 
 /** A second copy of this module, with its own class and its own guard, as a duplicate install has. */
 const otherCopy = async () => {
   vi.resetModules();
-  return import("./errors.js");
+  return import("./errors");
 };
 
 /** An Error made to look like `shape`, by no copy of this package. */

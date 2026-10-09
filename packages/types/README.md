@@ -1,7 +1,7 @@
 # @open-music-sdk/types
 
 TypeScript types for every object in the Apple Music API, generated from Apple's documentation.
-Zero dependencies, zero runtime: the package ships its `.ts` source and nothing else.
+Zero dependencies, zero runtime: the package ships its type declarations and nothing that runs.
 
 ```
 pnpm add -D @open-music-sdk/types
@@ -46,11 +46,11 @@ Apple's wording.
   arrive only when requested with `extend`.
 - A dictionary Apple documents with no properties is `Record<string, unknown>`.
 
-## Source-only
+## Declarations only
 
-`exports` points at `src/index.ts`. Your TypeScript compiler (5.0 or newer, with `moduleResolution`
-set to `bundler`, `node16`, or `nodenext`) reads the source directly; there is no build step and no
-`.d.ts`. If you need runtime validation, see
+`exports` points at `dist/index.d.ts`: every type in one declaration file that imports nothing, so it
+reads the same whether your `moduleResolution` is `bundler`, `node16`, or `nodenext`. The
+`dist/index.js` beside it is empty, because there is nothing to run. If you need runtime validation, see
 [`@open-music-sdk/validate`](https://www.npmjs.com/package/@open-music-sdk/validate).
 
 ## Regenerating

@@ -1,7 +1,7 @@
 import { createClient } from "@open-music-sdk/core";
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, optionsOf, storeOf, tokenOf, userIdOf } from "./check.js";
-import { MemoryUserTokenStore } from "./stores.js";
+import { clientOf, has, optionsOf, storeOf, tokenOf, userIdOf } from "./check";
+import { MemoryUserTokenStore } from "./stores";
 
 const SECRET = "s3cretT0ken";
 const noop = () => undefined;

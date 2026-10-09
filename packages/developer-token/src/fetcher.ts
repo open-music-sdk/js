@@ -1,9 +1,9 @@
 import { AppleMusicError, got, parseRetryAfter, readBounded } from "@open-music-sdk/core";
-import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
+import { cached, orAbort, type tDeveloperTokenProvider, type tIssued } from "./cache";
 
 // This module is also the package's "./fetcher" entry, for code that must carry no signing code: nothing it
 // imports, directly or through another module, may reach jose or ./mint.js. A test walks the imports.
-export type { tDeveloperTokenProvider } from "./cache.js";
+export type { tDeveloperTokenProvider } from "./cache";
 
 /** Invalid values throw a TypeError. */
 export interface tFetcherOptions {

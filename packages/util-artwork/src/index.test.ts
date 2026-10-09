@@ -1,7 +1,7 @@
 import type { tArtwork, tLibraryPlaylist, tSong } from "@open-music-sdk/types";
 import { describe, expect, test } from "vitest";
 import manifest from "../package.json" with { type: "json" };
-import * as api from "./index.js";
+import * as api from "./index";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {

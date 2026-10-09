@@ -1,5 +1,5 @@
-export { readBounded } from "./body.js";
-export { createClient, parseToken } from "./client.js";
+export { readBounded } from "./body";
+export { createClient, parseToken } from "./client";
 export type {
   tAppleMusicClient,
   tClientOptions,
@@ -12,11 +12,11 @@ export type {
   tTokenContext,
   tTokenProvider,
   tUserTokenStore,
-} from "./client.js";
-export { AppleMusicError, isAppleMusicError } from "./errors.js";
-export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors.js";
-export { got } from "./got.js";
-export { createRateLimiter } from "./rate-limit.js";
-export type { tRateLimiter } from "./rate-limit.js";
-export { parseRetryAfter, retry, retryable } from "./retry.js";
-export type { tRetryPolicy } from "./retry.js";
+} from "./client";
+export { AppleMusicError, isAppleMusicError } from "./errors";
+export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors";
+export { got } from "./got";
+export { createRateLimiter } from "./rate-limit";
+export type { tRateLimiter } from "./rate-limit";
+export { parseRetryAfter, retry, retryable } from "./retry";
+export type { tRetryPolicy } from "./retry";

@@ -1,7 +1,7 @@
 {
   "name": "@open-music-sdk/types",
   "version": "0.0.0",
-  "description": "Generated TypeScript types for the Apple Music API. Zero dependencies, source only.",
+  "description": "Generated TypeScript types for the Apple Music API. Zero dependencies, declarations only.",
   "license": "MIT",
   "keywords": [
     "apple-music-api",
@@ -23,14 +23,22 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "src"
+    "dist"
   ],
-  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
+    "build": "tsdown --sourcemap",
+    "prepack": "tsdown",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "devDependencies": {
+    "tooling-tsdown-config": "workspace:*",
+    "tsdown": "catalog:"
   }
 }

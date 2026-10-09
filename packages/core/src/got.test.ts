@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { got } from "./got.js";
+import { got } from "./got";
 
 const SECRET = "-----BEGIN PRIVATE KEY-----hunter2-----END PRIVATE KEY-----";
 

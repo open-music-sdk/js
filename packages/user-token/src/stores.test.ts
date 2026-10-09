@@ -1,6 +1,6 @@
 import { createClient, isAppleMusicError, type tUserTokenStore } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { KvUserTokenStore, MemoryUserTokenStore, type tKvNamespace, type tKvStoreOptions } from "./stores.js";
+import { KvUserTokenStore, MemoryUserTokenStore, type tKvNamespace, type tKvStoreOptions } from "./stores";
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
 const responses: Response[] = [];

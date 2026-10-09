@@ -2,7 +2,7 @@
 // Stores for core's tUserTokenStore: where forUser(userId) finds a listener's Music User Token.
 // Every store here is disposable, so `await using` works whichever one is behind it.
 import { got, type tUserTokenStore } from "@open-music-sdk/core";
-import { has, optionsOf } from "./check.js";
+import { has, optionsOf } from "./check";
 
 /** Keeps tokens in a Map: for tests, scripts, and single-process servers. Everything is gone on restart. */
 export class MemoryUserTokenStore implements tUserTokenStore, AsyncDisposable {

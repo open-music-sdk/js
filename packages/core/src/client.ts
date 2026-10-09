@@ -1,10 +1,10 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
-import { AppleMusicError, type tValidationIssue } from "./errors.js";
-import { got } from "./got.js";
-import type { tRateLimiter } from "./rate-limit.js";
-import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from "./retry.js";
+import { AppleMusicError, type tValidationIssue } from "./errors";
+import { got } from "./got";
+import type { tRateLimiter } from "./rate-limit";
+import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from "./retry";
 
 const BASE_URL = "https://api.music.apple.com/";
 const BASE_ORIGIN = new URL(BASE_URL).origin;

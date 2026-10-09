@@ -120,7 +120,7 @@ function ts(node, allowed) {
 
 function typesFile(dicts, file) {
   let out = HEADER;
-  for (const [f, names] of imports(dicts, file)) out += `import type { ${names.map(typeName).join(", ")} } from "./${f}.js";\n`;
+  for (const [f, names] of imports(dicts, file)) out += `import type { ${names.map(typeName).join(", ")} } from "./${f}";\n`;
   if (out !== HEADER) out += "\n";
   for (const d of dicts) {
     out += doc(d.doc);
@@ -138,7 +138,7 @@ function typesFile(dicts, file) {
 function typesUnion() {
   let out = HEADER;
   for (const [f, names] of imports([{ properties: resources.map((d) => ({ type: { kind: "ref", name: d.name } })) }], UNION_FILE))
-    out += `import type { ${names.map(typeName).join(", ")} } from "./${f}.js";\n`;
+    out += `import type { ${names.map(typeName).join(", ")} } from "./${f}";\n`;
   out += "\n/** Every resource object, discriminated by `type`. */\nexport type tAnyResource =\n";
   out += resources.map((d) => `  | ${typeName(d.name)}`).join("\n") + ";\n\n";
   out += 'export type tResourceType = tAnyResource["type"];\n';
@@ -162,13 +162,13 @@ function check(node, allowed) {
   }
 }
 
-const VALIDATE_PRELUDE = 'import type * as t from "@open-music-sdk/types";\nimport * as r from "../runtime.js";\n';
+const VALIDATE_PRELUDE = 'import type * as t from "@open-music-sdk/types";\nimport * as r from "../runtime";\n';
 
 function validateFile(dicts, file) {
   let out = HEADER + VALIDATE_PRELUDE;
   // Cross-file references are cyclic (a song's albums, an album's songs). That is safe: every reference
   // sits behind r.lazy, which resolves at validation time, after all modules have loaded.
-  for (const [f, names] of imports(dicts, file)) out += `import { ${names.map(valueName).join(", ")} } from "./${f}.js";\n`;
+  for (const [f, names] of imports(dicts, file)) out += `import { ${names.map(valueName).join(", ")} } from "./${f}";\n`;
   out += "\n";
   for (const d of dicts) {
     const tn = `t.${typeName(d.name)}`;
@@ -187,7 +187,7 @@ function validateFile(dicts, file) {
 function validateUnion() {
   let out = HEADER + VALIDATE_PRELUDE;
   for (const [f, names] of imports([{ properties: resources.map((d) => ({ type: { kind: "ref", name: d.name } })) }], UNION_FILE))
-    out += `import { ${names.map(valueName).join(", ")} } from "./${f}.js";\n`;
+    out += `import { ${names.map(valueName).join(", ")} } from "./${f}";\n`;
   out += `\n/** Any resource object. */\nexport const anyResource: r.tSchema<t.tAnyResource> = r.schema<t.tAnyResource>(\n`;
   out += `  r.union(${resources.map((d) => `r.lazy(() => ${valueName(d.name)})`).join(", ")}),\n);\n`;
   return out;
@@ -196,11 +196,11 @@ function validateUnion() {
 // ---- write -------------------------------------------------------------------------------------
 
 const fileNames = [...files.keys(), UNION_FILE].sort();
-const barrel = (extra = "") => HEADER + fileNames.map((f) => `export * from "./generated/${f}.js";\n`).join("") + extra;
+const barrel = (extra = "") => HEADER + fileNames.map((f) => `export * from "./generated/${f}";\n`).join("") + extra;
 
 for (const [pkg, perFile, union, extra] of [
   ["types", typesFile, typesUnion, ""],
-  ["validate", validateFile, validateUnion, 'export type { tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime.js";\n'],
+  ["validate", validateFile, validateUnion, 'export type { tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime";\n'],
 ]) {
   const src = path.join(root, "packages", pkg, "src");
   const dir = path.join(src, "generated");

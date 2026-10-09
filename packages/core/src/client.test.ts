@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createClient, parseToken, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client.js";
-import { AppleMusicError, isAppleMusicError } from "./errors.js";
-import { createRateLimiter } from "./rate-limit.js";
+import { createClient, parseToken, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client";
+import { AppleMusicError, isAppleMusicError } from "./errors";
+import { createRateLimiter } from "./rate-limit";
 
 type tReply = { status?: number; body?: unknown; text?: string; headers?: Record<string, string> } | Error;
 

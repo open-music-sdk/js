@@ -1,7 +1,7 @@
 import { createClient, isAppleMusicError, type tClientOptions, type tUserTokenStore } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { acceptUserToken } from "./accept.js";
-import { KvUserTokenStore, MemoryUserTokenStore } from "./stores.js";
+import { acceptUserToken } from "./accept";
+import { KvUserTokenStore, MemoryUserTokenStore } from "./stores";
 
 /** One answer from Apple: a response, a fetch that throws, or `"hang"` for one that never answers until the request aborts. */
 type tReply = { status?: number; body?: unknown } | Error | "hang";

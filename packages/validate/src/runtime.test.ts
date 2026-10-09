@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
-import * as r from "./runtime.js";
-import type { tCheck, tIssue, tSchema } from "./runtime.js";
+import * as r from "./runtime";
+import type { tCheck, tIssue, tSchema } from "./runtime";
 
 /** Runs a check at the root and returns its issues. */
 const run = (check: tCheck, value: unknown): tIssue[] => {

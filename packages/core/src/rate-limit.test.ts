@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createRateLimiter } from "./rate-limit.js";
+import { createRateLimiter } from "./rate-limit";
 
 // Only the clocks and timeouts are faked, so setImmediate still drains microtasks for us.
 beforeEach(() => {

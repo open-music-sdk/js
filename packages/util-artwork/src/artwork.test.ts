@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test, vi } from "vitest";
-import { artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork.js";
+import { artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */

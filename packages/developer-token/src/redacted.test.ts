@@ -1,6 +1,6 @@
 import { inspect } from "node:util";
 import { describe, expect, test } from "vitest";
-import { redacted } from "./redacted.js";
+import { redacted } from "./redacted";
 
 const SECRET = "-----BEGIN PRIVATE KEY-----hunter2-----END PRIVATE KEY-----";
 

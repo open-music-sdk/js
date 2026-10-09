@@ -3,8 +3,8 @@ import { AppleMusicError, createClient, isAppleMusicError } from "@open-music-sd
 import { exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import { describe, expect, test, vi } from "vitest";
 import manifest from "../package.json" with { type: "json" };
-import * as api from "./index.js";
-import * as remoteEntry from "./fetcher.js";
+import * as api from "./index";
+import * as remoteEntry from "./fetcher";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
@@ -53,7 +53,7 @@ describe("the ./fetcher entry", () => {
       expect(source, `${file} must not import dynamically, where this walk cannot follow`).not.toMatch(/\bimport\s*\(/);
       for (const [, from, bare] of source.matchAll(/^\s*(?:import|export)\s[^;]*?\sfrom\s+"([^"]+)"|^\s*import\s+"([^"]+)"/gm)) {
         const specifier = from ?? bare ?? "";
-        if (specifier.startsWith(".")) visit(specifier.replace(/\.js$/, ".ts"));
+        if (specifier.startsWith(".")) visit(`${specifier}.ts`);
         else packages.add(specifier);
       }
     };

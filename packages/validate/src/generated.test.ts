@@ -1,16 +1,16 @@
 // End-to-end checks against the generated validators: real Apple shapes, real names, real paths.
 import { describe, expect, test } from "vitest";
 import type { tAnyResource, tResourceType, tSong } from "@open-music-sdk/types";
-import * as all from "./index.js";
-import { album, albumRelationshipsAlbumTracksRelationship } from "./generated/album.js";
-import { anyResource } from "./generated/any-resource.js";
-import { emptyBodyResponse, errorsResponse } from "./generated/common.js";
-import { libraryPlaylistCreationRequestRelationshipsTracksData } from "./generated/library-playlist-creation-request.js";
-import { musicVideo } from "./generated/music-video.js";
-import { rating } from "./generated/rating.js";
-import { searchResponse } from "./generated/search-response.js";
-import { song, songAttributes, songsResponse } from "./generated/song.js";
-import type { tIssue, tSchema, tStandardSchemaV1 } from "./runtime.js";
+import * as all from "./index";
+import { album, albumRelationshipsAlbumTracksRelationship } from "./generated/album";
+import { anyResource } from "./generated/any-resource";
+import { emptyBodyResponse, errorsResponse } from "./generated/common";
+import { libraryPlaylistCreationRequestRelationshipsTracksData } from "./generated/library-playlist-creation-request";
+import { musicVideo } from "./generated/music-video";
+import { rating } from "./generated/rating";
+import { searchResponse } from "./generated/search-response";
+import { song, songAttributes, songsResponse } from "./generated/song";
+import type { tIssue, tSchema, tStandardSchemaV1 } from "./runtime";
 
 const report = (schema: tSchema<unknown>, value: unknown): string[] =>
   (schema["~standard"].validate(value).issues ?? []).map((i: tIssue) => `${(i.path ?? []).join(".") || "<root>"}: ${i.message}`);

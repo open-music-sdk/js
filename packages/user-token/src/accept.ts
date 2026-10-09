@@ -1,7 +1,7 @@
 // acceptUserToken: taking a token in for one of your users, without an HTTP request in sight.
 import type { tAppleMusicClient, tUserTokenStore } from "@open-music-sdk/core";
-import { clientOf, optionsOf, storeOf, tokenOf, userIdOf } from "./check.js";
-import { validateUserToken, type tValidateOptions } from "./token.js";
+import { clientOf, optionsOf, storeOf, tokenOf, userIdOf } from "./check";
+import { validateUserToken, type tValidateOptions } from "./token";
 
 /**
  * Takes a token in for one of your users: asks Apple whether it works and only then stores it under `userId`,

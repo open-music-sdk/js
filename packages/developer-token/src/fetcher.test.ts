@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { developerTokenFetcher } from "./fetcher.js";
+import { developerTokenFetcher } from "./fetcher";
 
 const NOW = Date.UTC(2026, 9, 7);
 const NOW_SECONDS = NOW / 1000;
