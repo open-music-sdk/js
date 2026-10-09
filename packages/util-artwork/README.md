@@ -62,12 +62,18 @@ same image twice nor mistakes its size.
 Give the `<img>` its `width` and `height` as well. The `srcset` says which file to fetch; the
 attributes say how much room to keep for it.
 
-A URL goes into the `srcset` as `artworkUrl` gives it, except for what would break the list: white
-space inside it, and a comma at either end, are percent-encoded.
+## One URL
+
+`artworkUrl` and `artworkSrcSet` give the same URL, character for character, spelled the way a
+browser reads a `src`: white space is dropped from its ends, tabs and line breaks from anywhere, and
+a space inside is written `%20`. A comma at either end, which a `srcset` would take for a separator,
+is kept by writing `./` before it or an empty `#` after it. None of this changes what is requested,
+so a `src` and a `srcset` never point at different places, and a check you make on the URL
+`artworkUrl` returns holds for the `srcset` too.
 
 ## The URL is the API's
 
-`artworkUrl` puts numbers into the URL the API returned and changes nothing else. It does not check
+`artworkUrl` puts numbers into the URL the API returned and, apart from that spelling, changes nothing. It does not check
 where the URL points, what scheme it has, or whether it is a URL at all. If your artwork objects can
 come from anywhere but Apple's API, vet them before they reach an `<img>`.
 

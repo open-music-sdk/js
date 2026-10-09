@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test } from "vitest";
-import { artworkSrcSet, artworkUrl, inSrcset, type tArtworkSource } from "./artwork.js";
+import { artworkSrcSet, artworkUrl, normalise, type tArtworkSource } from "./artwork.js";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */
@@ -82,27 +82,105 @@ describe("the srcset reader these tests check against", () => {
   });
 });
 
-describe("inSrcset", () => {
+/** What is requested for a URL on a page at BASE: where a URL parser says it points, without the fragment, which is never sent. */
+const BASE = "https://app.example/music/album/1";
+const requested = (url: string) => new URL(url, BASE).href.split("#")[0];
+/** Characters by code, so that none of the invisible ones has to appear in this file. */
+const [NBSP, LINE_SEPARATOR, IDEOGRAPHIC_SPACE, VERTICAL_TAB, NUL, UNIT_SEPARATOR] = [0xa0, 0x2028, 0x3000, 0x0b, 0x00, 0x1f].map((code) => String.fromCharCode(code)) as [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+];
+
+describe("normalise", () => {
   test.each([
-    ["nothing to escape", "https://example.com/a,b/300x300bb.jpg?x=1,2#f", "https://example.com/a,b/300x300bb.jpg?x=1,2#f"],
-    ["a space", "a b", "a%20b"],
-    ["each kind of white space a srcset splits on", "a\tb\nc\fd\re f", "a%09b%0Ac%0Cd%0De%20f"],
-    ["a run of spaces", "a   b", "a%20%20%20b"],
-    ["a comma at the start", ",a", "%2Ca"],
-    ["a comma at the end", "a,", "a%2C"],
-    ["commas at both ends and in the middle", ",,a,b,,", "%2C%2Ca,b%2C%2C"],
-    ["nothing but commas", ",,,", "%2C%2C%2C"],
-    ["nothing at all", "", ""],
-  ])("%s: %j becomes %j", (_name, url, expected) => {
-    expect(inSrcset(url)).toBe(expected);
+    ["an ordinary artwork URL", "https://is1-ssl.mzstatic.com/image/thumb/a.jpg/{w}x{h}bb.jpg"],
+    ["commas, escapes, a query and a fragment", "https://example.com/a,b/a%20b%2Cc/{w}x{h}bb.jpg?x=1,2&sig=a+b%2F#f,g"],
+    ["a relative URL", "/img/{w}x{h}.jpg"],
+    ["a data URL", "data:image/png;base64,AAAA"],
+    ["white space a URL parser keeps and a srcset does not split on", `https://example.com/a${NBSP}b${LINE_SEPARATOR}c${IDEOGRAPHIC_SPACE}d/x.jpg`],
+    ["a control character inside that is not white space", `https://example.com/a${VERTICAL_TAB}b${NUL}c/x.jpg`],
+    ["a lone percent sign", "https://example.com/100%/x.jpg"],
+    ["a comma next to an escaped space inside", "https://example.com/a,%20b/x.jpg"],
+  ])("%s is left exactly as it is", (_name, url) => {
+    expect(normalise(url)).toBe(url);
   });
 
   test.each([
-    ["white space a srcset does not split on", "a b c　d\u000be"],
-    ["percent signs and existing escapes", "a%20b%2Cc%"],
-    ["a comma next to a space inside", "a, b"],
-  ])("%s is left alone, but for the spaces", (_name, url) => {
-    expect(inSrcset(url)).toBe(url.replaceAll(" ", "%20"));
+    ["a space at the start", " https://example.com/x.jpg", "https://example.com/x.jpg"],
+    ["a space at the end", "https://example.com/x.jpg ", "https://example.com/x.jpg"],
+    ["tabs and line breaks at both ends", "\t\r\nhttps://example.com/x.jpg\n\t", "https://example.com/x.jpg"],
+    ["control characters at both ends", `${NUL}${UNIT_SEPARATOR}https://example.com/x.jpg${UNIT_SEPARATOR}${NUL}`, "https://example.com/x.jpg"],
+    ["a tab inside", "https://example.com/a\tb.jpg", "https://example.com/ab.jpg"],
+    ["a line break inside", "https://example.com/a\r\nb.jpg", "https://example.com/ab.jpg"],
+    ["a tab inside the scheme", "ht\ttps://example.com/x.jpg", "https://example.com/x.jpg"],
+    ["a space inside", "https://example.com/a b.jpg", "https://example.com/a%20b.jpg"],
+    ["a run of spaces inside", "https://example.com/a   b.jpg", "https://example.com/a%20%20%20b.jpg"],
+    ["a form feed inside", "https://example.com/a\fb.jpg", "https://example.com/a%0Cb.jpg"],
+    ["a space between tabs inside", "https://example.com/a\t \tb.jpg", "https://example.com/a%20b.jpg"],
+    ["a comma at the start", ",a.jpg", "./,a.jpg"],
+    ["commas at the start", ",,a.jpg", "./,,a.jpg"],
+    ["a comma at the end", "https://example.com/x.jpg?ids=1,2,", "https://example.com/x.jpg?ids=1,2,#"],
+    ["commas at the end", "https://example.com/x.jpg,,,", "https://example.com/x.jpg,,,#"],
+    ["a comma at the end of the fragment", "https://example.com/x.jpg#a,", "https://example.com/x.jpg#a%2C"],
+    ["commas at the end of the fragment", "https://example.com/x.jpg?a,#b,,", "https://example.com/x.jpg?a,#b%2C%2C"],
+    ["a comma at each end", ",a,", "./,a,#"],
+    ["a comma then a space at the end", "https://example.com/x.jpg, ", "https://example.com/x.jpg,#"],
+    ["a space then a comma at the start", " ,a.jpg", "./,a.jpg"],
+    ["nothing but a comma", ",", "./,#"],
+    ["nothing but white space", " \t\r\n\f", ""],
+    ["nothing at all", "", ""],
+  ])("%s: %j becomes %j", (_name, url, expected) => {
+    expect(normalise(url)).toBe(expected);
+  });
+
+  const awkward = [
+    " https://img.example/../../api/logout?via=1",
+    "\thttps://img.example/a/300.jpg",
+    "ht\ttps://img.example/a/300.jpg",
+    "https://img.example/a/300.jpg?ids=1,2,",
+    "https://img.example/a/300.jpg,,",
+    "https://img.example/a/300.jpg#frag,",
+    "https://img.example/a b/300.jpg?q=a b#c d",
+    "https://img.example/a\fb/300.jpg",
+    "https://img.example/a\r\n\tb/300.jpg ",
+    ",relative.jpg",
+    ",,/odd//path,",
+    " ,relative.jpg, ",
+    "//other.example/x.jpg ",
+    "/rooted/x.jpg\n",
+    "../up/x.jpg,",
+    "?only=query,",
+    "#only-fragment,",
+    "data:image/png;base64,AAAA,",
+    `${NUL}https://img.example/x.jpg${UNIT_SEPARATOR}`,
+  ];
+
+  test.each(awkward)("%j still requests what a browser would request for it as a src", (url) => {
+    expect(requested(normalise(url))).toBe(requested(url));
+  });
+
+  test.each(awkward)("%j comes out as something a srcset reads as one URL, the same one", (url) => {
+    const out = normalise(url);
+    expect(parseSrcset(`${out} 1x, other.jpg 2x`)).toEqual([
+      { url: out, descriptors: ["1x"] },
+      { url: "other.jpg", descriptors: ["2x"] },
+    ]);
+  });
+
+  test("the control: left as they are, most of the same URLs are split, cut short, or sent somewhere else by a srcset", () => {
+    const broken = awkward.filter((url) => {
+      const [first] = parseSrcset(`${url} 1x`);
+      return first?.descriptors.join() !== "1x" || requested(first.url) !== requested(url);
+    });
+    expect(broken.length).toBeGreaterThan(awkward.length / 2);
+  });
+
+  test("normalising twice changes nothing more", () => {
+    for (const url of awkward) expect(normalise(normalise(url))).toBe(normalise(url));
   });
 
   // A pattern that retries inside each run takes four times as long for twice the length: about fifteen seconds
@@ -110,8 +188,11 @@ describe("inSrcset", () => {
   test.each([
     ["commas inside the URL", (n: number) => `https://example.com/${",".repeat(n)}/{w}x{h}.jpg`],
     ["commas inside it, then one more character", (n: number) => `https://example.com/?${",".repeat(n)}x`],
+    ["commas at the end of the fragment", (n: number) => `https://example.com/{w}x{h}.jpg#${",".repeat(n)}`],
     ["spaces inside it", (n: number) => `https://example.com/${" ".repeat(n)}/{w}x{h}.jpg`],
+    ["spaces inside it, then one more character", (n: number) => `https://example.com/?${" ".repeat(n)}x`],
     ["commas at both ends", (n: number) => `${",".repeat(n)}{w}x{h}${",".repeat(n)}`],
+    ["white space at both ends", (n: number) => `${" \t".repeat(n / 2)}{w}x{h}${"\n ".repeat(n / 2)}`],
     ["commas and spaces by turns", (n: number) => `https://example.com/${", ".repeat(n / 2)}{w}x{h}`],
   ])("100 KB of %s costs time in step with its length, not with its square", (_name, make) => {
     const url = make(100_000);
@@ -411,7 +492,7 @@ describe("artworkSrcSet: where the artwork does not come large enough", () => {
   });
 });
 
-describe("artworkSrcSet: a browser reads back exactly the candidates that were meant, whatever the URL holds", () => {
+describe("one URL, whatever it holds: what artworkUrl gives is what the srcset carries and what a browser requests", () => {
   const hostile: [string, string][] = [
     ["a space", "https://example.com/a b/{w}x{h}.jpg"],
     ["several spaces", "https://example.com/a   b/{w}x{h}.jpg"],
@@ -421,18 +502,21 @@ describe("artworkSrcSet: a browser reads back exactly the candidates that were m
     ["a carriage return and line feed", "https://example.com/a\r\nb/{w}x{h}.jpg"],
     ["a form feed", "https://example.com/a\fb/{w}x{h}.jpg"],
     ["a space at the start", " https://example.com/{w}x{h}.jpg"],
+    ["a space at the start and a way up out of the path", " https://example.com/../../api/logout?via={w}"],
+    ["a tab inside the scheme", "ht\ttps://example.com/{w}x{h}.jpg"],
     ["a space at the end", "https://example.com/{w}x{h}.jpg "],
     ["a comma at the end", "https://example.com/{w}x{h}.jpg?ids=1,2,"],
     ["commas at the end", "https://example.com/{w}x{h}.jpg,,,"],
+    ["a comma at the end of a fragment", "https://example.com/{w}x{h}.jpg#a,"],
     ["a comma at the start", ",https://example.com/{w}x{h}.jpg"],
     ["a comma then a space at the end", "https://example.com/{w}x{h}.jpg, "],
     ["a space then a comma at the start", " ,https://example.com/{w}x{h}.jpg"],
     ["a comma in the middle", "https://example.com/w_{w},h_{h}/cover.jpg"],
     ["an open parenthesis", "https://example.com/{w}x{h}(1.jpg"],
     ["a data URL", "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}'/>"],
-    ["nothing but white space", " \t\n"],
     ["nothing but a comma", ","],
   ];
+  const filled = (url: string) => url.replaceAll("{w}", "300").replaceAll("{h}", "300");
 
   test.each(hostile)("a URL with %s is one candidate per density, each with one density descriptor", (_name, url) => {
     const candidates = parseSrcset(artworkSrcSet({ url }, 300, { densities: [1, 2] }));
@@ -440,15 +524,31 @@ describe("artworkSrcSet: a browser reads back exactly the candidates that were m
     expect(candidates).toHaveLength(url.includes("{w}") ? 2 : 1);
   });
 
-  test.each(hostile)("a URL with %s reads back as the URL artworkUrl gives, with only white space and outer commas escaped", (_name, url) => {
-    const [first] = parseSrcset(artworkSrcSet({ url }, 300, { densities: [1] }));
-    expect(decodeURIComponent(first?.url ?? "")).toBe(decodeURIComponent(artworkUrl({ url }, 300)));
-    expect(first?.url).not.toMatch(/[\t\n\f\r ]|^,|,$/);
+  test.each(hostile)("a URL with %s is carried by the srcset character for character as artworkUrl gives it", (_name, url) => {
+    expect(parseSrcset(artworkSrcSet({ url }, 300, { densities: [1] }))[0]?.url).toBe(artworkUrl({ url }, 300));
   });
 
-  test("a URL with nothing to escape goes into the srcset exactly as artworkUrl gives it", () => {
-    const url = "https://example.com/w_{w},h_{h}/a%20b.jpg?sig=a+b%2F#frag";
-    expect(parseSrcset(artworkSrcSet({ url }, 300, { densities: [1] }))[0]?.url).toBe(artworkUrl({ url }, 300));
+  test.each(hostile.filter(([name]) => name !== "a data URL"))("a URL with %s requests, as src and as srcset, what a browser would request for the URL as given", (_name, url) => {
+    expect(requested(artworkUrl({ url }, 300))).toBe(requested(filled(url)));
+  });
+
+  test("a data URL holds the same data, its spaces written as a URL writes them", () => {
+    const url = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}'/>";
+    expect(decodeURIComponent(artworkUrl({ url }, 300))).toBe(filled(url));
+  });
+
+  test("a URL that would pass a check of its host as given cannot point a srcset somewhere else", () => {
+    const url = " https://img.example/../../api/logout?via={w}";
+    expect(new URL(url).host).toBe("img.example");
+    for (const candidate of parseSrcset(artworkSrcSet({ url }, 300))) expect(new URL(candidate.url, BASE).host).toBe("img.example");
+  });
+
+  test.each([
+    ["nothing but white space", " \t\n"],
+    ["nothing but control characters", `${NUL}${UNIT_SEPARATOR}`],
+  ])("a URL of %s is no URL: a TypeError, as for an artwork without one", (_name, url) => {
+    expect(() => artworkUrl({ url }, 300)).toThrow(/^artwork: expected an artwork object with a url/);
+    expect(() => artworkSrcSet({ url }, 300)).toThrow(/^artwork: expected an artwork object with a url/);
   });
 });
 
