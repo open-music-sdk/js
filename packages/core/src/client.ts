@@ -287,7 +287,8 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       // would be nobody's to catch. It is the caller's to await.
       if (typeof (from as { then?: unknown } | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
       const first = pageOf(from, "the page given to paginate", 200);
-      yield* first.data as readonly T[];
+      // The walk's own copy, so that it goes over the page as it was handed, whatever is done to the page meanwhile.
+      yield* first.data.slice() as readonly T[];
       next = first.next;
       params = undefined;
     }

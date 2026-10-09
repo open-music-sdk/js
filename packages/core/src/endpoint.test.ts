@@ -441,6 +441,7 @@ describe("endpoint: the client it is handed is checked, in either form", () => {
     ["an object with request alone, which could not walk pages", { request: noop }],
     ["an object missing storefront", { request: noop, paginate: noop }],
     ["an object missing paginate", { request: noop, storefront: noop }],
+    ["an object missing request", { paginate: noop, storefront: noop }],
     ["a function with the methods on it", Object.assign(noop, { request: noop, paginate: noop, storefront: noop })],
   ];
 
@@ -540,6 +541,12 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const { music, sent } = apple([{ body: { data: [song("1"), song("2")], meta: { ignored: true } } }]);
       expect(await getSongs.bound(music)(["1", "2"])).toEqual([song("1"), song("2")]);
       expect(sent()).toEqual(["GET /v1/catalog/us/songs?ids=1,2"]);
+    });
+
+    test("the list is the one Apple sent, as it was sent: not a copy of it, and with nothing taken out", async () => {
+      const data = [song("1"), null, song("2")];
+      const client = { request: () => Promise.resolve({ data }), paginate: noop, storefront: noop } as unknown as tAppleMusicClient;
+      expect(await getSongs.bound(client)(["1", "2"])).toBe(data);
     });
 
     test.each<[string, tReply]>([
@@ -755,6 +762,26 @@ describe("the resource patterns: what each asks Apple for", () => {
     expect(sent()).toEqual(["GET /v1/catalog/us/artists/1?views=top-songs,singles", "GET /v1/catalog/us/songs/1"]);
   });
 
+  test("an option a declaration adds is sent by each kind of function that can add one", async () => {
+    interface tViews {
+      readonly views?: readonly string[] | undefined;
+    }
+    const one = resourceGetter<tSongsResponse, tNone, tViews>("getArtist", () => "v1/catalog/us/artists", { views: true });
+    const several = resourcesGetter<tSongsResponse, tNone, tViews>("getArtists", () => "v1/catalog/us/artists", { views: true });
+    const whole = resourceLister<tSongsResponse, tNone, tViews>("listArtists", () => "v1/catalog/us/artists", { views: true });
+    const { music, sent } = apple();
+    await one(music, "1", { views: ["top-songs"] });
+    await several(music, ["1"], { views: ["top-songs"] });
+    await whole(music, { views: ["top-songs"] });
+    await all(whole.bound(music)({ views: ["top-songs"] }));
+    expect(sent()).toEqual([
+      "GET /v1/catalog/us/artists/1?views=top-songs",
+      "GET /v1/catalog/us/artists?views=top-songs&ids=1",
+      "GET /v1/catalog/us/artists?views=top-songs",
+      "GET /v1/catalog/us/artists?views=top-songs",
+    ]);
+  });
+
   test("a relationship's schema is what its answer is held to, called with a client or walked", async () => {
     const failing: tSchemaLike<never> = { "~standard": { validate: () => ({ issues: [{ message: "expected artists" }] }) } };
     const runs = [(music: tAppleMusicClient) => getAlbumRelationship(music, "1", "artists", { schema: failing }), (music: tAppleMusicClient) => all(getAlbumRelationship.bound(music)("1", "artists", { schema: failing }))];
@@ -785,6 +812,18 @@ describe("the resource patterns: where the collection is", () => {
     const collection = vi.fn<tCollection>(() => SONGS);
     await resourcesGetter<tSongsResponse>("getSongs", collection)(music, ["1"]);
     expect(collection).toHaveBeenCalledWith("getSongs", music, {});
+  });
+
+  test("a relationship asks for its collection as the others do: with the options the call was given, or an empty bag", async () => {
+    const { music } = apple();
+    const collection = vi.fn<tCollection>(() => "v1/catalog/us/albums");
+    const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
+    await related(music, "1", "tracks");
+    await related(music, "1", "tracks", { limit: 5 });
+    expect(collection.mock.calls).toEqual([
+      ["getAlbumRelationship", music, {}],
+      ["getAlbumRelationship", music, { limit: 5 }],
+    ]);
   });
 
   test("it may ask the client, as a catalog asks for a storefront no option named", async () => {
@@ -967,6 +1006,21 @@ describe("the resource patterns: what a function is handed is checked before any
     expect(calls).toHaveLength(0);
   });
 
+  test("of two mistakes, the one named is the one in the argument handed over first", async () => {
+    const { music } = apple();
+    const none = null as unknown as tReadOptions<tSongsResponse>;
+    const firsts: [Promise<unknown>, string][] = [
+      [one(music, "", { limit: 0 }), "getSong: id "],
+      [one(music, "", none), "getSong: id "],
+      [several(music, [], { limit: 0 }), "getSongs: ids "],
+      [several(music, [], none), "getSongs: ids "],
+      [related(music, "", "" as "tracks", { limit: 0 }), "getAlbumRelationship: id "],
+      [related(music, "1", "" as "tracks", { limit: 0 }), "getAlbumRelationship: name "],
+      [related(music, "1", "tracks", { limit: 0 }), "getAlbumRelationship: limit "],
+    ];
+    for (const [call, start] of firsts) expect((await rejection(call)).message.startsWith(start), start).toBe(true);
+  });
+
   test("a token put where an id, a name or a list of ids belongs is refused for its length: it is not sent, and not shown", async () => {
     // The size and shape of a developer token: three runs of base64url with dots between.
     const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
@@ -1039,6 +1093,16 @@ describe("endpointNamespace", () => {
     const others = { version: 1, helper: noop, lookalike: { bound: noop }, halfway: Object.assign(() => undefined, { bound: "getSong" }), nothing: undefined, none: null };
     const catalog = endpointNamespace("catalog", apple().music, { getSong, ...others });
     expect(Object.keys(catalog)).toEqual(["getSong"]);
+  });
+
+  test("a function's bound is called as the function's own method, so one made elsewhere may be written as one", () => {
+    const { music } = apple();
+    const made = Object.assign(() => undefined, {
+      bound(this: unknown, client: tAppleMusicClient) {
+        return () => [this === made, client === music];
+      },
+    });
+    expect(endpointNamespace("catalog", music, { made }).made()).toEqual([true, true]);
   });
 
   test("a module of other things gives a namespace with nothing in it", async () => {

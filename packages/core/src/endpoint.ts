@@ -220,10 +220,11 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   ...also: tAlsoGiven<E>
 ): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>> {
   const [locate, names] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
+  // Here and below, what a call was handed is checked in the order it was handed over, so the first mistake is the one named.
   return declare("resourceGetter", fn, "resource", (client, id: string, options?: tEndpointOptions<R, C, E>) => {
+    const segment = segmentOf(fn, "id", id);
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<R>(fn, bag, {}, names);
-    const segment = segmentOf(fn, "id", id);
     return located<R>(fn, locate(fn, client, bag), (path) => [`${path}/${segment}`, init]);
   });
 }
@@ -236,8 +237,9 @@ export function resourcesGetter<R extends tResources = never, C extends object =
 ): tEndpoint<[ids: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
   const [locate, names] = given<C>("resourcesGetter", collection, (also as readonly unknown[])[0]);
   return declare("resourcesGetter", fn, "resources", (client, ids: readonly string[], options?: tEndpointOptions<R, C, E>) => {
+    const list = listOf(fn, "ids", ids);
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, { ids: listOf(fn, "ids", ids) }, names);
+    const init = initOf<R>(fn, bag, { ids: list }, names);
     return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
@@ -276,9 +278,9 @@ export interface tRelationshipEndpoint<Rels, C = tNone> {
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
   const [locate] = given<C>("relationshipGetter", collection, undefined);
   const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C>) => {
+    const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, OPTIONS);
     const init = initOf<tRelationshipResponse>(fn, bag);
-    const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
     return located<tRelationshipResponse>(fn, locate(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.

@@ -993,6 +993,39 @@ describe("paginate", () => {
       expect(calls).toHaveLength(0);
     });
 
+    test("a signal already aborted does not hold back what is in hand: its own items are yielded, and the next page is not asked for", async () => {
+      const { music, calls } = client([{ body: { data: [3] } }]);
+      const reason = new Error("stopped before it began");
+      const seen: number[] = [];
+      await expect(
+        (async () => {
+          for await (const item of music.paginate({ data: [1, 2], next: "/v1/x?offset=2" }, { signal: AbortSignal.abort(reason) })) seen.push(item);
+        })(),
+      ).rejects.toBe(reason);
+      expect(seen).toEqual([1, 2]);
+      expect(calls).toHaveLength(0);
+    });
+
+    test("the walk goes over the page as it was when the walk reached it: adding to the page meanwhile adds nothing", async () => {
+      const { music } = client();
+      const page = { data: [1, 2] };
+      const seen: number[] = [];
+      for await (const item of music.paginate(page)) {
+        seen.push(item);
+        if (item === 1) page.data.push(3);
+      }
+      expect(seen).toEqual([1, 2]);
+    });
+
+    test("the items are the page's own, not copies of them", async () => {
+      const { music } = client();
+      const [first, second] = [{ id: "1" }, { id: "2" }];
+      const seen: object[] = [];
+      for await (const item of music.paginate({ data: [first, second] })) seen.push(item);
+      expect([seen[0], seen[1]]).toEqual([first, second]);
+      expect(seen[0]).toBe(first);
+    });
+
     test("breaking out while its own items last asks Apple for nothing", async () => {
       const { music, calls } = client([{ body: { data: [3] } }]);
       for await (const item of music.paginate({ data: [1, 2], next: "/v1/x?offset=2" })) if (item === 1) break;

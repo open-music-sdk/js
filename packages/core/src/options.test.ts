@@ -273,6 +273,8 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["a limit that is null", { limit: null }, "getSong: limit must be a whole number above 0; got null"],
     ["an offset below zero", { offset: -1 }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got -1"],
     ["an offset that is not whole", { offset: 0.5 }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got 0.5"],
+    ["an offset past what a number can count", { offset: 2 ** 53 }, `getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got ${String(2 ** 53)}`],
+    ["an offset that is not a number", { offset: Number.NaN }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got NaN"],
     ["an empty cursor", { offset: "" }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got 0 characters"],
     ["a cursor one character too long", { offset: "c".repeat(257) }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got 257 characters"],
     ["an offset that is null", { offset: null }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got null"],
@@ -287,6 +289,9 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["a param list holding an object", { params: { a: [1, {}] } }, `${PARAM}object`],
     ["a param list holding a list", { params: { a: [["1"]] } }, `${PARAM}object`],
     ["a param list holding true", { params: { a: [true] } }, `${PARAM}object`],
+    ["a param list holding what is not a number", { params: { a: [1, Number.NaN] } }, `${PARAM}object`],
+    ["a param list holding infinity", { params: { a: [Number.POSITIVE_INFINITY] } }, `${PARAM}object`],
+    ["a param that is infinity", { params: { a: Number.NEGATIVE_INFINITY } }, `${PARAM}-Infinity`],
     ["a param list one item too long", { params: { a: Array.from({ length: 301 }, () => "1") } }, `${PARAM}object`],
     ["a schema with nothing in it", { schema: {} }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
     ["a schema whose validate is no function", { schema: { "~standard": { validate: "yes" } } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
@@ -309,6 +314,12 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     const params = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i) => [`p${String(i)}`, i]));
     expect(Object.keys(initOf("fn", { params: params(100) }).params ?? {})).toHaveLength(100);
     expect(thrown(() => initOf("getSong", { params: params(101) })).message).toBe("getSong: params must hold at most 100 parameters; got 101");
+  });
+
+  test("a param list of three hundred is taken, and one of three hundred and one is not", () => {
+    const list = (length: number) => Array.from({ length }, (_, i) => i);
+    expect(initOf("fn", { params: { ids: list(300) } }).params).toEqual({ ids: list(300) });
+    expect(() => initOf("fn", { params: { ids: list(301) } })).toThrow(TypeError);
   });
 
   test("a param list too long is not read: its length is all that is asked for", () => {

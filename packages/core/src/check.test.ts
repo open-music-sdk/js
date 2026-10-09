@@ -210,6 +210,12 @@ describe("segmentOf", () => {
     expect(segmentOf("fn", "id", value)).toBe(encoded);
   });
 
+  test("a value is encoded as it was written, not as another spelling of the same letters: an id is not normalised", () => {
+    const [composed, decomposed] = ["é", "é"];
+    expect(composed.normalize("NFD")).toBe(decomposed);
+    expect([segmentOf("fn", "id", composed), segmentOf("fn", "id", decomposed)]).toEqual(["%C3%A9", "e%CC%81"]);
+  });
+
   describe("whatever a segment holds, the request still goes where it was going", () => {
     const BASE = "https://api.music.apple.com/";
     const hostile = [
