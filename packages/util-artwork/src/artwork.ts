@@ -58,6 +58,8 @@ function cropOf(value: unknown): string | undefined {
 
 const SIZE = "{w}x{h}";
 const DEFAULT_CROP = "bb";
+/** The most pixels Apple's image server gives on a side. It answers 400 to a request for one more. */
+const MAX_SIDE = 10_000;
 
 /**
  * Whether a crop code fits the whole image inside the box, never enlarging it: `bb`, `bb` at a given JPEG
@@ -91,27 +93,32 @@ function tailored(template: string, crop: string | undefined, format: string | u
  * The pixel size to ask for, given the box wanted in device pixels and how large the artwork comes, and how far
  * the box had to shrink to get there. A `scale` of 1 is a box that got what it asked for.
  *
- * A box never asks for more than the artwork has, and it shrinks in its own shape. What "more" means depends on
- * the crop. An image that fills the box needs the artwork to cover the box both ways. An image fitted `inside`
+ * A box never asks for more than the artwork has, nor for more than the image server gives at all, and it
+ * shrinks in its own shape. What "more than the artwork has" means depends on the crop. An image that fills the box needs the artwork to cover the box both ways. An image fitted `inside`
  * the box touches two of its sides and leaves the others clear unless the shapes match, so the box may run past
  * the artwork one way and still hold a smaller image: it shrinks only once the image inside it would be larger
  * than the artwork comes. Shrinking it sooner gets a smaller image back, not the same one.
  */
 export function fit(
   box: { readonly width: number; readonly height: number },
-  max: { readonly width: number; readonly height: number } | undefined,
+  max: { readonly width?: number | undefined; readonly height?: number | undefined },
   inside: boolean,
 ): { width: number; height: number; scale: number } {
-  const [across, down] = max ? [max.width / box.width, max.height / box.height] : [Infinity, Infinity];
-  const scale = Math.min(1, inside ? Math.max(across, down) : Math.min(across, down));
-  return { width: Math.max(1, Math.round(box.width * scale)), height: Math.max(1, Math.round(box.height * scale)), scale };
+  const across = max.width === undefined ? Infinity : max.width / box.width;
+  const down = max.height === undefined ? Infinity : max.height / box.height;
+  // The image inside the box can only be worked out from the artwork's whole shape. With one side known, that
+  // side is all there is to go by, and the box is held to it as if the image filled it.
+  const artwork = inside && max.width !== undefined && max.height !== undefined ? Math.max(across, down) : Math.min(across, down);
+  const scale = Math.min(1, artwork, MAX_SIDE / box.width, MAX_SIDE / box.height);
+  const side = (pixels: number) => Math.max(1, Math.min(MAX_SIDE, Math.round(pixels * scale)));
+  return { width: side(box.width), height: side(box.height), scale };
 }
 
 /** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
 interface tRequest {
   readonly template: string;
-  /** How large the artwork comes, where it says. */
-  readonly max: { readonly width: number; readonly height: number } | undefined;
+  /** How large the artwork comes, each way, where it says. */
+  readonly max: { readonly width: number | undefined; readonly height: number | undefined };
   /** The box wanted, in CSS pixels. With no height, the box takes the artwork's shape. */
   readonly width: number;
   readonly height: number | undefined;
@@ -136,7 +143,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
   const named = tailored(template, crop, format);
   return {
     template: named.template,
-    max: positive(maxWidth) && positive(maxHeight) ? { width: maxWidth, height: maxHeight } : undefined,
+    max: { width: positive(maxWidth) ? maxWidth : undefined, height: positive(maxHeight) ? maxHeight : undefined },
     width: length("width", width),
     height: height === undefined ? undefined : length("height", height),
     format: format ?? "jpg",
@@ -149,7 +156,8 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
 /** The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has. */
 function image({ template, max, width, height, format, crop, inside }: tRequest, density: number): { url: string; scale: number } {
   const boxWidth = width * density;
-  const boxHeight = height === undefined ? (max ? (boxWidth * max.height) / max.width : boxWidth) : height * density;
+  // With no height asked for, the box takes the artwork's shape, or is square where the artwork does not say both ways.
+  const boxHeight = height === undefined ? (max.width !== undefined && max.height !== undefined ? (boxWidth * max.height) / max.width : boxWidth) : height * density;
   const { width: w, height: h, scale } = fit({ width: boxWidth, height: boxHeight }, max, inside);
   // Past this a number prints with an exponent, and what goes into the URL has to be digits.
   if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h)) throw new TypeError("artwork: the size asked for is too large");

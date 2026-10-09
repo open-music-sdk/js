@@ -435,22 +435,35 @@ describe("artworkUrl: the image keeps the artwork's shape unless a height says o
   test.each<[string, Partial<tArtworkSource>]>([
     ["no size", {}],
     ["a null size, as the library gives for some playlists", { width: null, height: null }],
-    ["only a width", { width: 1920 }],
-    ["only a height", { height: 1080 }],
     ["a zero size", { width: 0, height: 0 }],
     ["a negative size", { width: -1920, height: -1080 }],
     ["a size that is not a number", { width: Number.NaN, height: Number.NaN }],
     ["an infinite size", { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY }],
     ["a size given as text", { width: "1920", height: "1080" } as unknown as Partial<tArtworkSource>],
-  ])("artwork with %s has no known shape: the image is square and its size is not capped", (_name, known) => {
+  ])("artwork with %s has no known shape or size: the image is square, and held only to what the image server gives", (_name, known) => {
     expect(size(artworkUrl({ url: TEMPLATE, ...known }, 5000))).toBe("5000x5000");
+    expect(size(artworkUrl({ url: TEMPLATE, ...known }, 50_000))).toBe("10000x10000");
+  });
+
+  test.each<[string, Partial<tArtworkSource>, string]>([
+    ["only its width", { width: 1920 }, "1920x1920"],
+    ["only its height", { height: 1080 }, "1080x1080"],
+    ["its width, and a height that is no size", { width: 1920, height: null }, "1920x1920"],
+    ["its height, and a width that is no size", { width: 0, height: 1080 }, "1080x1080"],
+  ])("artwork that says %s has no known shape, so the image is square, but it is not asked for larger than that side", (_name, known, expected) => {
+    expect(size(artworkUrl({ url: TEMPLATE, ...known }, 5000))).toBe(expected);
+    expect(size(artworkUrl({ url: TEMPLATE, ...known }, 300))).toBe("300x300");
+  });
+
+  test("a srcset for artwork with no size stops at the image server's limit, under the density that amounts to", () => {
+    expect(artworkSrcSet({ url: TEMPLATE }, 4000)).toBe(squares("4000 1x", "8000 2x", "10000 2.5x"));
   });
 });
 
 describe("fit", () => {
   type tCase = [name: string, box: [number, number], max: [number, number] | undefined, expected: string, shrunk: boolean];
   const run = ([, [width, height], max, expected, shrunk]: tCase, inside: boolean) => {
-    const got = fit({ width, height }, max && { width: max[0], height: max[1] }, inside);
+    const got = fit({ width, height }, max ? { width: max[0], height: max[1] } : {}, inside);
     expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
     if (shrunk) expect(got.scale).toBeLessThan(1);
     else expect(got.scale).toBe(1);
@@ -501,7 +514,38 @@ describe("fit", () => {
 
   test("a box shrunk to nothing is one pixel a side, not none", () => {
     expect(fit({ width: 3000, height: 1 }, { width: 100, height: 100 }, false)).toMatchObject({ width: 100, height: 1 });
-    expect(fit({ width: 0.2, height: 0.2 }, undefined, true)).toMatchObject({ width: 1, height: 1 });
+    expect(fit({ width: 0.2, height: 0.2 }, {}, true)).toMatchObject({ width: 1, height: 1 });
+  });
+
+  test.each<[string, [number, number], { width?: number; height?: number }, string]>([
+    ["only its width, and a box too wide", [5000, 5000], { width: 1920 }, "1920x1920"],
+    ["only its width, and a box too wide by less", [3000, 1000], { width: 1500 }, "1500x500"],
+    ["only its width, and a box that is only tall", [1000, 9000], { width: 1920 }, "1000x9000"],
+    ["only its height, and a box too tall", [5000, 5000], { height: 1080 }, "1080x1080"],
+    ["only its height, and a box that is only wide", [9000, 1000], { height: 1080 }, "9000x1000"],
+    ["only its width, and a box inside it", [300, 300], { width: 1920 }, "300x300"],
+  ])("artwork that says %s: the box %j is held to the side that is known, whichever way the image is cut", (_name, [width, height], max, expected) => {
+    for (const inside of [false, true]) {
+      const got = fit({ width, height }, max, inside);
+      expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+      expect(got.scale < 1).toBe(expected !== `${String(width)}x${String(height)}`);
+    }
+  });
+
+  // Apple's image server answers 10000x100 and refuses 10001x100, and 100x10001.
+  test.each<[string, [number, number], { width?: number; height?: number }, boolean, string]>([
+    ["exactly the limit, on artwork with no size", [10_000, 10_000], {}, false, "10000x10000"],
+    ["one pixel past it", [10_001, 10_001], {}, false, "10000x10000"],
+    ["far past it", [120_000, 120_000], {}, false, "10000x10000"],
+    ["past it one way only", [20_000, 5000], {}, false, "10000x2500"],
+    ["past it the other way only", [5000, 20_000], {}, true, "2500x10000"],
+    ["past it, on artwork that says it comes larger still", [15_000, 15_000], { width: 20_000, height: 20_000 }, false, "10000x10000"],
+    ["past it one way, around an image that would fit inside", [40_000, 10_000], { width: 9000, height: 9000 }, true, "10000x2500"],
+    ["inside it, around an image at its full size", [9000, 3000], { width: 3000, height: 3000 }, true, "9000x3000"],
+  ])("no side is asked for past the 10,000 pixels the image server gives: %s", (_name, [width, height], max, inside, expected) => {
+    const got = fit({ width, height }, max, inside);
+    expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+    expect(got.scale < 1).toBe(expected !== `${String(width)}x${String(height)}`);
   });
 
   /** Whether `w` by `h` is the box `[width, height]` scaled by some one factor, to within the half pixel that rounding costs each side. */

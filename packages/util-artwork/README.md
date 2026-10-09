@@ -66,7 +66,8 @@ gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templat
 - **Shape.** With no `height`, the image keeps the artwork's own shape: a 1920 by 1080 still at width
   320 is asked for as `320x180`. Artwork that does not say how large it comes is taken to be square.
 - **Never larger than it comes.** The artwork's `width` and `height` are the largest Apple has. A box
-  that asks for more is shrunk, keeping its shape. Artwork with no size is not capped.
+  that asks for more is shrunk, keeping its shape. Artwork that gives only one of the two is held to
+  that one. No side is ever asked for past 10,000 pixels, where Apple's image server stops.
 - **A box of another shape.** With `height`, what "more" means depends on the crop. A crop that fills
   the box needs the artwork to cover it both ways. `bb` stands the whole image inside the box, so the
   box is shrunk only once the image inside it would be larger than the artwork: a 1500 pixel cover
