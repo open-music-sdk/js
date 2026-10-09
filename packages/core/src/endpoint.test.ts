@@ -1,7 +1,7 @@
 import type { tAlbumRelationships, tArtist, tGenre, tLibrarySong, tLibrarySongsResponse, tMusicVideo, tRelationshipResponse, tSong, tSongsResponse } from "@open-music-sdk/types";
 import { afterEach, describe, expect, expectTypeOf, test, vi } from "vitest";
 import { createClient, type tAppleMusicClient, type tClientOptions, type tSchemaLike } from "./client";
-import { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter, type tCollection, type tPaged, type tRequestPlan } from "./endpoint";
+import { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter, type tCollection, type tEndpointOptions, type tNone, type tRequestPlan } from "./endpoint";
 import { isAppleMusicError, type tErrorTag } from "./errors";
 import type { tReadOptions } from "./options";
 
@@ -11,6 +11,10 @@ type tReply = { status?: number; body?: unknown } | Error;
 const SECRET = "s3cretT0ken";
 const noop = () => undefined;
 const SONGS = "v1/catalog/us/songs";
+/** The option a catalog's collection reads. */
+interface tStore {
+  readonly storefront?: string | undefined;
+}
 const song = (id: string) => ({ id, type: "songs", href: `/v1/catalog/us/songs/${id}` });
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
@@ -72,16 +76,19 @@ describe("the types: one declaration gives both forms, and the name asked for de
   const bound = endpointNamespace("catalog", apple().music, { ...declared, version: 1, helper: noop });
 
   test("called with a client, a function resolves to what Apple answers", () => {
-    expectTypeOf(getSong).parameters.toEqualTypeOf<[client: tAppleMusicClient, id: string, options?: tReadOptions<tSongsResponse>]>();
+    expectTypeOf(getSong).parameters.toEqualTypeOf<[client: tAppleMusicClient, id: string, options?: tEndpointOptions<tSongsResponse>]>();
     expectTypeOf(getSong).returns.resolves.toEqualTypeOf<tSongsResponse>();
-    expectTypeOf(getSongs).parameters.toEqualTypeOf<[client: tAppleMusicClient, ids: readonly string[], options?: tReadOptions<tSongsResponse>]>();
+    expectTypeOf(getSongs).parameters.toEqualTypeOf<[client: tAppleMusicClient, ids: readonly string[], options?: tEndpointOptions<tSongsResponse>]>();
     expectTypeOf(getSongs).returns.resolves.toEqualTypeOf<tSongsResponse>();
     expectTypeOf(listLibrarySongs).returns.resolves.toEqualTypeOf<tLibrarySongsResponse & { readonly next?: string | undefined }>();
     expectTypeOf(searchCatalog).parameters.toEqualTypeOf<[client: tAppleMusicClient, term: string]>();
   });
 
   test("bound, it takes the same arguments without the client and hands over what the answer holds", () => {
-    expectTypeOf(bound.getSong).parameters.toEqualTypeOf<[id: string, options?: tReadOptions<tSongsResponse>]>();
+    expectTypeOf(bound.getSong).parameters.toEqualTypeOf<[id: string, options?: tEndpointOptions<tSongsResponse>]>();
+    // With no options of its collection's or its own, what a function takes is what every function takes.
+    expectTypeOf<tEndpointOptions<tSongsResponse>>().toExtend<tReadOptions<tSongsResponse>>();
+    expectTypeOf<tReadOptions<tSongsResponse>>().toExtend<tEndpointOptions<tSongsResponse>>();
     expectTypeOf(bound.getSong).returns.resolves.toEqualTypeOf<tSong>();
     expectTypeOf(bound.getSongs).returns.resolves.toEqualTypeOf<tSong[]>();
     expectTypeOf(bound.listLibrarySongs).returns.toEqualTypeOf<AsyncIterable<tLibrarySong>>();
@@ -114,6 +121,20 @@ describe("the types: one declaration gives both forms, and the name asked for de
     expect(wrong).toHaveLength(3);
   });
 
+  test("what is no options object, or an option the function does not take, is refused by the types", () => {
+    const wrong = [
+      // @ts-expect-error -- a string is not an options object
+      () => getSong(apple().music, "1", "en-GB"),
+      // @ts-expect-error -- an option that is misspelt is not one the function takes
+      () => getSong(apple().music, "1", { includ: ["albums"] }),
+      // @ts-expect-error -- views is not an option of a function whose declaration does not add it
+      () => getSong(apple().music, "1", { views: ["top-songs"] }),
+      // @ts-expect-error -- and so it is for the bound form
+      () => bound.getSong("1", { views: ["top-songs"] }),
+    ];
+    expect(wrong).toHaveLength(4);
+  });
+
   test("a set of names can be narrowed, as a catalog narrows away the one that needs the listener", () => {
     const withoutLibrary = relationshipGetter<Omit<tAlbumRelationships, "library">>("getAlbumRelationship", () => "v1/catalog/us/albums");
     const calls = [
@@ -135,11 +156,139 @@ describe("the types: one declaration gives both forms, and the name asked for de
   });
 
   test("the options a function takes are the ones its declaration names", () => {
-    type tOptions = tReadOptions<tSongsResponse> & { readonly storefront?: string | undefined; readonly views?: readonly "top-songs"[] | undefined };
-    const collection: tCollection<tOptions> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/artists`;
-    const getArtist = resourceGetter<tSongsResponse, tOptions>("getArtist", collection, ["views"]);
+    interface tViews {
+      readonly views?: readonly "top-songs"[] | undefined;
+    }
+    type tOptions = tReadOptions<tSongsResponse> & tStore & tViews;
+    const collection: tCollection<tStore> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/artists`;
+    const getArtist = resourceGetter<tSongsResponse, tStore, tViews>("getArtist", collection, { views: true });
     expectTypeOf(getArtist).parameter(2).toEqualTypeOf<tOptions | undefined>();
     expectTypeOf(endpointNamespace("catalog", apple().music, { getArtist }).getArtist).parameter(1).toEqualTypeOf<tOptions | undefined>();
+  });
+});
+
+describe("a declaration is checked as it is made, so a mistake in one is found when its module loads", () => {
+  const plan = (): tRequestPlan<unknown> => ["v1/x"];
+  /** The builders as someone without the types could call them. */
+  const builders: [string, (fn: unknown, collection: unknown, also?: unknown) => unknown][] = [
+    ["resourceGetter", resourceGetter as never],
+    ["resourcesGetter", resourcesGetter as never],
+    ["resourceLister", resourceLister as never],
+    ["relationshipGetter", relationshipGetter as never],
+  ];
+
+  test.each<[string, unknown, string]>([
+    ["missing", undefined, "undefined"],
+    ["empty", "", "0 characters"],
+    ["a number", 5, "5"],
+    ["the plan, put where the name belongs", plan, "function"],
+  ])("endpoint: a name that is %s is a TypeError naming endpoint", (_name, fn, what) => {
+    expect(() => endpoint(fn as string, "answer", plan)).toThrow(new TypeError(`endpoint: fn must be the name of the function, a string with something in it; got ${what}`));
+  });
+
+  test.each<[string, unknown, string]>([
+    ["misspelt", "resorce", "7 characters"],
+    ["missing", undefined, "undefined"],
+    ["a number", 1, "1"],
+  ])("endpoint: an unwrap that is %s is a TypeError, and is not taken for one of the four", (_name, unwrap, what) => {
+    expect(() => endpoint("getSong", unwrap as "answer", plan)).toThrow(new TypeError(`endpoint: unwrap must be "resource", "resources", "pages" or "answer"; got ${what}`));
+  });
+
+  test.each<[string, unknown, string]>([
+    ["a path where the plan belongs", "v1/x", "4 characters"],
+    ["missing", undefined, "undefined"],
+    ["what a plan gives, not the plan", ["v1/x"], "object"],
+  ])("endpoint: a plan that is %s is a TypeError", (_name, wrong, what) => {
+    expect(() => endpoint("getSong", "answer", wrong as typeof plan)).toThrow(new TypeError(`endpoint: plan must be a function; got ${what}`));
+  });
+
+  test.each(builders)("%s: a name that is no name is a TypeError naming it", (name, builder) => {
+    expect(() => builder("", () => SONGS)).toThrow(new TypeError(`${name}: fn must be the name of the function, a string with something in it; got 0 characters`));
+    expect(() => builder(undefined, () => SONGS)).toThrow(new TypeError(`${name}: fn must be the name of the function, a string with something in it; got undefined`));
+  });
+
+  test.each(builders)("%s: a collection that is a path, and not a function that gives one, is a TypeError naming it", (name, builder) => {
+    expect(() => builder("getSong", SONGS)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got 19 characters`));
+    expect(() => builder("getSong", undefined)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got undefined`));
+  });
+
+  test.each(builders.slice(0, 3))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
+    const message = (what: string) => new TypeError(`${name}: also must be an object that names each further option, such as { views: true }; got ${what}`);
+    expect(() => builder("getSong", () => SONGS, ["views"])).toThrow(message("object"));
+    expect(() => builder("getSong", () => SONGS, "views")).toThrow(message("5 characters"));
+    expect(() => builder("getSong", () => SONGS, null)).toThrow(message("null"));
+  });
+
+  test("what a declaration gives is frozen: nothing can put another bound in its place", () => {
+    for (const fn of Object.values(declared)) {
+      expect(Object.isFrozen(fn)).toBe(true);
+      expect(() => {
+        (fn as { bound: unknown }).bound = noop;
+      }).toThrow(TypeError);
+    }
+  });
+
+  test("the options it names are its own copy: naming another afterwards changes nothing", async () => {
+    const also: { views: true; with?: true } = { views: true };
+    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", also);
+    also.with = true;
+    const { music, sent } = apple();
+    await getArtist(music, "1", { views: ["top-songs"], with: ["attributes"] } as { views: string[] });
+    expect(sent()).toEqual(["GET /v1/catalog/us/artists/1?views=top-songs"]);
+  });
+
+  test("the types: a declaration has to say what its function's answer is, and to name every option it adds", () => {
+    interface tAdded {
+      readonly views?: readonly string[] | undefined;
+      readonly with?: readonly string[] | undefined;
+    }
+    const declarations = [
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true, with: true }),
+      // @ts-expect-error -- the answer's type is not said, so there is nothing a collection can be
+      () => resourceGetter("getSong", () => SONGS),
+      // @ts-expect-error -- so too for the resources with some ids
+      () => resourcesGetter("getSongs", () => SONGS),
+      // @ts-expect-error -- and for a whole collection
+      () => resourceLister("listSongs", () => SONGS),
+      // @ts-expect-error -- and for a relationship, whose names would otherwise be anything
+      () => relationshipGetter("getAlbumRelationship", () => SONGS),
+      // @ts-expect-error -- two options are added and none is named
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS),
+      // @ts-expect-error -- one of the two is not named
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true }),
+      // @ts-expect-error -- a name that is misspelt is not one of the options
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { veiws: true, with: true }),
+      // @ts-expect-error -- an option is named that the function does not add
+      () => resourceGetter<tSongsResponse>("getSong", () => SONGS, { views: true }),
+    ];
+    expect(declarations).toHaveLength(9);
+  });
+});
+
+describe("what a plan gives is checked before it is asked for", () => {
+  test.each<[string, unknown, string]>([
+    ["a path alone, not in a list", "v1/x", "4 characters"],
+    ["nothing", undefined, "undefined"],
+    ["a list with nothing in it", [], "object"],
+    ["a list whose path is no string", [5], "object"],
+    ["an init that is no object", ["v1/x", "GET"], "object"],
+    ["an init that is null", ["v1/x", null], "object"],
+    ["an object with a path in it", { path: "v1/x" }, "object"],
+  ])("a plan that gives %s is a TypeError naming the function, and nothing is asked for", async (_name, planned, what) => {
+    const mistake = new TypeError(`getSong: its plan must give [path, init]; got ${what}`);
+    const { music, calls } = apple();
+    for (const unwrap of ["resource", "resources", "answer"] as const) {
+      const fn = endpoint("getSong", unwrap as "answer", () => planned as tRequestPlan<unknown>);
+      expect(await rejection(fn(music))).toEqual(mistake);
+      expect(await rejection(fn.bound(music)())).toEqual(mistake);
+    }
+    const walker = endpoint("getSong", "pages", () => planned as tRequestPlan<{ data: unknown[] }>);
+    expect(await rejection(walker(music))).toEqual(mistake);
+    // A walk is planned as it is called, so a plan that is there at once is found wrong at the call, and one that comes later by the loop.
+    expect(() => walker.bound(music)()).toThrow(mistake);
+    const late = endpoint("getSong", "pages", () => Promise.resolve(planned as tRequestPlan<{ data: unknown[] }>));
+    expect(await rejection(all(late.bound(music)()))).toEqual(mistake);
+    expect(calls).toHaveLength(0);
   });
 });
 
@@ -391,7 +540,7 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const failing = () => resourceLister<tLibrarySongsResponse>("listSongs", () => Promise.reject(down));
 
       test("it is asked as the function is called, so a storefront is being fetched before any loop", async () => {
-        const collection = vi.fn<tCollection<tReadOptions>>(() => Promise.resolve("v1/catalog/gb/songs"));
+        const collection = vi.fn<tCollection>(() => Promise.resolve("v1/catalog/gb/songs"));
         const { music, sent } = apple();
         const walk = resourceLister<tLibrarySongsResponse>("listSongs", collection).bound(music)();
         expect(collection).toHaveBeenCalledTimes(1);
@@ -509,8 +658,7 @@ describe("the resource patterns: what each asks Apple for", () => {
   });
 
   test("an option is sent only by a function declared to take it", async () => {
-    type tOptions = tReadOptions<tSongsResponse> & { readonly views?: readonly string[] | undefined };
-    const getArtist = resourceGetter<tSongsResponse, tOptions>("getArtist", () => "v1/catalog/us/artists", ["views"]);
+    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", { views: true });
     const { music, sent } = apple();
     await getArtist(music, "1", { views: ["top-songs", "singles"] });
     await getSong(music, "1", { views: ["top-songs"] } as tReadOptions<tSongsResponse>);
@@ -527,7 +675,7 @@ describe("the resource patterns: what each asks Apple for", () => {
 describe("the resource patterns: where the collection is", () => {
   test("it is asked with the function's name, the client and the options the call was given", async () => {
     const { music } = apple();
-    const collection = vi.fn<tCollection<tReadOptions<tSongsResponse>>>(() => SONGS);
+    const collection = vi.fn<tCollection>(() => SONGS);
     const options = { language: "en-GB" };
     await resourceGetter<tSongsResponse>("getSong", collection)(music, "1", options);
     expect(collection).toHaveBeenCalledWith("getSong", music, options);
@@ -535,15 +683,14 @@ describe("the resource patterns: where the collection is", () => {
 
   test("a call with no options hands it an empty bag, never undefined", async () => {
     const { music } = apple();
-    const collection = vi.fn<tCollection<tReadOptions<tSongsResponse>>>(() => SONGS);
+    const collection = vi.fn<tCollection>(() => SONGS);
     await resourcesGetter<tSongsResponse>("getSongs", collection)(music, ["1"]);
     expect(collection).toHaveBeenCalledWith("getSongs", music, {});
   });
 
   test("it may ask the client, as a catalog asks for a storefront no option named", async () => {
-    type tOptions = tReadOptions<tSongsResponse> & { readonly storefront?: string | undefined };
-    const collection: tCollection<tOptions> = async (_fn, client, options) => `v1/catalog/${options.storefront ?? (await client.storefront())}/songs`;
-    const inStorefront = resourceGetter<tSongsResponse, tOptions>("getSong", collection);
+    const collection: tCollection<tStore> = async (_fn, client, options) => `v1/catalog/${options.storefront ?? (await client.storefront())}/songs`;
+    const inStorefront = resourceGetter<tSongsResponse, tStore>("getSong", collection);
     const { music, sent } = apple([], { storefront: "gb" });
     await inStorefront(music, "1");
     await inStorefront(music, "1", { storefront: "jp" });
@@ -562,13 +709,12 @@ describe("the resource patterns: where the collection is", () => {
 });
 
 describe("the resource patterns: what a collection gives is checked, so that what goes into it cannot move the request", () => {
-  type tIn<T> = tReadOptions<T> & { readonly storefront?: string | undefined };
   /** A collection that puts a storefront into its path as it comes, which is what the check is there for. */
-  const catalog: tCollection<{ readonly storefront?: string | undefined }> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/songs`;
-  const one = resourceGetter<tSongsResponse, tIn<tSongsResponse>>("getSong", catalog);
-  const several = resourcesGetter<tSongsResponse, tIn<tSongsResponse>>("getSongs", catalog);
-  const whole = resourceLister<tSongsResponse, tIn<tPaged<tSongsResponse>>>("listSongs", catalog);
-  const related = relationshipGetter<tAlbumRelationships, tIn<tRelationshipResponse>>("getSongRelationship", catalog);
+  const catalog: tCollection<tStore> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/songs`;
+  const one = resourceGetter<tSongsResponse, tStore>("getSong", catalog);
+  const several = resourcesGetter<tSongsResponse, tStore>("getSongs", catalog);
+  const whole = resourceLister<tSongsResponse, tStore>("listSongs", catalog);
+  const related = relationshipGetter<tAlbumRelationships, tStore>("getSongRelationship", catalog);
 
   const DOTS = 'holds a segment that is "." or "..", written out or percent-encoded, which a URL reads as "here" and "one up", so that the request would go to another path';
   const BACKSLASH = "holds a backslash, which a URL reads as a slash, so that it would begin another segment";
@@ -686,7 +832,7 @@ describe("the resource patterns: what a collection gives is checked, so that wha
 });
 
 describe("the resource patterns: what a function is handed is checked before anything is asked, of Apple or of the collection", () => {
-  const collection = vi.fn<tCollection<tReadOptions>>(() => SONGS);
+  const collection = vi.fn<tCollection>(() => SONGS);
   const one = resourceGetter<tSongsResponse>("getSong", collection);
   const several = resourcesGetter<tSongsResponse>("getSongs", collection);
   const whole = resourceLister<tLibrarySongsResponse>("listLibrarySongs", collection);

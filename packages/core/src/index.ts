@@ -16,7 +16,22 @@ export type {
   tUserTokenStore,
 } from "./client";
 export { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter } from "./endpoint";
-export type { tCollection, tEndpoint, tEndpointNamespace, tItem, tPaged, tRelated, tRelationshipEndpoint, tRelationshipPage, tRequestPlan, tResources, tUnwrap } from "./endpoint";
+export type {
+  tAlso,
+  tCollection,
+  tEndpoint,
+  tEndpointNamespace,
+  tEndpointOptions,
+  tItem,
+  tNone,
+  tPaged,
+  tRelated,
+  tRelationshipEndpoint,
+  tRelationshipPage,
+  tRequestPlan,
+  tResources,
+  tUnwrap,
+} from "./endpoint";
 export { AppleMusicError, isAppleMusicError } from "./errors";
 export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors";
 export { got } from "./got";
