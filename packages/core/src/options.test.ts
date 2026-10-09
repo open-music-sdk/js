@@ -55,6 +55,11 @@ describe("initOf: an option that is given reaches the query under Apple's name f
     expect(init.schema).toBe(schema);
     expect(init.signal).toBe(signal);
   });
+
+  test("a schema that is a function is a schema all the same: it is known by what is under ~standard, as request knows it", () => {
+    const callable: tSchemaLike<unknown> = Object.assign(() => "called as a function", { "~standard": { validate: (value: unknown) => ({ value }) } });
+    expect(initOf("fn", { schema: callable }).schema).toBe(callable);
+  });
 });
 
 describe("initOf: three things fill the query, and the later wins", () => {
@@ -244,7 +249,9 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["a param list one item too long", { params: { a: Array.from({ length: 301 }, () => "1") } }, `${PARAM}object`],
     ["a schema with nothing in it", { schema: {} }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
     ["a schema whose validate is no function", { schema: { "~standard": { validate: "yes" } } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
-    ["a schema that is a function", { schema: noop }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got function'],
+    ["a schema that is a function with nothing under ~standard", { schema: noop }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got function'],
+    ["a schema whose ~standard is itself a function", { schema: { "~standard": Object.assign(noop, { validate: noop }) } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
+    ["a schema whose ~standard is null", { schema: { "~standard": null } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
     ["a schema that is null", { schema: null }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got null'],
   ])("%s", (_name, options, message) => {
     const error = thrown(() => initOf("getSong", loose(options)));
@@ -333,6 +340,16 @@ describe("initOf: what it gives is what request takes", () => {
     const failing: tSchemaLike<never> = { "~standard": { validate: () => ({ issues: [{ message: "expected a list", path: ["data"] }] }) } };
     const error: unknown = await music.request("v1/catalog/us/songs", initOf("getSongs", { schema: failing })).catch((e: unknown) => e);
     expect(isAppleMusicError(error, "ValidationError")).toBe(true);
+  });
+
+  test("a schema that is a function is the one the answer is held to, here as it is when handed to request itself", async () => {
+    const issues = [{ message: "expected a list", path: ["data"] }];
+    const callable: tSchemaLike<never> = Object.assign(() => undefined, { "~standard": { validate: () => ({ issues }) } });
+    for (const init of [{ schema: callable }, initOf<never>("getSongs", { schema: callable })]) {
+      const { music } = client({ data: "not a list" });
+      const error: unknown = await music.request("v1/catalog/us/songs", init).catch((e: unknown) => e);
+      expect(isAppleMusicError(error, "ValidationError")).toBe(true);
+    }
   });
 
   test("the signal is the one that aborts the request", async () => {

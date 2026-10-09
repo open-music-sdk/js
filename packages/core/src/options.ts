@@ -61,7 +61,8 @@ function offsetOf(fn: string, value: unknown): number | string | undefined {
 }
 
 function schemaOf<T>(fn: string, value: unknown): tSchemaLike<T> | undefined {
-  const standard = typeof value === "object" && value !== null ? (value as { "~standard"?: unknown })["~standard"] : undefined;
+  // A Standard Schema is known by what is under "~standard", whatever holds it: an object, or a function, as some libraries' schemas are.
+  const standard = (typeof value === "object" && value !== null) || typeof value === "function" ? (value as { "~standard"?: unknown })["~standard"] : undefined;
   if (value === undefined || (typeof standard === "object" && standard !== null && typeof (standard as { validate?: unknown }).validate === "function")) return value as tSchemaLike<T> | undefined;
   throw new TypeError(`${fn}: schema must be a Standard Schema, with a validate function under "~standard"; got ${got(value)}`);
 }
