@@ -17,14 +17,14 @@ libs, and the integrations people actually install. Every package ships the same
 
 | Sub-task | Status | Progress | Description |
 | --- | :---: | :---: | --- |
-| Repository tooling | 🚧 In progress | 80% | pnpm workspace · Turborepo · TypeScript · ESLint · tsdown · Vitest · Changesets · CI and release workflows |
-| `codegen` | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
-| `@open-music-sdk/types` | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
-| `@open-music-sdk/validate` | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
-| `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
-| `@open-music-sdk/developer-token` | 🚧 In progress | 80% | JWT minting · minter and fetcher providers · untested against the live API |
-| `@open-music-sdk/user-token` | 🚧 In progress | 80% | Intake handler · validation · memory and KV stores · untested against the live API |
-| `@open-music-sdk/util-artwork` | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check · zero dependencies · checked against Apple's image server, untested against the live API |
+| Repository tooling | 🚧 In progress | 80% | pnpm workspace · Turborepo · TypeScript · ESLint · tsdown · Vitest · CI workflow · Changesets and the release workflow not yet set up |
+| [`codegen`](./codegen) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
+| [`@open-music-sdk/types`](./packages/types) | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
+| [`@open-music-sdk/validate`](./packages/validate) | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
+| [`@open-music-sdk/core`](./packages/core) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · untested against the live API |
+| [`@open-music-sdk/developer-token`](./packages/developer-token) | 🚧 In progress | 80% | JWT minting · minter and fetcher providers over one cache · a `/fetcher` entry with no signing code · untested against the live API |
+| [`@open-music-sdk/user-token`](./packages/user-token) | 🚧 In progress | 80% | Validation · intake handler, and the same step without HTTP · memory and KV stores · untested against the live API |
+| [`@open-music-sdk/util-artwork`](./packages/util-artwork) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check · zero dependencies · checked against Apple's image server, untested against the live API |
 | `@open-music-sdk/client-catalog` | ⬜ Not started | 0% | Catalog, storefront, search, and chart endpoints · developer token only |
 | `@open-music-sdk/client-user` | ⬜ Not started | 0% | Library, ratings, recommendations, history, and replay endpoints · both tokens |
 | `@open-music-sdk/lib-playlists` | ⬜ Not started | 0% | Resolve tracks · read playlists · plan and apply changes · export |
@@ -38,6 +38,30 @@ libs, and the integrations people actually install. Every package ships the same
 
 Progress is a judgement of how much of the described scope exists and is tested.
 
+Until an integration exists, a client is put together by hand from `core` and a token package. Each
+README linked above shows how.
+
+## What every package holds to
+
+Settled while the foundation packages were built, and followed by the packages still to come.
+
+- **Nothing reads an environment or a file.** Keys, IDs and tokens arrive as arguments. Loading them
+  is your app's job, done the way it loads its other secrets.
+- **Two kinds of error.** A mistake in how a function was called is a `TypeError` that says which
+  argument was wrong. What happens at runtime with Apple, or with your own token endpoint, is an
+  `AppleMusicError` with a `_tag` to switch on.
+- **No error prints a key or a token.** A value that should have been one is described by its length
+  or its kind, so a secret never reaches a log by way of an error message.
+- **Options are checked and taken when a thing is created.** A mistake fails there and not on the
+  first request, and nothing done to your options object afterwards changes what happens.
+- **Credentials only go to `https://api.music.apple.com`.** `core` refuses a path that resolves
+  anywhere else before a token is asked for or a request is made.
+- **What is read from outside is bounded.** The answer from your token endpoint and a body posted to
+  the intake handler are read up to a limit and no further.
+- **Signing code stays where a key may live.** `jose` is the only third-party runtime dependency, and
+  the entry a browser imports, `@open-music-sdk/developer-token/fetcher`, has none of it.
+- **ESM only, Node 24 or newer, no framework runtime.**
+
 ## Layout
 
 ```
@@ -48,6 +72,7 @@ eslint.config.ts      root ESLint config (tooling/eslint-config)
 tooling/              private shared configs: eslint, tsdown, vitest
 codegen/              docc-crawl → docc-ir/ir.json → emit (see codegen/README.md)
 packages/             foundation packages: types, validate, core, developer-token, user-token, util-artwork
+.github/workflows/    ci: build, typecheck, lint and test on what a change affects
 ```
 
 Planned workspaces: `clients/` (one per token boundary), `lib/` (conveniences),
