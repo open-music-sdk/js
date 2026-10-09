@@ -105,7 +105,7 @@ export interface tAppleMusicClient {
 type tSettled<T> = tResponseOutcome & ({ readonly value: T; readonly error: undefined } | { readonly error: AppleMusicError; readonly value?: undefined });
 
 /** A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a last, empty page. */
-function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
+export function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
   if (page === undefined) return { data: [], next: undefined };
   const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status: 200 });
   if (typeof page !== "object" || page === null || Array.isArray(page)) throw shape("expected a page object");
