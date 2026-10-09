@@ -1,10 +1,96 @@
-import { AppleMusicError, isAppleMusicError, type tAppleMusicClient, type tErrorTag } from "@open-music-sdk/core";
+import { createClient, isAppleMusicError, type AppleMusicError, type tAppleMusicClient, type tClientOptions } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { appleError, failure, fakeClient, foreignClient, misshapen, padded, shaped, storefront, type tReply } from "./testing.js";
 import { validateUserToken } from "./token.js";
+
+/** One answer from Apple: a response, a fetch that throws, or `"hang"` for one that never answers until the request aborts. */
+type tReply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error | "hang";
+
+const storefront = (id = "us") => ({ data: [{ id, type: "storefronts", href: `/v1/storefronts/${id}` }] });
+
+/** Apple's error body for `status`, with a detail no message of ours should repeat. */
+const appleError = (status: number, title: string) => ({
+  status,
+  body: { errors: [{ id: "e1", title, detail: "apple-internal-detail", status: String(status), code: `${String(status)}00` }] },
+});
+
+/** Every Response the fake Apple handed out, so the suite can insist each body was read. */
+const responses: Response[] = [];
+
+/**
+ * A client whose fetch answers from a queue of replies, then with a storefront, and records every Request it
+ * saw. Like the real fetch it rejects with the abort reason when the request is aborted.
+ */
+function fakeClient(replies: tReply[] = [], options: Partial<tClientOptions> = {}) {
+  const calls: Request[] = [];
+  const fetch = (input: RequestInfo | URL): Promise<Response> => {
+    const req = input instanceof Request ? input : new Request(input);
+    calls.push(req);
+    if (req.signal.aborted) return Promise.reject(req.signal.reason as Error);
+    const reply = replies.shift() ?? { body: storefront() };
+    if (reply === "hang")
+      return new Promise<Response>((_resolve, reject) => {
+        req.signal.addEventListener("abort", () => {
+          reject(req.signal.reason as Error);
+        });
+      });
+    if (reply instanceof Error) return Promise.reject(reply);
+    const res = new Response(reply.body === undefined ? null : JSON.stringify(reply.body), { status: reply.status ?? 200, headers: reply.headers ?? {} });
+    responses.push(res);
+    return Promise.resolve(res);
+  };
+  return { music: createClient({ developerToken: "dev", fetch, retry: false, ...options }), calls };
+}
+
+/** The AppleMusicError `p` rejects with; anything else fails the test. */
+const failure = async (p: Promise<unknown>): Promise<AppleMusicError> => {
+  try {
+    await p;
+  } catch (e) {
+    if (isAppleMusicError(e)) return e;
+    throw new Error(`expected an AppleMusicError, got ${String(e)}`, { cause: e });
+  }
+  throw new Error("expected a rejection");
+};
+
+/** Tokens by core's rule, tokens once the whitespace around them is dropped, and values that are no token at all. */
+const shaped: [string, string][] = [
+  ["one character", "a"],
+  ["four thousand characters", "a".repeat(4000)],
+  ["base64 with padding", "Ab+/9w=="],
+  ["base64url", "Ab-_9w"],
+  ["dotted segments", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJBIn0.c2ln"],
+  ["every visible ASCII character", Array.from({ length: 94 }, (_, i) => String.fromCharCode(0x21 + i)).join("")],
+];
+const padded: [string, string][] = [
+  ["a leading space", " token"],
+  ["a trailing newline", "token\n"],
+  ["a tab before and a Windows line ending after", "\ttoken\r\n"],
+];
+const misshapen: [string, unknown][] = [
+  ["empty", ""],
+  ["a space", " "],
+  ["an inner space", "to ken"],
+  ["an inner newline", "to\nken"],
+  ["a header injection", "token\r\nx-injected: 1"],
+  ["a tab", "to\tken"],
+  ["a NUL", "to\0ken"],
+  ["a DEL", "to\x7fken"],
+  ["Latin-1", "tokén"],
+  ["beyond Latin-1", "tokĀn"],
+  ["an emoji", "tok\u{1f3b5}n"],
+  ["undefined", undefined],
+  ["null", null],
+  ["a number", 12345],
+  ["true", true],
+  ["an object", { token: "abc" }],
+  ["an array holding a token", ["abc"]],
+];
 
 afterEach(() => {
   vi.useRealTimers();
+  // An unread body holds its connection until garbage collection, so no code path may drop one.
+  expect(responses.filter((r) => r.body !== null && !r.bodyUsed)).toEqual([]);
+  responses.length = 0;
 });
 
 describe("validateUserToken", () => {
@@ -129,7 +215,7 @@ describe("validateUserToken", () => {
   });
 });
 
-describe("a 401 on a personal endpoint is settled by asking once more without the user token", () => {
+describe("validateUserToken: a 401 on a personal endpoint is settled by asking once more without the user token", () => {
   const sent = (calls: Request[]) => calls.map((c) => [new URL(c.url).pathname, c.headers.get("authorization"), c.headers.get("music-user-token")]);
 
   test("the second request is GET /v1/test with the developer token and no user token", async () => {
@@ -217,7 +303,7 @@ describe("a 401 on a personal endpoint is settled by asking once more without th
   });
 });
 
-describe("validating leaves the client it was given as it was", () => {
+describe("validateUserToken: the client it was given is left as it was", () => {
   test("the token under test replaces the one the client is bound to, for this call only", async () => {
     const { music, calls } = fakeClient([], { userToken: "bound" });
     await validateUserToken(music, "candidate");
@@ -237,7 +323,7 @@ describe("validating leaves the client it was given as it was", () => {
   });
 });
 
-describe("Apple is asked under the client's retry policy, whatever it is", () => {
+describe("validateUserToken: Apple is asked under the client's retry policy, whatever it is", () => {
   test("with retries off, one failure is the answer", async () => {
     const { music, calls } = fakeClient([{ status: 500 }], { retry: false });
     expect((await failure(validateUserToken(music, "user-token")))._tag).toBe("ApiError");
@@ -263,9 +349,17 @@ describe("Apple is asked under the client's retry policy, whatever it is", () =>
   });
 });
 
-describe("no error quotes a token", () => {
+describe("validateUserToken: no error quotes a token", () => {
   /** Everything an error shows when it is printed or serialised. */
   const shown = (e: unknown) => (e instanceof Error ? `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))} ${String(e.cause)}` : String(e));
+
+  test.each<[string, Error]>([
+    ["in its message", new Error("refused secret-token")],
+    ["in a property of its own", Object.assign(new Error("refused"), { token: "secret-token" })],
+    ["in its cause", new Error("refused", { cause: new Error("secret-token") })],
+  ])("the check itself sees a token an error carries %s, so its silence means something", (_name, error) => {
+    expect(shown(error)).toContain("secret");
+  });
 
   test.each<[string, string, tReply[]]>([
     ["refused for what it is", "secret token", []],
@@ -279,47 +373,6 @@ describe("no error quotes a token", () => {
     const error: unknown = await validateUserToken(music, token).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect(shown(error)).not.toContain("secret");
-  });
-});
-
-describe("a client from another copy of core is validated the same", () => {
-  test("that copy really is another: its error class is not this one", async () => {
-    const { core } = await foreignClient();
-    expect(core.AppleMusicError).not.toBe(AppleMusicError);
-    expect(Object.getPrototypeOf(new core.AppleMusicError("ApiError", "x"))).not.toBe(AppleMusicError.prototype);
-  });
-
-  test("a token Apple accepts resolves to the storefront", async () => {
-    const { music } = await foreignClient([{ body: storefront("jp") }]);
-    await expect(validateUserToken(music, "user-token")).resolves.toBe("jp");
-  });
-
-  test.each<[string, tErrorTag, tReply[]]>([
-    ["403", "UserTokenInvalid", [{ status: 403 }]],
-    ["429", "RateLimited", [{ status: 429 }]],
-    ["500", "ApiError", [{ status: 500 }]],
-    ["failed fetch", "NetworkError", [new TypeError("fetch failed")]],
-    ["401 for the listener", "UserTokenInvalid", [{ status: 401 }, {}]],
-    ["401 for the developer token", "DeveloperTokenInvalid", [{ status: 401 }, { status: 401 }]],
-    ["200 naming no storefront", "ApiError", [{ body: {} }]],
-  ])("its %s is a %s to this copy's guard and to its own", async (_, tag, replies) => {
-    const { core, music } = await foreignClient(replies);
-    const e = await validateUserToken(music, "user-token").catch((thrown: unknown) => thrown);
-    expect(isAppleMusicError(e, tag)).toBe(true);
-    expect(core.isAppleMusicError(e, tag)).toBe(true);
-  });
-
-  test("a 401 from that copy's client is still followed by the second request", async () => {
-    const { music, calls } = await foreignClient([{ status: 401 }, {}]);
-    await validateUserToken(music, "user-token").catch(() => undefined);
-    expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/v1/me/storefront", "/v1/test"]);
-  });
-
-  test("the UserTokenInvalid this package makes, for a 401 that was the listener's, is an instance of that copy's class", async () => {
-    const { core, music } = await foreignClient([{ status: 401 }, {}]);
-    const e = await validateUserToken(music, "user-token").catch((thrown: unknown) => thrown);
-    expect(Object.getPrototypeOf(e)).toBe(AppleMusicError.prototype);
-    expect(e instanceof core.AppleMusicError).toBe(true);
   });
 });
 

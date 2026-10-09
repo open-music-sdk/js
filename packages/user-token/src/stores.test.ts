@@ -1,7 +1,27 @@
-import { isAppleMusicError } from "@open-music-sdk/core";
-import { describe, expect, test, vi } from "vitest";
+import { createClient, isAppleMusicError, type tUserTokenStore } from "@open-music-sdk/core";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { KvUserTokenStore, MemoryUserTokenStore, type tKvNamespace, type tKvStoreOptions } from "./stores.js";
-import { fakeClient } from "./testing.js";
+
+/** Every Response the fake Apple handed out, so the suite can insist each body was read. */
+const responses: Response[] = [];
+
+/** A client reading its user tokens from `store`, whose fetch answers every request with an empty page and records it. */
+function clientOver(store: tUserTokenStore) {
+  const calls: Request[] = [];
+  const fetch = (input: RequestInfo | URL): Promise<Response> => {
+    calls.push(input instanceof Request ? input : new Request(input));
+    const res = Response.json({ data: [] });
+    responses.push(res);
+    return Promise.resolve(res);
+  };
+  return { music: createClient({ developerToken: "dev", fetch, retry: false, userTokenStore: store }), calls };
+}
+
+afterEach(() => {
+  // An unread body holds its connection until garbage collection, so no code path may drop one.
+  expect(responses.filter((r) => r.body !== null && !r.bodyUsed)).toEqual([]);
+  responses.length = 0;
+});
 
 /** A namespace over a Map that answers null for a missing key, as Workers KV does. */
 function fakeKv() {
@@ -280,7 +300,7 @@ describe("KvUserTokenStore", () => {
 
 describe.each(stores)("forUser() sends what %s holds, looked up for each request", (_, create) => {
   const bound = (store: tStore) => {
-    const { music, calls } = fakeClient([], { userTokenStore: store });
+    const { music, calls } = clientOver(store);
     return { listener: music.forUser("u1"), sent: () => calls.map((c) => c.headers.get("music-user-token")) };
   };
   const invalid = (e: unknown) => isAppleMusicError(e, "UserTokenInvalid");
@@ -328,10 +348,10 @@ describe.each(stores)("forUser() sends what %s holds, looked up for each request
   });
 });
 
-describe("a store that cannot answer is not a store with no token", () => {
+describe("KvUserTokenStore: a namespace that cannot answer is not a user with no token", () => {
   test("forUser() rejects with the namespace's error, not UserTokenInvalid", async () => {
     const down = () => Promise.reject(new Error("kv down"));
-    const { music, calls } = fakeClient([], { userTokenStore: new KvUserTokenStore({ get: down, put: down, delete: down }) });
+    const { music, calls } = clientOver(new KvUserTokenStore({ get: down, put: down, delete: down }));
     await expect(music.forUser("u1").request("v1/me/library/songs")).rejects.toThrow("kv down");
     expect(calls).toHaveLength(0);
   });

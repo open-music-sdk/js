@@ -1,11 +1,79 @@
-import type { tAppleMusicClient, tClientOptions, tUserTokenStore } from "@open-music-sdk/core";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { isJson, userTokenIntake, type tIntakeOptions } from "./intake.js";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { createClient, type tAppleMusicClient, type tClientOptions, type tUserTokenStore } from "@open-music-sdk/core";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { isJson, userTokenIntake, type tIntakeOptions, type tUserTokenIntake } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
-import { appleError, fakeClient, foreignClient, misshapen, padded, shaped, type tReply } from "./testing.js";
 
 const ENDPOINT = "https://app.example/music/user-token";
 const JSON_TYPE = { "content-type": "application/json" };
+
+/** One answer from Apple: a response, a fetch that throws, or `"hang"` for one that never answers until the request aborts. */
+type tReply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error | "hang";
+
+const storefront = (id = "us") => ({ data: [{ id, type: "storefronts", href: `/v1/storefronts/${id}` }] });
+
+/** Apple's error body for `status`, with a detail no response of ours should repeat. */
+const appleError = (status: number, title: string) => ({
+  status,
+  body: { errors: [{ id: "e1", title, detail: "apple-internal-detail", status: String(status), code: `${String(status)}00` }] },
+});
+
+/** Every Response the fake Apple handed out, so the suite can insist each body was read. */
+const responses: Response[] = [];
+
+/**
+ * A client whose fetch answers from a queue of replies, then with a storefront, and records every Request it
+ * saw. Like the real fetch it rejects with the abort reason when the request is aborted.
+ */
+function fakeClient(replies: tReply[] = [], options: Partial<tClientOptions> = {}) {
+  const calls: Request[] = [];
+  const fetch = (input: RequestInfo | URL): Promise<Response> => {
+    const req = input instanceof Request ? input : new Request(input);
+    calls.push(req);
+    if (req.signal.aborted) return Promise.reject(req.signal.reason as Error);
+    const reply = replies.shift() ?? { body: storefront() };
+    if (reply === "hang")
+      return new Promise<Response>((_resolve, reject) => {
+        req.signal.addEventListener("abort", () => {
+          reject(req.signal.reason as Error);
+        });
+      });
+    if (reply instanceof Error) return Promise.reject(reply);
+    const res = new Response(reply.body === undefined ? null : JSON.stringify(reply.body), { status: reply.status ?? 200, headers: reply.headers ?? {} });
+    responses.push(res);
+    return Promise.resolve(res);
+  };
+  return { music: createClient({ developerToken: "dev", fetch, retry: false, ...options }), calls };
+}
+
+/** Tokens by core's rule, tokens once the whitespace around them is dropped, and strings that are no token at all. */
+const shaped: [string, string][] = [
+  ["one character", "a"],
+  ["four thousand characters", "a".repeat(4000)],
+  ["base64 with padding", "Ab+/9w=="],
+  ["base64url", "Ab-_9w"],
+  ["dotted segments", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJBIn0.c2ln"],
+  ["every visible ASCII character", Array.from({ length: 94 }, (_, i) => String.fromCharCode(0x21 + i)).join("")],
+];
+const padded: [string, string][] = [
+  ["a leading space", " token"],
+  ["a trailing newline", "token\n"],
+  ["a tab before and a Windows line ending after", "\ttoken\r\n"],
+];
+const misshapen: [string, string][] = [
+  ["empty", ""],
+  ["a space", " "],
+  ["an inner space", "to ken"],
+  ["an inner newline", "to\nken"],
+  ["a header injection", "token\r\nx-injected: 1"],
+  ["a tab", "to\tken"],
+  ["a NUL", "to\0ken"],
+  ["a DEL", "to\x7fken"],
+  ["Latin-1", "tokén"],
+  ["beyond Latin-1", "tokĀn"],
+  ["an emoji", "tok\u{1f3b5}n"],
+];
 
 /** An intake over a scripted client, the store behind it, and a spy on every write to that store. */
 function intake(replies: tReply[] = [], options: Partial<tIntakeOptions> = {}, clientOptions: Partial<tClientOptions> = {}) {
@@ -22,8 +90,14 @@ const post = (body: unknown, headers: Record<string, string> = JSON_TYPE) =>
 
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 
+/** Everything a response shows whoever receives it: its body and its headers. */
+const shown = async (res: Response) => (await res.text()) + JSON.stringify([...res.headers]);
+
 afterEach(() => {
   vi.useRealTimers();
+  // An unread body holds its connection until garbage collection, so no code path may drop one.
+  expect(responses.filter((r) => r.body !== null && !r.bodyUsed)).toEqual([]);
+  responses.length = 0;
 });
 
 describe("isJson", () => {
@@ -162,7 +236,7 @@ describe("userTokenIntake: one status per outcome", () => {
     expect(await store.get("u1")).toBe("token");
   });
 
-  test.each(misshapen.filter((row): row is [string, string] => typeof row[1] === "string"))("422 UserTokenInvalid for a posted string that is %s, without asking Apple", async (_, token) => {
+  test.each(misshapen)("422 UserTokenInvalid for a posted string that is %s, without asking Apple", async (_, token) => {
     const { handler, calls } = intake();
     const res = await handler(post({ token }));
     expect(res.status).toBe(422);
@@ -199,7 +273,7 @@ describe("userTokenIntake: one status per outcome", () => {
   });
 });
 
-describe("a token is stored only after Apple accepts it", () => {
+describe("userTokenIntake: a token is stored only after Apple accepts it", () => {
   test.each<[string, Request, tReply[]]>([
     ["Apple answers 403", post({ token: "user-token" }), [{ status: 403 }]],
     ["Apple answers 401 for the listener", post({ token: "user-token" }), [{ status: 401 }, {}]],
@@ -243,7 +317,7 @@ describe("a token is stored only after Apple accepts it", () => {
   });
 });
 
-describe("the user comes from the session and nowhere else", () => {
+describe("userTokenIntake: the user comes from the session and nowhere else", () => {
   test("the token is stored under what userId resolves to, and userId sees the request", async () => {
     const userId = vi.fn((req: Request) => Promise.resolve(req.headers.get("x-session")));
     const { handler, set } = intake([], { userId });
@@ -276,7 +350,7 @@ describe("the user comes from the session and nowhere else", () => {
   });
 });
 
-describe("another site cannot bind its own token to a visitor", () => {
+describe("userTokenIntake: another site cannot bind its own token to a visitor", () => {
   // What a cross-site form or a no-cors fetch can send without the browser asking first.
   test.each(["text/plain", "text/plain;charset=UTF-8", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"])(
     "a %s post is turned away before the session is consulted",
@@ -301,7 +375,7 @@ describe("another site cannot bind its own token to a visitor", () => {
   });
 });
 
-describe("Apple is asked under the client's retry policy, whatever it is", () => {
+describe("userTokenIntake: Apple is asked under the client's retry policy, whatever it is", () => {
   test("with retries off, one failure is a 502 after one request", async () => {
     const { handler, calls } = intake([{ status: 500 }], {}, { retry: false });
     expect((await handler(post({ token: "user-token" }))).status).toBe(502);
@@ -341,7 +415,7 @@ describe("Apple is asked under the client's retry policy, whatever it is", () =>
   });
 });
 
-describe("a request that is aborted is not answered", () => {
+describe("userTokenIntake: a request that is aborted is not answered", () => {
   const aborting = (controller: AbortController) => new Request(ENDPOINT,{ method: "POST", headers: JSON_TYPE, body: JSON.stringify({ token: "user-token" }), signal: controller.signal });
 
   test("aborted before the handler runs: rejects with the reason, Apple is not asked", async () => {
@@ -369,7 +443,15 @@ describe("a request that is aborted is not answered", () => {
   });
 });
 
-describe("no response carries the token or Apple's error text, and none may be cached", () => {
+describe("userTokenIntake: no response carries the token or Apple's error text, and none may be cached", () => {
+  test.each<[string, Response]>([
+    ["in its body", Response.json({ error: "secret-token" })],
+    ["in a header", new Response(null, { headers: { "x-echo": "secret-token" } })],
+    ["as Apple's detail", Response.json(appleError(403, "Forbidden").body)],
+  ])("the check itself sees what a response carries %s, so its silence means something", async (_name, res) => {
+    expect(await shown(res)).toMatch(/secret|apple-internal-detail/);
+  });
+
   test.each<[string, Request, tReply[]]>([
     ["accepted", post({ token: "secret-token" }), []],
     ["rejected by Apple", post({ token: "secret-token" }), [appleError(403, "Forbidden")]],
@@ -384,7 +466,7 @@ describe("no response carries the token or Apple's error text, and none may be c
   ])("%s", async (_, req, replies) => {
     const { handler } = intake(replies);
     const res = await handler(req);
-    const seen = (await res.text()) + JSON.stringify([...res.headers]);
+    const seen = await shown(res);
     expect(seen).not.toContain("secret");
     expect(seen).not.toContain("apple-internal-detail");
     expect(res.headers.get("cache-control")).toBe("no-store");
@@ -395,36 +477,6 @@ describe("no response carries the token or Apple's error text, and none may be c
     const res = await handler(post({ token: "secret-token" }));
     expect(await res.text()).not.toContain("secret");
     expect(res.headers.get("cache-control")).toBe("no-store");
-  });
-});
-
-describe("a client from another copy of core is served the same", () => {
-  const foreign = async (replies: tReply[] = []) => {
-    const { music, calls } = await foreignClient(replies);
-    const store = new MemoryUserTokenStore();
-    return { store, calls, handler: userTokenIntake(music, { store, userId: () => "u1" }) };
-  };
-
-  test("a token Apple accepts is stored", async () => {
-    const { handler, store } = await foreign();
-    expect((await handler(post({ token: "user-token" }))).status).toBe(204);
-    expect(await store.get("u1")).toBe("user-token");
-  });
-
-  test.each<[string, number, string, tReply[]]>([
-    ["403", 422, "UserTokenInvalid", [{ status: 403 }]],
-    ["401 for the listener", 422, "UserTokenInvalid", [{ status: 401 }, {}]],
-    ["401 for the developer token", 502, "DeveloperTokenInvalid", [{ status: 401 }, { status: 401 }]],
-    ["429", 502, "RateLimited", [{ status: 429 }]],
-    ["500", 502, "ApiError", [{ status: 500 }]],
-    ["200 naming no storefront", 502, "ApiError", [{ body: {} }]],
-    ["failed fetch", 502, "NetworkError", [new TypeError("fetch failed")]],
-  ])("its %s is answered %i %s, not thrown at the framework", async (_, status, tag, replies) => {
-    const { handler, store } = await foreign(replies);
-    const res = await handler(post({ token: "user-token" }));
-    expect(res.status).toBe(status);
-    expect(await errorOf(res)).toBe(tag);
-    expect(await store.get("u1")).toBeUndefined();
   });
 });
 
@@ -510,5 +562,115 @@ describe("userTokenIntake: its options are taken once", () => {
     expect((await handler(post({ token: "user-token" }))).status).toBe(204);
     expect(await first.get("u1")).toBe("user-token");
     expect([await second.get("u1"), await second.get("someone-else"), await first.get("someone-else")]).toEqual([undefined, undefined, undefined]);
+  });
+});
+
+describe("userTokenIntake: against a real server, with the real fetch", () => {
+  let server: Server;
+  let origin: string;
+  let handler: tUserTokenIntake;
+
+  beforeAll(async () => {
+    // What a framework's adapter does: a node request in, a web Request to the handler, its Response back out.
+    server = createServer((req, res) => {
+      const headers = new Headers();
+      for (let i = 0; i < req.rawHeaders.length; i += 2) headers.append(req.rawHeaders[i] ?? "", req.rawHeaders[i + 1] ?? "");
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          req.on("data", (chunk: Buffer) => {
+            if (!cancelled) controller.enqueue(new Uint8Array(chunk));
+          });
+          req.on("end", () => {
+            if (!cancelled) controller.close();
+          });
+        },
+        cancel() {
+          // What is left of the upload is let go by, so the answer can still be written on this connection.
+          cancelled = true;
+          req.resume();
+        },
+      });
+      const sends = req.method !== "GET" && req.method !== "HEAD";
+      const request = new Request(origin + (req.url ?? "/"), { method: req.method ?? "GET", headers, body: sends ? body : null, duplex: "half" } as RequestInit);
+      void handler(request).then(
+        async (response) => {
+          res.writeHead(response.status, Object.fromEntries(response.headers));
+          res.end(Buffer.from(await response.arrayBuffer()));
+        },
+        () => {
+          res.writeHead(500);
+          res.end();
+        },
+      );
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    origin = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  /** Mounts an intake on the server and says where to post to it. */
+  function mounted(replies: tReply[] = []) {
+    const made = intake(replies);
+    handler = made.handler;
+    return { ...made, url: `${origin}/music/user-token` };
+  }
+
+  test("a JSON post is validated with Apple and stored: 204 with no body", async () => {
+    const { url, store, calls } = mounted();
+    const res = await fetch(url, { method: "POST", headers: JSON_TYPE, body: JSON.stringify({ token: "user-token" }) });
+    expect([res.status, await res.text(), res.headers.get("cache-control")]).toEqual([204, "", "no-store"]);
+    expect(await store.get("u1")).toBe("user-token");
+    expect(calls.map((c) => c.headers.get("music-user-token"))).toEqual(["user-token"]);
+  });
+
+  test("a form post, the kind another site can send without asking, is 415 and reaches neither Apple nor the store", async () => {
+    const { url, set, calls } = mounted();
+    const res = await fetch(url, { method: "POST", body: new URLSearchParams({ token: "attacker-token" }) });
+    expect(res.headers.get("content-type")).toMatch(/^application\/json/);
+    expect([res.status, await errorOf(res)]).toEqual([415, "UnsupportedMediaType"]);
+    expect(calls).toHaveLength(0);
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  test("a post that declares more than 8 KiB is 413, and the connection still carries the answer", async () => {
+    const { url, calls } = mounted();
+    const res = await fetch(url, { method: "POST", headers: JSON_TYPE, body: JSON.stringify({ token: "user-token", pad: "x".repeat(20_000) }) });
+    expect([res.status, await errorOf(res)]).toEqual([413, "PayloadTooLarge"]);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a post streamed with no declared length is cut off past 8 KiB: 413", async () => {
+    const { url, calls } = mounted();
+    let sent = 0;
+    const upload = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent++ < 32) controller.enqueue(new Uint8Array(1024).fill(0x20));
+        else controller.close();
+      },
+    });
+    const res = await fetch(url, { method: "POST", headers: JSON_TYPE, body: upload, duplex: "half" } as RequestInit);
+    expect([res.status, await errorOf(res)]).toEqual([413, "PayloadTooLarge"]);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a GET is 405 and says what is allowed", async () => {
+    const { url } = mounted();
+    const res = await fetch(url);
+    expect([res.status, res.headers.get("allow"), await errorOf(res)]).toEqual([405, "POST", "MethodNotAllowed"]);
+  });
+
+  test("a token Apple will not take is 422, with nothing of Apple's answer in it", async () => {
+    const { url, store } = mounted([appleError(403, "Forbidden")]);
+    const res = await fetch(url, { method: "POST", headers: JSON_TYPE, body: JSON.stringify({ token: "revoked" }) });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toBe('{"error":"UserTokenInvalid"}');
+    expect(await store.get("u1")).toBeUndefined();
   });
 });

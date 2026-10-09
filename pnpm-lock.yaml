@@ -271,6 +271,9 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
       tooling-tsdown-config:
         specifier: workspace:*
         version: link:../../tooling/tsdown-config
