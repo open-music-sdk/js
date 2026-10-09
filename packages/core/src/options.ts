@@ -67,6 +67,15 @@ function schemaOf<T>(fn: string, value: unknown): tSchemaLike<T> | undefined {
   throw new TypeError(`${fn}: schema must be a Standard Schema, with a validate function under "~standard"; got ${got(value)}`);
 }
 
+/**
+ * A signal as `fetch` will take it. Anything else would be found out late, after other things had been asked for,
+ * and by the runtime, whose own complaint prints what it was handed.
+ */
+function signalOf(fn: string, value: unknown): AbortSignal | undefined {
+  if (value === undefined || value instanceof AbortSignal) return value;
+  throw new TypeError(`${fn}: signal must be an AbortSignal; got ${got(value)}`);
+}
+
 /** An option a function takes beyond the ones above, such as `views`: one value, or a list of them. */
 function alsoOf(fn: string, name: string, value: unknown): tValue | undefined {
   if (Array.isArray(value)) return namesOf(fn, name, value);
@@ -122,5 +131,5 @@ export function initOf<T>(fn: string, options: tReadOptions<T> | undefined, set:
     ...Object.entries(set),
   ];
   for (const [key, value] of given) if (value !== undefined && value !== null) query.set(key, value);
-  return { params: Object.fromEntries(query), schema: schemaOf(fn, schema), signal };
+  return { params: Object.fromEntries(query), schema: schemaOf(fn, schema), signal: signalOf(fn, signal) };
 }

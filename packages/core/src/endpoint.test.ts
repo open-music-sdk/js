@@ -502,6 +502,7 @@ describe("the resource patterns: what a function is handed is checked before any
     ["options that are no object", (music) => one(music, "1", "en-GB" as unknown as tReadOptions<tSongsResponse>), "getSong: expected an options object; got 5 characters"],
     ["options that are null", (music) => one(music, "1", null as unknown as tReadOptions<tSongsResponse>), "getSong: expected an options object; got null"],
     ["a wrong option", (music) => one(music, "1", { limit: 0 }), "getSong: limit must be a whole number above 0; got 0"],
+    ["a signal that is no signal", (music) => one(music, "1", { signal: {} as AbortSignal }), "getSong: signal must be an AbortSignal; got object"],
     ["one id where a list belongs", (music) => several(music, "1" as unknown as string[]), `getSongs: ids ${LIST}1 characters`],
     ["no ids", (music) => several(music, []), `getSongs: ids ${LIST}a list of 0`],
     ["two ids in one", (music) => several(music, ["1,2"]), `getSongs: ids ${LIST}3 characters at index 0`],

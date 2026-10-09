@@ -56,6 +56,14 @@ describe("initOf: an option that is given reaches the query under Apple's name f
     expect(init.signal).toBe(signal);
   });
 
+  test.each<[string, AbortSignal]>([
+    ["a controller's", new AbortController().signal],
+    ["one already aborted", AbortSignal.abort()],
+    ["one made of others", AbortSignal.any([new AbortController().signal])],
+  ])("a signal, %s, is taken", (_name, signal) => {
+    expect(initOf("fn", { signal }).signal).toBe(signal);
+  });
+
   test("a schema that is a function is a schema all the same: it is known by what is under ~standard, as request knows it", () => {
     const callable: tSchemaLike<unknown> = Object.assign(() => "called as a function", { "~standard": { validate: (value: unknown) => ({ value }) } });
     expect(initOf("fn", { schema: callable }).schema).toBe(callable);
@@ -253,6 +261,11 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["a schema whose ~standard is itself a function", { schema: { "~standard": Object.assign(noop, { validate: noop }) } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
     ["a schema whose ~standard is null", { schema: { "~standard": null } }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got object'],
     ["a schema that is null", { schema: null }, 'getSong: schema must be a Standard Schema, with a validate function under "~standard"; got null'],
+    ["a signal that is null", { signal: null }, "getSong: signal must be an AbortSignal; got null"],
+    ["a signal that is an empty object, as one parsed from JSON is", { signal: {} }, "getSong: signal must be an AbortSignal; got object"],
+    ["a signal that only looks like one", { signal: { aborted: false, reason: undefined, throwIfAborted: noop, addEventListener: noop, removeEventListener: noop } }, "getSong: signal must be an AbortSignal; got object"],
+    ["a controller where its signal belongs", { signal: new AbortController() }, "getSong: signal must be an AbortSignal; got object"],
+    ["a signal that is true", { signal: true }, "getSong: signal must be an AbortSignal; got boolean"],
   ])("%s", (_name, options, message) => {
     const error = thrown(() => initOf("getSong", loose(options)));
     expect(error).toBeInstanceOf(TypeError);
@@ -287,6 +300,8 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["params", { params: SECRET }],
     ["a param", { params: { a: { token: SECRET } } }],
     ["schema", { schema: SECRET }],
+    ["signal", { signal: SECRET }],
+    ["a signal that only looks like one", { signal: { token: SECRET, aborted: false, throwIfAborted: noop } }],
   ])("a mistake in %s does not show the value", (_name, options) => {
     const error = thrown(() => initOf("getSong", loose(options)));
     expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
