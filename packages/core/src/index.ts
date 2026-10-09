@@ -1,4 +1,4 @@
-export { createClient } from "./client.js";
+export { createClient, parseToken } from "./client.js";
 export type {
   tAppleMusicClient,
   tClientOptions,

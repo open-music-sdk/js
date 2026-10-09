@@ -110,13 +110,22 @@ const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof t
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
 
 /**
- * A token, fit to be a header value. A runtime's own complaint about a value it cannot send quotes the value,
- * so a token with a line break or a space inside it is refused here and described, never repeated.
- * Whitespace around it, as a token read from a file has, is dropped.
+ * `value` as a token fit to be a header value, or undefined when it is not one: printable ASCII with no spaces or
+ * line breaks inside. Whitespace around it, as a token read from a file has, is dropped. This is the one rule for
+ * what a token is, for a developer token and a Music User Token alike.
+ */
+export function parseToken(value: unknown): string | undefined {
+  const token = typeof value === "string" ? value.trim() : "";
+  return /^[\x21-\x7e]+$/.test(token) ? token : undefined;
+}
+
+/**
+ * A token, or a TypeError. A runtime's own complaint about a value it cannot send quotes the value, so a token
+ * with a line break or a space inside it is refused here and described, never repeated.
  */
 function credential(name: string, token: unknown): string {
-  const value = typeof token === "string" ? token.trim() : "";
-  if (/^[\x21-\x7e]+$/.test(value)) return value;
+  const value = parseToken(token);
+  if (value !== undefined) return value;
   throw new TypeError(`${name} is not a token: expected printable characters with no spaces or line breaks inside, got ${got(token)}`);
 }
 const formatIssues = (issues: readonly tValidationIssue[]) =>
