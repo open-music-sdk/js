@@ -265,6 +265,24 @@ importers:
 
   packages/types: {}
 
+  packages/util-artwork:
+    devDependencies:
+      '@open-music-sdk/types':
+        specifier: workspace:*
+        version: link:../types
+      tooling-tsdown-config:
+        specifier: workspace:*
+        version: link:../../tooling/tsdown-config
+      tooling-vitest-config:
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
+
   packages/validate:
     dependencies:
       '@open-music-sdk/types':
