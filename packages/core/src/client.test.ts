@@ -914,22 +914,50 @@ describe("paginate", () => {
       expect(calls).toHaveLength(0);
     });
 
-    test("a promise of a page is awaited, so a request can be handed over as it is made", async () => {
+    test("an answer, once awaited, is handed over as it is", async () => {
       const { music, calls } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2] } }]);
-      expect(await items(music.paginate(music.request<{ data: number[]; next?: string }>("v1/x", { params: { limit: 1 } })))).toEqual([1, 2]);
+      const first = await music.request<{ data: number[]; next?: string }>("v1/x", { params: { limit: 1 } });
+      expect(await items(music.paginate(first))).toEqual([1, 2]);
       expect(calls).toHaveLength(2);
     });
 
-    test("a promise that comes to nothing, as an empty answer does, is a last, empty page", async () => {
+    test("nothing at all, which is what an empty answer comes to, is a last, empty page", async () => {
       const { music, calls } = client([{ status: 204 }]);
-      expect(await items(music.paginate(music.request<{ data: number[] }>("v1/x")))).toEqual([]);
+      const empty = await music.request<{ data: number[] }>("v1/x");
+      expect(empty).toBeUndefined();
+      expect(await items(music.paginate(empty))).toEqual([]);
       expect(calls).toHaveLength(1);
     });
 
-    test("a promise that rejects surfaces from the loop, with nothing yielded", async () => {
-      const { music } = client([apiError(404, "Not Found")]);
-      const e = await failure(items(music.paginate(music.request<{ data: number[] }>("v1/x"))));
-      expect(e.status).toBe(404);
+    describe("a promise of a page is not a page", () => {
+      const AWAIT = "paginate: expected a path or a page; got a promise of one, which has to be awaited first";
+
+      test("it is a TypeError that says to await it, and nothing is asked for", async () => {
+        const { music, calls } = client();
+        const error: unknown = await items(music.paginate(Promise.resolve({ data: [1] }) as unknown as { data: number[] })).catch((e: unknown) => e);
+        expect(error).toEqual(new TypeError(AWAIT));
+        expect(calls).toHaveLength(0);
+      });
+
+      test("it is not awaited here: what it comes to, or rejects with, stays the caller's", async () => {
+        const then = vi.fn();
+        const { music } = client();
+        const error: unknown = await items(music.paginate({ then } as unknown as { data: number[] })).catch((e: unknown) => e);
+        expect(error).toEqual(new TypeError(AWAIT));
+        expect(then).not.toHaveBeenCalled();
+      });
+
+      test("awaited by the caller, a request that fails is caught where it was made, before any walk", async () => {
+        const { music } = client([apiError(404, "Not Found")]);
+        const walked: number[] = [];
+        const e = await failure(
+          (async () => {
+            for await (const item of music.paginate(await music.request<{ data: number[] }>("v1/x"))) walked.push(item);
+          })(),
+        );
+        expect(e.status).toBe(404);
+        expect(walked).toEqual([]);
+      });
     });
 
     test("a relationship inside a resource is a page like any other, whatever else it holds", async () => {
@@ -971,13 +999,9 @@ describe("paginate", () => {
       expect(calls).toHaveLength(0);
     });
 
-    test("nothing is read or asked for until the loop starts", async () => {
+    test("pages after it are fetched one at a time, as its own items run out", async () => {
       const { music, calls } = client([{ body: { data: [2] } }]);
-      const then = vi.fn((resolve: (page: { data: number[]; next: string }) => void) => {
-        resolve({ data: [1], next: "/v1/x?offset=1" });
-      });
-      const it = music.paginate({ then } as unknown as PromiseLike<{ data: number[]; next: string }>)[Symbol.asyncIterator]();
-      expect(then).not.toHaveBeenCalled();
+      const it = music.paginate({ data: [1], next: "/v1/x?offset=1" })[Symbol.asyncIterator]();
       expect((await it.next()).value).toBe(1);
       expect(calls).toHaveLength(0);
       expect((await it.next()).value).toBe(2);
@@ -997,9 +1021,6 @@ describe("paginate", () => {
       ["next as a number", { data: [], next: 7 }],
       ["next as an object", { data: [], next: {} }],
       ["a list", [1, 2]],
-      ["a promise of null", Promise.resolve(null)],
-      ["a promise of a string", Promise.resolve("v1/x")],
-      ["a promise of a number", Promise.resolve(5)],
     ])("%s is no page: an ApiError that says so, and nothing is asked for", async (_, page) => {
       const { music, calls } = client();
       const e = await failure(items(music.paginate(page as { data: number[] })));
@@ -1009,7 +1030,6 @@ describe("paginate", () => {
     });
 
     test.each<[string, unknown, string]>([
-      ["nothing", undefined, "undefined"],
       ["null", null, "null"],
       ["a number", 5, "5"],
       ["true", true, "boolean"],
@@ -1018,7 +1038,7 @@ describe("paginate", () => {
       const { music, calls } = client();
       const error: unknown = await items(music.paginate(page as { data: number[] })).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(TypeError);
-      expect((error as Error).message).toBe(`paginate: expected a path, or a page or a promise of one; got ${what}`);
+      expect((error as Error).message).toBe(`paginate: expected a path or a page; got ${what}`);
       expect(calls).toHaveLength(0);
     });
   });

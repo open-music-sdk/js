@@ -86,14 +86,14 @@ export interface tAppleMusicClient {
   /**
    * The items of `data` across every `next` page. Breaking out of the loop stops fetching.
    *
-   * `from` is a path, or a page already fetched, or a promise of one: the page's own items come first and nothing
-   * is asked for until they run out. With a page, `init.params` is not sent, since its `next` link already carries
-   * the query.
+   * `from` is a path, or a page already fetched: the page's own items come first and nothing is asked for until
+   * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A
+   * promise of a page is not a page: await it, so that what it rejects with reaches the code that asked.
    *
    * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
    * relationship's are. A search or a chart answers with its pages nested under `results`, and is not walked.
    */
-  paginate<T>(from: string | tPage<T> | PromiseLike<tPage<T>>, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
+  paginate<T>(from: string | tPage<T>, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
   /** The configured storefront, or the listener's, resolved once. */
   storefront(): Promise<string>;
   /** A client for one listener. Shares the developer token, limiter, retry policy, and hooks. */
@@ -245,14 +245,17 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 
-  async function* paginate<T>(from: string | tPage<T> | PromiseLike<tPage<T>>, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
+  async function* paginate<T>(from: string | tPage<T>, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
     let next: string | undefined;
     let params = init.params;
     if (typeof from === "string") next = from;
     else {
-      // Handing over nothing at all is the caller's mistake. A promise that comes to nothing is Apple's empty answer.
-      if (typeof from !== "object" || (from as unknown) === null) throw new TypeError(`paginate: expected a path, or a page or a promise of one; got ${got(from)}`);
-      const first = pageOf(await from, "the page given to paginate");
+      // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else that is no object is the caller's mistake.
+      if ((from as unknown) !== undefined && (typeof from !== "object" || (from as unknown) === null)) throw new TypeError(`paginate: expected a path or a page; got ${got(from)}`);
+      // A promise handed over would have nothing listening to it until a loop started, so one that rejects first
+      // would be nobody's to catch. It is the caller's to await.
+      if (typeof (from as { then?: unknown } | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
+      const first = pageOf(from, "the page given to paginate");
       yield* first.data as readonly T[];
       next = first.next;
       params = undefined;
