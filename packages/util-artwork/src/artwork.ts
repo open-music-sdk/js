@@ -61,14 +61,18 @@ function formatOf(value: unknown): tArtworkFormat | undefined {
  * around it. Apple's own run from `bb` to `SC.DN01` and `bb-60`: letters and digits, with a dot or hyphen between.
  */
 function cropOf(value: unknown): string | undefined {
-  if (value === undefined || (typeof value === "string" && /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*$/.test(value))) return value;
-  throw new TypeError("artwork: crop must be a crop code: letters and digits, with single dots or hyphens between them");
+  if (value === undefined || (typeof value === "string" && value.length <= MAX_CROP_LENGTH && /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*$/.test(value))) return value;
+  throw new TypeError(`artwork: crop must be a crop code: at most ${String(MAX_CROP_LENGTH)} letters and digits, with single dots or hyphens between them`);
 }
 
 const SIZE = "{w}x{h}";
 const DEFAULT_CROP = "bb";
 /** The most pixels Apple's image server gives on a side. It answers 400 to a request for one more. */
 const MAX_SIDE = 10_000;
+/** Three times the longest crop code seen from Apple. A code fills every `{c}` in a template, so its length is what a URL can grow by. */
+const MAX_CROP_LENGTH = 32;
+/** More densities than screens come in. Each one is a candidate built and a URL written, so the list is not left open. */
+const MAX_DENSITIES = 16;
 /** What arithmetic on sizes this small can be off by, with room to spare: a height of 180.0000000001 is 180, not 181. */
 const ROUNDING = 1e-6;
 
@@ -229,11 +233,12 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
   const request = read(artwork, width, options);
-  const densities: unknown = options.densities ?? [1, 2, 3];
+  const { densities = [1, 2, 3] } = options as { readonly densities?: unknown };
   // The length is read once too: a list that grows as it is read cannot keep this going.
   const count = Array.isArray(densities) ? densities.length : 0;
-  if (count === 0) throw new TypeError("artwork: densities must be a non-empty array of numbers above 0");
-  const candidates = new Map<string, string>();
+  if (count === 0 || count > MAX_DENSITIES) throw new TypeError(`artwork: densities must be an array of 1 to ${String(MAX_DENSITIES)} numbers above 0`);
+  const candidates: string[] = [];
+  const [urls, descriptors] = [new Set<string>(), new Set<string>()];
   for (let i = 0; i < count; i++) {
     const density = length(`densities[${String(i)}]`, (densities as unknown[])[i]);
     const { url, scale } = image(request, density);
@@ -242,10 +247,13 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
     // to shrink says something else, and then to three figures, which is as fine as a screen's density gets.
     const descriptor = `${String(scale < 1 ? Number((density * scale).toPrecision(3)) : density)}x`;
     // A browser keeps the first candidate of each density, and an image offered twice is offered once.
-    if (!candidates.has(url) && ![...candidates.values()].includes(descriptor)) candidates.set(url, descriptor);
+    if (urls.has(url) || descriptors.has(descriptor)) continue;
+    urls.add(url);
+    descriptors.add(descriptor);
+    candidates.push(`${url} ${descriptor}`);
   }
   // A URL with no size in it is one image of a size nobody here knows, so it is offered alone and unlabelled:
   // any density put on it would be a guess, and a browser would lay the image out by the guess.
   if (!request.sized) return image(request, 1).url;
-  return [...candidates].map(([url, descriptor]) => `${url} ${descriptor}`).join(", ");
+  return candidates.join(", ");
 }

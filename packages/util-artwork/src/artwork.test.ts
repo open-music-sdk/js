@@ -436,6 +436,24 @@ describe("artworkUrl: format and crop say how the image is encoded and cut, wher
     expect(() => artworkUrl(cover(), 300, { crop: crop as string })).toThrow(/^artwork: crop must be a crop code/);
   });
 
+  test.each([1, 2, 10, 32])("a crop code of %i characters is accepted", (count) => {
+    const crop = "a".repeat(count);
+    expect(artworkUrl(cover(), 300, { crop })).toBe(TEMPLATE.replace("{w}x{h}bb", `300x300${crop}`));
+  });
+
+  test.each([33, 1000, 10_000_000])("a crop code of %i characters is refused, and quickly", (count) => {
+    const start = performance.now();
+    expect(() => artworkUrl(cover(), 300, { crop: "a".repeat(count) })).toThrow(/^artwork: crop must be a crop code: at most 32/);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  test("a URL grows by no more than the crop and format it is given: a template of nothing but placeholders comes out eleven times its length at most", () => {
+    const url = `https://example.com/${"{c}{f}{w}{h}".repeat(10_000)}`;
+    const out = artworkUrl({ url }, 9_999_999, { crop: "a".repeat(32), format: "jpeg" });
+    expect(out.length).toBeLessThanOrEqual(url.length * 11);
+    expect(out.length).toBeGreaterThan(url.length);
+  });
+
   test.each([{ format: "a/b" }, { crop: "a/b" }])("%j is refused even for a URL with no place for it", (options) => {
     expect(() => artworkUrl({ url: "https://example.com/fixed.jpg" }, 300, options as tArtworkOptions)).toThrow(TypeError);
   });
@@ -911,10 +929,34 @@ describe("artworkSrcSet: one candidate per density, labelled with the density as
     ["a number, not a list", 2],
     ["a string", "1x, 2x"],
     ["null", null],
-  ])("densities given as %s: %j is a TypeError, except null, which means the default", (_name, densities) => {
-    const build = () => artworkSrcSet(cover(), 300, { densities: densities as number[] });
-    if (densities === null) expect(build()).toBe(artworkSrcSet(cover(), 300));
-    else expect(build).toThrow(/^artwork: densities must be a non-empty array/);
+    ["a typed array", new Float64Array([1, 2])],
+    ["a set", new Set([1, 2])],
+    ["something with a length and no more", { length: 2, 0: 1, 1: 2 }],
+    ["a list of seventeen", Array.from({ length: 17 }, (_, i) => i + 1)],
+    ["a list of a million", Array.from({ length: 1_000_000 }, (_, i) => i + 1)],
+  ])("densities given as %s is a TypeError saying what a density list is", (_name, densities) => {
+    expect(() => artworkSrcSet(cover(), 300, { densities: densities as number[] })).toThrow(/^artwork: densities must be an array of 1 to 16 numbers above 0$/);
+  });
+
+  test("only leaving densities out, or undefined, means the default", () => {
+    expect(artworkSrcSet(cover(), 300, { densities: undefined })).toBe(artworkSrcSet(cover(), 300));
+    expect(artworkSrcSet(cover(), 300, {})).toBe(artworkSrcSet(cover(), 300));
+  });
+
+  test.each([1, 2, 15, 16])("a list of %i densities is offered in full", (count) => {
+    const densities = Array.from({ length: count }, (_, i) => 1 + i / 4);
+    expect(parseSrcset(artworkSrcSet(cover(), 100, { densities })).map((c) => c.descriptors.join())).toEqual(densities.map((density) => `${String(density)}x`));
+  });
+
+  test("a list too long is refused before any of it is read, however long", () => {
+    const list = new Proxy(Array.from({ length: 5 }, () => 1), {
+      get: (target, key, receiver): unknown => {
+        if (key === "length") return 2 ** 32 - 1;
+        if (typeof key === "string" && /^\d+$/.test(key)) throw new Error("an entry was read");
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    expect(() => artworkSrcSet(cover(), 300, { densities: list })).toThrow(/^artwork: densities must be an array of 1 to 16/);
   });
 
   test.each<[string, unknown[], number]>([

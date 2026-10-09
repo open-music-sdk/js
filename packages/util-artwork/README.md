@@ -40,7 +40,7 @@ parser on its way to you, and has `%7Bw%7D` for `{w}`, is the same template and 
 | `height` | Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`. |
 | `format` | The file format: `"jpg"`, `"jpeg"`, `"png"`, `"webp"`, `"heic"` or `"heif"`. Default: the one the template names. |
 | `crop` | Apple's code for how the image is cut to the box. Default: the one the template names, usually `"bb"`, the whole image fitted inside the box. |
-| `densities` | For `artworkSrcSet`: the pixel densities to offer. Default `[1, 2, 3]`. |
+| `densities` | For `artworkSrcSet`: the pixel densities to offer, 16 at most. Default `[1, 2, 3]`. |
 
 A `width`, `height` or density that is not a number above zero, and no more than
 `Number.MAX_SAFE_INTEGER`, is a `TypeError`, as is a `format`
