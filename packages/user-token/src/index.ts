@@ -1,3 +1,4 @@
+export { acceptUserToken } from "./accept.js";
 export { userTokenIntake } from "./intake.js";
 export type { tUserTokenIntakeOptions } from "./intake.js";
 export { KvUserTokenStore, MemoryUserTokenStore } from "./stores.js";

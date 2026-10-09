@@ -1,6 +1,7 @@
 // A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
 // file. What this does is ask Apple about it before anything depends on it.
-import { AppleMusicError, got, isAppleMusicError, parseToken, type tAppleMusicClient } from "@open-music-sdk/core";
+import { AppleMusicError, isAppleMusicError, type tAppleMusicClient } from "@open-music-sdk/core";
+import { tokenOf } from "./check.js";
 
 export interface tValidateOptions {
   /** Aborts the requests to Apple. */
@@ -19,8 +20,7 @@ export interface tValidateOptions {
  * storefront) is the client's usual error and says nothing about the token.
  */
 export async function validateUserToken(client: tAppleMusicClient, token: string, options: tValidateOptions = {}): Promise<string> {
-  const value = parseToken(token);
-  if (value === undefined) throw new TypeError(`validateUserToken: token must be printable characters with no spaces or line breaks inside; got ${got(token)}`);
+  const value = tokenOf("validateUserToken", token);
   const { signal } = options;
   let body: unknown;
   try {

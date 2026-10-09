@@ -1,7 +1,7 @@
-// userTokenIntake: the one place a Music User Token enters over HTTP. A web-standard handler that
-// checks who is sending, asks Apple whether the token works, and only then stores it.
-import { isAppleMusicError, parseToken, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
-import { validateUserToken } from "./token.js";
+// userTokenIntake: acceptUserToken behind a web-standard handler. It checks who is sending, reads what was sent
+// up to a limit, and answers with a status; validating and storing are acceptUserToken's.
+import { isAppleMusicError, parseToken, readBounded, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
+import { acceptUserToken } from "./accept.js";
 
 // A token is a few hundred characters; nothing honest comes near this.
 const MAX_BODY_BYTES = 8192;
@@ -21,25 +21,6 @@ const reply = (status: number, error: string, headers: Record<string, string> = 
 /** Whether a Content-Type header says JSON: `application/json`, with or without parameters. */
 export const isJson = (contentType: string | null): boolean => /^application\/json\s*(;|$)/i.test(contentType ?? "");
 
-/** A body as text, or undefined once it runs past `limit` bytes. Content-Length is only a claim, so the stream is counted. */
-export async function readCapped(body: ReadableStream<Uint8Array> | null, limit: number): Promise<string | undefined> {
-  if (!body) return "";
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return text + decoder.decode();
-    size += value.byteLength;
-    if (size > limit) {
-      await reader.cancel();
-      return undefined;
-    }
-    text += decoder.decode(value, { stream: true });
-  }
-}
-
 /**
  * A handler for `POST` with a JSON body `{ "token": "..." }`. Answers 204 once Apple has accepted the
  * token and the store has it; otherwise `{ "error": ... }` with 422 when the token is no good and
@@ -56,7 +37,8 @@ export function userTokenIntake(client: tAppleMusicClient, options: tUserTokenIn
     const userId = await options.userId(req);
     if (!userId) return reply(401, "Unauthorized");
 
-    const text = await readCapped(req.body, MAX_BODY_BYTES);
+    // Whoever posts decides how much is sent, and must not decide how much is kept.
+    const text = await readBounded(req, MAX_BODY_BYTES);
     if (text === undefined) return reply(413, "PayloadTooLarge");
     let posted: unknown;
     try {
@@ -66,17 +48,15 @@ export function userTokenIntake(client: tAppleMusicClient, options: tUserTokenIn
     }
     if (typeof posted !== "string") return reply(400, "BadRequest");
     // What is posted is input, not a caller's mistake: a string that is no token is answered, not thrown.
-    // The token goes on as core will send it, with the whitespace around it dropped.
     const token = parseToken(posted);
     if (token === undefined) return reply(422, "UserTokenInvalid");
 
     try {
-      await validateUserToken(client, token, { signal: req.signal });
+      await acceptUserToken(client, options.store, userId, token, { signal: req.signal });
     } catch (e) {
       if (!isAppleMusicError(e)) throw e;
       return reply(e._tag === "UserTokenInvalid" ? 422 : 502, e._tag);
     }
-    await options.store.set(userId, token);
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   };
 }

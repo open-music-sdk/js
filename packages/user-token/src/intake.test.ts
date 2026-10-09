@@ -1,6 +1,6 @@
 import type { tClientOptions } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { isJson, readCapped, userTokenIntake, type tUserTokenIntakeOptions } from "./intake.js";
+import { isJson, userTokenIntake, type tUserTokenIntakeOptions } from "./intake.js";
 import { MemoryUserTokenStore } from "./stores.js";
 import { appleError, fakeClient, foreignClient, misshapen, padded, shaped, type tReply } from "./testing.js";
 
@@ -21,27 +21,6 @@ const post = (body: unknown, headers: Record<string, string> = JSON_TYPE) =>
   new Request(ENDPOINT,{ method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) });
 
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
-
-/** A body stream of the given chunks that records whether it was cancelled and how often it was pulled. */
-function streamOf(...chunks: (string | Uint8Array)[]) {
-  const seen = { cancelled: false, pulls: 0 };
-  const queue = chunks.map((c) => (typeof c === "string" ? new TextEncoder().encode(c) : c));
-  const body = new ReadableStream<Uint8Array>(
-    {
-      pull(controller) {
-        seen.pulls++;
-        const next = queue.shift();
-        if (next) controller.enqueue(next);
-        else controller.close();
-      },
-      cancel() {
-        seen.cancelled = true;
-      },
-    },
-    { highWaterMark: 0 },
-  );
-  return { body, seen };
-}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -77,97 +56,6 @@ describe("isJson", () => {
     "*/*",
   ])("%j is not", (type) => {
     expect(isJson(type)).toBe(false);
-  });
-});
-
-describe("readCapped", () => {
-  test("no body is the empty string", async () => {
-    expect(await readCapped(null, 10)).toBe("");
-  });
-
-  test.each<[string, string[]]>([
-    ["an empty stream", []],
-    ["one chunk", ['{"token":"abc"}']],
-    ["several chunks, in order", ['{"tok', 'en":"', 'abc"}']],
-    ["an empty chunk among others", ["ab", "", "cd"]],
-  ])("%s is read whole", async (_, chunks) => {
-    expect(await readCapped(streamOf(...chunks).body, 100)).toBe(chunks.join(""));
-  });
-
-  test.each([
-    ["one chunk", ["a".repeat(10)]],
-    ["several chunks", ["aaaa", "aaaa", "aa"]],
-  ])("exactly the limit in %s is read", async (_, chunks) => {
-    expect(await readCapped(streamOf(...chunks).body, 10)).toBe("a".repeat(10));
-  });
-
-  test.each([
-    ["one chunk", ["a".repeat(11)]],
-    ["several chunks", ["aaaa", "aaaa", "aaa"]],
-    ["a first chunk already past it", ["a".repeat(1000), "a"]],
-  ])("one byte past the limit in %s is undefined", async (_, chunks) => {
-    expect(await readCapped(streamOf(...chunks).body, 10)).toBeUndefined();
-  });
-
-  test("a limit of zero takes only an empty body", async () => {
-    expect(await readCapped(streamOf().body, 0)).toBe("");
-    expect(await readCapped(streamOf("a").body, 0)).toBeUndefined();
-  });
-
-  test("the limit counts bytes, not characters", async () => {
-    expect(await readCapped(streamOf("é".repeat(5)).body, 10)).toBe("é".repeat(5));
-    expect(await readCapped(streamOf("é".repeat(6)).body, 10)).toBeUndefined();
-  });
-
-  test("going past the limit cancels the stream and stops reading it", async () => {
-    const { body, seen } = streamOf("aaaa", "aaaa", "aaaa", "aaaa", "aaaa");
-    expect(await readCapped(body, 10)).toBeUndefined();
-    expect(seen.cancelled).toBe(true);
-    expect(seen.pulls).toBe(3);
-  });
-
-  test("a stream within the limit is read to its end and not cancelled", async () => {
-    const { body, seen } = streamOf("aaaa", "aaaa");
-    await readCapped(body, 10);
-    expect(seen).toEqual({ cancelled: false, pulls: 3 });
-  });
-
-  test.each([
-    ["two bytes", "é"],
-    ["three bytes", "€"],
-    ["four bytes", "\u{1f3b5}"],
-  ])("a character of %s split across chunks is decoded whole", async (_, char) => {
-    const bytes = new TextEncoder().encode(`a${char}b`);
-    for (let cut = 1; cut < bytes.length; cut++) expect(await readCapped(streamOf(bytes.slice(0, cut), bytes.slice(cut)).body, 100)).toBe(`a${char}b`);
-  });
-
-  test("a byte order mark is dropped", async () => {
-    expect(await readCapped(streamOf(new Uint8Array([0xef, 0xbb, 0xbf]), "{}").body, 100)).toBe("{}");
-  });
-
-  test.each([
-    ["a lone continuation byte", [0x61, 0x80, 0x62], "a�b"],
-    ["a sequence cut short by the end", [0x61, 0xe2, 0x82], "a�"],
-  ])("%s becomes U+FFFD rather than an error", async (_, bytes, text) => {
-    expect(await readCapped(streamOf(new Uint8Array(bytes)).body, 100)).toBe(text);
-  });
-
-  test("a stream that fails part way rejects with its error", async () => {
-    const failed = new Error("connection reset");
-    let pulls = 0;
-    const body = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        if (pulls++ === 0) controller.enqueue(new Uint8Array([0x61]));
-        else controller.error(failed);
-      },
-    });
-    await expect(readCapped(body, 100)).rejects.toBe(failed);
-  });
-
-  test("a stream someone else is reading rejects", async () => {
-    const { body } = streamOf("abc");
-    body.getReader();
-    await expect(readCapped(body, 100)).rejects.toThrow(TypeError);
   });
 });
 
