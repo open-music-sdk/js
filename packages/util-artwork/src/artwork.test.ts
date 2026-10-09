@@ -706,37 +706,111 @@ describe("artworkUrl: sizes are whole pixels", () => {
     expect(size(artworkUrl({ url: TEMPLATE, width: 3000, height: 1 }, 100))).toBe("100x1");
   });
 
-  test.each([1e15, 2 ** 53, 1e21, 1e300, Number.MAX_VALUE])("a width of %s is filled in as digits or refused, never written with an exponent", (width) => {
-    let url = "";
-    try {
-      url = artworkUrl({ url: "{w}x{h}" }, width);
-    } catch (e) {
-      expect(e).toBeInstanceOf(TypeError);
-    }
-    expect(url).toMatch(/^(\d+x\d+)?$/);
+  const LARGEST = Number.MAX_SAFE_INTEGER;
+
+  test.each([
+    ["the smallest number there is", Number.MIN_VALUE, "1x1"],
+    ["a width in the millions, as people ask for 'the largest'", 9_999_999, "10000x10000"],
+    ["a width with an exponent to its name", 1e15, "10000x10000"],
+    ["the largest whole number that is exact", LARGEST, "10000x10000"],
+  ])("%s is a width: %s on artwork with no size is %s, in digits", (_name, width, expected) => {
+    expect(artworkUrl({ url: "{w}x{h}" }, width)).toBe(expected);
+    expect(artworkUrl({ url: "{w}x{h}" }, 300, { height: width })).toMatch(/^\d+x\d+$/);
+  });
+
+  test("the largest numbers there are, all at once, still give whole pixels and a density a browser reads", () => {
+    for (const artwork of [{ url: "{w}x{h}" }, { url: "{w}x{h}", width: LARGEST, height: 1 }, { url: "{w}x{h}", width: 1, height: LARGEST }, { url: "{w}x{h}cc.jpg", width: LARGEST, height: LARGEST }])
+      for (const [width, height] of [[LARGEST, LARGEST], [LARGEST, Number.MIN_VALUE], [Number.MIN_VALUE, LARGEST], [Number.MIN_VALUE, undefined], [LARGEST, undefined]] as const)
+        for (const density of [Number.MIN_VALUE, 1, LARGEST]) {
+          const [candidate] = parseSrcset(artworkSrcSet(artwork, width, { height, densities: [density] }));
+          expect(candidate?.url).toMatch(/^[1-9]\d{0,4}x[1-9]\d{0,4}(cc\.jpg)?$/);
+          expect(fetched(`${candidate?.url ?? ""} ${candidate?.descriptors.join(" ") ?? ""}`, 1)).toBe(candidate?.url);
+        }
   });
 });
 
-describe("artworkUrl: what it refuses", () => {
+describe("what the artwork says of its size is data, not an argument: a size that is no size is one the artwork did not give", () => {
+  test.each<[string, unknown, unknown, number, string]>([
+    ["a height past what a number can count", 1, 1e16, 300, "1x1"],
+    ["a width past it", 1e16, 1, 300, "1x1"],
+    ["both past it", 1e300, 1e300, 300, "300x300"],
+    ["both the largest number there is", Number.MAX_VALUE, Number.MAX_VALUE, 300, "300x300"],
+    ["both below one pixel", 0.5, 0.5, 300, "300x300"],
+    ["both the smallest number there is", Number.MIN_VALUE, Number.MIN_VALUE, 300, "300x300"],
+    ["both negative", -3000, -3000, 300, "300x300"],
+    ["both infinite", Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, 300, "300x300"],
+    ["both not a number", Number.NaN, Number.NaN, 300, "300x300"],
+    ["both text", "3000", "3000", 300, "300x300"],
+    ["both objects", { valueOf: () => 3000 }, [3000], 300, "300x300"],
+    ["a shape as thin as numbers go", Number.MAX_SAFE_INTEGER, 1, 300, "300x1"],
+    ["a shape as tall as numbers go", 1, Number.MAX_SAFE_INTEGER, 300, "1x10000"],
+  ])("artwork with %s (%s by %s) asked for at %i gives %s, and never throws", (_name, width, height, wanted, expected) => {
+    const artwork = { url: TEMPLATE, width, height } as tArtworkSource;
+    expect(size(artworkUrl(artwork, wanted))).toBe(expected);
+    expect(() => artworkSrcSet(artwork, wanted)).not.toThrow();
+  });
+
+  test.each([
+    [1000.6, 5000, "1000x1000"],
+    [1000.4, 5000, "1000x1000"],
+    [1.9, 5000, "1x1"],
+    [999.999, 300, "300x300"],
+  ])("a size that is not a whole number counts for the whole pixels in it: %s square, asked for at %i, is %s", (side, wanted, expected) => {
+    expect(size(artworkUrl(cover(side), wanted))).toBe(expected);
+    expect(size(artworkUrl({ ...cover(side), url: TEMPLATE.replace("bb", "cc") }, wanted))).toBe(expected);
+  });
+});
+
+describe("the numbers a caller gives are checked once, where they come in", () => {
+  const LARGEST = Number.MAX_SAFE_INTEGER;
   const bad: [string, unknown][] = [
     ["zero", 0],
     ["a negative number", -300],
     ["NaN", Number.NaN],
     ["infinity", Number.POSITIVE_INFINITY],
+    ["one more than the largest whole number that is exact", 2 ** 53],
+    ["a number that prints with an exponent", 1e21],
+    ["the largest number there is", Number.MAX_VALUE],
     ["a string", "300"],
     ["null", null],
     ["an object", { width: 300 }],
+    ["a number object", new Number(300)],
+    ["a bigint", 300n],
   ];
+  const message = (name: string) => new RegExp(`^artwork: ${name.replaceAll("[", "\\[").replaceAll("]", "\\]")} must be a number above 0 and at most ${String(LARGEST)}, got `);
 
-  test.each([...bad, ["undefined", undefined]])("a width of %s is a TypeError naming width", (_name, width) => {
-    expect(() => artworkUrl(cover(), width as number)).toThrow(/^artwork: width must be a number above 0/);
+  test.each([...bad, ["undefined", undefined]])("a width of %s is a TypeError naming width and its bounds", (_name, width) => {
     expect(() => artworkUrl(cover(), width as number)).toThrow(TypeError);
+    expect(() => artworkUrl(cover(), width as number)).toThrow(message("width"));
+    expect(() => artworkSrcSet(cover(), width as number)).toThrow(message("width"));
   });
 
-  test.each(bad)("a height of %s is a TypeError naming height", (_name, height) => {
-    expect(() => artworkUrl(cover(), 300, { height: height as number })).toThrow(/^artwork: height must be a number above 0/);
+  test.each(bad)("a height of %s is a TypeError naming height and its bounds", (_name, height) => {
+    expect(() => artworkUrl(cover(), 300, { height: height as number })).toThrow(message("height"));
+    expect(() => artworkSrcSet(cover(), 300, { height: height as number })).toThrow(message("height"));
   });
 
+  test.each([...bad, ["undefined", undefined]])("a density of %s is a TypeError naming its place in the list", (_name, density) => {
+    expect(() => artworkSrcSet(cover(), 300, { densities: [1, density as number] })).toThrow(message("densities[1]"));
+  });
+
+  test.each([
+    ["a number", 0, "got 0"],
+    ["a number out of range", 2 ** 53, "got 9007199254740992"],
+    ["NaN", Number.NaN, "got NaN"],
+    ["a string", "300", "got string"],
+    ["null", null, "got object"],
+    ["nothing", undefined, "got undefined"],
+  ])("the error says what it got: for %s, %j, it ends %j", (_name, width, ending) => {
+    expect(() => artworkUrl(cover(), width as number)).toThrow(new RegExp(`${ending}$`));
+  });
+
+  test.each([Number.MIN_VALUE, 0.001, 1, 300, 10_000, 1e15, LARGEST])("%s is accepted as a width, a height and a density", (value) => {
+    expect(() => artworkSrcSet(cover(), value, { height: value, densities: [value] })).not.toThrow();
+  });
+});
+
+describe("an artwork that is no artwork, and options that are no options, are refused", () => {
   test.each<[string, unknown]>([
     ["undefined, as a resource without artwork gives", undefined],
     ["null", null],
@@ -815,15 +889,13 @@ describe("artworkSrcSet: one candidate per density, labelled with the density as
     else expect(build).toThrow(/^artwork: densities must be a non-empty array/);
   });
 
-  test.each<[string, unknown[]]>([
-    ["a zero", [1, 0]],
-    ["a negative", [-1]],
-    ["NaN", [1, Number.NaN]],
-    ["infinity", [Number.POSITIVE_INFINITY]],
-    ["a string", [1, "2"]],
-    ["a hole", new Array<number>(2)],
-  ])("a density list holding %s is a TypeError naming the entry", (_name, densities) => {
-    expect(() => artworkSrcSet(cover(), 300, { densities: densities as number[] })).toThrow(/^artwork: densities\[\d\] must be a number above 0/);
+  test.each<[string, unknown[], number]>([
+    ["first", [0, 1, 2], 0],
+    ["last", [1, 2, Number.NaN], 2],
+    ["a hole in the list", [1, , 2], 1], // eslint-disable-line no-sparse-arrays -- a hole is the case
+    ["every entry of a list that is all holes, of which the first is named", new Array<number>(3), 0],
+  ])("a density that is no density, %s, is a TypeError naming where in the list it is", (_name, densities, at) => {
+    expect(() => artworkSrcSet(cover(), 300, { densities: densities as number[] })).toThrow(new RegExp(`^artwork: densities\\[${String(at)}\\] must be a number above 0`));
   });
 });
 

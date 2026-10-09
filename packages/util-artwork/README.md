@@ -41,7 +41,8 @@ them. Every `tArtwork` from `@open-music-sdk/types` fits.
 | `crop` | Apple's code for how the image is cut to the box. Default: the one the template names, usually `"bb"`, the whole image fitted inside the box. |
 | `densities` | For `artworkSrcSet`: the pixel densities to offer. Default `[1, 2, 3]`. |
 
-A `width`, `height` or density that is not a number above zero is a `TypeError`, as is a `format`
+A `width`, `height` or density that is not a number above zero, and no more than
+`Number.MAX_SAFE_INTEGER`, is a `TypeError`, as is a `format`
 that is not one of the six, a `crop` that is not shaped like a crop code, and an `artwork` without a
 `url`.
 
@@ -65,6 +66,8 @@ gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templat
 
 - **Shape.** With no `height`, the image keeps the artwork's own shape: a 1920 by 1080 still at width
   320 is asked for as `320x180`. Artwork that does not say how large it comes is taken to be square.
+  What the artwork says of its size is data, never an error: a `width` or `height` on it that is
+  no size, such as `null`, zero or text, is one it did not give.
 - **Never larger than it comes.** The artwork's `width` and `height` are the largest Apple has. A box
   that asks for more is shrunk, keeping its shape. Artwork that gives only one of the two is held to
   that one. No side is ever asked for past 10,000 pixels, where Apple's image server stops.

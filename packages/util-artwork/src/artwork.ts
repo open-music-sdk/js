@@ -35,12 +35,21 @@ export interface tArtworkSrcSetOptions extends tArtworkOptions {
   readonly densities?: readonly number[] | undefined;
 }
 
-const positive = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
-
+/**
+ * A length or density the caller gave. The upper bound is where whole numbers stop being exact; nothing near it
+ * is a real size, but below it the arithmetic that follows cannot overflow, so no number here ever needs a
+ * second check.
+ */
 function length(name: string, value: unknown): number {
-  if (positive(value)) return value;
-  throw new TypeError(`artwork: ${name} must be a number above 0, got ${typeof value === "number" ? String(value) : typeof value}`);
+  if (typeof value === "number" && value > 0 && value <= Number.MAX_SAFE_INTEGER) return value;
+  throw new TypeError(`artwork: ${name} must be a number above 0 and at most ${String(Number.MAX_SAFE_INTEGER)}, got ${typeof value === "number" ? String(value) : typeof value}`);
 }
+
+/**
+ * How large the artwork says it comes, one way, in whole pixels, or nothing where what it says is no size. That
+ * is data from somewhere else, so a bad one is not an error: the artwork is treated as not having said.
+ */
+const pixels = (value: unknown): number | undefined => (typeof value === "number" && value >= 1 && value <= Number.MAX_SAFE_INTEGER ? Math.floor(value) : undefined);
 
 function formatOf(value: unknown): tArtworkFormat | undefined {
   if (value === undefined || (FORMATS as readonly unknown[]).includes(value)) return value as tArtworkFormat | undefined;
@@ -153,7 +162,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
   const named = tailored(template, crop, format);
   return {
     template: named.template,
-    max: { width: positive(maxWidth) ? maxWidth : undefined, height: positive(maxHeight) ? maxHeight : undefined },
+    max: { width: pixels(maxWidth), height: pixels(maxHeight) },
     width: length("width", width),
     height: height === undefined ? undefined : length("height", height),
     format: format ?? "jpg",
@@ -166,8 +175,6 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
 /** The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has. */
 function image({ template, max, width, height, format, crop, inside }: tRequest, density: number): { url: string; scale: number } {
   const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, inside);
-  // Past this a number prints with an exponent, and what goes into the URL has to be digits.
-  if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h)) throw new TypeError("artwork: the size asked for is too large");
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
   return { url, scale };
 }
