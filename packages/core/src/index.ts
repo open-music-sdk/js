@@ -1,4 +1,5 @@
-export { createClient } from "./client.js";
+export { readBounded } from "./body.js";
+export { createClient, parseToken } from "./client.js";
 export type {
   tAppleMusicClient,
   tClientOptions,
@@ -14,6 +15,7 @@ export type {
 } from "./client.js";
 export { AppleMusicError, isAppleMusicError } from "./errors.js";
 export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors.js";
+export { got } from "./got.js";
 export { createRateLimiter } from "./rate-limit.js";
 export type { tRateLimiter } from "./rate-limit.js";
 export { parseRetryAfter, retry, retryable } from "./retry.js";

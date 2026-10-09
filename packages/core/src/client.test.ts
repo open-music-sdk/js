@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createClient, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client.js";
+import { createClient, parseToken, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client.js";
 import { AppleMusicError, isAppleMusicError } from "./errors.js";
 import { createRateLimiter } from "./rate-limit.js";
 
@@ -239,6 +239,54 @@ describe("token providers", () => {
     const { music, calls } = client([], { developerToken: () => Promise.reject(boom) });
     await expect(music.request("v1/test")).rejects.toBe(boom);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("parseToken", () => {
+  test.each([
+    ["a JWT", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJERUYxMjNHSElKIn0.c2ln-_"],
+    ["base64 with its padding and symbols", "Ak9+/abc=="],
+    ["one character", "a"],
+    ["every printable ASCII character", Array.from({ length: 94 }, (_, i) => String.fromCharCode(0x21 + i)).join("")],
+  ])("%s is a token, and comes back as it is", (_name, token) => {
+    expect(parseToken(token)).toBe(token);
+  });
+
+  test.each(["dev\n", "\ndev", "  dev  ", "dev\r\n", "\tdev"])("whitespace around %j, as a token read from a file has, is dropped", (token) => {
+    expect(parseToken(token)).toBe("dev");
+  });
+
+  test.each<[string, unknown]>([
+    ["a line break inside it", "a\nb"],
+    ["a carriage return inside it", "a\rb"],
+    ["a header smuggled after it", "a\r\nx-evil: 1"],
+    ["a space inside it", "a b"],
+    ["a tab inside it", "a\tb"],
+    ["a NUL inside it", "a\0b"],
+    ["a DEL inside it", "a\x7fb"],
+    ["a letter outside ASCII", "aé"],
+    ["a character outside Latin-1", "a☃"],
+    ["nothing in it", ""],
+    ["only whitespace in it", " \n"],
+    ["undefined", undefined],
+    ["null", null],
+    ["a number", 12345],
+    ["true", true],
+    ["an object holding a token", { token: "abc" }],
+    ["an array holding a token", ["abc"]],
+    ["a String object of a token", new String("abc")],
+  ])("%s is not a token", (_name, value) => {
+    expect(parseToken(value)).toBeUndefined();
+  });
+
+  test("the rule sets no length: how much a caller will read is the caller's to bound", () => {
+    expect(parseToken("a".repeat(100_000))).toHaveLength(100_000);
+  });
+
+  test("nothing is called on a value that is not a string: it is not asked to become one", () => {
+    const asked = vi.fn(() => "abc");
+    expect(parseToken({ toString: asked, valueOf: asked, [Symbol.toPrimitive]: asked })).toBeUndefined();
+    expect(asked).not.toHaveBeenCalled();
   });
 });
 
