@@ -1,5 +1,5 @@
 export { readBounded } from "./body";
-export { clientOf, has, optionsOf, segmentOf } from "./check";
+export { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
 export { createClient, parseToken } from "./client";
 export type {
   tAppleMusicClient,

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, optionsOf, segmentOf } from "./check";
+import { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
 import { createClient } from "./client";
 
 const SECRET = "s3cretT0ken";
@@ -220,6 +220,94 @@ describe("segmentOf", () => {
   test("nothing is called on a value that is not a string: it is not asked to become one", () => {
     const asked = vi.fn(() => SECRET);
     thrown(() => segmentOf("fn", "id", { toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }));
+    expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("listOf", () => {
+  const MESSAGE = "getSongs: ids must be a list of 1 to 300 strings, each of 1 to 256 characters with no comma in it; got ";
+  /** Three long with nothing at index 1: a hole is not an item. */
+  const holed = new Array<string>(3);
+  holed[0] = "1";
+  holed[2] = "3";
+
+  test.each<[string, string[]]>([
+    ["one id", ["1613600188"]],
+    ["several", ["1", "2", "3"]],
+    ["the same one twice", ["1", "1"]],
+    ["types", ["songs", "music-videos"]],
+    ["what a path could not hold, which a query can", ["a/b", "..", ".", "a b", "a?b#c", "é"]],
+    ["an item of the longest length", ["s".repeat(256)]],
+    ["as many as Apple takes", Array.from({ length: 300 }, (_, i) => String(i))],
+  ])("%s is a list, and comes back item for item", (_name, value) => {
+    expect(listOf("fn", "ids", value)).toEqual(value);
+  });
+
+  test("what comes back is the call's own copy: changing the caller's list afterwards changes nothing", () => {
+    const mine = ["1", "2"];
+    const list = listOf("fn", "ids", mine);
+    mine.push("3");
+    mine[0] = "9";
+    expect(list).not.toBe(mine);
+    expect(list).toEqual(["1", "2"]);
+  });
+
+  test("each item is read once, so what was checked is what is sent", () => {
+    let reads = 0;
+    const shifting = new Proxy(["1"], {
+      get: (target, key, receiver) => (key === "0" ? (++reads === 1 ? "1" : "1,2") : (Reflect.get(target, key, receiver) as unknown)),
+    });
+    expect(listOf("fn", "ids", shifting)).toEqual(["1"]);
+    expect(reads).toBe(1);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["an empty list", [], "a list of 0"],
+    ["one item too many", Array.from({ length: 301 }, (_, i) => String(i)), "a list of 301"],
+    ["an empty string in it", ["1", ""], "0 characters at index 1"],
+    ["an item with a comma, which would arrive as two", ["1", "2,3"], "3 characters at index 1"],
+    ["an item one character too long", ["s".repeat(257)], "257 characters at index 0"],
+    ["a number in it", ["1", 2], "2 at index 1"],
+    ["null in it", [null], "null at index 0"],
+    ["undefined in it", ["1", undefined, "3"], "undefined at index 1"],
+    ["a list in it", [["1"]], "object at index 0"],
+    ["a hole in it", holed, "undefined at index 1"],
+    ["a string, which is one id and not a list of them", "1613600188", "10 characters"],
+    ["undefined", undefined, "undefined"],
+    ["null", null, "null"],
+    ["a number", 42, "42"],
+    ["an object shaped like a list", { 0: "1", length: 1 }, "object"],
+    ["a Set", new Set(["1"]), "object"],
+  ])("%s is a TypeError naming the function and the argument, and saying what it got", (_name, value, what) => {
+    const error = thrown(() => listOf("getSongs", "ids", value));
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toBe(MESSAGE + what);
+  });
+
+  test("the first item that is wrong is the one named", () => {
+    expect(thrown(() => listOf("getSongs", "ids", ["1", "", 3, ""])).message).toBe(`${MESSAGE}0 characters at index 1`);
+  });
+
+  test("a list too long is not read: its length is all that is asked for", () => {
+    const read = vi.fn();
+    const long = new Proxy(Array.from({ length: 301 }, () => "1"), {
+      get: (target, key, receiver) => {
+        if (typeof key === "string" && /^\d+$/.test(key)) read(key);
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    expect(() => listOf("fn", "ids", long)).toThrow(TypeError);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test("an item that is refused is not shown", () => {
+    const error = thrown(() => listOf("getSongs", "ids", [`${SECRET},${SECRET}`, { token: SECRET }]));
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  });
+
+  test("nothing is called on an item that is not a string", () => {
+    const asked = vi.fn(() => SECRET);
+    thrown(() => listOf("fn", "ids", [{ toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }]));
     expect(asked).not.toHaveBeenCalled();
   });
 });

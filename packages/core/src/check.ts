@@ -45,3 +45,21 @@ export function segmentOf(fn: string, name: string, value: unknown): string {
   }
   throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters, and not "." or ".."; got ${got(value)}`);
 }
+
+/** The most Apple documents taking in one request, which is for songs by id. Each item is a URL made longer, so the list is not left open. */
+const MAX_ITEMS = 300;
+
+/** One value of a list: a list is sent joined by commas, so an item with a comma in it would arrive as two. */
+const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_LENGTH && !item.includes(",");
+
+/**
+ * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken
+ * before it is checked, so what was checked is what is sent.
+ */
+export function listOf(fn: string, name: string, value: unknown): readonly string[] {
+  const items: unknown[] = Array.isArray(value) && value.length <= MAX_ITEMS ? [...(value as unknown[])] : [];
+  const bad = items.findIndex((item) => !isItem(item));
+  if (items.length > 0 && bad === -1) return items as string[];
+  const what = !Array.isArray(value) ? got(value) : bad === -1 ? `a list of ${String(value.length)}` : `${got(items[bad])} at index ${String(bad)}`;
+  throw new TypeError(`${fn}: ${name} must be a list of 1 to ${String(MAX_ITEMS)} strings, each of 1 to ${String(MAX_LENGTH)} characters with no comma in it; got ${what}`);
+}
