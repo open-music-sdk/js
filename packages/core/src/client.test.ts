@@ -1047,6 +1047,13 @@ describe("paginate", () => {
       expect(header("music-user-token", 0)).toBe("user");
     });
 
+    test("a walk told user: false sends no Music User Token, wherever its links point", async () => {
+      const { music, header, url } = client([{ body: { data: [2], next: "/v1/catalog/../me/library/songs?offset=2" } }, { body: { data: [3] } }], { userToken: "user" });
+      expect(await items(music.paginate({ data: [1], next: "/v1/me/library/songs?offset=1" }, { user: false }))).toEqual([1, 2, 3]);
+      expect([url(0), url(1)]).toEqual(["https://api.music.apple.com/v1/me/library/songs?offset=1", "https://api.music.apple.com/v1/me/library/songs?offset=2"]);
+      expect([header("music-user-token", 0), header("music-user-token", 1)]).toEqual([null, null]);
+    });
+
     test.each<[string, unknown]>([
       ["data as a number", { data: 5 }],
       ["data as a string", { data: "abc" }],
