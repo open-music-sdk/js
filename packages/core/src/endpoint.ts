@@ -274,15 +274,18 @@ export function relationshipGetter<Rels = never, C extends object = tNone>(fn: s
   return declared as unknown as tRelationshipEndpoint<Rels, C>;
 }
 
+/** What makes a value a function for an endpoint, to the types as to the code below: a function, with a `bound` function on it. */
+type tBindable = ((...args: never[]) => unknown) & { readonly bound: (client: tAppleMusicClient) => unknown };
+
 /**
  * Each function of `F` bound to one client, under its own name. Whatever in `F` is not a function for an endpoint
- * is left out.
+ * is left out, and one that `F` may or may not hold is one the namespace may or may not hold.
  */
 export type tEndpointNamespace<F> = {
-  readonly [K in keyof F as F[K] extends { readonly bound: (client: tAppleMusicClient) => unknown } ? K : never]: F[K] extends { readonly bound: (client: tAppleMusicClient) => infer B } ? B : never;
+  readonly [K in keyof F as NonNullable<F[K]> extends tBindable ? K : never]: NonNullable<F[K]> extends { readonly bound: (client: tAppleMusicClient) => infer B } ? B : never;
 };
 
-const isEndpoint = (value: unknown): value is { readonly bound: (client: tAppleMusicClient) => unknown } => typeof value === "function" && typeof (value as { bound?: unknown }).bound === "function";
+const isEndpoint = (value: unknown): value is tBindable => typeof value === "function" && typeof (value as { bound?: unknown }).bound === "function";
 
 /**
  * Binds every function in `endpoints` to `client`: `{ getSong, getSongs }` becomes an object whose `getSong(id)`

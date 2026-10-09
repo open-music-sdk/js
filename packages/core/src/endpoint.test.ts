@@ -202,6 +202,24 @@ describe("the types: one declaration gives both forms, and the name asked for de
     expect(Object.keys(bound).sort()).toEqual(Object.keys(declared).sort());
   });
 
+  test("the types leave out what the namespace leaves out: an object that only has a bound on it is no function for an endpoint", () => {
+    const lookalike: { bound: (client: tAppleMusicClient) => number } = { bound: () => 5 };
+    const catalog = endpointNamespace("catalog", apple().music, { getSong, lookalike });
+    expectTypeOf(catalog).toHaveProperty("getSong");
+    expectTypeOf(catalog).not.toHaveProperty("lookalike");
+    expect(Object.keys(catalog)).toEqual(["getSong"]);
+  });
+
+  test("a function that may or may not be there is one the namespace may or may not hold, to the types as at runtime", () => {
+    const maybe: { getSong?: typeof getSong; getSongs: typeof getSongs } = { getSongs };
+    const without = endpointNamespace("catalog", apple().music, maybe);
+    const withIt = endpointNamespace("catalog", apple().music, { ...maybe, getSong });
+    expectTypeOf(without).toHaveProperty("getSong");
+    expectTypeOf(without.getSong).toEqualTypeOf<typeof bound.getSong | undefined>();
+    expectTypeOf(without.getSongs).toEqualTypeOf<typeof bound.getSongs>();
+    expect([Object.keys(without), Object.keys(withIt).sort()]).toEqual([["getSongs"], ["getSong", "getSongs"]]);
+  });
+
   test("the options a function takes are the ones its declaration names", () => {
     interface tViews {
       readonly views?: readonly "top-songs"[] | undefined;
