@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { inspect } from "node:util";
+import { inspect, parseEnv } from "node:util";
 import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -180,6 +180,17 @@ describe("mintDeveloperToken: the key", () => {
     await read(await mintDeveloperToken({ ...valid, pem: wrap(valid.pem) }));
   });
 
+  // parseEnv is what `node --env-file` and process.loadEnvFile use: the key as an app reads it from its own environment.
+  test.each([
+    ["on one line with escaped line breaks, double-quoted", (pem: string) => `KEY="${pem.replaceAll("\n", "\\n")}"\n`],
+    ["on one line with escaped line breaks, single-quoted", (pem: string) => `KEY='${pem.replaceAll("\n", "\\n")}'\n`],
+    ["over several lines, double-quoted", (pem: string) => `KEY="${pem}"\n`],
+    ["in a file with Windows line endings", (pem: string) => `KEY="${pem.replaceAll("\n", "\\n")}"\n`.replaceAll("\n", "\r\n")],
+    ["with Windows line breaks escaped inside it", (pem: string) => `KEY="${pem.replaceAll("\n", "\\r\\n")}"\n`],
+  ])("accepts the PEM as a .env file gives it when written %s", async (_name, file) => {
+    await read(await mintDeveloperToken({ ...valid, pem: parseEnv(file(valid.pem.trim())).KEY ?? "" }));
+  });
+
   test.each(["a public key", "a P-384 key", "an Ed25519 key", "an RSA key", "a P-256 key in SEC1 rather than PKCS8"])("rejects %s", async (name) => {
     await expect(mintDeveloperToken({ ...valid, pem: wrongKeys[name] ?? "" })).rejects.toThrow(TypeError);
   });
@@ -273,6 +284,39 @@ describe("mintDeveloperToken and developerTokenMinter: a pem that is anything bu
     const error: unknown = await mintDeveloperToken(valid.pem as unknown as tMintOptions).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TypeError);
     expect(leaks(shown(error))).toBe(false);
+  });
+});
+
+describe("mintDeveloperToken and developerTokenMinter: the key and its IDs are the ones given, and no environment is read", () => {
+  // The variables an earlier version read by default, each holding something a mint would accept.
+  beforeEach(() => {
+    vi.stubEnv("APPLE_MUSIC_PRIVATE_KEY", valid.pem);
+    vi.stubEnv("APPLE_MUSIC_TEAM_ID", "ENVTEAM001");
+    vi.stubEnv("APPLE_MUSIC_KEY_ID", "ENVKEY0001");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test.each(["pem", "teamId", "keyId"] as const)("a %s left out is a TypeError naming it, though process.env holds one", async (option) => {
+    const options = { ...valid, [option]: undefined } as unknown as tMintOptions;
+    const error: unknown = await mintDeveloperToken(options).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toContain(`developer token: ${option} must be`);
+    expect(() => developerTokenMinter(options)).toThrow(`developer token: ${option} must be`);
+  });
+
+  test("what is signed is what was given, not what process.env holds", async () => {
+    for (const token of [await mintDeveloperToken(valid), await developerTokenMinter(valid)()]) {
+      const { header, claims } = await read(token);
+      expect([claims.iss, header.kid]).toEqual(["DEF123GHIJ", "ABC123DEFG"]);
+    }
+  });
+
+  test("an environment handed over as env, as an earlier version took it, is not read", async () => {
+    const options = { env: process.env } as unknown as tMintOptions;
+    await expect(mintDeveloperToken(options)).rejects.toThrow("developer token: pem must be");
+    expect(() => developerTokenMinter(options)).toThrow("developer token: pem must be");
   });
 });
 

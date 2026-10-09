@@ -20,19 +20,18 @@ copy made it.
 import { createClient } from "@open-music-sdk/core";
 import { developerTokenMinter } from "@open-music-sdk/developer-token";
 
-// The key and its two IDs are read from the environment: your .env file, or your platform's secrets.
-const music = createClient({ developerToken: developerTokenMinter({ env: process.env }), storefront: "us" });
+// The key and its two IDs, from wherever your app keeps its secrets. Here, three environment variables of your naming.
+const key = {
+  pem: process.env.APPLE_MUSIC_PRIVATE_KEY!,
+  teamId: process.env.APPLE_MUSIC_TEAM_ID!,
+  keyId: process.env.APPLE_MUSIC_KEY_ID!,
+};
+
+const music = createClient({ developerToken: developerTokenMinter(key), storefront: "us" });
 
 // A token endpoint for your own front end: bound to your origin, never stored by a cache.
-const forBrowsers = developerTokenMinter({ env: process.env, origin: ["https://app.example"] });
+const forBrowsers = developerTokenMinter({ ...key, origin: ["https://app.example"] });
 export const GET = async () => new Response(await forBrowsers(), { headers: { "cache-control": "no-store" } });
-```
-
-```sh
-# .env
-APPLE_MUSIC_TEAM_ID=DEF123GHIJ
-APPLE_MUSIC_KEY_ID=ABC123DEFG
-APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END PRIVATE KEY-----"
 ```
 
 ```ts
@@ -62,32 +61,32 @@ sign a token even if a private key were handed to it by mistake.
 
 ## The key
 
-Apple lets you download `AuthKey_XXXXXXXXXX.p8` once. Put its contents in the environment, not in the
-repository: a `.env` file that is never committed for local work, your platform's secret store in
-production. Pass the environment as `env` and the minter reads three variables from it. The environment
-is an option, not something the package goes looking for, so it works with whatever loaded it:
-`node --env-file=.env`, `process.loadEnvFile()`, a framework's own `.env` support, or the `env` a
-Cloudflare Worker is handed.
+Apple lets you download `AuthKey_XXXXXXXXXX.p8` once. Keep its contents out of the repository: in a
+`.env` file that is never committed for local work, in your platform's secret store in production.
 
-| Variable | Holds |
-| --- | --- |
-| `APPLE_MUSIC_PRIVATE_KEY` | The contents of the `.p8`. On one line with `\n` for each line break, or across several lines inside double quotes. |
-| `APPLE_MUSIC_TEAM_ID` | Your Team ID. |
-| `APPLE_MUSIC_KEY_ID` | The key's ID: the ten characters in the file name. |
+This package reads no environment and no file. Loading the key and its two IDs is your app's job,
+done the way it loads its other secrets; the minter takes them as `pem`, `teamId` and `keyId` and is
+responsible for them from there. It checks what it is handed: an option that is missing, or is not a
+string, is a `TypeError` naming the option, so an unset variable behind one of the `!` above fails
+where the minter is created and not on the first request.
 
-Other names go in `variables`: `developerTokenMinter({ env, variables: { pem: "MUSICKIT_KEY" } })`. Anything
-given outright is used instead of its variable, so `developerTokenMinter({ env, teamId, keyId })` reads only
-the key from the environment. A variable that is missing or empty is a `TypeError` naming every such
-variable, and an invalid value is reported with the variable it was read from. No error quotes a value:
-a string is described by its length and anything else by its kind. Only a number is printed as given.
+`pem` is the text of the file. A variable usually holds it on one line with `\n` for each line break,
+and that is accepted as it is, as are Windows line endings, a byte order mark, and whitespace around it:
+
+```sh
+# .env
+APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END PRIVATE KEY-----"
+```
+
+No error quotes a value: a string is described by its length and anything else by its kind. Only a
+number is printed as given.
 
 ## Minting
 
 | Option | |
 | --- | --- |
-| `env`, `variables` | An environment to read the key and both IDs from, and other names for its three variables. See [The key](#the-key). |
-| `pem` | The contents of the `.p8`, as a string, when it does not come from `env`. |
-| `teamId`, `keyId` | Your Team ID and the key's ID: ten capital letters and digits each. Required unless `env` holds them. |
+| `pem` | The contents of the `.p8`, as a string. Required. |
+| `teamId`, `keyId` | Your Team ID, and the key's ID (the ten characters in the file's name): ten capital letters and digits each. Required. |
 | `ttlSeconds` | The token's lifetime in whole seconds. Default 3600, one hour; from 60 to 15 777 000 (Apple's six months). |
 | `origin` | Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Set it on any token a browser will see. |
 | `refreshAheadSeconds` | For `developerTokenMinter`, not `mintDeveloperToken`: how long before `exp` to mint a replacement. Default, and at most, half the lifetime. |
@@ -98,8 +97,8 @@ never quoted in an error. The private key stays where you put it: only the signe
 
 `developerTokenMinter` reads its options once, when it is created, so nothing you do to your object afterwards
 changes what it mints. It imports the key on first use into a form that can sign and cannot be
-exported, and from then on holds no copy of the PEM text or of `env`. The text is still wherever you
-got it from, `process.env` included.
+exported, and from then on holds no copy of the PEM text. The text is still wherever you got it from,
+`process.env` included.
 
 ## Your token endpoint
 

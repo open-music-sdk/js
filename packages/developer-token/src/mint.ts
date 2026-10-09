@@ -1,47 +1,28 @@
 import { importPKCS8, SignJWT } from "jose";
 import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
-import { readEnv, type tEnvVariables, type tSetting } from "./env.js";
 import { got } from "./got.js";
 
-/** The key and its two IDs, given outright. */
-interface tKeyGiven {
+/**
+ * Where the key and its two IDs are kept, and how they are loaded, is the caller's business: nothing here reads an
+ * environment or a file. Invalid values throw a TypeError. No error quotes a value.
+ */
+export interface tMintOptions {
   /** The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Line breaks escaped as `\n` are accepted. */
   readonly pem: string;
   /** Your Apple Developer Team ID; becomes `iss`. */
   readonly teamId: string;
   /** The ID of the MusicKit key; becomes `kid`. */
   readonly keyId: string;
-  readonly env?: undefined;
-  readonly variables?: undefined;
-}
-
-/** The key and its two IDs, read from an environment. Any of them given outright as well is used instead of its variable. */
-interface tKeyFromEnv {
-  /**
-   * The environment to read: `process.env` once your `.env` file is loaded, a Workers `env`, or any object of
-   * strings. It is read once, when the options are, from `APPLE_MUSIC_PRIVATE_KEY`, `APPLE_MUSIC_TEAM_ID` and
-   * `APPLE_MUSIC_KEY_ID` unless `variables` names others.
-   */
-  readonly env: object;
-  /** Other names for the three variables. */
-  readonly variables?: tEnvVariables | undefined;
-  readonly pem?: string | undefined;
-  readonly teamId?: string | undefined;
-  readonly keyId?: string | undefined;
-}
-
-/** Invalid values throw a TypeError. No error quotes a value. */
-export type tMintOptions = (tKeyGiven | tKeyFromEnv) & {
   /** Lifetime in whole seconds, from 60 to 15 777 000 (Apple's six months). Default one hour. */
   readonly ttlSeconds?: number | undefined;
   /** Web origins the token is valid for. Set it on any token a browser will see. */
   readonly origin?: readonly string[] | undefined;
-};
+}
 
-export type tMinterOptions = tMintOptions & {
+export interface tMinterOptions extends tMintOptions {
   /** Mint a replacement this long before `exp`. Default, and at most, half the lifetime. */
   readonly refreshAheadSeconds?: number | undefined;
-};
+}
 
 // A token cannot be taken back without revoking the key, so its lifetime is how long a leaked one stays useful.
 // Minting is local and the minter replaces tokens in the background, so a short life costs nothing.
@@ -51,9 +32,9 @@ const MIN_TTL_SECONDS = 60;
 const MAX_TTL_SECONDS = 15_777_000; // Apple's limit
 
 /** The PEM, which is a string and nothing else: no wrapper is opened and no object is asked for one. */
-function pemOf(name: string, pem: unknown): string {
+function pemOf(pem: unknown): string {
   if (typeof pem === "string" && pem !== "") return pem;
-  throw new TypeError(`developer token: ${name} must be the contents of the .p8 file, as a string; got ${got(pem)}`);
+  throw new TypeError(`developer token: pem must be the contents of the .p8 file, as a string; got ${got(pem)}`);
 }
 
 /** Apple's Team IDs and key IDs are ten capital letters and digits. Anything else is refused before it is signed into a token. */
@@ -61,8 +42,6 @@ function id(name: string, value: unknown): string {
   if (typeof value === "string" && /^[A-Z0-9]{10}$/.test(value)) return value;
   throw new TypeError(`developer token: ${name} must be ten capital letters and digits, as Apple issues it; got ${got(value)}`);
 }
-
-const SETTINGS: readonly tSetting[] = ["pem", "teamId", "keyId"];
 
 /** What a browser sends as Origin: scheme, host and port, in their canonical spelling. */
 function isOrigin(value: unknown): boolean {
@@ -87,19 +66,12 @@ interface tClaims {
  * Checks everything that can be checked without parsing the key, and returns it as values of its own: nothing the
  * caller does to its object, or to the origin list inside it, reaches a later mint.
  */
-function check(options: tMintOptions): tClaims & { readonly pem: string; readonly pemName: string } {
-  if (typeof options !== "object" || (options as unknown) === null)
-    throw new TypeError(`developer token: expected an options object with pem, teamId and keyId, or with env; got ${got(options)}`);
-  const { env, variables, ttlSeconds = DEFAULT_TTL_SECONDS, origin } = options;
-  // The types rule this out, and a caller without them can still do it.
-  if (env === undefined && (variables as unknown) !== undefined) throw new TypeError("developer token: variables names what to read from env, and no env was given");
-  // Each of the key and its IDs comes from its own option or, failing that, from env under its variable's name.
-  const read = env === undefined ? {} : readEnv(env, variables, SETTINGS.filter((setting) => options[setting] === undefined));
-  /** The option as an error should name it: with the variable it was read from, when it was. */
-  const named = (setting: tSetting) => (read[setting] === undefined ? setting : `${setting} (read from ${read[setting].variable})`);
-  const key = pemOf(named("pem"), options.pem ?? read.pem?.value);
-  const teamId = id(named("teamId"), options.teamId ?? read.teamId?.value);
-  const keyId = id(named("keyId"), options.keyId ?? read.keyId?.value);
+function check(options: tMintOptions): tClaims & { readonly pem: string } {
+  if (typeof options !== "object" || (options as unknown) === null) throw new TypeError(`developer token: expected an options object with pem, teamId and keyId; got ${got(options)}`);
+  const { ttlSeconds = DEFAULT_TTL_SECONDS, origin } = options;
+  const key = pemOf(options.pem);
+  const teamId = id("teamId", options.teamId);
+  const keyId = id("keyId", options.keyId);
   if (!Number.isInteger(ttlSeconds) || ttlSeconds < MIN_TTL_SECONDS || ttlSeconds > MAX_TTL_SECONDS)
     throw new TypeError(`developer token: ttlSeconds must be an integer from ${String(MIN_TTL_SECONDS)} to ${String(MAX_TTL_SECONDS)}, got ${got(ttlSeconds)}`);
   let origins: string[] | undefined;
@@ -114,15 +86,15 @@ function check(options: tMintOptions): tClaims & { readonly pem: string; readonl
   }
   // An environment variable often carries the PEM with its line breaks escaped; a PEM has no backslashes of its own.
   // jose insists the armor is the very first thing, so a stray newline or a byte order mark is trimmed away.
-  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), pemName: named("pem"), teamId, keyId, ttlSeconds, origin: origins };
+  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), teamId, keyId, ttlSeconds, origin: origins };
 }
 
-/** The PEM as a key that can sign and cannot be exported. `name` is how an error should refer to where it came from. */
-async function importKey(pem: string, name: string): Promise<CryptoKey> {
+/** The PEM as a key that can sign and cannot be exported. */
+async function importKey(pem: string): Promise<CryptoKey> {
   try {
     return await importPKCS8(pem, "ES256");
   } catch (e) {
-    throw new TypeError(`developer token: ${name} is not a PKCS8 P-256 private key (expected the contents of AuthKey_XXXXXXXXXX.p8)`, { cause: e });
+    throw new TypeError(`developer token: pem is not a PKCS8 P-256 private key (expected the contents of AuthKey_XXXXXXXXXX.p8)`, { cause: e });
   }
 }
 
@@ -140,8 +112,8 @@ async function sign(key: CryptoKey, { teamId, keyId, ttlSeconds, origin }: tClai
 
 /** Signs a developer token: an ES256 JWT with `iss`, `iat`, `exp`, and optionally `origin`. */
 export async function mintDeveloperToken(options: tMintOptions): Promise<string> {
-  const { pem, pemName, ...claims } = check(options);
-  return (await sign(await importKey(pem, pemName), claims)).token;
+  const { pem, ...claims } = check(options);
+  return (await sign(await importKey(pem), claims)).token;
 }
 
 /**
@@ -152,10 +124,10 @@ export async function mintDeveloperToken(options: tMintOptions): Promise<string>
  * minter holds a key that can sign and cannot be exported, and no copy of the text it came from.
  */
 export function developerTokenMinter(options: tMinterOptions): tDeveloperTokenProvider {
-  const { pem, pemName, ...claims } = check(options);
+  const { pem, ...claims } = check(options);
   let key: string | CryptoKey = pem; // the PEM until it has been imported, then the key in its place
   return cached(async () => {
-    if (typeof key === "string") key = await importKey(key, pemName);
+    if (typeof key === "string") key = await importKey(key);
     return sign(key, claims);
   }, options.refreshAheadSeconds);
 }

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { AppleMusicError, createClient, isAppleMusicError } from "@open-music-sdk/core";
 import { exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import { describe, expect, test, vi } from "vitest";
@@ -15,10 +15,15 @@ describe("the package entry", () => {
     expect(Object.keys(manifest.exports)).toEqual([".", "./fetcher"]);
   });
 
-  test("from an environment to a request, using nothing but the entry and core", async () => {
+  test("no source file names process or env: the key and its IDs are handed over, never read from an environment", () => {
+    const sources = readdirSync(new URL(".", import.meta.url)).filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"));
+    expect(sources).toContain("mint.ts");
+    for (const file of sources) expect(readFileSync(new URL(file, import.meta.url), "utf8"), file).not.toMatch(/\bprocess\b|\benv\b/i);
+  });
+
+  test("from a key to a request, using nothing but the entry and core", async () => {
     const pair = await generateKeyPair("ES256", { extractable: true });
-    const env = Object.fromEntries([["KEY", await exportPKCS8(pair.privateKey)], ["TEAM", "DEF123GHIJ"], ["KID", "ABC123DEFG"]]);
-    const developerToken = api.developerTokenMinter({ env, variables: { pem: "KEY", teamId: "TEAM", keyId: "KID" } });
+    const developerToken = api.developerTokenMinter({ pem: await exportPKCS8(pair.privateKey), teamId: "DEF123GHIJ", keyId: "ABC123DEFG" });
     const sent: string[] = [];
     const fetch = (input: RequestInfo | URL): Promise<Response> => {
       sent.push(new Request(input).headers.get("authorization") ?? "");
