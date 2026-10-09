@@ -4,11 +4,30 @@ import { createClient } from "@open-music-sdk/core";
 import { decodeProtectedHeader, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, jwtVerify } from "jose";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { developerTokenMinter, mintDeveloperToken, type tMintOptions } from "./mint.js";
+import { redacted } from "./redacted.js";
 
 // jose as it is, with its key import counted: how often the minter parses the key is part of what it promises.
 vi.mock("jose", async (importOriginal) => {
   const jose = await importOriginal<typeof import("jose")>();
   return { ...jose, importPKCS8: vi.fn(jose.importPKCS8) };
+});
+
+// The wrapper as it is, with every opening counted: the key is to be held wrapped and opened only to be imported.
+const opened = vi.hoisted(() => ({ times: 0 }));
+vi.mock("./redacted.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./redacted.js")>();
+  return {
+    redacted: vi.fn(<T>(value: T) => {
+      const wrapper = actual.redacted(value);
+      return {
+        ...wrapper,
+        unwrap: () => {
+          opened.times++;
+          return wrapper.unwrap();
+        },
+      };
+    }),
+  };
 });
 
 const NOW = Date.UTC(2026, 9, 7);
@@ -40,6 +59,8 @@ const at = (ms: number) => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date", "performance"], now: NOW });
   vi.mocked(importPKCS8).mockClear();
+  vi.mocked(redacted).mockClear();
+  opened.times = 0;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -604,6 +625,40 @@ describe("developerTokenMinter: the key is parsed once and the PEM not gone back
     await mintDeveloperToken(valid);
     await mintDeveloperToken(valid);
     expect(importPKCS8).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the key is held wrapped from the moment the options are read, and opened only to be imported", () => {
+  test("a new minter has wrapped the key, as the PEM it will import, and has not opened it", () => {
+    developerTokenMinter({ ...valid, pem: `\n${valid.pem.replaceAll("\n", "\\n")}` });
+    expect(redacted).toHaveBeenCalledExactlyOnceWith(valid.pem.trim());
+    expect(opened.times).toBe(0);
+  });
+
+  test.each([0, 1, 5])("after a first token and %i more, the wrapper has been opened once and what jose was given is what it held", async (more) => {
+    const minter = developerTokenMinter(valid);
+    let held = await minter();
+    for (let i = 1; i <= more; i++) {
+      at(i * 60_000);
+      held = await minter({ rejected: held });
+    }
+    expect(opened.times).toBe(1);
+    expect(importPKCS8).toHaveBeenCalledExactlyOnceWith(valid.pem.trim(), "ES256");
+  });
+
+  test("a key that cannot be imported stays wrapped, and is opened again for each attempt", async () => {
+    const minter = developerTokenMinter({ ...valid, pem: "not a key" });
+    await expect(minter()).rejects.toThrow(TypeError);
+    await expect(minter()).rejects.toThrow(TypeError);
+    expect(redacted).toHaveBeenCalledTimes(1);
+    expect(opened.times).toBe(2);
+  });
+
+  test("mintDeveloperToken wraps the key and opens it once each time it is called", async () => {
+    await mintDeveloperToken(valid);
+    await mintDeveloperToken(valid);
+    expect(redacted).toHaveBeenCalledTimes(2);
+    expect(opened.times).toBe(2);
   });
 });
 

@@ -96,9 +96,10 @@ as a rejection. A key that is not a PKCS8 P-256 private key is a `TypeError` on 
 never quoted in an error. The private key stays where you put it: only the signed token travels.
 
 `developerTokenMinter` reads its options once, when it is created, so nothing you do to your object afterwards
-changes what it mints. It imports the key on first use into a form that can sign and cannot be
-exported, and from then on holds no copy of the PEM text. The text is still wherever you got it from,
-`process.env` included.
+changes what it mints. Until a token is first wanted it holds the PEM in a wrapper that prints as
+`<redacted>`, opened only to import the key. The key is imported into a form that can sign and cannot
+be exported, and from then on the minter holds no copy of the PEM text. The text is still wherever
+you got it from, `process.env` included.
 
 ## Your token endpoint
 

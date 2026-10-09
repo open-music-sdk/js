@@ -1,6 +1,7 @@
 import { importPKCS8, SignJWT } from "jose";
 import { cached, type tDeveloperTokenProvider, type tIssued } from "./cache.js";
 import { got } from "./got.js";
+import { redacted, type tRedacted } from "./redacted.js";
 
 /**
  * Where the key and its two IDs are kept, and how they are loaded, is the caller's business: nothing here reads an
@@ -64,9 +65,10 @@ interface tClaims {
 
 /**
  * Checks everything that can be checked without parsing the key, and returns it as values of its own: nothing the
- * caller does to its object, or to the origin list inside it, reaches a later mint.
+ * caller does to its object, or to the origin list inside it, reaches a later mint. The PEM comes back wrapped, so
+ * from here on it prints as a mask wherever it ends up, until `importKey` opens it.
  */
-function check(options: tMintOptions): tClaims & { readonly pem: string } {
+function check(options: tMintOptions): tClaims & { readonly pem: tRedacted<string> } {
   if (typeof options !== "object" || (options as unknown) === null) throw new TypeError(`developer token: expected an options object with pem, teamId and keyId; got ${got(options)}`);
   const { ttlSeconds = DEFAULT_TTL_SECONDS, origin } = options;
   const key = pemOf(options.pem);
@@ -86,13 +88,13 @@ function check(options: tMintOptions): tClaims & { readonly pem: string } {
   }
   // An environment variable often carries the PEM with its line breaks escaped; a PEM has no backslashes of its own.
   // jose insists the armor is the very first thing, so a stray newline or a byte order mark is trimmed away.
-  return { pem: key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim(), teamId, keyId, ttlSeconds, origin: origins };
+  return { pem: redacted(key.replaceAll("\\r", "\r").replaceAll("\\n", "\n").trim()), teamId, keyId, ttlSeconds, origin: origins };
 }
 
-/** The PEM as a key that can sign and cannot be exported. */
-async function importKey(pem: string): Promise<CryptoKey> {
+/** The PEM as a key that can sign and cannot be exported. The one place the wrapper is opened. */
+async function importKey(pem: tRedacted<string>): Promise<CryptoKey> {
   try {
-    return await importPKCS8(pem, "ES256");
+    return await importPKCS8(pem.unwrap(), "ES256");
   } catch (e) {
     throw new TypeError(`developer token: pem is not a PKCS8 P-256 private key (expected the contents of AuthKey_XXXXXXXXXX.p8)`, { cause: e });
   }
@@ -120,14 +122,15 @@ export async function mintDeveloperToken(options: tMintOptions): Promise<string>
  * A `developerToken` provider that mints on first use and reuses the token, replacing it in the background
  * halfway through its life. Concurrent requests share one mint, and a token Apple answers 401 to is replaced.
  *
- * The options are read once, here. The key is imported on first use and the PEM let go of: from then on the
- * minter holds a key that can sign and cannot be exported, and no copy of the text it came from.
+ * The options are read once, here, and the PEM held wrapped so that nothing prints it. The key is imported on
+ * first use and the PEM let go of: from then on the minter holds a key that can sign and cannot be exported, and
+ * no copy of the text it came from.
  */
 export function developerTokenMinter(options: tMinterOptions): tDeveloperTokenProvider {
   const { pem, ...claims } = check(options);
-  let key: string | CryptoKey = pem; // the PEM until it has been imported, then the key in its place
+  let key: tRedacted<string> | CryptoKey = pem; // the wrapped PEM until it has been imported, then the key in its place
   return cached(async () => {
-    if (typeof key === "string") key = await importKey(key);
+    if ("unwrap" in key) key = await importKey(key);
     return sign(key, claims);
   }, options.refreshAheadSeconds);
 }
