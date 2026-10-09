@@ -1,0 +1,368 @@
+/** What is read from an artwork object. Any `tArtwork` from `@open-music-sdk/types` fits. */
+export interface tArtworkSource {
+  /** The URL template. `{w}` and `{h}` stand for the pixel size. */
+  readonly url: string;
+  /** The widest the image comes, in pixels. No image larger than it comes is asked for. */
+  readonly width?: number | null | undefined;
+  /** The tallest the image comes, in pixels. */
+  readonly height?: number | null | undefined;
+}
+
+/**
+ * The formats Apple's image server converts to. It answers 400 to `avif`, `bmp` and others, and to `gif` and
+ * `tiff` it sends a JPEG under that name, so those are not here.
+ */
+const FORMATS = ["jpg", "jpeg", "png", "webp", "heic", "heif"] as const;
+
+/** A file format the image server converts artwork to. */
+export type tArtworkFormat = (typeof FORMATS)[number];
+
+export interface tArtworkOptions {
+  /** Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`, or `width` where its shape is unknown. */
+  readonly height?: number | undefined;
+  /** The file format. Default: the one the template names, or `"jpg"` where it leaves that open as `{f}`. */
+  readonly format?: tArtworkFormat | undefined;
+  /**
+   * Apple's code for how the image is cut to the box, such as `"bb"`, the whole image fitted inside it, or
+   * `"sr"`, the box filled. Default: the one the template names, or `"bb"` where it leaves that open as `{c}`.
+   */
+  readonly crop?: string | undefined;
+  /**
+   * The hosts artwork may come from, such as `["mzstatic.com"]`, where Apple serves its catalog artwork. With
+   * this, a URL that is not `https` on one of them or on a subdomain of one, with no port and no credentials, is
+   * a `TypeError` and nothing is returned. Default: where the URL points is not checked at all.
+   */
+  readonly hosts?: readonly string[] | undefined;
+}
+
+export interface tArtworkSrcSetOptions extends tArtworkOptions {
+  /** The pixel densities to offer, 16 at most. Default 1, 2 and 3. */
+  readonly densities?: readonly number[] | undefined;
+}
+
+/** What an `<img>` is given to show an artwork. The names are the element's own, so the object can be assigned to one. */
+export interface tArtworkImage {
+  /** The image at a density of one: what `artworkUrl` gives. */
+  readonly src: string;
+  /** What `artworkSrcSet` gives. */
+  readonly srcset: string;
+  /** How wide the image is shown, in whole CSS pixels. */
+  readonly width: number;
+  /** How tall the image is shown, in whole CSS pixels. */
+  readonly height: number;
+}
+
+/**
+ * A length or density the caller gave. The upper bound is where whole numbers stop being exact; nothing near it
+ * is a real size, but below it the arithmetic that follows cannot overflow, so no number here ever needs a
+ * second check.
+ */
+function length(name: string, value: unknown): number {
+  if (typeof value === "number" && value > 0 && value <= Number.MAX_SAFE_INTEGER) return value;
+  throw new TypeError(`artwork: ${name} must be a number above 0 and at most ${String(Number.MAX_SAFE_INTEGER)}, got ${typeof value === "number" ? String(value) : typeof value}`);
+}
+
+/**
+ * How large the artwork says it comes, one way, in whole pixels, or nothing where what it says is no size. That
+ * is data from somewhere else, so a bad one is not an error: the artwork is treated as not having said.
+ */
+const pixels = (value: unknown): number | undefined => (typeof value === "number" && value >= 1 && value <= Number.MAX_SAFE_INTEGER ? Math.floor(value) : undefined);
+
+function formatOf(value: unknown): tArtworkFormat | undefined {
+  if (value === undefined || (FORMATS as readonly unknown[]).includes(value)) return value as tArtworkFormat | undefined;
+  throw new TypeError(`artwork: format must be one of ${FORMATS.join(", ")}`);
+}
+
+/**
+ * A crop code goes into the file name as it is, so it may hold nothing that could end the name or change the URL
+ * around it. Apple's own run from `bb` to `SC.DN01` and `bb-60`: letters and digits, with a dot or hyphen between.
+ */
+function cropOf(value: unknown): string | undefined {
+  if (value === undefined || (typeof value === "string" && value.length <= MAX_CROP_LENGTH && /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*$/.test(value))) return value;
+  throw new TypeError(`artwork: crop must be a crop code: at most ${String(MAX_CROP_LENGTH)} letters and digits, with single dots or hyphens between them`);
+}
+
+/**
+ * The hosts a caller allows, as a list of this call's own. Each is a bare host name in small letters, as a URL
+ * parser gives a host: `https://mzstatic.com`, `*.mzstatic.com` and `MzStatic.com` would each match nothing, so
+ * they are refused here and not left to refuse every artwork later.
+ */
+function hostsOf(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  const hosts: unknown[] = Array.isArray(value) && value.length <= MAX_HOSTS ? [...(value as unknown[])] : [];
+  if (hosts.length > 0 && hosts.every((host): host is string => typeof host === "string" && host.length <= 253 && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(host))) return hosts;
+  throw new TypeError(`artwork: hosts must be an array of 1 to ${String(MAX_HOSTS)} host names in small letters, such as mzstatic.com`);
+}
+
+/**
+ * The URL, if no hosts were named or it is `https` on one of them, and a `TypeError` if it is not. The error
+ * does not show the URL: it is not ours, and may be as long or as strange as whoever wrote it liked.
+ *
+ * The URL is read by the parser a browser reads it with, so what is checked is what will be requested.
+ */
+function allowed(url: string, hosts: readonly string[] | undefined): string {
+  if (hosts === undefined) return url;
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // A URL that does not stand on its own, such as a relative one, is on no host that could be allowed.
+  }
+  const host = parsed?.hostname ?? "";
+  if (parsed?.protocol === "https:" && parsed.username === "" && parsed.password === "" && parsed.port === "" && hosts.some((name) => host === name || host.endsWith(`.${name}`))) return url;
+  throw new TypeError("artwork: the artwork's url is not https on one of the hosts allowed");
+}
+
+const SIZE = "{w}x{h}";
+const DEFAULT_CROP = "bb";
+/** The most pixels Apple's image server gives on a side. It answers 400 to a request for one more. */
+const MAX_SIDE = 10_000;
+/** Three times the longest crop code seen from Apple. A code fills every `{c}` in a template, so its length is what a URL can grow by. */
+const MAX_CROP_LENGTH = 32;
+/** More hosts than artwork is served from. */
+const MAX_HOSTS = 16;
+/** More densities than screens come in. Each one is a candidate built and a URL written, so the list is not left open. */
+const MAX_DENSITIES = 16;
+/** What arithmetic on sizes this small can be off by, with room to spare: a height of 180.0000000001 is 180, not 181. */
+const ROUNDING = 1e-6;
+
+/**
+ * What a crop code makes of the box it is given, as Apple's image server was seen to do it:
+ *
+ * - `inside`: the whole image fitted inside the box and never enlarged. `bb`, `bb` at a JPEG quality, and a
+ *   file name with no code at all.
+ * - `square`: a square as long as the box's longer side, whatever the box's shape, enlarged if it must be. `cc`.
+ * - `fill`: the box exactly, enlarged if it must be. Every other code that was tried.
+ */
+export type tPlacement = "inside" | "square" | "fill";
+
+/** A URL that does not say how the image is cut is taken to fill the box: that never asks for an enlargement. */
+const placementOf = (cut: string | undefined): tPlacement => (cut === undefined ? "fill" : cut === "" || /^bb(?:-|$)/.test(cut) ? "inside" : /^cc(?:-|$)/.test(cut) ? "square" : "fill");
+
+/**
+ * The template with a crop or format that was asked for written where the template names one.
+ *
+ * Apple documents the template as `{w}x{h}` and then the rest of a file name: in `{w}x{h}bb.jpg` the image is
+ * cut `bb` and encoded `jpg`. Some templates leave those open as `{c}` and `{f}`, which are filled in like the
+ * size. Most name them, and asking for another means writing over what is there. A URL whose file name is not of
+ * that form says nothing about cut or encoding, and is left as it is.
+ *
+ * `cut` is the crop code the file name ends up with, where it has the form to name one.
+ */
+function tailored(template: string, crop: string | undefined, format: string | undefined): { template: string; cut: string | undefined } {
+  const end = /[?#]/.exec(template)?.index ?? template.length;
+  const start = template.lastIndexOf("/", end) + 1;
+  const name = template.slice(start, end);
+  const dot = name.lastIndexOf(".");
+  if (!name.startsWith(SIZE) || dot < SIZE.length || dot === name.length - 1) return { template, cut: undefined };
+  const [cut, encoding] = [name.slice(SIZE.length, dot), name.slice(dot + 1)];
+  const [newCut, newEncoding] = [crop !== undefined && !cut.includes("{c}") ? crop : cut, format !== undefined && !encoding.includes("{f}") ? format : encoding];
+  return { template: `${template.slice(0, start)}${SIZE}${newCut}.${newEncoding}${template.slice(end)}`, cut: newCut.replaceAll("{c}", crop ?? DEFAULT_CROP) };
+}
+
+/**
+ * The pixel size to ask for, given the box wanted in device pixels and how large the artwork comes, and how far
+ * the box had to shrink to get there. A `scale` of 1 is a box that got what it asked for.
+ *
+ * A box never asks for more than the artwork has, nor for more than the image server gives at all, and it
+ * shrinks in its own shape. What "more than the artwork has" means depends on the crop. An image that fills the box needs the artwork to cover the box both ways. An image fitted `inside`
+ * the box touches two of its sides and leaves the others clear unless the shapes match, so the box may run past
+ * the artwork one way and still hold a smaller image: it shrinks only once the image inside it would be larger
+ * than the artwork comes. Shrinking it sooner gets a smaller image back, not the same one.
+ */
+export function fit(
+  box: { readonly width: number; readonly height?: number | undefined },
+  max: { readonly width?: number | undefined; readonly height?: number | undefined },
+  placement: tPlacement,
+): { width: number; height: number; scale: number } {
+  if (placement === "square") {
+    // The image will be a square as long as the box's longer side, so that square is what is asked for, and
+    // the artwork has one as long as its shorter side to give.
+    const side = Math.max(box.width, box.height ?? box.width);
+    const most = max.width === undefined ? max.height : max.height === undefined ? max.width : Math.min(max.width, max.height);
+    return fit({ width: side, height: side }, { width: most, height: most }, "fill");
+  }
+  const inside = placement === "inside";
+  // With no height, the box takes the artwork's shape, or is square where the artwork does not say both ways.
+  const shape = max.width !== undefined && max.height !== undefined ? max.height / max.width : 1;
+  const boxHeight = box.height ?? box.width * shape;
+  const across = max.width === undefined ? Infinity : max.width / box.width;
+  const down = max.height === undefined ? Infinity : max.height / boxHeight;
+  // The image inside the box can only be worked out from the artwork's whole shape. With one side known, that
+  // side is all there is to go by, and the box is held to it as if the image filled it.
+  const artwork = inside && max.width !== undefined && max.height !== undefined ? Math.max(across, down) : Math.min(across, down);
+  const scale = Math.min(1, artwork, MAX_SIDE / box.width, MAX_SIDE / boxHeight);
+  const whole = (pixels: number) => Math.max(1, Math.min(MAX_SIDE, pixels));
+  const width = whole(Math.round(box.width * scale));
+  // A height that was asked for is rounded like the width. One that follows from the width is worked out from
+  // the width's whole pixels and rounded up, so that it is the width that decides the image: 150 by 77.49
+  // rounded to 150x77 comes back 149 pixels wide, where 150x78 comes back 150.
+  const height = whole(box.height === undefined ? Math.ceil(width * shape - ROUNDING) : Math.round(box.height * scale));
+  return { width, height, scale };
+}
+
+/** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
+interface tRequest {
+  readonly template: string;
+  /** Whether the template has a size to fill in. A URL without one is one image, whatever is asked of it. */
+  readonly sized: boolean;
+  /** How large the artwork comes, each way, where it says. */
+  readonly max: { readonly width: number | undefined; readonly height: number | undefined };
+  /** The box wanted, in CSS pixels. With no height, the box takes the artwork's shape. */
+  readonly width: number;
+  readonly height: number | undefined;
+  readonly format: string;
+  readonly crop: string;
+  /** What the crop in force makes of the box, so far as the template says how the image is cut. */
+  readonly placement: tPlacement;
+  /** The hosts the URL may be on, where the caller named any. */
+  readonly hosts: readonly string[] | undefined;
+}
+
+/**
+ * Reads the artwork and the options, each property once, and checks them. What the artwork holds is data from
+ * somewhere else: an object that answers differently the second time it is asked is never asked a second time.
+ */
+function read(artwork: tArtworkSource, width: number, options: tArtworkOptions): tRequest {
+  if (typeof artwork !== "object" || (artwork as unknown) === null) throw new TypeError("artwork: expected an artwork object with a url");
+  const { url, width: maxWidth, height: maxHeight } = artwork;
+  // A template that has been through a URL parser has its braces percent-encoded. It is the same template.
+  const template = typeof url === "string" ? normalise(url).replace(/%7[Bb]([whcf])%7[Dd]/g, "{$1}") : "";
+  if (template === "") throw new TypeError("artwork: expected an artwork object with a url");
+  if (typeof options !== "object" || (options as unknown) === null) throw new TypeError("artwork: options must be an object");
+  const { height } = options;
+  const [format, crop] = [formatOf(options.format), cropOf(options.crop)];
+  const named = tailored(template, crop, format);
+  return {
+    template: named.template,
+    sized: named.template.includes("{w}") || named.template.includes("{h}"),
+    max: { width: pixels(maxWidth), height: pixels(maxHeight) },
+    width: length("width", width),
+    height: height === undefined ? undefined : length("height", height),
+    format: format ?? "jpg",
+    crop: crop ?? DEFAULT_CROP,
+    placement: placementOf(named.cut),
+    hosts: hostsOf(options.hosts),
+  };
+}
+
+/**
+ * The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has.
+ * Every URL that leaves this package is made here, so here is where its host is checked, once it is whole.
+ */
+function image({ template, max, width, height, format, crop, placement, hosts }: tRequest, density: number): { url: string; scale: number } {
+  const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, placement);
+  const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
+  return { url: allowed(url, hosts), scale };
+}
+
+/**
+ * The URL as a browser reads it from `src`, spelled so that a `srcset` carries it unchanged.
+ *
+ * Before it looks at anything, a URL parser drops white space and control characters from both ends and tabs
+ * and line breaks from anywhere. The same go here, or a `src` and a `srcset` given one URL would disagree
+ * about where it points. A space or form feed inside, which would end the URL in a `srcset`, is written the
+ * way the parser would write it. A comma at either end would be taken for a separator: a leading one is kept
+ * by saying `./` first, a trailing one by closing with an empty fragment, or by encoding it where it is in the
+ * fragment already. None of this changes what is requested.
+ *
+ * The ends are walked, not matched. A pattern that looks for something at the end starts over inside every run
+ * of it, which takes time by the square of the run's length, and the URL is not ours to trust with that.
+ */
+export function normalise(url: string): string {
+  let [start, end] = [0, url.length];
+  while (start < end && url.charCodeAt(start) <= 0x20) start++;
+  while (end > start && url.charCodeAt(end - 1) <= 0x20) end--;
+  const out = url.slice(start, end).replace(/[\t\n\r]/g, "").replace(/ /g, "%20").replace(/\f/g, "%0C");
+  const led = out.startsWith(",") ? `./${out}` : out;
+  if (!led.endsWith(",")) return led;
+  if (!led.includes("#")) return `${led}#`;
+  let cut = led.length;
+  while (led.charCodeAt(cut - 1) === 0x2c) cut--;
+  return led.slice(0, cut) + "%2C".repeat(led.length - cut);
+}
+
+/**
+ * The URL of an artwork image `width` CSS pixels wide: the template with `{w}` and `{h}` filled in.
+ *
+ * The image keeps the artwork's own shape unless `height` says otherwise, and is never asked for larger than
+ * the artwork comes. The URL is the one the API gave, spelled as a browser would read it, with numbers put in.
+ *
+ * Where it points is not checked unless `hosts` says where it may: artwork that did not come straight from
+ * Apple's API can hold any URL, which an `<img>` will request, a link will run if it is `javascript:`, and a
+ * server-side fetch will follow into your own network.
+ */
+export function artworkUrl(artwork: tArtworkSource, width: number, options: tArtworkOptions = {}): string {
+  return image(read(artwork, width, options), 1).url;
+}
+
+/**
+ * A `srcset` for an image shown `width` CSS pixels wide: one candidate per pixel density, so a dense screen
+ * gets a sharper image and a plain one a smaller file.
+ *
+ * Each candidate carries the density it was asked for. Where the artwork does not come large enough for one,
+ * the largest it has is offered once, under the density that image amounts to.
+ *
+ * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
+ */
+export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
+  return srcset(read(artwork, width, options), options);
+}
+
+/**
+ * Everything an `<img>` needs to show an artwork `width` CSS pixels wide: its `src`, its `srcset`, and the
+ * `width` and `height` to lay it out by, worked out together from one reading of the artwork.
+ *
+ * Use this where you would otherwise call `artworkUrl` and `artworkSrcSet` side by side. A browser takes `src`
+ * for the 1x image wherever the `srcset` does not offer one, and sizes an image with no `width` and `height`
+ * by the density of whichever candidate it took, so the four have to agree, and here they cannot fail to.
+ * `width` and `height` are the size the image itself is shown at: with a `height` and a crop that fits the
+ * artwork inside the box, that is the artwork standing in your box, not the box.
+ *
+ * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
+ */
+export function artworkImage(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): tArtworkImage {
+  const request = read(artwork, width, options);
+  return { src: image(request, 1).url, srcset: srcset(request, options), ...shown(request) };
+}
+
+/**
+ * The size the image is shown at, in whole CSS pixels: the box wanted where the crop fills it, the artwork
+ * standing inside the box where the crop fits it in, and a square of the box's longer side where the crop
+ * makes one.
+ */
+function shown({ max, width, height, placement }: tRequest): { width: number; height: number } {
+  const whole = (pixels: number) => Math.max(1, Math.round(pixels));
+  if (placement === "square") return { width: whole(Math.max(width, height ?? width)), height: whole(Math.max(width, height ?? width)) };
+  const shapeKnown = max.width !== undefined && max.height !== undefined;
+  const boxHeight = height ?? (shapeKnown ? (width * max.height) / max.width : width);
+  if (placement !== "inside" || !shapeKnown) return { width: whole(width), height: whole(boxHeight) };
+  const share = Math.min(width / max.width, boxHeight / max.height);
+  return { width: whole(max.width * share), height: whole(max.height * share) };
+}
+
+function srcset(request: tRequest, options: tArtworkSrcSetOptions): string {
+  const { densities = [1, 2, 3] } = options as { readonly densities?: unknown };
+  // The length is read once too: a list that grows as it is read cannot keep this going.
+  const count = Array.isArray(densities) ? densities.length : 0;
+  if (count === 0 || count > MAX_DENSITIES) throw new TypeError(`artwork: densities must be an array of 1 to ${String(MAX_DENSITIES)} numbers above 0`);
+  const candidates: string[] = [];
+  const [urls, descriptors] = [new Set<string>(), new Set<string>()];
+  for (let i = 0; i < count; i++) {
+    const density = length(`densities[${String(i)}]`, (densities as unknown[])[i]);
+    const { url, scale } = image(request, density);
+    // The density as it was asked for, never worked back from the pixels: those are rounded, and 50 pixels for
+    // a width of 50.4 would say 0.99x, which a 1x screen passes over for the next size up. Only a box that had
+    // to shrink says something else, and then to three figures, which is as fine as a screen's density gets.
+    const descriptor = `${String(scale < 1 ? Number((density * scale).toPrecision(3)) : density)}x`;
+    // A browser keeps the first candidate of each density, and an image offered twice is offered once.
+    if (urls.has(url) || descriptors.has(descriptor)) continue;
+    urls.add(url);
+    descriptors.add(descriptor);
+    candidates.push(`${url} ${descriptor}`);
+  }
+  // A URL with no size in it is one image of a size nobody here knows, so it is offered alone and unlabelled:
+  // any density put on it would be a guess, and a browser would lay the image out by the guess.
+  if (!request.sized) return image(request, 1).url;
+  return candidates.join(", ");
+}
