@@ -99,6 +99,18 @@ describe("request: credentials never leave the Apple origin", () => {
     expect(calls).toHaveLength(1);
   });
 
+  test.each(escapes)("a page handed to paginate whose next link is %s is not followed", async (next) => {
+    const { music, calls } = client([], { userToken: "user" });
+    const seen: unknown[] = [];
+    await expect(
+      (async () => {
+        for await (const item of music.paginate({ data: [1], next })) seen.push(item);
+      })(),
+    ).rejects.toThrow(TypeError);
+    expect(seen).toEqual([1]);
+    expect(calls).toHaveLength(0);
+  });
+
   test("an absolute URL on the Apple origin is allowed", async () => {
     const { music, url } = client();
     await music.request("https://api.music.apple.com/v1/test");
@@ -879,6 +891,136 @@ describe("paginate", () => {
     await items(music.paginate("v1/me/x"));
     expect(header("music-user-token", 0)).toBe("user");
     expect(header("music-user-token", 1)).toBe("user");
+  });
+
+  describe("from a page already fetched", () => {
+    test("its own items come first, then those of every page after it", async () => {
+      const { music, calls, url } = client([{ body: { data: [3, 4], next: "/v1/x?offset=4" } }, { body: { data: [5] } }]);
+      expect(await items(music.paginate({ data: [1, 2], next: "/v1/x?offset=2" }))).toEqual([1, 2, 3, 4, 5]);
+      expect(calls).toHaveLength(2);
+      expect(url(0)).toBe("https://api.music.apple.com/v1/x?offset=2");
+      expect(url(1)).toBe("https://api.music.apple.com/v1/x?offset=4");
+    });
+
+    test.each([{ data: [1, 2] }, { data: [1, 2], next: undefined }])("a last page, %j, asks Apple for nothing", async (page) => {
+      const { music, calls } = client();
+      expect(await items(music.paginate(page))).toEqual([1, 2]);
+      expect(calls).toHaveLength(0);
+    });
+
+    test.each([{}, { data: [] }, { data: undefined }])("a page with nothing in it, %j, yields nothing", async (page: { data?: number[] | undefined }) => {
+      const { music, calls } = client();
+      expect(await items(music.paginate(page))).toEqual([]);
+      expect(calls).toHaveLength(0);
+    });
+
+    test("a promise of a page is awaited, so a request can be handed over as it is made", async () => {
+      const { music, calls } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2] } }]);
+      expect(await items(music.paginate(music.request<{ data: number[]; next?: string }>("v1/x", { params: { limit: 1 } })))).toEqual([1, 2]);
+      expect(calls).toHaveLength(2);
+    });
+
+    test("a promise that comes to nothing, as an empty answer does, is a last, empty page", async () => {
+      const { music, calls } = client([{ status: 204 }]);
+      expect(await items(music.paginate(music.request<{ data: number[] }>("v1/x")))).toEqual([]);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("a promise that rejects surfaces from the loop, with nothing yielded", async () => {
+      const { music } = client([apiError(404, "Not Found")]);
+      const e = await failure(items(music.paginate(music.request<{ data: number[] }>("v1/x"))));
+      expect(e.status).toBe(404);
+    });
+
+    test("a relationship inside a resource is a page like any other, whatever else it holds", async () => {
+      const { music, url } = client([{ body: { data: [song] } }]);
+      const tracks = { href: "/v1/catalog/us/albums/1/tracks", data: [song], next: "/v1/catalog/us/albums/1/tracks?offset=1", meta: { total: 2 } };
+      expect(await items(music.paginate(tracks))).toEqual([song, song]);
+      expect(url()).toBe("https://api.music.apple.com/v1/catalog/us/albums/1/tracks?offset=1");
+    });
+
+    test("the params given with it are not sent, since its next link carries the query; the rest of init still applies", async () => {
+      const validate = vi.fn((value: unknown) => ({ value: value as { data: number[] } }));
+      const { music, url } = client([{ body: { data: [2] } }]);
+      expect(await items(music.paginate({ data: [1], next: "/v1/x?offset=1&limit=1" }, { params: { limit: 50, l: "fr" }, schema: { "~standard": { validate } } }))).toEqual([1, 2]);
+      expect(url()).toBe("https://api.music.apple.com/v1/x?offset=1&limit=1");
+      // The schema is for what is fetched: the page handed over is taken as it is.
+      expect(validate).toHaveBeenCalledTimes(1);
+      expect(validate).toHaveBeenCalledWith({ data: [2] });
+    });
+
+    test("an abort stops the walk before the next page is asked for", async () => {
+      const { music, calls } = client([{ body: { data: [2] } }]);
+      const controller = new AbortController();
+      const seen: number[] = [];
+      await expect(
+        (async () => {
+          for await (const item of music.paginate({ data: [1], next: "/v1/x?offset=1" }, { signal: controller.signal })) {
+            seen.push(item);
+            controller.abort(new Error("stopped"));
+          }
+        })(),
+      ).rejects.toThrow("stopped");
+      expect(seen).toEqual([1]);
+      expect(calls).toHaveLength(0);
+    });
+
+    test("breaking out while its own items last asks Apple for nothing", async () => {
+      const { music, calls } = client([{ body: { data: [3] } }]);
+      for await (const item of music.paginate({ data: [1, 2], next: "/v1/x?offset=2" })) if (item === 1) break;
+      expect(calls).toHaveLength(0);
+    });
+
+    test("nothing is read or asked for until the loop starts", async () => {
+      const { music, calls } = client([{ body: { data: [2] } }]);
+      const then = vi.fn((resolve: (page: { data: number[]; next: string }) => void) => {
+        resolve({ data: [1], next: "/v1/x?offset=1" });
+      });
+      const it = music.paginate({ then } as unknown as PromiseLike<{ data: number[]; next: string }>)[Symbol.asyncIterator]();
+      expect(then).not.toHaveBeenCalled();
+      expect((await it.next()).value).toBe(1);
+      expect(calls).toHaveLength(0);
+      expect((await it.next()).value).toBe(2);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("the user token travels with every page after it", async () => {
+      const { music, header } = client([{ body: { data: [] } }], { userToken: "user" });
+      await items(music.paginate({ data: [1], next: "/v1/me/x?offset=1" }));
+      expect(header("music-user-token", 0)).toBe("user");
+    });
+
+    test.each<[string, unknown]>([
+      ["data as a number", { data: 5 }],
+      ["data as a string", { data: "abc" }],
+      ["data as an object", { data: { id: "1" } }],
+      ["next as a number", { data: [], next: 7 }],
+      ["next as an object", { data: [], next: {} }],
+      ["a list", [1, 2]],
+      ["a promise of null", Promise.resolve(null)],
+      ["a promise of a string", Promise.resolve("v1/x")],
+      ["a promise of a number", Promise.resolve(5)],
+    ])("%s is no page: an ApiError that says so, and nothing is asked for", async (_, page) => {
+      const { music, calls } = client();
+      const e = await failure(items(music.paginate(page as { data: number[] })));
+      expect(e._tag).toBe("ApiError");
+      expect(e.message).toContain("the page given to paginate");
+      expect(calls).toHaveLength(0);
+    });
+
+    test.each<[string, unknown, string]>([
+      ["nothing", undefined, "undefined"],
+      ["null", null, "null"],
+      ["a number", 5, "5"],
+      ["true", true, "boolean"],
+      ["a function", () => ({ data: [] }), "function"],
+    ])("%s handed over is the caller's mistake: a TypeError, and nothing is asked for", async (_, page, what) => {
+      const { music, calls } = client();
+      const error: unknown = await items(music.paginate(page as { data: number[] })).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as Error).message).toBe(`paginate: expected a path, or a page or a promise of one; got ${what}`);
+      expect(calls).toHaveLength(0);
+    });
   });
 });
 

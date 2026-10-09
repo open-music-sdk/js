@@ -83,8 +83,17 @@ export interface tPage<T> {
 export interface tAppleMusicClient {
   /** `path` is "v1/...", "/v1/...", or a `next` subpath from a response. Resolves to the parsed body, or undefined when there is none. */
   request<T>(path: string, init?: tRequestInit<T>): Promise<T>;
-  /** The items of `data` across every `next` page. Breaking out of the loop stops fetching. */
-  paginate<T>(path: string, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
+  /**
+   * The items of `data` across every `next` page. Breaking out of the loop stops fetching.
+   *
+   * `from` is a path, or a page already fetched, or a promise of one: the page's own items come first and nothing
+   * is asked for until they run out. With a page, `init.params` is not sent, since its `next` link already carries
+   * the query.
+   *
+   * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
+   * relationship's are. A search or a chart answers with its pages nested under `results`, and is not walked.
+   */
+  paginate<T>(from: string | tPage<T> | PromiseLike<tPage<T>>, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
   /** The configured storefront, or the listener's, resolved once. */
   storefront(): Promise<string>;
   /** A client for one listener. Shares the developer token, limiter, retry policy, and hooks. */
@@ -236,9 +245,18 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 
-  async function* paginate<T>(path: string, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
-    let next: string | undefined = path;
+  async function* paginate<T>(from: string | tPage<T> | PromiseLike<tPage<T>>, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
+    let next: string | undefined;
     let params = init.params;
+    if (typeof from === "string") next = from;
+    else {
+      // Handing over nothing at all is the caller's mistake. A promise that comes to nothing is Apple's empty answer.
+      if (typeof from !== "object" || (from as unknown) === null) throw new TypeError(`paginate: expected a path, or a page or a promise of one; got ${got(from)}`);
+      const first = pageOf(await from, "the page given to paginate");
+      yield* first.data as readonly T[];
+      next = first.next;
+      params = undefined;
+    }
     while (next !== undefined) {
       const page = pageOf(await request<unknown>(next, { ...init, params }), next);
       yield* page.data as readonly T[];
