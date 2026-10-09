@@ -72,7 +72,8 @@ gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templat
   the box needs the artwork to cover it both ways. `bb` stands the whole image inside the box, so the
   box is shrunk only once the image inside it would be larger than the artwork: a 1500 pixel cover
   in a 1200 by 300 slot is offered boxes up to `6000x1500`, which holds it at full size.
-- **Whole pixels.** Sizes are rounded, and never below one.
+- **Whole pixels.** Sizes are rounded, and never below one. A height that follows from the width is
+  rounded up, so that the image comes back the full width that was asked for.
 
 ## srcset
 

@@ -60,6 +60,8 @@ const SIZE = "{w}x{h}";
 const DEFAULT_CROP = "bb";
 /** The most pixels Apple's image server gives on a side. It answers 400 to a request for one more. */
 const MAX_SIDE = 10_000;
+/** What arithmetic on sizes this small can be off by, with room to spare: a height of 180.0000000001 is 180, not 181. */
+const ROUNDING = 1e-6;
 
 /**
  * Whether a crop code fits the whole image inside the box, never enlarging it: `bb`, `bb` at a given JPEG
@@ -100,18 +102,26 @@ function tailored(template: string, crop: string | undefined, format: string | u
  * than the artwork comes. Shrinking it sooner gets a smaller image back, not the same one.
  */
 export function fit(
-  box: { readonly width: number; readonly height: number },
+  box: { readonly width: number; readonly height?: number | undefined },
   max: { readonly width?: number | undefined; readonly height?: number | undefined },
   inside: boolean,
 ): { width: number; height: number; scale: number } {
+  // With no height, the box takes the artwork's shape, or is square where the artwork does not say both ways.
+  const shape = max.width !== undefined && max.height !== undefined ? max.height / max.width : 1;
+  const boxHeight = box.height ?? box.width * shape;
   const across = max.width === undefined ? Infinity : max.width / box.width;
-  const down = max.height === undefined ? Infinity : max.height / box.height;
+  const down = max.height === undefined ? Infinity : max.height / boxHeight;
   // The image inside the box can only be worked out from the artwork's whole shape. With one side known, that
   // side is all there is to go by, and the box is held to it as if the image filled it.
   const artwork = inside && max.width !== undefined && max.height !== undefined ? Math.max(across, down) : Math.min(across, down);
-  const scale = Math.min(1, artwork, MAX_SIDE / box.width, MAX_SIDE / box.height);
-  const side = (pixels: number) => Math.max(1, Math.min(MAX_SIDE, Math.round(pixels * scale)));
-  return { width: side(box.width), height: side(box.height), scale };
+  const scale = Math.min(1, artwork, MAX_SIDE / box.width, MAX_SIDE / boxHeight);
+  const whole = (pixels: number) => Math.max(1, Math.min(MAX_SIDE, pixels));
+  const width = whole(Math.round(box.width * scale));
+  // A height that was asked for is rounded like the width. One that follows from the width is worked out from
+  // the width's whole pixels and rounded up, so that it is the width that decides the image: 150 by 77.49
+  // rounded to 150x77 comes back 149 pixels wide, where 150x78 comes back 150.
+  const height = whole(box.height === undefined ? Math.ceil(width * shape - ROUNDING) : Math.round(box.height * scale));
+  return { width, height, scale };
 }
 
 /** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
@@ -155,10 +165,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
 
 /** The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has. */
 function image({ template, max, width, height, format, crop, inside }: tRequest, density: number): { url: string; scale: number } {
-  const boxWidth = width * density;
-  // With no height asked for, the box takes the artwork's shape, or is square where the artwork does not say both ways.
-  const boxHeight = height === undefined ? (max.width !== undefined && max.height !== undefined ? (boxWidth * max.height) / max.width : boxWidth) : height * density;
-  const { width: w, height: h, scale } = fit({ width: boxWidth, height: boxHeight }, max, inside);
+  const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, inside);
   // Past this a number prints with an exponent, and what goes into the URL has to be digits.
   if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h)) throw new TypeError("artwork: the size asked for is too large");
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);

@@ -418,8 +418,10 @@ describe("artworkUrl: the image keeps the artwork's shape unless a height says o
     ["landscape 16:9", 1920, 1080, 320, "320x180"],
     ["portrait 2:3", 2000, 3000, 300, "300x450"],
     ["a wide banner", 4320, 1080, 400, "400x100"],
-    ["a shape that does not divide evenly", 1000, 333, 100, "100x33"],
-    ["a shape that rounds up", 1000, 667, 100, "100x67"],
+    ["a shape whose height falls just above a whole pixel", 1000, 333, 100, "100x34"],
+    ["a shape whose height falls just below one", 1000, 667, 100, "100x67"],
+    ["a wide still, as Apple's server was asked for it", 3701, 1912, 150, "150x78"],
+    ["the same still, wider", 3701, 1912, 320, "320x166"],
   ])("%s artwork (%i by %i) at width %i is %s", (_name, width, height, wanted, expected) => {
     expect(size(artworkUrl({ url: TEMPLATE, width, height }, wanted))).toBe(expected);
   });
@@ -510,6 +512,62 @@ describe("fit", () => {
     ["a square box on a wide still, too large both ways", [4000, 4000], [3701, 1912], "3701x3701", true],
   ])("an image fitted inside %s: the box shrinks only once the image inside it would be larger than the artwork", (...row) => {
     run(row, true);
+  });
+
+  test.each<[string, number, [number, number], string]>([
+    ["a square", 300, [3000, 3000], "300x300"],
+    ["16:9, where the height is a whole number", 320, [1920, 1080], "320x180"],
+    ["16:9, where it is not", 300, [1920, 1080], "300x169"],
+    ["2:3", 300, [2000, 3000], "300x450"],
+    ["a wide still", 150, [3701, 1912], "150x78"],
+    ["a wide still, larger", 1000, [3701, 1912], "1000x517"],
+    ["a width that is not a whole number", 33.3, [1920, 1080], "33x19"],
+    ["a width that rounds up", 150.6, [3701, 1912], "151x79"],
+  ])("with no height, the box takes the artwork's shape (%s): %s wide on %j is %s", (_name, width, [maxWidth, maxHeight], expected) => {
+    for (const inside of [false, true]) {
+      const got = fit({ width }, { width: maxWidth, height: maxHeight }, inside);
+      expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+    }
+  });
+
+  test.each<[string, number, [number, number], string]>([
+    ["wider than a wide still", 4000, [3701, 1912], "3701x1912"],
+    ["far wider than a cover", 99_999, [1500, 1500], "1500x1500"],
+    ["wider than tall artwork", 5000, [600, 900], "600x900"],
+    ["a hair wider than a still whose shape does not divide evenly", 3702, [3701, 1912], "3701x1912"],
+  ])("with no height, a box %s shrinks to exactly the artwork's size: %s on %j is %s", (_name, width, [maxWidth, maxHeight], expected) => {
+    for (const inside of [false, true]) {
+      const got = fit({ width }, { width: maxWidth, height: maxHeight }, inside);
+      expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+    }
+  });
+
+  test("with no height and no shape to take, the box is square", () => {
+    expect(fit({ width: 300 }, {}, true)).toMatchObject({ width: 300, height: 300 });
+    expect(fit({ width: 300 }, { width: 1920 }, false)).toMatchObject({ width: 300, height: 300 });
+    expect(fit({ width: 299.6 }, {}, false)).toMatchObject({ width: 300, height: 300 });
+  });
+
+  test.each([
+    [100.4, 50.4, "100x50"],
+    [100.5, 50.5, "101x51"],
+    [100, 49.5, "100x50"],
+    [100, 50.49, "100x50"],
+  ])("a height that was asked for is rounded to the nearest pixel, like the width: %s by %s is %s", (width, height, expected) => {
+    const got = fit({ width, height }, {}, true);
+    expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+  });
+
+  // 150x77bb comes back from Apple's server 149 by 77, and 150x78bb comes back 150 by 77.
+  test("whatever the artwork and the width, a height that follows from the width never makes the image narrower than the width", () => {
+    for (const [maxWidth, maxHeight] of [[3701, 1912], [1920, 1080], [600, 900], [1000, 333], [1000, 667], [4320, 1080], [7, 3]] as const)
+      for (let wanted = 1; wanted < 700; wanted += 6.31) {
+        const { width, height } = fit({ width: wanted }, { width: maxWidth, height: maxHeight }, true);
+        // Fitted inside width by height, the artwork is as wide as the box unless the box is too short for that.
+        expect(height / maxHeight).toBeGreaterThanOrEqual(width / maxWidth - 1e-9);
+        // And the height is the least that does it, so nothing is asked for that is not shown.
+        if (height > 1 && width < maxWidth) expect((height - 1) / maxHeight).toBeLessThan(width / maxWidth);
+      }
   });
 
   test("a box shrunk to nothing is one pixel a side, not none", () => {
