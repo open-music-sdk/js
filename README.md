@@ -24,7 +24,7 @@ libs, and the integrations people actually install. Every package ships the same
 | `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
 | `@open-music-sdk/developer-token` | 🚧 In progress | 80% | JWT minting · minter and fetcher providers · untested against the live API |
 | `@open-music-sdk/user-token` | 🚧 In progress | 0% | Music User Token intake · validation · pluggable stores |
-| `@open-music-sdk/util-artwork` | 🚧 In progress | 80% | Artwork URL templates · srcset by pixel density · zero dependencies · untested against live artwork |
+| `@open-music-sdk/util-artwork` | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check · zero dependencies · checked against Apple's image server, untested against the live API |
 | `@open-music-sdk/client-catalog` | ⬜ Not started | 0% | Catalog, storefront, search, and chart endpoints · developer token only |
 | `@open-music-sdk/client-user` | ⬜ Not started | 0% | Library, ratings, recommendations, history, and replay endpoints · both tokens |
 | `@open-music-sdk/lib-playlists` | ⬜ Not started | 0% | Resolve tracks · read playlists · plan and apply changes · export |

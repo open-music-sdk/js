@@ -26,15 +26,19 @@ if (artwork) Object.assign(img, artworkImage(artwork, 300));
 ```
 
 ```tsx
-// In React, where the attribute is spelled srcSet.
+// In a React component, where the attribute is spelled srcSet.
+const artwork = song.attributes?.artwork;
+if (!artwork) return null;
 const { srcset, ...image } = artworkImage(artwork, 300);
 return <img {...image} srcSet={srcset} alt={song.attributes?.name} />;
 ```
 
-Some resources have no artwork, and a resource may come without its attributes. Check before you
-call, as above.
+Some resources have no artwork, and a resource can come without its attributes. The functions take
+an artwork, not the lack of one: check before you call, as both examples do.
 
 ## What is in it
+
+Each export is named for what it gives back.
 
 | Export | Does |
 | --- | --- |
@@ -59,24 +63,32 @@ parser on its way to you, and has `%7Bw%7D` for `{w}`, is the same template and 
 | `densities` | For `artworkImage` and `artworkSrcSet`: the pixel densities to offer, 16 at most. Default `[1, 2, 3]`. |
 | `hosts` | The hosts the artwork may come from, such as `["mzstatic.com"]`. Default: the URL is not checked. See [Where the URL points](#where-the-url-points). |
 
-A `width`, `height` or density that is not a number above zero, and no more than
-`Number.MAX_SAFE_INTEGER`, is a `TypeError`, as is a `format`
-that is not one of the six, a `crop` that is not shaped like a crop code, and an `artwork` without a
-`url`.
+Each of these is a `TypeError`:
+
+- a `width`, `height` or density that is not a number above zero and at most `Number.MAX_SAFE_INTEGER`;
+- a `format` that is not one of the six, or a `crop` that is not shaped like a crop code;
+- `densities` that is not an array of 1 to 16 numbers, or `hosts` that is not an array of 1 to 16
+  host names;
+- an `artwork` that is not an object with a `url`;
+- with `hosts`, an artwork whose URL is not on one of them.
+
+No error shows the URL. The messages say which argument, and for a number, what it was.
 
 ## Format and crop
 
 A template says how the image is cut and encoded in its file name: `{w}x{h}bb.jpg` is cut `bb` and
 encoded `jpg`. `format` and `crop` write over those, so `artworkUrl(artwork, 300, { format: "webp" })`
-gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templates leave them open as
-`{c}` and `{f}` instead; those are filled in the same way, with `bb` and `jpg` if you do not say.
+gives `…/300x300bb.webp`, which for the one cover measured was a third of the JPEG's bytes. Some
+templates leave them open as `{c}` and `{f}` instead; those are filled in the same way, with `bb` and
+`jpg` if you do not say.
 
 - **Formats** are the six Apple's image server was seen to convert to. It refuses `avif` and `bmp`,
   and for `gif` and `tiff` it sends a JPEG under another name, so those are a `TypeError` here.
 - **Crop codes** are Apple's and undocumented, so any code of the right shape is accepted: letters
   and digits, with single dots or hyphens between, case kept. `bb` fits the whole image inside the
-  box and never enlarges it; `cc` cuts a square from the centre; `sr` fills the box; `bb-60` is
-  `bb` at a lower JPEG quality. Codes such as `SC.DN01` come with some editorial artwork.
+  box and never enlarges it; `cc` gave a square as wide as the box; `sr` filled the box; `bb-60` is
+  `bb` at a lower JPEG quality. Codes such as `SC.DN01` come with some editorial artwork. Every
+  code but `bb` that was tried enlarged the image when asked for more than there was.
 - **A URL that is not a template of this form**, such as a fixed URL for a playlist's own artwork,
   says nothing about cut or encoding and is returned as it is.
 
@@ -87,14 +99,16 @@ gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templat
   What the artwork says of its size is data, never an error: a `width` or `height` on it that is
   no size, such as `null`, zero or text, is one it did not give.
 - **Never larger than it comes.** The artwork's `width` and `height` are the largest Apple has. A box
-  that asks for more is shrunk, keeping its shape. Artwork that gives only one of the two is held to
-  that one. No side is ever asked for past 10,000 pixels, where Apple's image server stops.
+  that asks for more is shrunk in its own shape, as near as whole pixels allow. Artwork that gives
+  only one of the two is held to that one. No side is ever asked for past 10,000 pixels, where
+  Apple's image server stops.
 - **A box of another shape.** With `height`, what "more" means depends on the crop. A crop that fills
   the box needs the artwork to cover it both ways. `bb` stands the whole image inside the box, so the
   box is shrunk only once the image inside it would be larger than the artwork: a 1500 pixel cover
   in a 1200 by 300 slot is offered boxes up to `6000x1500`, which holds it at full size.
-- **Whole pixels.** Sizes are rounded, and never below one. A height that follows from the width is
-  rounded up, so that the image comes back the full width that was asked for.
+- **Whole pixels.** Sizes are rounded, and never below one a side, so a box shrunk very far ends
+  squarer than it began. A height that follows from the width is rounded up, so that the image
+  comes back the full width that was asked for.
 
 ## srcset
 
@@ -126,12 +140,12 @@ whatever resolution was fetched for it.
 
 ## One URL
 
-`artworkUrl` and `artworkSrcSet` give the same URL, character for character, spelled the way a
-browser reads a `src`: white space is dropped from its ends, tabs and line breaks from anywhere, and
-a space inside is written `%20`. A comma at either end, which a `srcset` would take for a separator,
-is kept by writing `./` before it or an empty `#` after it. None of this changes what is requested,
-so a `src` and a `srcset` never point at different places, and a check you make on the URL
-`artworkUrl` returns holds for the `srcset` too.
+All three functions give the same URL, character for character, spelled the way a browser reads a
+`src`: white space is dropped from its ends, tabs and line breaks from anywhere, and a space inside
+is written `%20`. A comma at either end, which a `srcset` would take for a separator, is kept by
+writing `./` before it or an empty `#` after it, or `%2C` where it is in the fragment already. None
+of this changes what is requested, so a `src` and a `srcset` never point at different places, and a
+check you make on the URL `artworkUrl` returns holds for the `srcset` too.
 
 ## Where the URL points
 
@@ -175,6 +189,8 @@ work until they are filled in.
 
 ## Not here
 
+- **Getting the artwork.** It arrives on the resources `@open-music-sdk/core` fetches; this package
+  only reads it.
 - **Screen density detection.** `srcset` is how a browser picks; nothing here reads `devicePixelRatio`.
 - **Width descriptors** (`300w` with `sizes`), for images whose shown width depends on the layout.
 - **Colours.** `bgColor` and `textColor1` to `textColor4` are hex without the `#`; prefix one and it

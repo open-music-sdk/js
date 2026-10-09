@@ -2,7 +2,7 @@
 export interface tArtworkSource {
   /** The URL template. `{w}` and `{h}` stand for the pixel size. */
   readonly url: string;
-  /** The widest the image comes, in pixels. Nothing larger is asked for. */
+  /** The widest the image comes, in pixels. No image larger than it comes is asked for. */
   readonly width?: number | null | undefined;
   /** The tallest the image comes, in pixels. */
   readonly height?: number | null | undefined;
@@ -24,8 +24,7 @@ export interface tArtworkOptions {
   readonly format?: tArtworkFormat | undefined;
   /**
    * Apple's code for how the image is cut to the box, such as `"bb"`, the whole image fitted inside it, or
-   * `"cc"`, a square cut from its centre. Default: the one the template names, or `"bb"` where it leaves that
-   * open as `{c}`.
+   * `"sr"`, the box filled. Default: the one the template names, or `"bb"` where it leaves that open as `{c}`.
    */
   readonly crop?: string | undefined;
   /**
