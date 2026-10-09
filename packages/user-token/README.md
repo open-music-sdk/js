@@ -170,7 +170,7 @@ characters. Anything else is `UserTokenInvalid` without a request. Then Apple de
 | 2xx naming none | `ApiError`; the token is not treated as accepted |
 | 403 | `UserTokenInvalid`, with `status` 403 |
 | 401, and the developer token works on its own | `UserTokenInvalid`, with `status` 401 |
-| 401, and the developer token is refused on its own too | `DeveloperTokenRejected` |
+| 401, and the developer token is refused on its own too | `DeveloperTokenInvalid` |
 | Anything else | The client's usual error, which says nothing about the token |
 
 Apple documents two causes for a 401 on `/v1/me`: the developer token, or a listener who is not
@@ -195,7 +195,7 @@ variable is `undefined`. A variable that is set has to pass the same header chec
 | 413 | `{ "error": "PayloadTooLarge" }` | The body is over 8 KiB |
 | 415 | `{ "error": "UnsupportedMediaType" }` | The content type is not `application/json` |
 | 422 | `{ "error": "UserTokenInvalid" }` | The token is malformed, Apple answered 403, or Apple answered 401 for the listener; nothing is stored |
-| 502 | `{ "error": "<tag>" }` | Apple did not confirm the token: `DeveloperTokenRejected`, `RateLimited`, `ApiError`, `NetworkError`; nothing is stored |
+| 502 | `{ "error": "<tag>" }` | Apple did not confirm the token: `DeveloperTokenInvalid`, `RateLimited`, `ApiError`, `NetworkError`; nothing is stored |
 
 - **`userId` is the authentication.** It must return the signed-in user from your own session and
   nothing when there is none. The body cannot name a user.

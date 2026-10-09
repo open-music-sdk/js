@@ -242,6 +242,81 @@ describe("token providers", () => {
   });
 });
 
+describe("request: a token that cannot be a header is refused before it is sent, and never quoted", () => {
+  const SECRET = "s3cretT0ken";
+  const unfit: [string, unknown][] = [
+    ["a line break inside it", `${SECRET}\n${SECRET}`],
+    ["a carriage return inside it", `${SECRET}\r${SECRET}`],
+    ["a header smuggled after it", `${SECRET}\r\nx-evil: 1`],
+    ["a NUL inside it", `${SECRET}\0${SECRET}`],
+    ["a space inside it", `${SECRET} ${SECRET}`],
+    ["a tab inside it", `${SECRET}\t${SECRET}`],
+    ["a letter outside ASCII", `${SECRET}é`],
+    ["a character outside Latin-1", `${SECRET}☃`],
+    ["nothing in it", ""],
+    ["only whitespace in it", " \n"],
+  ];
+  /** What only a provider can hand over: a configured token is a string or it is taken for a provider. */
+  const notStrings: [string, unknown][] = [
+    ["undefined", undefined],
+    ["a number", 12345],
+    ["an object holding the token", { token: SECRET }],
+  ];
+  /** Everything an error shows when it is printed or serialised. */
+  const shown = (e: Error) => `${e.message} ${e.stack ?? ""} ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`;
+  const refusal = async (p: Promise<unknown>): Promise<Error> => {
+    const error: unknown = await p.catch((e: unknown) => e);
+    if (error instanceof Error) return error;
+    throw new Error("expected a rejection");
+  };
+
+  /** Sends a request that carries both tokens and expects it refused for the one named. */
+  async function refused(name: "developerToken" | "userToken", options: Partial<tClientOptions>) {
+    const { music, calls } = client([], { userToken: "user", ...options, retry: { maxAttempts: 3, baseDelayMs: 0 } });
+    const error = await refusal(music.request("v1/me/library/songs"));
+    expect(error).toBeInstanceOf(TypeError);
+    expect(isAppleMusicError(error)).toBe(false);
+    expect(error.message).toMatch(new RegExp(`^${name} is not a token`));
+    expect(shown(error)).not.toContain(SECRET);
+    expect(calls).toHaveLength(0);
+  }
+
+  describe.each(["developerToken", "userToken"] as const)("%s", (name) => {
+    test.each(unfit)("a string with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: token });
+    });
+    test.each(unfit)("a provider answering with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: () => Promise.resolve(token) });
+    });
+    test.each(notStrings)("a provider answering with %s is a TypeError that names the option, not the token", async (_name, token) => {
+      await refused(name, { [name]: () => token as string });
+    });
+  });
+
+  test.each([
+    ["a JWT", "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJERUYxMjNHSElKIn0.c2ln-_"],
+    ["base64 with its padding and symbols", "Ak9+/abc=="],
+    ["every printable ASCII character", "!\"#$%&'()*+,-./0123456789:;<=>?@ABCXYZ[\\]^_`abcxyz{|}~"],
+  ])("%s is sent exactly as given, as both tokens", async (_name, token) => {
+    const { music, header } = client([], { developerToken: token, userToken: token });
+    await music.request("v1/me/library/songs");
+    expect([header("authorization"), header("music-user-token")]).toEqual([`Bearer ${token}`, token]);
+  });
+
+  test.each(["dev\n", "\ndev", "  dev  ", "dev\r\n", "\tdev"])("whitespace around %j, as a token read from a file has, is dropped", async (token) => {
+    const { music, header } = client([], { developerToken: token, userToken: token });
+    await music.request("v1/me/library/songs");
+    expect([header("authorization"), header("music-user-token")]).toEqual(["Bearer dev", "dev"]);
+  });
+
+  test("a refused token takes no turn in the rate limiter", async () => {
+    const acquire = vi.fn(() => Promise.resolve());
+    const { music } = client([], { developerToken: "bad token", rateLimit: { acquire } });
+    await refusal(music.request("v1/test"));
+    expect(acquire).not.toHaveBeenCalled();
+  });
+});
+
 describe("responses", () => {
   test.each([
     [{ status: 200, body: { data: [song] } }, { data: [song] }],
@@ -311,7 +386,7 @@ describe("401 and the developer token", () => {
   test("a fixed token gets no second chance", async () => {
     const { music, calls } = client([apiError(401, "Unauthorized")]);
     const e = await failure(music.request("v1/test"));
-    expect(e._tag).toBe("DeveloperTokenRejected");
+    expect(e._tag).toBe("DeveloperTokenInvalid");
     expect(e.status).toBe(401);
     expect(calls).toHaveLength(1);
   });
@@ -330,7 +405,7 @@ describe("401 and the developer token", () => {
   test("a provider that returns the same token is not resent", async () => {
     const developerToken = vi.fn(() => "same");
     const { music, calls } = client([apiError(401, "Unauthorized")], { developerToken });
-    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenInvalid");
     expect(developerToken).toHaveBeenCalledTimes(2);
     expect(calls).toHaveLength(1);
   });
@@ -339,7 +414,7 @@ describe("401 and the developer token", () => {
     let n = 0;
     const developerToken = vi.fn(() => `dev${String(++n)}`);
     const { music, calls } = client([apiError(401, "Unauthorized"), apiError(401, "Unauthorized")], { developerToken, retry: { maxAttempts: 3, baseDelayMs: 0 } });
-    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenRejected");
+    expect((await failure(music.request("v1/test")))._tag).toBe("DeveloperTokenInvalid");
     expect(developerToken).toHaveBeenCalledTimes(2);
     expect(calls).toHaveLength(2);
   });
@@ -399,6 +474,52 @@ describe("retrying", () => {
     expect(e._tag).toBe("NetworkError");
     expect(e.cause).toBe(boom);
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
+  });
+
+  describe("a developer token provider that cannot get a token", () => {
+    const unavailable = (status?: number) => new AppleMusicError("DeveloperTokenUnavailable", "token source down", { status });
+    /** A provider that throws each error in turn, then answers "dev". */
+    const flaky = (...errors: AppleMusicError[]) =>
+      vi.fn((): Promise<string> => {
+        const error = errors.shift();
+        return error === undefined ? Promise.resolve("dev") : Promise.reject(error);
+      });
+
+    test.each([undefined, 429, 500, 503])("with status %s is asked again, and the request then goes out once", async (status) => {
+      const developerToken = flaky(unavailable(status), unavailable(status));
+      const { music, calls } = client([{ body: { ok: true } }], { developerToken, retry: quick });
+      expect(await music.request("v1/test")).toEqual({ ok: true });
+      expect(developerToken).toHaveBeenCalledTimes(3);
+      expect(calls).toHaveLength(1);
+    });
+
+    test.each([200, 401, 403, 404, 501])("with status %i is not asked again: the error reaches the caller as thrown and Apple is never called", async (status) => {
+      const error = unavailable(status);
+      const developerToken = flaky(error);
+      const { music, calls } = client([], { developerToken, retry: quick });
+      await expect(music.request("v1/test")).rejects.toBe(error);
+      expect(developerToken).toHaveBeenCalledTimes(1);
+      expect(calls).toHaveLength(0);
+    });
+
+    test("keeps its own tag and status when attempts run out, so it is never mistaken for Apple's answer", async () => {
+      const developerToken = flaky(unavailable(503), unavailable(503), unavailable(503));
+      const { music } = client([], { developerToken, retry: quick });
+      const e = await failure(music.request("v1/test"));
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", 503]);
+    });
+
+    test("is waited for as long as its Retry-After asks", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
+      const developerToken = flaky(new AppleMusicError("DeveloperTokenUnavailable", "busy", { status: 503, retryAfterMs: 2000 }));
+      const { music, calls } = client([{ body: { ok: true } }], { developerToken, retry: { maxAttempts: 2 } });
+      const done = music.request("v1/test");
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(developerToken).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await done).toEqual({ ok: true });
+      expect(calls).toHaveLength(1);
+    });
   });
 
   describe("a connection lost after the headers is a network failure like any other", () => {
@@ -918,7 +1039,7 @@ describe("hooks", () => {
       let n = 0;
       const { music, seen } = observed([apiError(401, "Unauthorized"), { body: {} }], { developerToken: () => `dev${String(++n)}` });
       await music.request("v1/test");
-      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["DeveloperTokenRejected", undefined]);
+      expect(seen.map((s) => s.outcome.error?._tag)).toEqual(["DeveloperTokenInvalid", undefined]);
       expect(seen.map((s) => s.req.headers.get("authorization"))).toEqual(["Bearer dev1", "Bearer dev2"]);
     });
 

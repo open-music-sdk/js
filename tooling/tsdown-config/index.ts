@@ -5,7 +5,8 @@ export const libraryConfig = (overrides: UserConfig = {}) =>
   defineConfig({
     entry: ["src/index.ts"],
     format: ["esm"],
-    dts: true,
+    // With maps: `sourcemap` below stamps a sourceMappingURL on the declarations too, and it must point at something.
+    dts: { sourcemap: true },
     platform: "neutral",
     deps: { neverBundle: [/^@open-music-sdk\//, "jose", "react", "next", "@tanstack/react-query"] },
     treeshake: true,

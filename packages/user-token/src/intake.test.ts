@@ -287,7 +287,7 @@ describe("userTokenIntake: one status per outcome", () => {
   });
 
   test.each<[string, tReply[], string]>([
-    ["401, and 401 again without the user token", [{ status: 401 }, { status: 401 }], "DeveloperTokenRejected"],
+    ["401, and 401 again without the user token", [{ status: 401 }, { status: 401 }], "DeveloperTokenInvalid"],
     ["401, then 500 without the user token", [{ status: 401 }, { status: 500 }], "ApiError"],
     ["401, then nothing without the user token", [{ status: 401 }, new TypeError("fetch failed")], "NetworkError"],
     ["404", [{ status: 404 }], "ApiError"],
@@ -519,7 +519,7 @@ describe("a client from another copy of core is served the same", () => {
   test.each<[string, number, string, tReply[]]>([
     ["403", 422, "UserTokenInvalid", [{ status: 403 }]],
     ["401 for the listener", 422, "UserTokenInvalid", [{ status: 401 }, {}]],
-    ["401 for the developer token", 502, "DeveloperTokenRejected", [{ status: 401 }, { status: 401 }]],
+    ["401 for the developer token", 502, "DeveloperTokenInvalid", [{ status: 401 }, { status: 401 }]],
     ["429", 502, "RateLimited", [{ status: 429 }]],
     ["500", 502, "ApiError", [{ status: 500 }]],
     ["200 naming no storefront", 502, "ApiError", [{ body: {} }]],

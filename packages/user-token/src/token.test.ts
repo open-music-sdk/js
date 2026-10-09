@@ -104,10 +104,10 @@ describe("validateUserToken", () => {
     expect(e.status).toBe(401);
   });
 
-  test("401, with the developer token refused on its own too, is DeveloperTokenRejected", async () => {
+  test("401, with the developer token refused on its own too, is DeveloperTokenInvalid", async () => {
     const { music } = fakeClient([appleError(401, "Unauthorized"), appleError(401, "Unauthorized")]);
     const e = await failure(validateUserToken(music, "user-token"));
-    expect(e._tag).toBe("DeveloperTokenRejected");
+    expect(e._tag).toBe("DeveloperTokenInvalid");
     expect(e.status).toBe(401);
   });
 
@@ -246,12 +246,12 @@ describe("a 401 on a personal endpoint is settled by asking once more without th
     expect(e._tag).toBe("UserTokenInvalid");
     expect(e.message).toMatch(/not signed in, or no Apple Music subscription/);
     expect(e.errors?.[0]?.title).toBe("Unauthorized");
-    expect(isAppleMusicError(e.cause, "DeveloperTokenRejected")).toBe(true);
+    expect(isAppleMusicError(e.cause, "DeveloperTokenInvalid")).toBe(true);
     expect(calls).toHaveLength(2);
   });
 
   test.each<[string, tReply, string]>([
-    ["401", { status: 401 }, "DeveloperTokenRejected"],
+    ["401", { status: 401 }, "DeveloperTokenInvalid"],
     ["404", { status: 404 }, "ApiError"],
     ["429", { status: 429 }, "RateLimited"],
     ["500", { status: 500 }, "ApiError"],
@@ -392,7 +392,7 @@ describe("a client from another copy of core is validated the same", () => {
     ["500", "ApiError", [{ status: 500 }]],
     ["failed fetch", "NetworkError", [new TypeError("fetch failed")]],
     ["401 for the listener", "UserTokenInvalid", [{ status: 401 }, {}]],
-    ["401 for the developer token", "DeveloperTokenRejected", [{ status: 401 }, { status: 401 }]],
+    ["401 for the developer token", "DeveloperTokenInvalid", [{ status: 401 }, { status: 401 }]],
     ["200 naming no storefront", "ApiError", [{ body: {} }]],
   ])("its %s is a %s to this copy's guard and to its own", async (_, tag, replies) => {
     const { core, music } = await foreignClient(replies);

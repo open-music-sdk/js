@@ -25,7 +25,7 @@ export async function validateUserToken(client: tAppleMusicClient, token: unknow
     // Not client.storefront(): that answers from configuration, without asking Apple, when a storefront is set.
     body = await client.as(token).request<unknown>("v1/me/storefront", { signal });
   } catch (e) {
-    if (!isAppleMusicError(e, "DeveloperTokenRejected")) throw e;
+    if (!isAppleMusicError(e, "DeveloperTokenInvalid")) throw e;
     // Apple documents two causes for a 401 on a personal endpoint: the developer token, or a listener
     // who is not signed in or has no subscription. One request without the user token tells them
     // apart: if the developer token is the problem this throws, as it would have anyway.

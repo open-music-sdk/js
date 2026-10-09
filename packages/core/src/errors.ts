@@ -2,7 +2,14 @@
 // What makes a value one of these is its shape, so the guard holds across duplicate copies of the package.
 import type { tError } from "@open-music-sdk/types";
 
-export type tErrorTag = "DeveloperTokenRejected" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
+/**
+ * All but one describe what Apple answered. `DeveloperTokenUnavailable` is raised by a developer token provider
+ * that could not obtain a token at all, so its `status` is its own source's, never Apple's.
+ *
+ * A token that cannot be used is `Invalid`, whichever token it is: `DeveloperTokenInvalid` when Apple answers
+ * 401, `UserTokenInvalid` when Apple answers 403 or there is no user token to send.
+ */
+export type tErrorTag = "DeveloperTokenInvalid" | "DeveloperTokenUnavailable" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
 
 /** A Standard Schema issue, as any validator reports it. */
 export interface tValidationIssue {
@@ -17,7 +24,7 @@ export interface tErrorDetails {
   readonly errors?: readonly tError[] | undefined;
   /** Validator issues, on a ValidationError. */
   readonly issues?: readonly tValidationIssue[] | undefined;
-  /** The delay Apple asked for in a Retry-After header, in milliseconds. */
+  /** The delay a Retry-After header asked for, in milliseconds. */
   readonly retryAfterMs?: number | undefined;
   readonly cause?: unknown;
 }

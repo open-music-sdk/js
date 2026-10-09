@@ -36,7 +36,7 @@ describe("retryable", () => {
     },
   );
   test.each([
-    fail("DeveloperTokenRejected"),
+    fail("DeveloperTokenInvalid"),
     fail("UserTokenInvalid"),
     fail("ValidationError"),
     fail("ApiError"),
@@ -46,6 +46,20 @@ describe("retryable", () => {
     fail("ApiError", { status: 501 }),
   ])("does not retry %s", (e) => {
     expect(retryable(e)).toBe(false);
+  });
+
+  test.each([
+    ["no status, its source being unreachable", undefined],
+    ["429", 429],
+    ["500", 500],
+    ["502", 502],
+    ["503", 503],
+    ["504", 504],
+  ])("retries a developer token that was unavailable with %s", (_name, status) => {
+    expect(retryable(fail("DeveloperTokenUnavailable", { status }))).toBe(true);
+  });
+  test.each([200, 204, 302, 400, 401, 403, 404, 501])("does not retry a developer token that was unavailable with %i", (status) => {
+    expect(retryable(fail("DeveloperTokenUnavailable", { status }))).toBe(false);
   });
 });
 
@@ -85,7 +99,7 @@ describe("retry", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  test.each([fail("DeveloperTokenRejected"), fail("UserTokenInvalid"), fail("ValidationError"), fail("ApiError", { status: 404 }), fail("ApiError", { status: 501 })])(
+  test.each([fail("DeveloperTokenInvalid"), fail("UserTokenInvalid"), fail("ValidationError"), fail("ApiError", { status: 404 }), fail("ApiError", { status: 501 })])(
     "does not retry %s",
     async (e) => {
       const fn = vi.fn(failing(e));
