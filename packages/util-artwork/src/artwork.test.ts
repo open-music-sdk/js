@@ -286,6 +286,34 @@ describe("artworkUrl: the template", () => {
     expect(artworkUrl({ url, width: 600, height: 600 }, 300)).toBe(url);
   });
 
+  // What a template becomes if it is put through a URL parser on its way here: new URL(template).href.
+  test.each([
+    ["every brace encoded", "https://example.com/%7Bw%7Dx%7Bh%7Dbb.jpg", "https://example.com/300x300bb.jpg"],
+    ["the hex in small letters", "https://example.com/%7bw%7dx%7bh%7dbb.jpg", "https://example.com/300x300bb.jpg"],
+    ["one placeholder encoded and one not", "https://example.com/%7Bw%7Dx{h}bb.jpg", "https://example.com/300x300bb.jpg"],
+    ["the open crop and format encoded too", "https://example.com/%7Bw%7Dx%7Bh%7D%7Bc%7D.%7Bf%7D", "https://example.com/300x300bb.jpg"],
+    ["an encoded placeholder in the query", "https://example.com/cover.jpg?w=%7Bw%7D", "https://example.com/cover.jpg?w=300"],
+  ])("a template with %s is the same template, and is filled in", (_name, url, expected) => {
+    expect(artworkUrl({ url, width: 3000, height: 3000 }, 300)).toBe(expected);
+  });
+
+  test("a template as a URL parser writes it is filled in exactly as the template itself is, format and crop included", () => {
+    const options: tArtworkOptions = { format: "webp", crop: "cc", height: 150 };
+    expect(new URL(TEMPLATE).href).not.toBe(TEMPLATE);
+    expect(artworkUrl({ ...cover(), url: new URL(TEMPLATE).href }, 300, options)).toBe(artworkUrl(cover(), 300, options));
+    expect(artworkSrcSet({ ...cover(), url: new URL(TEMPLATE).href }, 300, options)).toBe(artworkSrcSet(cover(), 300, options));
+  });
+
+  test.each([
+    ["a capital letter", "https://example.com/%7BW%7Dx%7BH%7D.jpg"],
+    ["another letter", "https://example.com/%7Bx%7D.jpg"],
+    ["the percent signs encoded as well", "https://example.com/%257Bw%257D.jpg"],
+    ["one brace of the pair encoded", "https://example.com/%7Bw}.jpg"],
+    ["other encoded characters around a real name", "https://example.com/%5Bw%5D.jpg"],
+  ])("what only looks like an encoded placeholder, with %s, is left as it is", (_name, url) => {
+    expect(artworkUrl({ url }, 300)).toBe(url);
+  });
+
   test("a tArtwork from the generated types is accepted as it is", () => {
     const artwork: tArtwork = { url: TEMPLATE, width: 3000, height: 3000, bgColor: "1a1a1a", textColor1: "ffffff" };
     expect(size(artworkUrl(artwork, 300))).toBe("300x300");
@@ -930,8 +958,39 @@ describe("artworkSrcSet: where the artwork does not come large enough for a dens
     expect(artworkSrcSet(cover(601), 300, { densities })).toBe(squares(expected));
   });
 
-  test("a URL with no placeholders is offered once: every density would be the same image", () => {
-    expect(artworkSrcSet({ url: "https://example.com/fixed.jpg" }, 300)).toBe("https://example.com/fixed.jpg 1x");
+  const FIXED = "https://example.com/fixed.jpg";
+
+  test.each<[string, number[] | undefined]>([
+    ["the default densities", undefined],
+    ["one density", [2]],
+    ["densities that do not start at one", [2, 3]],
+    ["densities in another order", [3, 1]],
+  ])("a URL with no size in it is offered alone and unlabelled, with %s: it is one image, of a size nobody here knows", (_name, densities) => {
+    expect(artworkSrcSet({ url: FIXED }, 300, { densities })).toBe(FIXED);
+    expect(artworkSrcSet({ url: FIXED, width: 200, height: 200 }, 300, { densities, height: 150, format: "webp", crop: "cc" })).toBe(FIXED);
+  });
+
+  test.each([1, 2, 3])("on a screen of density %s a browser fetches that one image, with a src or without", (dpr) => {
+    expect(fetched(artworkSrcSet({ url: FIXED }, 300, { densities: [2, 3] }), dpr)).toBe(FIXED);
+    expect(fetched(artworkSrcSet({ url: FIXED }, 300, { densities: [2, 3] }), dpr, artworkUrl({ url: FIXED }, 300))).toBe(FIXED);
+  });
+
+  test("the control: labelled with whichever density came first, the same image would be laid out at half or a third its size", () => {
+    expect(parseSrcset(`${FIXED} 2x`)[0]?.descriptors).toEqual(["2x"]);
+    expect(parseSrcset(artworkSrcSet({ url: FIXED }, 300, { densities: [2, 3] }))[0]?.descriptors).toEqual([]);
+  });
+
+  test.each([
+    ["only a width", "https://example.com/w{w}.jpg", "https://example.com/w300.jpg 1x, https://example.com/w600.jpg 2x"],
+    ["only a height", "https://example.com/h{h}.jpg", "https://example.com/h300.jpg 1x, https://example.com/h600.jpg 2x"],
+    ["its size in the query", "https://example.com/cover.jpg?w={w}", "https://example.com/cover.jpg?w=300 1x, https://example.com/cover.jpg?w=600 2x"],
+  ])("a URL with %s to fill in does have a size, and is offered at each density", (_name, url, expected) => {
+    expect(artworkSrcSet({ url }, 300, { densities: [1, 2] })).toBe(expected);
+  });
+
+  test("a URL with no size is still checked like any other: a bad density is refused before it is found not to matter", () => {
+    expect(() => artworkSrcSet({ url: FIXED }, 300, { densities: [0] })).toThrow(/^artwork: densities\[0\]/);
+    expect(() => artworkSrcSet({ url: FIXED }, 0)).toThrow(/^artwork: width/);
   });
 
   test("whatever the artwork, width and densities: no two candidates share a density or an image, and a browser accepts every one", () => {
@@ -977,10 +1036,9 @@ describe("one URL, whatever it holds: what artworkUrl gives is what the srcset c
   ];
   const filled = (url: string) => url.replaceAll("{w}", "300").replaceAll("{h}", "300");
 
-  test.each(hostile)("a URL with %s is one candidate per density, each with one density descriptor", (_name, url) => {
+  test.each(hostile)("a URL with %s is one candidate per density, each with its one density, or one candidate alone where it has no size", (_name, url) => {
     const candidates = parseSrcset(artworkSrcSet({ url }, 300, { densities: [1, 2] }));
-    expect(candidates.map((c) => c.descriptors)).toEqual([["1x"], ["2x"]].slice(0, candidates.length));
-    expect(candidates).toHaveLength(url.includes("{w}") ? 2 : 1);
+    expect(candidates.map((c) => c.descriptors)).toEqual(url.includes("{w}") ? [["1x"], ["2x"]] : [[]]);
   });
 
   test.each(hostile)("a URL with %s is carried by the srcset character for character as artworkUrl gives it", (_name, url) => {

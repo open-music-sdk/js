@@ -32,7 +32,8 @@ Some resources have no artwork. Check before you call: `artwork && artworkUrl(ar
 | `artworkSrcSet(artwork, width, options?)` | A `srcset` for an image shown `width` CSS pixels wide: one candidate per pixel density |
 
 `artwork` is the object the API gives: anything with a `url`, and a `width` and `height` if it has
-them. Every `tArtwork` from `@open-music-sdk/types` fits.
+them. Every `tArtwork` from `@open-music-sdk/types` fits. A template that has been through a URL
+parser on its way to you, and has `%7Bw%7D` for `{w}`, is the same template and is filled in.
 
 | Option | |
 | --- | --- |
@@ -85,6 +86,9 @@ artwork does not come large enough for one, the largest it has is offered once, 
 that image amounts to: a 500 pixel cover shown at 300 gives
 `…/300x300bb.jpg 1x, …/500x500bb.jpg 1.67x`, so a browser neither downloads the same image twice nor
 mistakes its size.
+
+A URL with no size to fill in, such as a fixed URL for a playlist's own artwork, is one image of a
+size nobody here knows. It is offered alone, with no density on it, since any would be a guess.
 
 Give the `<img>` its `width` and `height` as well. The `srcset` says which file to fetch; the
 attributes say how much room to keep for it.

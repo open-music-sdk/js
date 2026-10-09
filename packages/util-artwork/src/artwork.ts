@@ -136,6 +136,8 @@ export function fit(
 /** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
 interface tRequest {
   readonly template: string;
+  /** Whether the template has a size to fill in. A URL without one is one image, whatever is asked of it. */
+  readonly sized: boolean;
   /** How large the artwork comes, each way, where it says. */
   readonly max: { readonly width: number | undefined; readonly height: number | undefined };
   /** The box wanted, in CSS pixels. With no height, the box takes the artwork's shape. */
@@ -154,7 +156,8 @@ interface tRequest {
 function read(artwork: tArtworkSource, width: number, options: tArtworkOptions): tRequest {
   if (typeof artwork !== "object" || (artwork as unknown) === null) throw new TypeError("artwork: expected an artwork object with a url");
   const { url, width: maxWidth, height: maxHeight } = artwork;
-  const template = typeof url === "string" ? normalise(url) : "";
+  // A template that has been through a URL parser has its braces percent-encoded. It is the same template.
+  const template = typeof url === "string" ? normalise(url).replace(/%7[Bb]([whcf])%7[Dd]/g, "{$1}") : "";
   if (template === "") throw new TypeError("artwork: expected an artwork object with a url");
   if (typeof options !== "object" || (options as unknown) === null) throw new TypeError("artwork: options must be an object");
   const { height } = options;
@@ -162,6 +165,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
   const named = tailored(template, crop, format);
   return {
     template: named.template,
+    sized: named.template.includes("{w}") || named.template.includes("{h}"),
     max: { width: pixels(maxWidth), height: pixels(maxHeight) },
     width: length("width", width),
     height: height === undefined ? undefined : length("height", height),
@@ -240,5 +244,8 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
     // A browser keeps the first candidate of each density, and an image offered twice is offered once.
     if (!candidates.has(url) && ![...candidates.values()].includes(descriptor)) candidates.set(url, descriptor);
   }
+  // A URL with no size in it is one image of a size nobody here knows, so it is offered alone and unlabelled:
+  // any density put on it would be a guess, and a browser would lay the image out by the guess.
+  if (!request.sized) return image(request, 1).url;
   return [...candidates].map(([url, descriptor]) => `${url} ${descriptor}`).join(", ");
 }
