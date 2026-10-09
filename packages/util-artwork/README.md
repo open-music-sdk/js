@@ -86,9 +86,11 @@ templates leave them open as `{c}` and `{f}` instead; those are filled in the sa
   and for `gif` and `tiff` it sends a JPEG under another name, so those are a `TypeError` here.
 - **Crop codes** are Apple's and undocumented, so any code of the right shape is accepted: letters
   and digits, with single dots or hyphens between, case kept. `bb` fits the whole image inside the
-  box and never enlarges it; `cc` gave a square as wide as the box; `sr` filled the box; `bb-60` is
-  `bb` at a lower JPEG quality. Codes such as `SC.DN01` come with some editorial artwork. Every
-  code but `bb` that was tried enlarged the image when asked for more than there was.
+  box and never enlarges it; `cc` gives a square as long as the box's longer side, whatever the
+  box's shape; `sr` fills the box exactly; `bb-60` is `bb` at a lower JPEG quality. Codes such as
+  `SC.DN01` come with some editorial artwork. Every code but `bb` that was tried enlarged the image
+  when asked for more than there was. A code this package does not know is taken to fill the box
+  exactly, as all the others tried did; if yours does not, lay the image out yourself.
 - **A URL that is not a template of this form**, such as a fixed URL for a playlist's own artwork,
   says nothing about cut or encoding and is returned as it is.
 
@@ -105,7 +107,9 @@ templates leave them open as `{c}` and `{f}` instead; those are filled in the sa
 - **A box of another shape.** With `height`, what "more" means depends on the crop. A crop that fills
   the box needs the artwork to cover it both ways. `bb` stands the whole image inside the box, so the
   box is shrunk only once the image inside it would be larger than the artwork: a 1500 pixel cover
-  in a 1200 by 300 slot is offered boxes up to `6000x1500`, which holds it at full size.
+  in a 1200 by 300 slot is offered boxes up to `6000x1500`, which holds it at full size. `cc` makes
+  a square of the box's longer side, so that square is what is asked for, no longer than the
+  artwork's shorter side.
 - **Whole pixels.** Sizes are rounded, and never below one a side, so a box shrunk very far ends
   squarer than it began. A height that follows from the width is rounded up, so that the image
   comes back the full width that was asked for.
@@ -134,6 +138,8 @@ whatever resolution was fetched for it.
 
 - With no `height` option, that is `width` and the height the artwork's shape gives it.
 - With a `height` and a crop that fills the box, it is the box.
+- With `cc`, it is a square as long as the longer of `width` and `height`, since that is what `cc`
+  sends back.
 - With a `height` and `bb`, which stands the whole image inside the box, it is the image standing
   there: a square cover in a 1200 by 300 slot is laid out 300 by 300. Setting the box's own size on
   the `<img>` would stretch it.

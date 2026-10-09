@@ -127,11 +127,17 @@ const MAX_DENSITIES = 16;
 const ROUNDING = 1e-6;
 
 /**
- * Whether a crop code fits the whole image inside the box, never enlarging it: `bb`, `bb` at a given JPEG
- * quality, and a file name with no code at all. Every other code Apple's image server was tried with fills the
- * box, enlarging the image if it must.
+ * What a crop code makes of the box it is given, as Apple's image server was seen to do it:
+ *
+ * - `inside`: the whole image fitted inside the box and never enlarged. `bb`, `bb` at a JPEG quality, and a
+ *   file name with no code at all.
+ * - `square`: a square as long as the box's longer side, whatever the box's shape, enlarged if it must be. `cc`.
+ * - `fill`: the box exactly, enlarged if it must be. Every other code that was tried.
  */
-const fitsInside = (cut: string) => cut === "" || /^bb(?:-|$)/.test(cut);
+export type tPlacement = "inside" | "square" | "fill";
+
+/** A URL that does not say how the image is cut is taken to fill the box: that never asks for an enlargement. */
+const placementOf = (cut: string | undefined): tPlacement => (cut === undefined ? "fill" : cut === "" || /^bb(?:-|$)/.test(cut) ? "inside" : /^cc(?:-|$)/.test(cut) ? "square" : "fill");
 
 /**
  * The template with a crop or format that was asked for written where the template names one.
@@ -167,8 +173,16 @@ function tailored(template: string, crop: string | undefined, format: string | u
 export function fit(
   box: { readonly width: number; readonly height?: number | undefined },
   max: { readonly width?: number | undefined; readonly height?: number | undefined },
-  inside: boolean,
+  placement: tPlacement,
 ): { width: number; height: number; scale: number } {
+  if (placement === "square") {
+    // The image will be a square as long as the box's longer side, so that square is what is asked for, and
+    // the artwork has one as long as its shorter side to give.
+    const side = Math.max(box.width, box.height ?? box.width);
+    const most = max.width === undefined ? max.height : max.height === undefined ? max.width : Math.min(max.width, max.height);
+    return fit({ width: side, height: side }, { width: most, height: most }, "fill");
+  }
+  const inside = placement === "inside";
   // With no height, the box takes the artwork's shape, or is square where the artwork does not say both ways.
   const shape = max.width !== undefined && max.height !== undefined ? max.height / max.width : 1;
   const boxHeight = box.height ?? box.width * shape;
@@ -199,8 +213,8 @@ interface tRequest {
   readonly height: number | undefined;
   readonly format: string;
   readonly crop: string;
-  /** Whether the image is fitted inside the box and never enlarged, so far as the template says how it is cut. */
-  readonly inside: boolean;
+  /** What the crop in force makes of the box, so far as the template says how the image is cut. */
+  readonly placement: tPlacement;
   /** The hosts the URL may be on, where the caller named any. */
   readonly hosts: readonly string[] | undefined;
 }
@@ -227,8 +241,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
     height: height === undefined ? undefined : length("height", height),
     format: format ?? "jpg",
     crop: crop ?? DEFAULT_CROP,
-    // A URL that does not say how the image is cut is taken to fill the box: that never asks for an enlargement.
-    inside: named.cut !== undefined && fitsInside(named.cut),
+    placement: placementOf(named.cut),
     hosts: hostsOf(options.hosts),
   };
 }
@@ -237,8 +250,8 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
  * The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has.
  * Every URL that leaves this package is made here, so here is where its host is checked, once it is whole.
  */
-function image({ template, max, width, height, format, crop, inside, hosts }: tRequest, density: number): { url: string; scale: number } {
-  const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, inside);
+function image({ template, max, width, height, format, crop, placement, hosts }: tRequest, density: number): { url: string; scale: number } {
+  const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, placement);
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
   return { url: allowed(url, hosts), scale };
 }
@@ -313,12 +326,17 @@ export function artworkImage(artwork: tArtworkSource, width: number, options: tA
   return { src: image(request, 1).url, srcset: srcset(request, options), ...shown(request) };
 }
 
-/** The size the image is shown at, in whole CSS pixels: the box wanted, or the artwork standing inside it. */
-function shown({ max, width, height, inside }: tRequest): { width: number; height: number } {
+/**
+ * The size the image is shown at, in whole CSS pixels: the box wanted where the crop fills it, the artwork
+ * standing inside the box where the crop fits it in, and a square of the box's longer side where the crop
+ * makes one.
+ */
+function shown({ max, width, height, placement }: tRequest): { width: number; height: number } {
   const whole = (pixels: number) => Math.max(1, Math.round(pixels));
+  if (placement === "square") return { width: whole(Math.max(width, height ?? width)), height: whole(Math.max(width, height ?? width)) };
   const shapeKnown = max.width !== undefined && max.height !== undefined;
   const boxHeight = height ?? (shapeKnown ? (width * max.height) / max.width : width);
-  if (!inside || !shapeKnown) return { width: whole(width), height: whole(boxHeight) };
+  if (placement !== "inside" || !shapeKnown) return { width: whole(width), height: whole(boxHeight) };
   const share = Math.min(width / max.width, boxHeight / max.height);
   return { width: whole(max.width * share), height: whole(max.height * share) };
 }

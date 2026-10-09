@@ -518,8 +518,8 @@ describe("artworkUrl: the image keeps the artwork's shape unless a height says o
 
 describe("fit", () => {
   type tCase = [name: string, box: [number, number], max: [number, number] | undefined, expected: string, shrunk: boolean];
-  const run = ([, [width, height], max, expected, shrunk]: tCase, inside: boolean) => {
-    const got = fit({ width, height }, max ? { width: max[0], height: max[1] } : {}, inside);
+  const run = ([, [width, height], max, expected, shrunk]: tCase, placement: "inside" | "fill") => {
+    const got = fit({ width, height }, max ? { width: max[0], height: max[1] } : {}, placement);
     expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
     if (shrunk) expect(got.scale).toBeLessThan(1);
     else expect(got.scale).toBe(1);
@@ -531,8 +531,8 @@ describe("fit", () => {
     ["a box of another shape, inside the artwork", [800, 200], [1000, 1000], "800x200", false],
     ["artwork with no size", [5000, 3000], undefined, "5000x3000", false],
   ])("%s is asked for as it is, whichever way the image is cut", (...row) => {
-    run(row, false);
-    run(row, true);
+    run(row, "fill");
+    run(row, "inside");
   });
 
   test.each<tCase>([
@@ -541,8 +541,8 @@ describe("fit", () => {
     ["too large, on landscape artwork", [3840, 2160], [1920, 1080], "1920x1080", true],
     ["too large, on portrait artwork", [4000, 6000], [2000, 3000], "2000x3000", true],
   ])("a box of the artwork's own shape, %s, shrinks to the artwork, whichever way the image is cut", (...row) => {
-    run(row, false);
-    run(row, true);
+    run(row, "fill");
+    run(row, "inside");
   });
 
   test.each<tCase>([
@@ -551,7 +551,7 @@ describe("fit", () => {
     ["too large both ways, by different amounts", [4000, 1000], [1000, 500], "1000x250", true],
     ["a square on landscape artwork, too tall only", [1500, 1500], [1920, 1080], "1080x1080", true],
   ])("an image that fills a box %s: the box shrinks, in its own shape, until the artwork covers it", (...row) => {
-    run(row, false);
+    run(row, "fill");
   });
 
   // Each of these was asked of Apple's image server for a 1500 pixel square cover, and one for a 3701 by 1912 still.
@@ -565,7 +565,7 @@ describe("fit", () => {
     ["a square box on a wide still, too tall only", [2000, 2000], [3701, 1912], "2000x2000", false],
     ["a square box on a wide still, too large both ways", [4000, 4000], [3701, 1912], "3701x3701", true],
   ])("an image fitted inside %s: the box shrinks only once the image inside it would be larger than the artwork", (...row) => {
-    run(row, true);
+    run(row, "inside");
   });
 
   test.each<[string, number, [number, number], string]>([
@@ -578,8 +578,8 @@ describe("fit", () => {
     ["a width that is not a whole number", 33.3, [1920, 1080], "33x19"],
     ["a width that rounds up", 150.6, [3701, 1912], "151x79"],
   ])("with no height, the box takes the artwork's shape (%s): %s wide on %j is %s", (_name, width, [maxWidth, maxHeight], expected) => {
-    for (const inside of [false, true]) {
-      const got = fit({ width }, { width: maxWidth, height: maxHeight }, inside);
+    for (const placement of ["fill", "inside"] as const) {
+      const got = fit({ width }, { width: maxWidth, height: maxHeight }, placement);
       expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
     }
   });
@@ -593,16 +593,16 @@ describe("fit", () => {
     ["exactly as wide as artwork whose height the arithmetic lands a hair above", 1400, [1400, 933], "1400x933"],
     ["twice as wide as that artwork", 2800, [1400, 933], "1400x933"],
   ])("with no height, a box %s shrinks to exactly the artwork's size: %s on %j is %s", (_name, width, [maxWidth, maxHeight], expected) => {
-    for (const inside of [false, true]) {
-      const got = fit({ width }, { width: maxWidth, height: maxHeight }, inside);
+    for (const placement of ["fill", "inside"] as const) {
+      const got = fit({ width }, { width: maxWidth, height: maxHeight }, placement);
       expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
     }
   });
 
   test("with no height and no shape to take, the box is square", () => {
-    expect(fit({ width: 300 }, {}, true)).toMatchObject({ width: 300, height: 300 });
-    expect(fit({ width: 300 }, { width: 1920 }, false)).toMatchObject({ width: 300, height: 300 });
-    expect(fit({ width: 299.6 }, {}, false)).toMatchObject({ width: 300, height: 300 });
+    expect(fit({ width: 300 }, {}, "inside")).toMatchObject({ width: 300, height: 300 });
+    expect(fit({ width: 300 }, { width: 1920 }, "fill")).toMatchObject({ width: 300, height: 300 });
+    expect(fit({ width: 299.6 }, {}, "fill")).toMatchObject({ width: 300, height: 300 });
   });
 
   test.each([
@@ -611,7 +611,7 @@ describe("fit", () => {
     [100, 49.5, "100x50"],
     [100, 50.49, "100x50"],
   ])("a height that was asked for is rounded to the nearest pixel, like the width: %s by %s is %s", (width, height, expected) => {
-    const got = fit({ width, height }, {}, true);
+    const got = fit({ width, height }, {}, "inside");
     expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
   });
 
@@ -619,7 +619,7 @@ describe("fit", () => {
   test("whatever the artwork and the width, a height that follows from the width never makes the image narrower than the width", () => {
     for (const [maxWidth, maxHeight] of [[3701, 1912], [1920, 1080], [600, 900], [1000, 333], [1000, 667], [4320, 1080], [7, 3]] as const)
       for (let wanted = 1; wanted < 700; wanted += 6.31) {
-        const { width, height } = fit({ width: wanted }, { width: maxWidth, height: maxHeight }, true);
+        const { width, height } = fit({ width: wanted }, { width: maxWidth, height: maxHeight }, "inside");
         // Fitted inside width by height, the artwork is as wide as the box unless the box is too short for that.
         expect(height / maxHeight).toBeGreaterThanOrEqual(width / maxWidth - 1e-9);
         // And the height is the least that does it, so nothing is asked for that is not shown.
@@ -627,9 +627,39 @@ describe("fit", () => {
       }
   });
 
+  // 150x300cc and 300x150cc both come back from Apple's server 300 by 300, and 400x100cc comes back 400 by 400,
+  // from a square cover and from a 3701 by 1912 still alike; 1600x1600cc of a 1500 pixel cover comes back enlarged.
+  test.each<[string, { width: number; height?: number }, { width?: number; height?: number }, string, boolean]>([
+    ["a wide box", { width: 300, height: 150 }, { width: 1500, height: 1500 }, "300x300", false],
+    ["a tall box", { width: 150, height: 300 }, { width: 1500, height: 1500 }, "300x300", false],
+    ["a banner", { width: 400, height: 100 }, { width: 3701, height: 1912 }, "400x400", false],
+    ["a width alone, on artwork that is not square", { width: 320 }, { width: 3701, height: 1912 }, "320x320", false],
+    ["a width alone, on artwork with no size", { width: 320 }, {}, "320x320", false],
+    ["a square the artwork's shorter side can just give", { width: 1912, height: 1000 }, { width: 3701, height: 1912 }, "1912x1912", false],
+    ["a box longer than the artwork's shorter side", { width: 3000, height: 1000 }, { width: 3701, height: 1912 }, "1912x1912", true],
+    ["a box longer than a tall artwork's shorter side", { width: 800 }, { width: 600, height: 900 }, "600x600", true],
+    ["a box longer than a cover", { width: 2000 }, { width: 1500, height: 1500 }, "1500x1500", true],
+    ["a box longer than the one side the artwork gives", { width: 5000, height: 100 }, { width: 1920 }, "1920x1920", true],
+    ["a box longer than the one side it gives, the other way", { width: 100, height: 5000 }, { height: 1080 }, "1080x1080", true],
+    ["a box longer than the image server gives", { width: 100, height: 12_000 }, {}, "10000x10000", true],
+  ])("a crop that makes a square: %s, %j on %j, is asked for as the square %s", (_name, box, max, expected, shrunk) => {
+    const got = fit(box, max, "square");
+    expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
+    expect(got.scale < 1).toBe(shrunk);
+  });
+
+  test("a crop that makes a square is never asked for longer than the artwork's shorter side, whatever the box", () => {
+    for (const [maxWidth, maxHeight] of artworks)
+      for (const box of boxes) {
+        const { width, height } = fit({ width: box[0], height: box[1] }, { width: maxWidth, height: maxHeight }, "square");
+        expect(width).toBe(height);
+        expect(width).toBe(Math.min(Math.max(...box), maxWidth, maxHeight));
+      }
+  });
+
   test("a box shrunk to nothing is one pixel a side, not none", () => {
-    expect(fit({ width: 3000, height: 1 }, { width: 100, height: 100 }, false)).toMatchObject({ width: 100, height: 1 });
-    expect(fit({ width: 0.2, height: 0.2 }, {}, true)).toMatchObject({ width: 1, height: 1 });
+    expect(fit({ width: 3000, height: 1 }, { width: 100, height: 100 }, "fill")).toMatchObject({ width: 100, height: 1 });
+    expect(fit({ width: 0.2, height: 0.2 }, {}, "inside")).toMatchObject({ width: 1, height: 1 });
   });
 
   test.each<[string, [number, number], { width?: number; height?: number }, string]>([
@@ -640,25 +670,25 @@ describe("fit", () => {
     ["only its height, and a box that is only wide", [9000, 1000], { height: 1080 }, "9000x1000"],
     ["only its width, and a box inside it", [300, 300], { width: 1920 }, "300x300"],
   ])("artwork that says %s: the box %j is held to the side that is known, whichever way the image is cut", (_name, [width, height], max, expected) => {
-    for (const inside of [false, true]) {
-      const got = fit({ width, height }, max, inside);
+    for (const placement of ["fill", "inside"] as const) {
+      const got = fit({ width, height }, max, placement);
       expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
       expect(got.scale < 1).toBe(expected !== `${String(width)}x${String(height)}`);
     }
   });
 
   // Apple's image server answers 10000x100 and refuses 10001x100, and 100x10001.
-  test.each<[string, [number, number], { width?: number; height?: number }, boolean, string]>([
-    ["exactly the limit, on artwork with no size", [10_000, 10_000], {}, false, "10000x10000"],
-    ["one pixel past it", [10_001, 10_001], {}, false, "10000x10000"],
-    ["far past it", [120_000, 120_000], {}, false, "10000x10000"],
-    ["past it one way only", [20_000, 5000], {}, false, "10000x2500"],
-    ["past it the other way only", [5000, 20_000], {}, true, "2500x10000"],
-    ["past it, on artwork that says it comes larger still", [15_000, 15_000], { width: 20_000, height: 20_000 }, false, "10000x10000"],
-    ["past it one way, around an image that would fit inside", [40_000, 10_000], { width: 9000, height: 9000 }, true, "10000x2500"],
-    ["inside it, around an image at its full size", [9000, 3000], { width: 3000, height: 3000 }, true, "9000x3000"],
-  ])("no side is asked for past the 10,000 pixels the image server gives: %s", (_name, [width, height], max, inside, expected) => {
-    const got = fit({ width, height }, max, inside);
+  test.each<[string, [number, number], { width?: number; height?: number }, "inside" | "fill", string]>([
+    ["exactly the limit, on artwork with no size", [10_000, 10_000], {}, "fill", "10000x10000"],
+    ["one pixel past it", [10_001, 10_001], {}, "fill", "10000x10000"],
+    ["far past it", [120_000, 120_000], {}, "fill", "10000x10000"],
+    ["past it one way only", [20_000, 5000], {}, "fill", "10000x2500"],
+    ["past it the other way only", [5000, 20_000], {}, "inside", "2500x10000"],
+    ["past it, on artwork that says it comes larger still", [15_000, 15_000], { width: 20_000, height: 20_000 }, "fill", "10000x10000"],
+    ["past it one way, around an image that would fit inside", [40_000, 10_000], { width: 9000, height: 9000 }, "inside", "10000x2500"],
+    ["inside it, around an image at its full size", [9000, 3000], { width: 3000, height: 3000 }, "inside", "9000x3000"],
+  ])("no side is asked for past the 10,000 pixels the image server gives: %s", (_name, [width, height], max, placement, expected) => {
+    const got = fit({ width, height }, max, placement);
     expect(`${String(got.width)}x${String(got.height)}`).toBe(expected);
     expect(got.scale < 1).toBe(expected !== `${String(width)}x${String(height)}`);
   });
@@ -678,7 +708,7 @@ describe("fit", () => {
   test("across artworks and boxes, an image that fills the box is never asked for larger than the artwork either way, and the box keeps its shape", () => {
     for (const [maxWidth, maxHeight] of artworks)
       for (const box of boxes) {
-        const { width, height } = fit({ width: box[0], height: box[1] }, { width: maxWidth, height: maxHeight }, false);
+        const { width, height } = fit({ width: box[0], height: box[1] }, { width: maxWidth, height: maxHeight }, "fill");
         expect(width).toBeLessThanOrEqual(maxWidth);
         expect(height).toBeLessThanOrEqual(maxHeight);
         if (width > 1 && height > 1) expect(sameShape(width, height, box)).toBe(true);
@@ -688,7 +718,7 @@ describe("fit", () => {
   test("across artworks and boxes, an image fitted inside the box comes back no larger than the artwork, at its full size if the box had to shrink, and the box keeps its shape", () => {
     for (const [maxWidth, maxHeight] of artworks)
       for (const box of boxes) {
-        const { width, height, scale } = fit({ width: box[0], height: box[1] }, { width: maxWidth, height: maxHeight }, true);
+        const { width, height, scale } = fit({ width: box[0], height: box[1] }, { width: maxWidth, height: maxHeight }, "inside");
         // What the server sends back is the artwork scaled to stand inside the box asked for: this is by how much.
         const sent = Math.min(width / maxWidth, height / maxHeight);
         const pixel = 1 / Math.min(maxWidth, maxHeight);
@@ -732,12 +762,17 @@ describe("artworkUrl and artworkSrcSet: nothing larger than the artwork comes is
     ["names no crop code", "{w}x{h}.jpg", {}, "3000x750"],
     ["leaves the crop open, which then is bb", "{w}x{h}{c}.{f}", {}, "3000x750"],
     ["names a crop that fills, with bb asked for", "{w}x{h}cc.jpg", { crop: "bb" }, "3000x750"],
-    ["names a crop that fills", "{w}x{h}cc.jpg", {}, "1500x375"],
-    ["names another", "{w}x{h}sr.jpg", {}, "1500x375"],
+    ["names a crop that fills", "{w}x{h}sr.jpg", {}, "1500x375"],
+    ["names another", "{w}x{h}bf.jpg", {}, "1500x375"],
+    ["names a code that only starts like cc", "{w}x{h}ccx.jpg", {}, "1500x375"],
+    ["names the crop that makes a square", "{w}x{h}cc.jpg", {}, "1500x1500"],
+    ["names it at a JPEG quality", "{w}x{h}cc-60.jpg", {}, "1500x1500"],
+    ["names bb, with the square crop asked for", "{w}x{h}bb.jpg", { crop: "cc" }, "1500x1500"],
+    ["leaves the crop open, with the square crop asked for", "{w}x{h}{c}.{f}", { crop: "cc" }, "1500x1500"],
     ["names an editorial crop", "{w}x{h}SC.DN01.jpg", {}, "1500x375"],
     ["names a code that only starts like bb", "{w}x{h}bbq.jpg", {}, "1500x375"],
     ["names bb, with a crop that fills asked for", "{w}x{h}bb.jpg", { crop: "sr" }, "1500x375"],
-    ["leaves the crop open, with one that fills asked for", "{w}x{h}{c}.{f}", { crop: "cc" }, "1500x375"],
+    ["leaves the crop open, with one that fills asked for", "{w}x{h}{c}.{f}", { crop: "sr" }, "1500x375"],
   ])("a template that %s, %s with %j: a 3000 by 750 box on a 1500 pixel cover is asked for as %s", (_name, name, options, expected) => {
     expect(size(artworkUrl({ url: `https://example.com/${name}`, width: 1500, height: 1500 }, 3000, { height: 750, ...options }))).toBe(expected);
   });
@@ -925,10 +960,10 @@ describe("artworkSrcSet: one candidate per density, labelled with the density as
   });
 
   test("the 1x candidate is the URL artworkUrl gives for the same width and options", () => {
-    const options: tArtworkOptions = { height: 200, format: "webp", crop: "cc" };
+    const options: tArtworkOptions = { height: 200, format: "webp", crop: "sr" };
     const artwork = { url: "https://example.com/{w}x{h}{c}.{f}", width: 3000, height: 3000 };
     expect(parseSrcset(artworkSrcSet(artwork, 300, options))[0]?.url).toBe(artworkUrl(artwork, 300, options));
-    expect(artworkSrcSet(artwork, 300, options)).toBe("https://example.com/300x200cc.webp 1x, https://example.com/600x400cc.webp 2x, https://example.com/900x600cc.webp 3x");
+    expect(artworkSrcSet(artwork, 300, options)).toBe("https://example.com/300x200sr.webp 1x, https://example.com/600x400sr.webp 2x, https://example.com/900x600sr.webp 3x");
   });
 
   test("each candidate keeps the artwork's shape", () => {
@@ -1122,7 +1157,11 @@ describe("artworkImage: everything an <img> needs, worked out together", () => {
     ["artwork with one side known is laid out square", { url: TEMPLATE, width: 1920 }, 300, {}, [300, 300]],
     ["a cover smaller than it is shown is still laid out at the size asked for", cover(200), 300, {}, [300, 300]],
     ["artwork too small for the box is laid out at the size asked for, past what the server gives", { url: TEMPLATE }, 20_000, {}, [20_000, 20_000]],
-    ["a crop that fills the box is laid out as the box", cover(), 300, { height: 150, crop: "cc" }, [300, 150]],
+    ["a crop that fills the box is laid out as the box", cover(), 300, { height: 150, crop: "sr" }, [300, 150]],
+    ["the crop that makes a square is laid out square, as long as the box is wide", cover(), 300, { height: 150, crop: "cc" }, [300, 300]],
+    ["the same, as long as the box is tall where that is more", cover(), 150, { height: 300, crop: "cc" }, [300, 300]],
+    ["the same, on artwork that is not square and with no height", STILL, 320, { crop: "cc" }, [320, 320]],
+    ["the same, on artwork with no size", { url: TEMPLATE }, 300, { crop: "cc" }, [300, 300]],
     ["a crop that fills, with no height, is laid out in the artwork's shape", { url: TEMPLATE, width: 1920, height: 1080 }, 320, { crop: "sr" }, [320, 180]],
     ["a URL that does not say how it is cut, with no height, likewise", { url: "https://example.com/w_{w},h_{h}/still.jpg", width: 1920, height: 1080 }, 320, {}, [320, 180]],
     ["a URL that does not say how it is cut is laid out as the box", { url: "https://example.com/fixed.jpg", width: 600, height: 600 }, 300, { height: 150 }, [300, 150]],
