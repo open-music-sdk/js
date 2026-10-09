@@ -8,12 +8,19 @@ export const has = (value: unknown, methods: readonly string[]): boolean =>
   typeof value === "object" && value !== null && methods.every((method) => typeof (value as Record<string, unknown>)[method] === "function");
 
 /**
- * An options bag, or the empty one when none was given. The types rule anything else out, and a caller without
- * them can still pass it.
+ * What an object holds itself, each property read once, as an object of this call's own that inherits nothing. A
+ * property is then there or it is not, whatever other code has put on `Object.prototype`: an option nobody passed
+ * cannot be found there.
+ */
+export const ownOf = <T extends object>(bag: T): T => Object.assign(Object.create(null) as T, bag);
+
+/**
+ * An options bag as this call's own: what the caller's object holds itself, and the empty bag when none was
+ * given. The types rule anything but an object out, and a caller without them can still pass it.
  */
 export function optionsOf<T extends object>(fn: string, options: T | undefined, what: string): T {
-  if (options === undefined) return {} as T;
-  if (typeof options === "object" && (options as unknown) !== null) return options;
+  if (options === undefined) return ownOf({} as T);
+  if (typeof options === "object" && (options as unknown) !== null) return ownOf(options);
   throw new TypeError(`${fn}: expected ${what}; got ${got(options)}`);
 }
 

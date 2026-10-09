@@ -61,8 +61,65 @@ describe("optionsOf", () => {
     expect(optionsOf("fn", undefined, "an options object")).toEqual({});
   });
 
-  test.each([{}, { signal: undefined }, { prefix: "p:" }])("an object, %j, comes back as it is", (options) => {
-    expect(optionsOf("fn", options, "an options object")).toBe(options);
+  test.each([{}, { signal: undefined }, { prefix: "p:" }])("an object, %j, comes back as this call's own copy of what it holds", (options) => {
+    const bag = optionsOf("fn", options, "an options object");
+    expect(bag).not.toBe(options);
+    expect(Object.entries(bag)).toEqual(Object.entries(options));
+  });
+
+  describe("a bag holds what the caller's object holds itself, and nothing that is inherited", () => {
+    /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
+    function polluted<T>(planted: Record<string, unknown>, run: () => T): T {
+      Object.assign(Object.prototype, planted);
+      try {
+        return run();
+      } finally {
+        for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
+      }
+    }
+
+    test.each<[string, object | undefined]>([
+      ["no options", undefined],
+      ["an empty object", {}],
+      ["an object with options", { limit: 5 }],
+    ])("for %s, it inherits from nothing at all", (_name, options) => {
+      expect(Object.getPrototypeOf(optionsOf("fn", options, "an options object"))).toBeNull();
+    });
+
+    test("what the caller's object inherits is not in it", () => {
+      const options = Object.assign(Object.create({ limit: 5, storefront: "zz" }) as { limit?: number; storefront?: string; language?: string }, { language: "en-GB" });
+      const bag = optionsOf("fn", options, "an options object");
+      expect(Object.entries(bag)).toEqual([["language", "en-GB"]]);
+      expect([bag.limit, bag.storefront]).toEqual([undefined, undefined]);
+    });
+
+    test("what other code has put on Object.prototype is not in it, passed an object or passed none", () => {
+      const seen = polluted({ storefront: "zz", user: true }, () =>
+        [undefined, {}].map((options: { storefront?: string; user?: boolean } | undefined) => {
+          const bag = optionsOf("fn", options, "an options object");
+          return [bag.storefront, bag.user, "storefront" in bag];
+        }),
+      );
+      expect(seen).toEqual([
+        [undefined, undefined, false],
+        [undefined, undefined, false],
+      ]);
+    });
+
+    test("the check that says so can tell: an ordinary object does appear to hold what was planted, for as long as it is", () => {
+      expect(polluted({ storefront: "zz" }, () => ({} as { storefront?: string }).storefront)).toBe("zz");
+      expect(({} as { storefront?: string }).storefront).toBeUndefined();
+    });
+
+    test("each of the caller's properties is read once, and changing the object afterwards changes nothing", () => {
+      const read = vi.fn(() => "en-GB");
+      const options: { limit: number; language?: string } = { limit: 5 };
+      Object.defineProperty(options, "language", { get: read, enumerable: true });
+      const bag = optionsOf("fn", options, "an options object");
+      options.limit = 50;
+      expect([bag.language, bag.language, bag.limit]).toEqual(["en-GB", "en-GB", 5]);
+      expect(read).toHaveBeenCalledTimes(1);
+    });
   });
 
   test.each<[string, unknown]>([

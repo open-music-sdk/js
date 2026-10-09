@@ -1342,3 +1342,68 @@ describe("hooks", () => {
     });
   });
 });
+
+describe("an option is one that was passed, never one found on Object.prototype", () => {
+  /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
+  async function polluted<T>(planted: Record<string, unknown>, run: () => Promise<T>): Promise<T> {
+    Object.assign(Object.prototype, planted);
+    try {
+      return await run();
+    } finally {
+      for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
+    }
+  }
+
+  test("request: with user, method, body, params and schema planted there, a catalog request is still the plain GET it was asked to be", async () => {
+    const validate = vi.fn(() => ({ issues: [{ message: "planted" }] }));
+    const planted = { user: true, method: "DELETE", body: { planted: true }, params: { planted: 1 }, schema: { "~standard": { validate } } };
+    const { music, calls, url, header } = client([{ body: { data: [song] } }], { userToken: "user" });
+    const answer = await polluted(planted, () => music.request("v1/catalog/us/songs/1"));
+    expect(answer).toEqual({ data: [song] });
+    expect([calls[0]?.method, url(), header("music-user-token"), calls[0]?.body]).toEqual(["GET", "https://api.music.apple.com/v1/catalog/us/songs/1", null, null]);
+    expect(validate).not.toHaveBeenCalled();
+  });
+
+  test("request: what is passed is still what is used, beside what is planted", async () => {
+    const { music, calls, header } = client([{ status: 204 }], { userToken: "user" });
+    await polluted({ user: false, method: "DELETE" }, () => music.request("v1/catalog/us/songs/1", { user: true, method: "PUT", body: { rated: 1 } }));
+    expect([calls[0]?.method, header("music-user-token"), await calls[0]?.json()]).toEqual(["PUT", "user", { rated: 1 }]);
+  });
+
+  test("the check that says so can tell: an ordinary object does appear to ask for the listener's token while it is planted", async () => {
+    expect(await polluted({ user: true }, () => Promise.resolve(({} as { user?: boolean }).user))).toBe(true);
+    expect(({} as { user?: boolean }).user).toBeUndefined();
+  });
+
+  test("paginate: a limit planted there is not the walk's", async () => {
+    const { music, calls } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2], next: "/v1/x?offset=2" } }, { body: { data: [3] } }]);
+    const seen = await polluted({ maxPages: 1 }, async () => {
+      const out: number[] = [];
+      for await (const item of music.paginate<number>("v1/x")) out.push(item);
+      return out;
+    });
+    expect(seen).toEqual([1, 2, 3]);
+    expect(calls).toHaveLength(3);
+  });
+
+  test("createClient: a listener's token, a storefront, a hook and a fetch planted there are not the client's", async () => {
+    const plantedFetch = vi.fn();
+    const onRequest = vi.fn();
+    const { fetch, calls } = fakeFetch({ body: {} });
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const outcome = await polluted({ userToken: "planted", storefront: "zz", onRequest, fetch: plantedFetch }, async () => {
+        const music = createClient({ developerToken: "dev", retry: false });
+        await music.request("v1/test");
+        return { me: await failure(music.request("v1/me/library/songs")), storefront: await failure(music.storefront()) };
+      });
+      expect([outcome.me._tag, outcome.storefront._tag]).toEqual(["UserTokenInvalid", "UserTokenInvalid"]);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.headers.get("music-user-token")).toBeNull();
+      expect(plantedFetch).not.toHaveBeenCalled();
+      expect(onRequest).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

@@ -214,6 +214,39 @@ describe("initOf: what it gives is this call's own", () => {
   });
 });
 
+describe("initOf: an option is one the caller passed, never one found on Object.prototype", () => {
+  /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
+  function polluted<T>(planted: Record<string, unknown>, run: () => T): T {
+    Object.assign(Object.prototype, planted);
+    try {
+      return run();
+    } finally {
+      for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
+    }
+  }
+  const planted = { language: "fr", include: ["planted"], extend: ["planted"], limit: 9, offset: 9, params: { planted: 1 }, schema, views: ["planted"] };
+
+  test.each<[string, tReadOptions | undefined]>([
+    ["no options", undefined],
+    ["an empty bag", {}],
+  ])("with every option planted there, a call with %s still sends nothing", (_name, options) => {
+    expect(polluted(planted, () => initOf("fn", options, {}, ["views"]))).toEqual({ params: {}, schema: undefined, signal: undefined });
+  });
+
+  test("an option the caller did pass is the one sent, beside planted ones that are not", () => {
+    expect(polluted(planted, () => initOf("fn", { limit: 2 }, {}, ["views"])).params).toEqual({ limit: 2 });
+  });
+
+  test("the check that says so can tell: an ordinary object does appear to hold what was planted", () => {
+    expect(polluted(planted, () => ({} as tReadOptions).limit)).toBe(9);
+  });
+
+  test("an option the caller's object inherits is not one it passed", () => {
+    const options = Object.assign(Object.create({ limit: 9, params: { inherited: 1 } }) as tReadOptions, { language: "en-GB" });
+    expect(initOf("fn", options).params).toEqual({ l: "en-GB" });
+  });
+});
+
 describe("initOf: what it is handed is checked, and a mistake names the function and the option", () => {
   const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
   const PARAM = "getSong: params.a must be a string, a number, true or false, or a list of at most 300 strings and numbers; got ";

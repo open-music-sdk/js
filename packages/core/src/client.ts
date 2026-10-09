@@ -1,6 +1,7 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
+import { ownOf } from "./check";
 import { AppleMusicError, type tValidationIssue } from "./errors";
 import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
@@ -153,14 +154,18 @@ function credential(name: string, token: unknown): string {
 const formatIssues = (issues: readonly tValidationIssue[]) =>
   issues.map((i) => `${(i.path ?? []).map((s) => String(typeof s === "object" ? s.key : s)).join(".") || "<root>"}: ${i.message}`).join("; ");
 
-export function createClient(options: tClientOptions): tAppleMusicClient {
+export function createClient(given: tClientOptions): tAppleMusicClient {
+  // What the options hold themselves, and nothing they inherit: a `fetch` or a `userToken` that some other code has
+  // put on Object.prototype is not one this client was given. The same goes for what `request` and `paginate` take.
+  const options = ownOf(given);
   const developerToken = toProvider(options.developerToken);
   const userToken = options.userToken === undefined ? undefined : toProvider(options.userToken);
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const policy = resolveRetryPolicy(options.retry === false ? { maxAttempts: 1 } : options.retry);
   let storefrontPromise: Promise<string> | undefined;
 
-  async function request<T>(path: string, init: tRequestInit<T> = {}): Promise<T> {
+  async function request<T>(path: string, given: tRequestInit<T> = {}): Promise<T> {
+    const init = ownOf(given);
     const url = new URL(path, BASE_URL);
     // Both tokens ride on every request, so nothing may send one anywhere else: not an absolute URL,
     // not a scheme-relative one (the URL parser also reads `\\host` as one), not a downgrade to http.
@@ -260,7 +265,7 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
 
   async function* paginate<T>(from: string | tPage<T>, init: tPaginateInit<T> = {}): AsyncIterable<T> {
     // The limit is the walk's own: what is left is what each page is asked for with.
-    const { maxPages, ...each } = init;
+    const { maxPages, ...each } = ownOf(init);
     if (maxPages !== undefined && !(Number.isSafeInteger(maxPages) && maxPages > 0)) throw new TypeError(`paginate: maxPages must be a whole number above 0; got ${got(maxPages)}`);
     let next: string | undefined;
     let params = each.params;
