@@ -8,12 +8,25 @@ export interface tArtworkSource {
   readonly height?: number | null | undefined;
 }
 
+/**
+ * The formats Apple's image server converts to. It answers 400 to `avif`, `bmp` and others, and to `gif` and
+ * `tiff` it sends a JPEG under that name, so those are not here.
+ */
+const FORMATS = ["jpg", "jpeg", "png", "webp", "heic", "heif"] as const;
+
+/** A file format the image server converts artwork to. */
+export type tArtworkFormat = (typeof FORMATS)[number];
+
 export interface tArtworkOptions {
   /** Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`, or `width` where its shape is unknown. */
   readonly height?: number | undefined;
-  /** What replaces `{f}` in a template that has it: the file format. Default `"jpg"`. */
-  readonly format?: string | undefined;
-  /** What replaces `{c}` in a template that has it: the crop code. Default `"bb"`, the whole image fitted inside the box. */
+  /** The file format. Default: the one the template names, or `"jpg"` where it leaves that open as `{f}`. */
+  readonly format?: tArtworkFormat | undefined;
+  /**
+   * Apple's code for how the image is cut to the box, such as `"bb"`, the whole image fitted inside it, or
+   * `"cc"`, a square cut from its centre. Default: the one the template names, or `"bb"` where it leaves that
+   * open as `{c}`.
+   */
   readonly crop?: string | undefined;
 }
 
@@ -29,11 +42,39 @@ function length(name: string, value: unknown): number {
   throw new TypeError(`artwork: ${name} must be a number above 0, got ${typeof value === "number" ? String(value) : typeof value}`);
 }
 
-/** A word that goes into the URL as it is, so it may be nothing that could change what the URL means. */
-function word(name: string, value: unknown, fallback: string): string {
-  if (value === undefined) return fallback;
-  if (typeof value === "string" && /^[a-z0-9]+$/i.test(value)) return value;
-  throw new TypeError(`artwork: ${name} must be letters and digits`);
+function formatOf(value: unknown): tArtworkFormat | undefined {
+  if (value === undefined || (FORMATS as readonly unknown[]).includes(value)) return value as tArtworkFormat | undefined;
+  throw new TypeError(`artwork: format must be one of ${FORMATS.join(", ")}`);
+}
+
+/**
+ * A crop code goes into the file name as it is, so it may hold nothing that could end the name or change the URL
+ * around it. Apple's own run from `bb` to `SC.DN01` and `bb-60`: letters and digits, with a dot or hyphen between.
+ */
+function cropOf(value: unknown): string | undefined {
+  if (value === undefined || (typeof value === "string" && /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*$/.test(value))) return value;
+  throw new TypeError("artwork: crop must be a crop code: letters and digits, with single dots or hyphens between them");
+}
+
+const SIZE = "{w}x{h}";
+
+/**
+ * The template with a crop or format that was asked for written where the template names one.
+ *
+ * Apple documents the template as `{w}x{h}` and then the rest of a file name: in `{w}x{h}bb.jpg` the image is
+ * cut `bb` and encoded `jpg`. Some templates leave those open as `{c}` and `{f}`, which are filled in like the
+ * size. Most name them, and asking for another means writing over what is there. A URL whose file name is not of
+ * that form says nothing about cut or encoding, and is left as it is.
+ */
+function tailored(template: string, crop: string | undefined, format: string | undefined): string {
+  const end = /[?#]/.exec(template)?.index ?? template.length;
+  const start = template.lastIndexOf("/", end) + 1;
+  const name = template.slice(start, end);
+  const dot = name.lastIndexOf(".");
+  if (!name.startsWith(SIZE) || dot < SIZE.length || dot === name.length - 1) return template;
+  const [cut, encoding] = [name.slice(SIZE.length, dot), name.slice(dot + 1)];
+  const [newCut, newEncoding] = [crop !== undefined && !cut.includes("{c}") ? crop : cut, format !== undefined && !encoding.includes("{f}") ? format : encoding];
+  return `${template.slice(0, start)}${SIZE}${newCut}.${newEncoding}${template.slice(end)}`;
 }
 
 /** What one call was given, read once and checked. Nothing is read from the artwork or the options after this. */
@@ -58,14 +99,15 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
   const template = typeof url === "string" ? normalise(url) : "";
   if (template === "") throw new TypeError("artwork: expected an artwork object with a url");
   if (typeof options !== "object" || (options as unknown) === null) throw new TypeError("artwork: options must be an object");
-  const { height, format, crop } = options;
+  const { height } = options;
+  const [format, crop] = [formatOf(options.format), cropOf(options.crop)];
   return {
-    template,
+    template: tailored(template, crop, format),
     max: positive(maxWidth) && positive(maxHeight) ? { width: maxWidth, height: maxHeight } : undefined,
     width: length("width", width),
     height: height === undefined ? undefined : length("height", height),
-    format: word("format", format, "jpg"),
-    crop: word("crop", crop, "bb"),
+    format: format ?? "jpg",
+    crop: crop ?? "bb",
   };
 }
 

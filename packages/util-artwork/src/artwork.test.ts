@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test } from "vitest";
-import { artworkSrcSet, artworkUrl, normalise, type tArtworkSource } from "./artwork.js";
+import { artworkSrcSet, artworkUrl, normalise, type tArtworkOptions, type tArtworkSource } from "./artwork.js";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */
@@ -286,20 +286,6 @@ describe("artworkUrl: the template", () => {
     expect(artworkUrl({ url, width: 600, height: 600 }, 300)).toBe(url);
   });
 
-  test.each<[string, object, string]>([
-    ["neither option", {}, "300x300bb.jpg"],
-    ["a format", { format: "webp" }, "300x300bb.webp"],
-    ["a crop", { crop: "cc" }, "300x300cc.jpg"],
-    ["both", { format: "png", crop: "sr" }, "300x300sr.png"],
-    ["both undefined", { format: undefined, crop: undefined }, "300x300bb.jpg"],
-  ])("a template with {c} and {f}, given %s, ends in %s", (_name, options, expected) => {
-    expect(artworkUrl({ url: "https://example.com/{w}x{h}{c}.{f}" }, 300, options)).toBe(`https://example.com/${expected}`);
-  });
-
-  test("format and crop change nothing in a template without their placeholders", () => {
-    expect(artworkUrl(cover(), 300, { format: "webp", crop: "cc" })).toBe(artworkUrl(cover(), 300));
-  });
-
   test("a tArtwork from the generated types is accepted as it is", () => {
     const artwork: tArtwork = { url: TEMPLATE, width: 3000, height: 3000, bgColor: "1a1a1a", textColor1: "ffffff" };
     expect(size(artworkUrl(artwork, 300))).toBe("300x300");
@@ -310,6 +296,120 @@ describe("artworkUrl: the template", () => {
     artworkUrl(artwork, 300);
     artworkSrcSet(artwork, 300);
     expect(artwork).toEqual({ url: TEMPLATE, width: 3000, height: 3000 });
+  });
+});
+
+describe("artworkUrl: format and crop say how the image is encoded and cut, wherever the template says it", () => {
+  const HOST = "https://example.com/thumb/cover.jpg/";
+  type tCase = [template: string, options: tArtworkOptions, expected: string];
+
+  test.each<tCase>([
+    ["{w}x{h}bb.jpg", {}, "300x300bb.jpg"],
+    ["{w}x{h}bb.jpg", { format: "webp" }, "300x300bb.webp"],
+    ["{w}x{h}bb.jpg", { crop: "cc" }, "300x300cc.jpg"],
+    ["{w}x{h}bb.jpg", { format: "png", crop: "sr" }, "300x300sr.png"],
+    ["{w}x{h}bb.jpg", { format: undefined, crop: undefined }, "300x300bb.jpg"],
+    ["{w}x{h}bb.jpeg", { format: "heic" }, "300x300bb.heic"],
+    ["{w}x{h}bb.png", {}, "300x300bb.png"],
+    ["{w}x{h}cc.jpg", { crop: "bb" }, "300x300bb.jpg"],
+    ["{w}x{h}SC.DN01.jpg", { format: "webp" }, "300x300SC.DN01.webp"],
+    ["{w}x{h}SC.DN01.jpg", { crop: "bb" }, "300x300bb.jpg"],
+    ["{w}x{h}bb-60.jpg", { crop: "bb" }, "300x300bb.jpg"],
+    ["{w}x{h}.jpg", { crop: "bb", format: "webp" }, "300x300bb.webp"],
+  ])("a template that names them, %s, given %j, is %s", (template, options, expected) => {
+    expect(artworkUrl({ url: HOST + template }, 300, options)).toBe(HOST + expected);
+  });
+
+  test.each<tCase>([
+    ["{w}x{h}{c}.{f}", {}, "300x300bb.jpg"],
+    ["{w}x{h}{c}.{f}", { format: "webp" }, "300x300bb.webp"],
+    ["{w}x{h}{c}.{f}", { crop: "cc" }, "300x300cc.jpg"],
+    ["{w}x{h}{c}.{f}", { format: "png", crop: "sr" }, "300x300sr.png"],
+    ["{w}x{h}bb.{f}", {}, "300x300bb.jpg"],
+    ["{w}x{h}bb.{f}", { format: "webp", crop: "cc" }, "300x300cc.webp"],
+    ["{w}x{h}{c}.jpg", { format: "webp", crop: "cc" }, "300x300cc.webp"],
+    ["{w}x{h}SC.DN01.{f}?l=en-US", {}, "300x300SC.DN01.jpg?l=en-US"],
+    ["{w}x{h}SC.DN01.{f}?l=en-US", { format: "webp", crop: "bb" }, "300x300bb.webp?l=en-US"],
+    ["{w}x{h}{c}-60.{f}", { crop: "cc" }, "300x300cc-60.jpg"],
+  ])("a template that leaves them open, %s, given %j, is %s", (template, options, expected) => {
+    expect(artworkUrl({ url: HOST + template }, 300, options)).toBe(HOST + expected);
+  });
+
+  test.each<tCase>([
+    ["{w}x{h}bb.jpg?size=1.5&next=/a/b.png#top.left", { format: "webp" }, "300x300bb.webp?size=1.5&next=/a/b.png#top.left"],
+    ["{w}x{h}bb.jpg#a/b.c", { crop: "cc" }, "300x300cc.jpg#a/b.c"],
+    ["{w}x{h}bb.jpg?w={w}&f={f}&c={c}", { format: "png", crop: "sr" }, "300x300sr.png?w=300&f=png&c=sr"],
+  ])("only the file name is written over: what follows it in %s is kept, and filled in where it has placeholders", (template, options, expected) => {
+    expect(artworkUrl({ url: HOST + template }, 300, options)).toBe(HOST + expected);
+  });
+
+  test.each([
+    ["no size at all", "https://example.com/fixed.jpg", "https://example.com/fixed.jpg"],
+    ["its size in an earlier part of the path", "https://example.com/{w}x{h}/cover.jpg", "https://example.com/300x300/cover.jpg"],
+    ["its size after the start of the file name", "https://example.com/cover-{w}x{h}bb.jpg", "https://example.com/cover-300x300bb.jpg"],
+    ["its width and height apart", "https://example.com/w_{w},h_{h}/cover.jpg", "https://example.com/w_300,h_300/cover.jpg"],
+    ["no dot after the size", "https://example.com/{w}x{h}bb", "https://example.com/300x300bb"],
+    ["nothing after the dot", "https://example.com/{w}x{h}bb.", "https://example.com/300x300bb."],
+    ["its size only in the query", "https://example.com/cover.jpg?size={w}x{h}bb.jpg", "https://example.com/cover.jpg?size=300x300bb.jpg"],
+  ])("a URL with %s does not say how the image is cut or encoded, so format and crop leave it as it is", (_name, url, expected) => {
+    expect(artworkUrl({ url }, 300, { format: "webp", crop: "cc" })).toBe(expected);
+  });
+
+  test("a srcset is cut and encoded the same way in every candidate", () => {
+    expect(artworkSrcSet(cover(), 300, { format: "webp", crop: "cc", densities: [1, 2] })).toBe(squares("300 1x", "600 2x").replaceAll("bb.jpg", "cc.webp"));
+  });
+
+  test.each(["jpg", "jpeg", "png", "webp", "heic", "heif"] as const)("%s is a format the image server converts to", (format) => {
+    expect(artworkUrl(cover(), 300, { format })).toBe(TEMPLATE.replace("{w}x{h}bb.jpg", `300x300bb.${format}`));
+  });
+
+  test.each([
+    ["one the server answers 400 to", "avif"],
+    ["another", "bmp"],
+    ["one it answers with a JPEG under that name", "gif"],
+    ["another", "tiff"],
+    ["a known one in capitals", "JPG"],
+    ["a known one with a dot", ".jpg"],
+    ["a known one with a space", "jpg "],
+    ["empty", ""],
+    ["a placeholder", "{f}"],
+    ["a replacement pattern", "$&"],
+    ["a path", "jpg/../x"],
+    ["a number", 42],
+    ["null", null],
+    ["a list holding a known one", ["jpg"]],
+  ])("a format that is %s, %j, is a TypeError that lists the formats", (_name, format) => {
+    expect(() => artworkUrl(cover(), 300, { format: format as "jpg" })).toThrow(/^artwork: format must be one of jpg, jpeg, png, webp, heic, heif$/);
+  });
+
+  test.each(["bb", "cc", "sr", "w", "h", "bf", "FA01", "bb-60", "cc-60", "SC.DN01", "SH.FPTSW02", "SC.FPESS04"])("%s is accepted as a crop code, as Apple's own are", (crop) => {
+    expect(artworkUrl(cover(), 300, { crop })).toBe(TEMPLATE.replace("{w}x{h}bb", `300x300${crop}`));
+  });
+
+  test.each([
+    ["empty", ""],
+    ["a lone dot", "."],
+    ["ending in a dot", "bb."],
+    ["starting with a dot", ".bb"],
+    ["with two dots together", "SC..DN01"],
+    ["with two hyphens together", "bb--60"],
+    ["with a slash", "bb/../x"],
+    ["with a space", "bb 2x"],
+    ["with a comma", "bb,"],
+    ["with a query", "bb?x=1"],
+    ["with a fragment", "bb#x"],
+    ["with a percent sign", "bb%2F"],
+    ["with a letter outside ASCII", "bé"],
+    ["a placeholder", "{w}"],
+    ["a replacement pattern", "$&"],
+    ["a number", 42],
+    ["null", null],
+  ])("a crop that is %s, %j, is a TypeError: it goes into the file name as it is", (_name, crop) => {
+    expect(() => artworkUrl(cover(), 300, { crop: crop as string })).toThrow(/^artwork: crop must be a crop code/);
+  });
+
+  test.each([{ format: "a/b" }, { crop: "a/b" }])("%j is refused even for a URL with no place for it", (options) => {
+    expect(() => artworkUrl({ url: "https://example.com/fixed.jpg" }, 300, options as tArtworkOptions)).toThrow(TypeError);
   });
 });
 
@@ -423,26 +523,6 @@ describe("artworkUrl: what it refuses", () => {
     expect(() => artworkUrl(cover(), 300, { height: height as number })).toThrow(/^artwork: height must be a number above 0/);
   });
 
-  test.each([
-    ["empty", ""],
-    ["with a dot", "tar.gz"],
-    ["with a slash", "jpg/../x"],
-    ["with a space", "jpg 2x"],
-    ["with a comma", "jpg,"],
-    ["with a query", "jpg?x=1"],
-    ["with a placeholder", "{w}"],
-    ["with a replacement pattern", "$&"],
-    ["not a string", 42],
-    ["null", null],
-  ])("a format or crop that is %s is a TypeError: it goes into the URL as it is", (_name, value) => {
-    expect(() => artworkUrl(cover(), 300, { format: value as string })).toThrow(/^artwork: format must be letters and digits/);
-    expect(() => artworkUrl(cover(), 300, { crop: value as string })).toThrow(/^artwork: crop must be letters and digits/);
-  });
-
-  test("a bad format or crop is refused even when the template has no place for it", () => {
-    expect(() => artworkUrl(cover(), 300, { format: "a/b" })).toThrow(TypeError);
-  });
-
   test.each<[string, unknown]>([
     ["undefined, as a resource without artwork gives", undefined],
     ["null", null],
@@ -500,7 +580,7 @@ describe("artworkSrcSet: one candidate per density, labelled with the density as
   });
 
   test("the 1x candidate is the URL artworkUrl gives for the same width and options", () => {
-    const options = { height: 200, format: "webp", crop: "cc" };
+    const options: tArtworkOptions = { height: 200, format: "webp", crop: "cc" };
     const artwork = { url: "https://example.com/{w}x{h}{c}.{f}", width: 3000, height: 3000 };
     expect(parseSrcset(artworkSrcSet(artwork, 300, options))[0]?.url).toBe(artworkUrl(artwork, 300, options));
     expect(artworkSrcSet(artwork, 300, options)).toBe("https://example.com/300x200cc.webp 1x, https://example.com/600x400cc.webp 2x, https://example.com/900x600cc.webp 3x");

@@ -37,12 +37,29 @@ them. Every `tArtwork` from `@open-music-sdk/types` fits.
 | Option | |
 | --- | --- |
 | `height` | Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`. |
-| `format` | What replaces `{f}` in a template that has it. Default `"jpg"`. |
-| `crop` | What replaces `{c}` in a template that has it. Default `"bb"`, the whole image fitted inside the box. |
+| `format` | The file format: `"jpg"`, `"jpeg"`, `"png"`, `"webp"`, `"heic"` or `"heif"`. Default: the one the template names. |
+| `crop` | Apple's code for how the image is cut to the box. Default: the one the template names, usually `"bb"`, the whole image fitted inside the box. |
 | `densities` | For `artworkSrcSet`: the pixel densities to offer. Default `[1, 2, 3]`. |
 
-A `width`, `height` or density that is not a number above zero is a `TypeError`, as is a `format` or
-`crop` that is anything but letters and digits, and an `artwork` without a `url`.
+A `width`, `height` or density that is not a number above zero is a `TypeError`, as is a `format`
+that is not one of the six, a `crop` that is not shaped like a crop code, and an `artwork` without a
+`url`.
+
+## Format and crop
+
+A template says how the image is cut and encoded in its file name: `{w}x{h}bb.jpg` is cut `bb` and
+encoded `jpg`. `format` and `crop` write over those, so `artworkUrl(artwork, 300, { format: "webp" })`
+gives `…/300x300bb.webp`, about a third of the bytes of the JPEG. Some templates leave them open as
+`{c}` and `{f}` instead; those are filled in the same way, with `bb` and `jpg` if you do not say.
+
+- **Formats** are the six Apple's image server was seen to convert to. It refuses `avif` and `bmp`,
+  and for `gif` and `tiff` it sends a JPEG under another name, so those are a `TypeError` here.
+- **Crop codes** are Apple's and undocumented, so any code of the right shape is accepted: letters
+  and digits, with single dots or hyphens between, case kept. `bb` fits the whole image inside the
+  box and never enlarges it; `cc` cuts a square from the centre; `sr` fills the box; `bb-60` is
+  `bb` at a lower JPEG quality. Codes such as `SC.DN01` come with some editorial artwork.
+- **A URL that is not a template of this form**, such as a fixed URL for a playlist's own artwork,
+  says nothing about cut or encoding and is returned as it is.
 
 ## Size
 
@@ -78,8 +95,9 @@ so a `src` and a `srcset` never point at different places, and a check you make 
 where the URL points, what scheme it has, or whether it is a URL at all. If your artwork objects can
 come from anywhere but Apple's API, vet them before they reach an `<img>`.
 
-`{f}` and `{c}` are not in Apple's reference, which documents only `{w}x{h}`. They appear in some of
-the templates the API returns, and a template that has them does not work until they are filled in.
+`{f}` and `{c}`, the formats and the crop codes are not in Apple's reference, which documents only
+`{w}x{h}`. They are what Apple's own pages and image server were seen to use when this was written,
+and a template that has `{c}` or `{f}` does not work until they are filled in.
 
 ## Not here
 
