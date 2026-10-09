@@ -482,18 +482,43 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       expect(await getSong.bound(music)("1")).toEqual(song("1"));
     });
 
-    test.each<[string, tReply]>([
-      ["an empty list", { body: { data: [] } }],
-      ["a list holding null", { body: { data: [null] } }],
-      ["no data at all", { body: {} }],
-      ["data that is null", { body: { data: null } }],
-      ["an empty body", { status: 204 }],
-    ])("a success with %s is an ApiError that says there was no resource, not undefined", async (_name, reply) => {
+    test.each<[string, tReply, number]>([
+      ["an empty list", { body: { data: [] } }, 200],
+      ["a list holding null", { body: { data: [null] } }, 200],
+      ["no data at all", { body: {} }, 200],
+      ["data that is null", { body: { data: null } }, 200],
+      ["a created answer with an empty list", { status: 201, body: { data: [] } }, 201],
+      ["an accepted answer with nothing in it", { status: 202 }, 202],
+      ["an empty body", { status: 204 }, 204],
+    ])("a success with %s is an ApiError that says there was no resource, not undefined, and carries the status it came with", async (_name, reply, status) => {
       const { music } = apple([reply]);
       const error = await rejection(getSong.bound(music)("1"));
       expect(isAppleMusicError(error, "ApiError")).toBe(true);
       expect(error.message).toBe("getSong: Apple answered with no resource");
-      expect((error as { status?: number }).status).toBe(200);
+      expect((error as { status?: number }).status).toBe(status);
+    });
+
+    test("an answer that is no page carries its own status too", async () => {
+      const { music } = apple([{ status: 201, body: { data: "p.1" } }]);
+      const error = await rejection(getSong.bound(music)("1"));
+      expect(error.message).toBe("getSong: data is not an array");
+      expect((error as { status?: number }).status).toBe(201);
+    });
+
+    test("with a client that does not say what the status was, the error does not make one up", async () => {
+      const silent = { request: () => Promise.resolve({ data: [] }), paginate: noop, storefront: noop } as unknown as tAppleMusicClient;
+      const error = await rejection(getSong.bound(silent)("1"));
+      expect(error.message).toBe("getSong: Apple answered with no resource");
+      expect(error).toHaveProperty("status", undefined);
+    });
+
+    test("a plan that has its own use for the response still gets it", async () => {
+      const mine = vi.fn();
+      const fn = endpoint("createLibraryPlaylist", "resource", (): tRequestPlan<{ data: unknown[] }> => ["v1/x", { onResponse: mine }]);
+      const { music } = apple([{ status: 201, body: { data: [] } }, { status: 201, body: { data: [song("1")] } }]);
+      expect((await rejection(fn.bound(music)())) as { status?: number }).toHaveProperty("status", 201);
+      expect(await fn(music)).toEqual({ data: [song("1")] });
+      expect(mine.mock.calls.map((call) => (call[0] as Response).status)).toEqual([201, 201]);
     });
 
     test.each<[string, unknown]>([

@@ -66,11 +66,21 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
   if (typeof plan !== "function") throw new TypeError(`${builder}: plan must be a function; got ${got(plan)}`);
   const planFor = plan as unknown as tPlan<unknown[], unknown>;
 
-  const send = async (client: tAppleMusicClient, ...args: unknown[]): Promise<unknown> => {
-    const music = clientOf(fn, client, METHODS);
-    const [path, init] = await settled(fn, planFor(music, ...args));
-    return music.request(path, init);
+  /** One call, planned and asked for: what Apple answered, and with what status, when the client says. */
+  const ask = async (music: tAppleMusicClient, args: unknown[]): Promise<{ readonly body: unknown; readonly status: number | undefined }> => {
+    const [path, init = {}] = await settled(fn, planFor(music, ...args));
+    let status: number | undefined;
+    const body = await music.request(path, {
+      ...init,
+      // `request` resolves to the body alone. The status comes by its hook, which a plan may have a use for as well.
+      onResponse: (res, req, outcome) => {
+        status = res.status;
+        init.onResponse?.(res, req, outcome);
+      },
+    });
+    return { body, status };
   };
+  const send = async (client: tAppleMusicClient, ...args: unknown[]): Promise<unknown> => (await ask(clientOf(fn, client, METHODS), args)).body;
   const bound = (client: tAppleMusicClient) => {
     const music = clientOf(fn, client, METHODS);
     if (unwrap === "answer") return (...args: unknown[]) => send(music, ...args);
@@ -88,10 +98,11 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
         };
       };
     return async (...args: unknown[]): Promise<unknown> => {
-      const { data } = pageOf(await send(music, ...args), fn);
+      const { body, status } = await ask(music, args);
+      const { data } = pageOf(body, fn, status);
       if (unwrap === "resources") return data;
-      // A success that holds no resource is not the resource: it is said, not handed over as undefined.
-      if (data[0] == null) throw new AppleMusicError("ApiError", `${fn}: Apple answered with no resource`, { status: 200 });
+      // A success that holds no resource is not the resource: it is said, with the status it came with, not handed over as undefined.
+      if (data[0] == null) throw new AppleMusicError("ApiError", `${fn}: Apple answered with no resource`, { status });
       return data[0];
     };
   };

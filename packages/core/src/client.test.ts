@@ -1343,6 +1343,69 @@ describe("hooks", () => {
   });
 });
 
+describe("request: onResponse for one request alone, by which a caller learns what request does not resolve to", () => {
+  test("it is told of the answer once it is settled: the response, the request, the body and no error", async () => {
+    const onResponse = vi.fn();
+    const { music, calls } = client([{ status: 201, body: { data: [song] }, headers: { "x-apple-request-id": "abc" } }]);
+    await music.request("v1/me/library/playlists", { method: "POST", user: false, body: {}, onResponse });
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    const [res, req, outcome] = onResponse.mock.calls[0] as [Response, Request, tResponseOutcome];
+    expect([res.status, res.headers.get("x-apple-request-id"), res.bodyUsed]).toEqual([201, "abc", true]);
+    expect(req).toBe(calls[0]);
+    expect(outcome).toEqual({ body: { data: [song] }, error: undefined });
+  });
+
+  test("it is told after the client's own hook, and before the request resolves", async () => {
+    const order: string[] = [];
+    const { music } = client([{ body: {} }], { onResponse: () => order.push("the client's") });
+    await music.request("v1/test", { onResponse: () => order.push("the request's") }).then(() => order.push("resolved"));
+    expect(order).toEqual(["the client's", "the request's", "resolved"]);
+  });
+
+  test("it is told of every response of a request that is retried, and of the error each one is", async () => {
+    const statuses: [number, string | undefined][] = [];
+    const { music } = client([{ status: 503 }, { body: {} }], { retry: { maxAttempts: 2, baseDelayMs: 0 } });
+    await music.request("v1/test", { onResponse: (res, _req, outcome) => statuses.push([res.status, outcome.error?._tag]) });
+    expect(statuses).toEqual([
+      [503, "ApiError"],
+      [200, undefined],
+    ]);
+  });
+
+  test("it is told of an answer that is an error, with the very error the request throws", async () => {
+    const onResponse = vi.fn();
+    const { music } = client([apiError(404, "Resource Not Found")]);
+    const thrown = await failure(music.request("v1/catalog/us/songs/x", { onResponse }));
+    expect((onResponse.mock.calls[0] as [Response, Request, tResponseOutcome])[2].error).toBe(thrown);
+  });
+
+  test("it is not told when there was no response at all", async () => {
+    const onResponse = vi.fn();
+    const { music } = client([new TypeError("down")]);
+    await failure(music.request("v1/test", { onResponse }));
+    expect(onResponse).not.toHaveBeenCalled();
+  });
+
+  test("it is that request's alone: the next one, without it, tells nobody", async () => {
+    const onResponse = vi.fn();
+    const { music } = client([{ body: {} }, { body: {} }]);
+    await music.request("v1/test", { onResponse });
+    await music.request("v1/test");
+    expect(onResponse).toHaveBeenCalledTimes(1);
+  });
+
+  test("a walk tells it of every page that is asked for", async () => {
+    const statuses: number[] = [];
+    const { music } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2] } }]);
+    const seen: number[] = [];
+    for await (const item of music.paginate<number>("v1/x", { onResponse: (res) => statuses.push(res.status) })) seen.push(item);
+    expect([seen, statuses]).toEqual([
+      [1, 2],
+      [200, 200],
+    ]);
+  });
+});
+
 describe("an option is one that was passed, never one found on Object.prototype", () => {
   /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
   async function polluted<T>(planted: Record<string, unknown>, run: () => Promise<T>): Promise<T> {

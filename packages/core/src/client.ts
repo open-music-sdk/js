@@ -73,6 +73,12 @@ export interface tRequestInit<T = unknown> {
   /** Validates the parsed body; a failure throws ValidationError. */
   readonly schema?: tSchemaLike<T> | undefined;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Called as the client's own `onResponse` is, and after it, for this request alone: once per response, when the
+   * body has been read and the outcome decided. It is how a caller learns what `request` does not resolve to, such
+   * as the status of the answer or one of its headers.
+   */
+  readonly onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
 
 /** One page of a collection or relationship response. */
@@ -118,10 +124,13 @@ export interface tAppleMusicClient {
 
 type tSettled<T> = tResponseOutcome & ({ readonly value: T; readonly error: undefined } | { readonly error: AppleMusicError; readonly value?: undefined });
 
-/** A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a last, empty page. */
-export function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
+/**
+ * A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a
+ * last, empty page. `status` is that of the answer the page came in, for the error that says it was no page.
+ */
+export function pageOf(page: unknown, path: string, status: number | undefined): { readonly data: readonly unknown[]; readonly next: string | undefined } {
   if (page === undefined) return { data: [], next: undefined };
-  const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status: 200 });
+  const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status });
   if (typeof page !== "object" || page === null || Array.isArray(page)) throw shape("expected a page object");
   const { data, next } = page as { data?: unknown; next?: unknown };
   if (data != null && !Array.isArray(data)) throw shape("data is not an array");
@@ -196,6 +205,7 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       }
       const outcome = await settle(res, init, user, url);
       options.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
+      init.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
       return outcome;
     };
 
@@ -276,13 +286,13 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       // A promise handed over would have nothing listening to it until a loop started, so one that rejects first
       // would be nobody's to catch. It is the caller's to await.
       if (typeof (from as { then?: unknown } | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
-      const first = pageOf(from, "the page given to paginate");
+      const first = pageOf(from, "the page given to paginate", 200);
       yield* first.data as readonly T[];
       next = first.next;
       params = undefined;
     }
     for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {
-      const page = pageOf(await request<unknown>(next, { ...each, params }), next);
+      const page = pageOf(await request<unknown>(next, { ...each, params }), next, 200);
       yield* page.data as readonly T[];
       next = page.next;
       params = undefined; // a next link already carries the query
