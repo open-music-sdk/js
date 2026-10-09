@@ -28,6 +28,12 @@ export interface tArtworkOptions {
    * open as `{c}`.
    */
   readonly crop?: string | undefined;
+  /**
+   * The hosts artwork may come from, such as `["mzstatic.com"]`, where Apple serves its catalog artwork. With
+   * this, a URL that is not `https` on one of them or on a subdomain of one, with no port and no credentials, is
+   * a `TypeError` and nothing is returned. Default: where the URL points is not checked at all.
+   */
+  readonly hosts?: readonly string[] | undefined;
 }
 
 export interface tArtworkSrcSetOptions extends tArtworkOptions {
@@ -77,12 +83,45 @@ function cropOf(value: unknown): string | undefined {
   throw new TypeError(`artwork: crop must be a crop code: at most ${String(MAX_CROP_LENGTH)} letters and digits, with single dots or hyphens between them`);
 }
 
+/**
+ * The hosts a caller allows, as a list of this call's own. Each is a bare host name in small letters, as a URL
+ * parser gives a host: `https://mzstatic.com`, `*.mzstatic.com` and `MzStatic.com` would each match nothing, so
+ * they are refused here and not left to refuse every artwork later.
+ */
+function hostsOf(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  const hosts: unknown[] = Array.isArray(value) && value.length <= MAX_HOSTS ? [...(value as unknown[])] : [];
+  if (hosts.length > 0 && hosts.every((host): host is string => typeof host === "string" && host.length <= 253 && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(host))) return hosts;
+  throw new TypeError(`artwork: hosts must be an array of 1 to ${String(MAX_HOSTS)} host names in small letters, such as mzstatic.com`);
+}
+
+/**
+ * The URL, if no hosts were named or it is `https` on one of them, and a `TypeError` if it is not. The error
+ * does not show the URL: it is not ours, and may be as long or as strange as whoever wrote it liked.
+ *
+ * The URL is read by the parser a browser reads it with, so what is checked is what will be requested.
+ */
+function allowed(url: string, hosts: readonly string[] | undefined): string {
+  if (hosts === undefined) return url;
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // A URL that does not stand on its own, such as a relative one, is on no host that could be allowed.
+  }
+  const host = parsed?.hostname ?? "";
+  if (parsed?.protocol === "https:" && parsed.username === "" && parsed.password === "" && parsed.port === "" && hosts.some((name) => host === name || host.endsWith(`.${name}`))) return url;
+  throw new TypeError("artwork: the artwork's url is not https on one of the hosts allowed");
+}
+
 const SIZE = "{w}x{h}";
 const DEFAULT_CROP = "bb";
 /** The most pixels Apple's image server gives on a side. It answers 400 to a request for one more. */
 const MAX_SIDE = 10_000;
 /** Three times the longest crop code seen from Apple. A code fills every `{c}` in a template, so its length is what a URL can grow by. */
 const MAX_CROP_LENGTH = 32;
+/** More hosts than artwork is served from. */
+const MAX_HOSTS = 16;
 /** More densities than screens come in. Each one is a candidate built and a URL written, so the list is not left open. */
 const MAX_DENSITIES = 16;
 /** What arithmetic on sizes this small can be off by, with room to spare: a height of 180.0000000001 is 180, not 181. */
@@ -163,6 +202,8 @@ interface tRequest {
   readonly crop: string;
   /** Whether the image is fitted inside the box and never enlarged, so far as the template says how it is cut. */
   readonly inside: boolean;
+  /** The hosts the URL may be on, where the caller named any. */
+  readonly hosts: readonly string[] | undefined;
 }
 
 /**
@@ -189,14 +230,18 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
     crop: crop ?? DEFAULT_CROP,
     // A URL that does not say how the image is cut is taken to fill the box: that never asks for an enlargement.
     inside: named.cut !== undefined && fitsInside(named.cut),
+    hosts: hostsOf(options.hosts),
   };
 }
 
-/** The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has. */
-function image({ template, max, width, height, format, crop, inside }: tRequest, density: number): { url: string; scale: number } {
+/**
+ * The template filled in for the box at `density`, and how far the box had to shrink to what the artwork has.
+ * Every URL that leaves this package is made here, so here is where its host is checked, once it is whole.
+ */
+function image({ template, max, width, height, format, crop, inside, hosts }: tRequest, density: number): { url: string; scale: number } {
   const { width: w, height: h, scale } = fit({ width: width * density, height: height === undefined ? undefined : height * density }, max, inside);
   const url = template.replaceAll("{w}", String(w)).replaceAll("{h}", String(h)).replaceAll("{f}", format).replaceAll("{c}", crop);
-  return { url, scale };
+  return { url: allowed(url, hosts), scale };
 }
 
 /**
@@ -229,8 +274,11 @@ export function normalise(url: string): string {
  * The URL of an artwork image `width` CSS pixels wide: the template with `{w}` and `{h}` filled in.
  *
  * The image keeps the artwork's own shape unless `height` says otherwise, and is never asked for larger than
- * the artwork comes. The URL is the one the API gave, spelled as a browser would read it, with numbers put in:
- * where it points is not checked.
+ * the artwork comes. The URL is the one the API gave, spelled as a browser would read it, with numbers put in.
+ *
+ * Where it points is not checked unless `hosts` says where it may: artwork that did not come straight from
+ * Apple's API can hold any URL, which an `<img>` will request, a link will run if it is `javascript:`, and a
+ * server-side fetch will follow into your own network.
  */
 export function artworkUrl(artwork: tArtworkSource, width: number, options: tArtworkOptions = {}): string {
   return image(read(artwork, width, options), 1).url;
@@ -242,6 +290,8 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
  *
  * Each candidate carries the density it was asked for. Where the artwork does not come large enough for one,
  * the largest it has is offered once, under the density that image amounts to.
+ *
+ * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
   return srcset(read(artwork, width, options), options);
@@ -256,6 +306,8 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
  * by the density of whichever candidate it took, so the four have to agree, and here they cannot fail to.
  * `width` and `height` are the size the image itself is shown at: with a `height` and a crop that fits the
  * artwork inside the box, that is the artwork standing in your box, not the box.
+ *
+ * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
  */
 export function artworkImage(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): tArtworkImage {
   const request = read(artwork, width, options);

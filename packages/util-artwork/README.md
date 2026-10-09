@@ -57,6 +57,7 @@ parser on its way to you, and has `%7Bw%7D` for `{w}`, is the same template and 
 | `format` | The file format: `"jpg"`, `"jpeg"`, `"png"`, `"webp"`, `"heic"` or `"heif"`. Default: the one the template names. |
 | `crop` | Apple's code for how the image is cut to the box. Default: the one the template names, usually `"bb"`, the whole image fitted inside the box. |
 | `densities` | For `artworkImage` and `artworkSrcSet`: the pixel densities to offer, 16 at most. Default `[1, 2, 3]`. |
+| `hosts` | The hosts the artwork may come from, such as `["mzstatic.com"]`. Default: the URL is not checked. See [Where the URL points](#where-the-url-points). |
 
 A `width`, `height` or density that is not a number above zero, and no more than
 `Number.MAX_SAFE_INTEGER`, is a `TypeError`, as is a `format`
@@ -132,15 +133,45 @@ is kept by writing `./` before it or an empty `#` after it. None of this changes
 so a `src` and a `srcset` never point at different places, and a check you make on the URL
 `artworkUrl` returns holds for the `srcset` too.
 
-## The URL is the API's
+## Where the URL points
 
-`artworkUrl` puts numbers into the URL the API returned and, apart from that spelling, changes nothing. It does not check
-where the URL points, what scheme it has, or whether it is a URL at all. If your artwork objects can
-come from anywhere but Apple's API, vet them before they reach an `<img>`.
+These functions fill in the URL the API gave. Unless you ask, they do not look at where it points:
+not its scheme, not its host, not whether it is a URL at all. That is enough for artwork that came
+from Apple's API a moment ago. It is not enough for artwork that could have come from anywhere
+else: a cache or a database that others can write to, a link someone shared, another service.
 
-`{f}` and `{c}`, the formats and the crop codes are not in Apple's reference, which documents only
-`{w}x{h}`. They are what Apple's own pages and image server were seen to use when this was written,
-and a template that has `{c}` or `{f}` does not work until they are filled in.
+What a bad URL can do depends on where you put it:
+
+- **An `<img>`.** No script runs, but the browser makes the request: to someone else's host, who
+  learns your visitor was there, or, for a URL with no host, to your own site with your visitor's
+  cookies.
+- **A link, `window.open` or `location`**, as for "open the artwork full size": a `javascript:` URL
+  runs.
+- **A request your server makes**, as in an image proxy or a social card: it goes wherever the URL
+  says, from inside your network.
+
+Pass `hosts` to have it checked:
+
+```ts
+artworkImage(artwork, 300, { hosts: ["mzstatic.com"] });
+```
+
+With `hosts`, a URL that is not `https` on one of those hosts or a subdomain of one, with no port
+and no credentials, is a `TypeError`, and no URL is returned. The check is made on the URL as it is
+returned, read by the parser a browser reads it with. Apple serves catalog artwork from
+`is1-ssl.mzstatic.com` and its numbered siblings; artwork a listener gave a playlist of their own
+may be served from elsewhere, so look at what your app receives before you settle the list.
+
+What comes back is a URL, not markup. Assigned to an element, or given to React, it is escaped for
+you. Written into HTML by hand it needs escaping like any other attribute value, and it is not safe
+to put inside a CSS `url(…)` as it is.
+
+## What Apple documents, and what it does not
+
+Apple's reference documents `{w}x{h}` and nothing else. `{f}` and `{c}`, the formats, the crop codes,
+how each crop fills or fits the box, and the limit of 10,000 pixels a side are what Apple's own pages
+and image server were seen to do when this was written. A template that has `{c}` or `{f}` does not
+work until they are filled in.
 
 ## Not here
 

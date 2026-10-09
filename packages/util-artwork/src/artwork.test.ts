@@ -1217,6 +1217,125 @@ describe("one URL, whatever it holds: what artworkUrl gives is what the srcset c
   });
 });
 
+describe("hosts: where the artwork may come from, for a caller who says", () => {
+  const APPLE = ["mzstatic.com"];
+  const REFUSED = /^artwork: the artwork's url is not https on one of the hosts allowed$/;
+  /** The three functions, each given the same artwork and options. */
+  const every = (artwork: tArtworkSource, options: tArtworkSrcSetOptions) => [() => artworkUrl(artwork, 300, options), () => artworkSrcSet(artwork, 300, options), () => artworkImage(artwork, 300, options)];
+
+  test.each([
+    ["a catalog cover", TEMPLATE],
+    ["another of Apple's image hosts", "https://is5-ssl.mzstatic.com/image/thumb/a.jpg/{w}x{h}bb.jpg"],
+    ["the host itself, with nothing before it", "https://mzstatic.com/{w}x{h}bb.jpg"],
+    ["a host written in capitals", "https://IS1-SSL.MZSTATIC.COM/image/{w}x{h}bb.jpg"],
+    ["the port https has anyway", "https://is1-ssl.mzstatic.com:443/image/{w}x{h}bb.jpg"],
+    ["a query and a fragment", "https://is1-ssl.mzstatic.com/{w}x{h}bb.jpg?l=en-US#top"],
+    ["a URL with no size in it", "https://is1-ssl.mzstatic.com/image/fixed.jpg"],
+    ["white space around it", "  https://is1-ssl.mzstatic.com/image/{w}x{h}bb.jpg\n"],
+    ["a placeholder in the host that fills to a name under it", "https://{c}.mzstatic.com/{w}x{h}.jpg"],
+  ])("%s on an allowed host is filled in exactly as it would be with no hosts named", (_name, url) => {
+    const artwork = { url, width: 3000, height: 3000 };
+    expect(artworkUrl(artwork, 300, { hosts: APPLE })).toBe(artworkUrl(artwork, 300));
+    expect(artworkSrcSet(artwork, 300, { hosts: APPLE })).toBe(artworkSrcSet(artwork, 300));
+    expect(artworkImage(artwork, 300, { hosts: APPLE })).toEqual(artworkImage(artwork, 300));
+  });
+
+  test("any host on the list will do, and a subdomain of one at any depth", () => {
+    const hosts = ["example.org", "blobstore.apple.com", "mzstatic.com"];
+    for (const host of ["mzstatic.com", "a.mzstatic.com", "a.b.c.mzstatic.com", "store-032.blobstore.apple.com", "example.org"])
+      expect(artworkUrl({ url: `https://${host}/{w}x{h}bb.jpg` }, 300, { hosts })).toBe(`https://${host}/300x300bb.jpg`);
+  });
+
+  const elsewhere: [string, string][] = [
+    ["another host", "https://evil.example/{w}x{h}bb.jpg"],
+    ["a host that ends with an allowed one's letters but is not under it", "https://evilmzstatic.com/{w}x{h}bb.jpg"],
+    ["a host that starts with an allowed one", "https://is1-ssl.mzstatic.com.evil.example/{w}x{h}bb.jpg"],
+    ["an allowed host over http", "http://is1-ssl.mzstatic.com/image/{w}x{h}bb.jpg"],
+    ["an allowed host on another port", "https://is1-ssl.mzstatic.com:8443/image/{w}x{h}bb.jpg"],
+    ["an allowed host with a user name and password", "https://user:pass@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host with a user name alone", "https://user@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host as the user name of another", "https://is1-ssl.mzstatic.com@evil.example/{w}x{h}bb.jpg"],
+    ["an allowed host after backslashes a parser reads as slashes", "https:\\\\evil.example\\@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host in the fragment", "https://evil.example/#@is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host in the path", "https://evil.example/is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["an allowed host with a dot after it", "https://is1-ssl.mzstatic.com./{w}x{h}bb.jpg"],
+    ["a space in front and a way up out of the path", " https://evil.example/../../api/logout?via={w}"],
+    ["no scheme, so the page's own", "//is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
+    ["no host, so the page's own", "/api/logout?via={w}"],
+    ["a path of its own only", "covers/{w}x{h}bb.jpg"],
+    ["script for a scheme", "javascript:alert(document.domain)//{w}"],
+    ["a document of its own", "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' onload='alert(1)' width='{w}'/>"],
+    ["a blob, even one made on an allowed host", "blob:https://is1-ssl.mzstatic.com/0b2d6f3e-{w}"],
+    ["a file", "file:///etc/passwd#{w}"],
+    ["a cloud metadata address", "http://169.254.169.254/latest/meta-data/{w}"],
+    ["this machine", "http://localhost:6379/{w}"],
+    ["this machine by number", "https://[::1]/{w}x{h}bb.jpg"],
+    ["a placeholder in the host that fills to a name elsewhere", "https://{c}.evil.example/{w}x{h}.jpg"],
+    ["a size in the host", "https://{w}.example/{h}.jpg"],
+  ];
+
+  test.each(elsewhere)("artwork on %s is refused by all three functions, with an error that does not show the URL", (_name, url) => {
+    for (const call of every({ url, width: 3000, height: 3000 }, { hosts: APPLE })) {
+      expect(call).toThrow(REFUSED);
+      expect(call).toThrow(TypeError);
+    }
+  });
+
+  test.each(elsewhere)("the control: with no hosts named, artwork on %s is filled in like any other", (_name, url) => {
+    for (const call of every({ url, width: 3000, height: 3000 }, {})) expect(call).not.toThrow();
+  });
+
+  test("what was checked is what is handed back: every URL that comes out stands on an allowed host by a URL parser's reading", () => {
+    for (const url of [TEMPLATE, "  https://IS1-SSL.MZSTATIC.COM:443/a b/{w}x{h}bb.jpg?ids=1,2,", "https://{c}.mzstatic.com/{w}x{h}.jpg"]) {
+      const { src, srcset } = artworkImage({ url, width: 3000, height: 3000 }, 300, { hosts: APPLE });
+      for (const out of [src, ...parseSrcset(srcset).map((c) => c.url)]) {
+        // Read with the page as its base, as a browser would: a URL that only looked whole would land on app.example.
+        const read = new URL(out, BASE);
+        expect([read.protocol, read.port, read.username]).toEqual(["https:", "", ""]);
+        expect(read.hostname.endsWith(".mzstatic.com")).toBe(true);
+      }
+    }
+  });
+
+  test("a srcset is refused whole: it is never returned with some of its candidates left out", () => {
+    expect(() => artworkSrcSet({ url: "https://{w}.mzstatic.com.evil.example/{h}.jpg" }, 300, { hosts: APPLE, densities: [1, 2, 3] })).toThrow(REFUSED);
+  });
+
+  test.each<[string, unknown]>([
+    ["an empty list", []],
+    ["a host on its own, not in a list", "mzstatic.com"],
+    ["null", null],
+    ["a set", new Set(["mzstatic.com"])],
+    ["a list of seventeen", Array.from({ length: 17 }, (_, i) => `host${String(i)}.example`)],
+    ["a host in capitals, which no URL's host would equal", ["MzStatic.com"]],
+    ["a URL, not a host", ["https://mzstatic.com"]],
+    ["a wildcard", ["*.mzstatic.com"]],
+    ["a host with a port", ["mzstatic.com:443"]],
+    ["a host with a path", ["mzstatic.com/image"]],
+    ["a host with a dot in front", [".mzstatic.com"]],
+    ["a host with a dot after", ["mzstatic.com."]],
+    ["a host with a space", ["mzstatic.com "]],
+    ["an empty host", [""]],
+    ["a host longer than a host name can be", [`${"a".repeat(250)}.com`]],
+    ["a host that is not a string", [42]],
+    ["one bad host after a good one", ["mzstatic.com", "*.example"]],
+  ])("hosts given as %s is a TypeError that says what a host list is, whatever the artwork", (_name, hosts) => {
+    for (const call of every(cover(), { hosts: hosts as string[] })) expect(call).toThrow(/^artwork: hosts must be an array of 1 to 16 host names in small letters, such as mzstatic\.com$/);
+  });
+
+  test.each([["mzstatic.com"], ["localhost"], ["xn--bcher-kva.example"], ["a-b.c-d.example"], ["10.0.0.1"], Array.from({ length: 16 }, (_, i) => `host${String(i)}.example`)])(
+    "%j is a host list",
+    (...hosts) => {
+      expect(() => artworkUrl({ url: `https://${hosts[0] ?? ""}/{w}x{h}bb.jpg` }, 300, { hosts })).not.toThrow();
+    },
+  );
+
+  test("leaving hosts out, or undefined, checks nothing: that is the default, and it is the caller's to change", () => {
+    expect(artworkUrl({ url: "javascript:alert({w})" }, 300, { hosts: undefined })).toBe("javascript:alert(300)");
+    expect(artworkUrl({ url: "javascript:alert({w})" }, 300)).toBe("javascript:alert(300)");
+  });
+});
+
 describe("the artwork and the options are each read once, so an object that changes its answer cannot change the result", () => {
   /** An object whose properties count how often they are read, and answer `later` from the second time on. */
   function counted<T extends object>(first: T, later: Partial<Record<keyof T, unknown>> = {}) {
@@ -1241,7 +1360,7 @@ describe("the artwork and the options are each read once, so an object that chan
     ["artworkImage", (artwork: tArtworkSource, options: object) => artworkImage(artwork, 300, options)],
   ])("%s reads each property of the artwork and of the options exactly once", (_name, call) => {
     const artwork = counted<tArtworkSource>({ url: TEMPLATE, width: 3000, height: 3000 });
-    const options = counted({ height: 300, format: "jpg", crop: "bb", densities: [1, 2] });
+    const options = counted({ height: 300, format: "jpg", crop: "bb", densities: [1, 2], hosts: ["mzstatic.com"] });
     call(artwork.object, options.object);
     expect(artwork.reads).toEqual({ url: 1, width: 1, height: 1 });
     for (const count of Object.values(options.reads)) expect(count).toBe(1);
