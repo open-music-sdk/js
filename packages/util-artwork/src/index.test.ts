@@ -5,13 +5,15 @@ import * as api from "./index.js";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
-    expect(Object.keys(api).sort()).toEqual(["artworkSrcSet", "artworkUrl"]);
+    expect(Object.keys(api).sort()).toEqual(["artworkImage", "artworkSrcSet", "artworkUrl"]);
   });
 
   test("from an artwork object as the API gives it to an image, using nothing but the entry", () => {
-    const artwork: tArtwork = { url: "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/cover.jpg/{w}x{h}bb.jpg", width: 3000, height: 3000, bgColor: "1a1a1a" };
-    expect(api.artworkUrl(artwork, 300)).toBe("https://is1-ssl.mzstatic.com/image/thumb/Music/v4/cover.jpg/300x300bb.jpg");
-    expect(api.artworkSrcSet(artwork, 300)).toContain("/600x600bb.jpg 2x");
+    const at = (size: string) => `https://is1-ssl.mzstatic.com/image/thumb/Music/v4/cover.jpg/${size}bb.jpg`;
+    const artwork: tArtwork = { url: at("{w}x{h}"), width: 3000, height: 3000, bgColor: "1a1a1a" };
+    expect(api.artworkUrl(artwork, 300)).toBe(at("300x300"));
+    expect(api.artworkSrcSet(artwork, 300)).toBe(`${at("300x300")} 1x, ${at("600x600")} 2x, ${at("900x900")} 3x`);
+    expect(api.artworkImage(artwork, 300)).toEqual({ src: api.artworkUrl(artwork, 300), srcset: api.artworkSrcSet(artwork, 300), width: 300, height: 300 });
   });
 });
 

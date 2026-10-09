@@ -31,8 +31,20 @@ export interface tArtworkOptions {
 }
 
 export interface tArtworkSrcSetOptions extends tArtworkOptions {
-  /** The pixel densities to offer. Default 1, 2 and 3. */
+  /** The pixel densities to offer, 16 at most. Default 1, 2 and 3. */
   readonly densities?: readonly number[] | undefined;
+}
+
+/** What an `<img>` is given to show an artwork. The names are the element's own, so the object can be assigned to one. */
+export interface tArtworkImage {
+  /** The image at a density of one: what `artworkUrl` gives. */
+  readonly src: string;
+  /** What `artworkSrcSet` gives. */
+  readonly srcset: string;
+  /** How wide the image is shown, in whole CSS pixels. */
+  readonly width: number;
+  /** How tall the image is shown, in whole CSS pixels. */
+  readonly height: number;
 }
 
 /**
@@ -232,7 +244,35 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
  * the largest it has is offered once, under the density that image amounts to.
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
+  return srcset(read(artwork, width, options), options);
+}
+
+/**
+ * Everything an `<img>` needs to show an artwork `width` CSS pixels wide: its `src`, its `srcset`, and the
+ * `width` and `height` to lay it out by, worked out together from one reading of the artwork.
+ *
+ * Use this where you would otherwise call `artworkUrl` and `artworkSrcSet` side by side. A browser takes `src`
+ * for the 1x image wherever the `srcset` does not offer one, and sizes an image with no `width` and `height`
+ * by the density of whichever candidate it took, so the four have to agree, and here they cannot fail to.
+ * `width` and `height` are the size the image itself is shown at: with a `height` and a crop that fits the
+ * artwork inside the box, that is the artwork standing in your box, not the box.
+ */
+export function artworkImage(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): tArtworkImage {
   const request = read(artwork, width, options);
+  return { src: image(request, 1).url, srcset: srcset(request, options), ...shown(request) };
+}
+
+/** The size the image is shown at, in whole CSS pixels: the box wanted, or the artwork standing inside it. */
+function shown({ max, width, height, inside }: tRequest): { width: number; height: number } {
+  const whole = (pixels: number) => Math.max(1, Math.round(pixels));
+  const shapeKnown = max.width !== undefined && max.height !== undefined;
+  const boxHeight = height ?? (shapeKnown ? (width * max.height) / max.width : width);
+  if (!inside || !shapeKnown) return { width: whole(width), height: whole(boxHeight) };
+  const share = Math.min(width / max.width, boxHeight / max.height);
+  return { width: whole(max.width * share), height: whole(max.height * share) };
+}
+
+function srcset(request: tRequest, options: tArtworkSrcSetOptions): string {
   const { densities = [1, 2, 3] } = options as { readonly densities?: unknown };
   // The length is read once too: a list that grows as it is read cannot keep this going.
   const count = Array.isArray(densities) ? densities.length : 0;

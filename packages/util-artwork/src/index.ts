@@ -1,2 +1,2 @@
-export { artworkSrcSet, artworkUrl } from "./artwork.js";
-export type { tArtworkFormat, tArtworkOptions, tArtworkSource, tArtworkSrcSetOptions } from "./artwork.js";
+export { artworkImage, artworkSrcSet, artworkUrl } from "./artwork.js";
+export type { tArtworkFormat, tArtworkImage, tArtworkOptions, tArtworkSource, tArtworkSrcSetOptions } from "./artwork.js";

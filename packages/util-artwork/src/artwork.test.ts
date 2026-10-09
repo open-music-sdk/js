@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test } from "vitest";
-import { artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource } from "./artwork.js";
+import { artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork.js";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */
@@ -1052,6 +1052,112 @@ describe("artworkSrcSet: where the artwork does not come large enough for a dens
   });
 });
 
+describe("artworkImage: everything an <img> needs, worked out together", () => {
+  const STILL: tArtworkSource = { url: TEMPLATE, width: 3701, height: 1912 };
+
+  test("gives the src, the srcset, and the width and height to lay the image out by", () => {
+    expect(artworkImage(cover(), 300)).toEqual({
+      src: TEMPLATE.replace("{w}x{h}", "300x300"),
+      srcset: squares("300 1x", "600 2x", "900 3x"),
+      width: 300,
+      height: 300,
+    });
+  });
+
+  const calls: [string, tArtworkSource, number, tArtworkSrcSetOptions][] = [
+    ["a cover", cover(), 300, {}],
+    ["a cover, at a width that is not a whole number", cover(), 50.4, {}],
+    ["a cover smaller than it is shown", cover(200), 300, {}],
+    ["a cover with other densities", cover(), 300, { densities: [2, 3] }],
+    ["a cover in another format and crop", cover(), 300, { format: "webp", crop: "cc" }],
+    ["a cover in a wide slot", cover(1500), 1200, { height: 300 }],
+    ["a wide still", STILL, 320, {}],
+    ["a wide still in a square slot", STILL, 300, { height: 300 }],
+    ["artwork with no size", { url: TEMPLATE }, 300, {}],
+    ["artwork with no size, larger than the server gives", { url: TEMPLATE }, 4000, {}],
+    ["a URL with no size in it", { url: "https://example.com/fixed.jpg" }, 300, { densities: [2, 3] }],
+    ["a URL a srcset could not carry as given", { url: " https://example.com/a b/{w}x{h}.jpg?ids=1,2," }, 300, {}],
+  ];
+
+  test.each(calls)("for %s, src is what artworkUrl gives and srcset what artworkSrcSet gives, for the same call", (_name, artwork, width, options) => {
+    const image = artworkImage(artwork, width, options);
+    expect(image.src).toBe(artworkUrl(artwork, width, options));
+    expect(image.srcset).toBe(artworkSrcSet(artwork, width, options));
+  });
+
+  test.each(calls)("for %s, a screen of each density on offer is given the image labelled for it, and a plain screen the src where no 1x is on offer", (_name, artwork, width, options) => {
+    const { src, srcset } = artworkImage(artwork, width, options);
+    const candidates = parseSrcset(srcset);
+    for (const { url, descriptors } of candidates) expect(fetched(srcset, Number.parseFloat(descriptors[0] ?? "1"), src)).toBe(url);
+    if (!candidates.some((c) => (c.descriptors[0] ?? "1x") === "1x")) expect(fetched(srcset, 1, src)).toBe(src);
+    for (const dpr of [0.5, 1, 1.25, 1.5, 2, 2.625, 3, 4]) expect([src, ...candidates.map((c) => c.url)]).toContain(fetched(srcset, dpr, src));
+  });
+
+  test.each(calls)("for %s, width and height are whole numbers of pixels, at least one", (_name, artwork, width, options) => {
+    const image = artworkImage(artwork, width, options);
+    for (const side of [image.width, image.height]) {
+      expect(Number.isInteger(side)).toBe(true);
+      expect(side).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test.each<[string, tArtworkSource, number, tArtworkSrcSetOptions, [number, number]]>([
+    ["a cover is laid out square", cover(), 300, {}, [300, 300]],
+    ["a width that is not a whole number is rounded", cover(), 50.4, {}, [50, 50]],
+    ["a width below a pixel is one", cover(), 0.2, {}, [1, 1]],
+    ["a wide still takes its own shape", STILL, 320, {}, [320, 165]],
+    ["16:9 artwork takes its own shape", { url: TEMPLATE, width: 1920, height: 1080 }, 320, {}, [320, 180]],
+    ["artwork with no size is laid out square", { url: TEMPLATE }, 300, {}, [300, 300]],
+    ["artwork with one side known is laid out square", { url: TEMPLATE, width: 1920 }, 300, {}, [300, 300]],
+    ["a cover smaller than it is shown is still laid out at the size asked for", cover(200), 300, {}, [300, 300]],
+    ["artwork too small for the box is laid out at the size asked for, past what the server gives", { url: TEMPLATE }, 20_000, {}, [20_000, 20_000]],
+    ["a crop that fills the box is laid out as the box", cover(), 300, { height: 150, crop: "cc" }, [300, 150]],
+    ["a URL that does not say how it is cut is laid out as the box", { url: "https://example.com/fixed.jpg", width: 600, height: 600 }, 300, { height: 150 }, [300, 150]],
+    ["a cover fitted inside a wide slot is laid out as the cover standing in it", cover(1500), 1200, { height: 300 }, [300, 300]],
+    ["a cover fitted inside a tall slot likewise", cover(1500), 300, { height: 1200 }, [300, 300]],
+    ["a wide still fitted inside a square slot is laid out as the still", STILL, 300, { height: 300 }, [300, 155]],
+    ["a box of the artwork's own shape is laid out as the box", STILL, 3701, { height: 1912 }, [3701, 1912]],
+    ["artwork with no shape, fitted inside a slot, is laid out as the slot: there is nothing else to go by", { url: TEMPLATE }, 300, { height: 150 }, [300, 150]],
+  ])("%s", (_name, artwork, width, options, [expectedWidth, expectedHeight]) => {
+    expect(artworkImage(artwork, width, options)).toMatchObject({ width: expectedWidth, height: expectedHeight });
+  });
+
+  // 300x300bb for this still comes back from Apple's server 300 by 155.
+  test("the size it is laid out at is the shape of what the server sends back, so the image is never stretched", () => {
+    const { width, height, src } = artworkImage(STILL, 300, { height: 300 });
+    expect(size(src)).toBe("300x300");
+    expect(width / height).toBeCloseTo(3701 / 1912, 1);
+  });
+
+  test("it can be assigned to an element as it is: its names are the element's own, and there are no others", () => {
+    expect(Object.keys(artworkImage(cover(), 300)).sort()).toEqual(["height", "src", "srcset", "width"]);
+    const img = { src: "", srcset: "", width: 0, height: 0, alt: "kept" };
+    expect(Object.assign(img, artworkImage(cover(), 300))).toMatchObject({ alt: "kept", width: 300, src: TEMPLATE.replace("{w}x{h}", "300x300") });
+  });
+
+  test("a cover smaller than it is shown: the one image there is, laid out at the size asked for, whichever of src and srcset a browser goes by", () => {
+    const { src, srcset, width, height } = artworkImage(cover(200), 300);
+    expect(srcset).toBe(squares("200 0.667x"));
+    expect(size(src)).toBe("200x200");
+    for (const dpr of [1, 2, 3]) expect(fetched(srcset, dpr, src)).toBe(src);
+    expect([width, height]).toEqual([300, 300]);
+  });
+
+  test.each<[string, unknown, number, unknown, RegExp]>([
+    ["no artwork", undefined, 300, {}, /^artwork: expected an artwork object with a url/],
+    ["a width of zero", cover(), 0, {}, /^artwork: width must be/],
+    ["a bad height", cover(), 300, { height: -1 }, /^artwork: height must be/],
+    ["a bad format", cover(), 300, { format: "avif" }, /^artwork: format must be/],
+    ["a bad crop", cover(), 300, { crop: "a/b" }, /^artwork: crop must be/],
+    ["a bad density", cover(), 300, { densities: [1, 0] }, /^artwork: densities\[1\] must be/],
+    ["no densities", cover(), 300, { densities: [] }, /^artwork: densities must be/],
+    ["options that are no object", cover(), 300, null, /^artwork: options must be an object/],
+  ])("it refuses what the other two refuse: %s", (_name, artwork, width, options, message) => {
+    expect(() => artworkImage(artwork as tArtworkSource, width, options as tArtworkSrcSetOptions)).toThrow(message);
+    expect(() => artworkImage(artwork as tArtworkSource, width, options as tArtworkSrcSetOptions)).toThrow(TypeError);
+  });
+});
+
 describe("one URL, whatever it holds: what artworkUrl gives is what the srcset carries and what a browser requests", () => {
   const hostile: [string, string][] = [
     ["a space", "https://example.com/a b/{w}x{h}.jpg"],
@@ -1132,6 +1238,7 @@ describe("the artwork and the options are each read once, so an object that chan
   test.each([
     ["artworkUrl", (artwork: tArtworkSource, options: object) => artworkUrl(artwork, 300, options)],
     ["artworkSrcSet", (artwork: tArtworkSource, options: object) => artworkSrcSet(artwork, 300, options)],
+    ["artworkImage", (artwork: tArtworkSource, options: object) => artworkImage(artwork, 300, options)],
   ])("%s reads each property of the artwork and of the options exactly once", (_name, call) => {
     const artwork = counted<tArtworkSource>({ url: TEMPLATE, width: 3000, height: 3000 });
     const options = counted({ height: 300, format: "jpg", crop: "bb", densities: [1, 2] });

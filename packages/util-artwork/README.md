@@ -2,8 +2,8 @@
 
 Artwork in the Apple Music API is not an image URL but a template for one:
 `https://…/{w}x{h}bb.jpg`, with the pixel size left for you to fill in. This package fills it in, and
-builds the `srcset` that gives a dense screen a sharper image. Two functions, strings in and strings
-out, no dependencies.
+builds the `srcset` that gives a dense screen a sharper image. Strings and numbers in, strings and
+numbers out, no dependencies.
 
 You probably want one of the integrations instead (`browser`, `react`, `next`) once they exist. Use
 this package directly to assemble your own client or to build one of those.
@@ -13,23 +13,39 @@ pnpm add @open-music-sdk/util-artwork
 ```
 
 ```ts
-import { artworkSrcSet, artworkUrl } from "@open-music-sdk/util-artwork";
+// In a browser, or anywhere that writes HTML: nothing here touches the DOM or the network.
+import { artworkImage } from "@open-music-sdk/util-artwork";
 
-const { artwork } = song.attributes; // { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000, … }
+const artwork = song.attributes?.artwork; // { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000, … }
 
-img.src = artworkUrl(artwork, 300); // https://…/300x300bb.jpg
-img.srcset = artworkSrcSet(artwork, 300); // https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x, https://…/900x900bb.jpg 3x
-img.width = img.height = 300;
+if (artwork) Object.assign(img, artworkImage(artwork, 300));
+// img.src     https://…/300x300bb.jpg
+// img.srcset  https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x, https://…/900x900bb.jpg 3x
+// img.width   300
+// img.height  300
 ```
 
-Some resources have no artwork. Check before you call: `artwork && artworkUrl(artwork, 300)`.
+```tsx
+// In React, where the attribute is spelled srcSet.
+const { srcset, ...image } = artworkImage(artwork, 300);
+return <img {...image} srcSet={srcset} alt={song.attributes?.name} />;
+```
+
+Some resources have no artwork, and a resource may come without its attributes. Check before you
+call, as above.
 
 ## What is in it
 
 | Export | Does |
 | --- | --- |
-| `artworkUrl(artwork, width, options?)` | The URL of the image `width` CSS pixels wide |
-| `artworkSrcSet(artwork, width, options?)` | A `srcset` for an image shown `width` CSS pixels wide: one candidate per pixel density |
+| `artworkImage(artwork, width, options?)` | Everything an `<img>` needs: `{ src, srcset, width, height }`, worked out together |
+| `artworkUrl(artwork, width, options?)` | The URL of the image `width` CSS pixels wide: the `src` alone |
+| `artworkSrcSet(artwork, width, options?)` | A `srcset` for an image shown `width` CSS pixels wide, one candidate per pixel density: the `srcset` alone |
+
+Reach for `artworkImage` unless you need only one of the parts. The four belong together: a browser
+takes `src` for the 1x image wherever the `srcset` does not offer one, and sizes an image that has
+no `width` and `height` by the density of whichever candidate it took. Worked out separately they
+can disagree; from one call they cannot.
 
 `artwork` is the object the API gives: anything with a `url`, and a `width` and `height` if it has
 them. Every `tArtwork` from `@open-music-sdk/types` fits. A template that has been through a URL
@@ -40,7 +56,7 @@ parser on its way to you, and has `%7Bw%7D` for `{w}`, is the same template and 
 | `height` | Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`. |
 | `format` | The file format: `"jpg"`, `"jpeg"`, `"png"`, `"webp"`, `"heic"` or `"heif"`. Default: the one the template names. |
 | `crop` | Apple's code for how the image is cut to the box. Default: the one the template names, usually `"bb"`, the whole image fitted inside the box. |
-| `densities` | For `artworkSrcSet`: the pixel densities to offer, 16 at most. Default `[1, 2, 3]`. |
+| `densities` | For `artworkImage` and `artworkSrcSet`: the pixel densities to offer, 16 at most. Default `[1, 2, 3]`. |
 
 A `width`, `height` or density that is not a number above zero, and no more than
 `Number.MAX_SAFE_INTEGER`, is a `TypeError`, as is a `format`
@@ -90,8 +106,22 @@ mistakes its size.
 A URL with no size to fill in, such as a fixed URL for a playlist's own artwork, is one image of a
 size nobody here knows. It is offered alone, with no density on it, since any would be a guess.
 
-Give the `<img>` its `width` and `height` as well. The `srcset` says which file to fetch; the
-attributes say how much room to keep for it.
+If you use `artworkSrcSet` on its own, give the `<img>` its `width` and `height` as well, and know
+what a browser does with `src`: where the `srcset` has no 1x candidate, `src` is taken as one. A
+200 pixel cover shown at 300 has a `srcset` of `…/200x200bb.jpg 0.667x` and the same URL as its
+`src`, so with both set the browser reads that image as 1x, and without `width` and `height` lays it
+out 200 pixels wide, not 300. `artworkImage` gives all four for that reason.
+
+## Layout
+
+`artworkImage` gives `width` and `height` in whole CSS pixels: the size the image itself is shown at,
+whatever resolution was fetched for it.
+
+- With no `height` option, that is `width` and the height the artwork's shape gives it.
+- With a `height` and a crop that fills the box, it is the box.
+- With a `height` and `bb`, which stands the whole image inside the box, it is the image standing
+  there: a square cover in a 1200 by 300 slot is laid out 300 by 300. Setting the box's own size on
+  the `<img>` would stretch it.
 
 ## One URL
 
