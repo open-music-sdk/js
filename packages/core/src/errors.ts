@@ -7,7 +7,9 @@ import type { tError } from "@open-music-sdk/types";
  * that could not obtain a token at all, so its `status` is its own source's, never Apple's.
  *
  * A token that cannot be used is `Invalid`, whichever token it is: `DeveloperTokenInvalid` when Apple answers
- * 401, `UserTokenInvalid` when Apple answers 403 or there is no user token to send.
+ * 401, `UserTokenInvalid` when Apple answers 403 or there is no user token to send. Validating a user token
+ * also raises `UserTokenInvalid`, with status 401, when Apple answers 401 for the listener while it accepts
+ * the developer token on its own.
  */
 export type tErrorTag = "DeveloperTokenInvalid" | "DeveloperTokenUnavailable" | "UserTokenInvalid" | "RateLimited" | "ApiError" | "ValidationError" | "NetworkError";
 

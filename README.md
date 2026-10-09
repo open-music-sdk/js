@@ -4,9 +4,9 @@
 
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
 
-> **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core and
-> developer token packages exist and pass their tests, but none has been run against the live API, and there
-> is no Music User Token handling and no integration to install.
+> **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core, developer
+> token and user token packages exist and pass their tests, but none has been run against the live API, and
+> there is no integration to install.
 > The table below is the source of truth for what works; expect everything else to be missing or to change.
 
 ## Project status
@@ -23,7 +23,7 @@ libs, and the integrations people actually install. Every package ships the same
 | `@open-music-sdk/validate` | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
 | `@open-music-sdk/core` | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · untested against the live API |
 | `@open-music-sdk/developer-token` | 🚧 In progress | 80% | JWT minting · minter and fetcher providers · untested against the live API |
-| `@open-music-sdk/user-token` | 🚧 In progress | 0% | Music User Token intake · validation · pluggable stores |
+| `@open-music-sdk/user-token` | 🚧 In progress | 80% | Intake handler · validation · memory and KV stores · untested against the live API |
 | `@open-music-sdk/util-artwork` | ⬜ Not started | 0% | Artwork URL templates · srcset helpers · browser only |
 | `@open-music-sdk/client-catalog` | ⬜ Not started | 0% | Catalog, storefront, search, and chart endpoints · developer token only |
 | `@open-music-sdk/client-user` | ⬜ Not started | 0% | Library, ratings, recommendations, history, and replay endpoints · both tokens |
@@ -47,7 +47,7 @@ tsconfig.base.json    strict TypeScript base every package extends
 eslint.config.ts      root ESLint config (tooling/eslint-config)
 tooling/              private shared configs: eslint, tsdown, vitest
 codegen/              docc-crawl → docc-ir/ir.json → emit (see codegen/README.md)
-packages/             foundation packages: types, validate, core, developer-token
+packages/             foundation packages: types, validate, core, developer-token, user-token
 ```
 
 Planned workspaces: `clients/` (one per token boundary), `lib/` (conveniences),
