@@ -3,6 +3,7 @@
 // relationship, and a resource's view. A function is named for the generated type it is about: `getSong` and `tSong`.
 import {
   endpoint,
+  inStorefront,
   optionsOf,
   relationshipGetter,
   resourceGetter,
@@ -14,6 +15,8 @@ import {
   type tEndpointOptions,
   type tRelated,
   type tRequestPlan,
+  type tStorefrontOption,
+  type tViewsOption,
   type tWalkOptions,
   walkOf,
 } from "@open-music-sdk/core";
@@ -48,13 +51,7 @@ import type {
   tStationsResponse,
   tStorefrontsResponse,
 } from "@open-music-sdk/types";
-import { NO_LISTENER, catalogOf, inStorefront, storefronts, type tStorefrontOption } from "./storefront";
-
-/** The option of a function for a resource that has views: which of them to send with the resource. */
-export interface tViewsOption<Views> {
-  /** The views to send with the resource, by name, such as `["top-songs"]`. Default: none. */
-  readonly views?: readonly (keyof Views & string)[] | undefined;
-}
+import { NO_LISTENER, catalogOf, storefronts } from "./storefront";
 
 /** The option of a function that looks for equivalents: what to leave out of them. */
 export interface tRestrictOption {

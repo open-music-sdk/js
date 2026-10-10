@@ -45,6 +45,9 @@ try {
 | `has(value, methods)`, `optionsOf(fn, options, what)`, `clientOf(fn, client, methods)` | The checks a package makes on what it is handed: an object with those methods, an options bag, a client. A mistake is a `TypeError` naming `fn` |
 | `segmentOf(fn, name, value)` | A caller's value as one segment of a path, percent-encoded, or a `TypeError` |
 | `listOf(fn, name, value)` | A caller's list of ids, types or codes as the call's own copy, or a `TypeError` |
+| `textOf(fn, name, value)` | A caller's text that is no name, such as a search term, or a `TypeError` |
+| `isName(value)`, `isPlain(value)`, `itemsOf(value, least, most)`, `ownOf(object)` | What the checks are made of, for a package that has one of its own to make: a string of 1 to 64 characters; a plain object; a caller's list as the call's own copy; what an object holds itself |
+| `inStorefront(fn, client, storefront, finish)`, `tStorefrontOption`, `tViewsOption` | The storefront a call is for, as one segment of a path, and the options both clients share |
 | `typedIdsOf(fn, name, value)` | A caller's ids by type, such as `{ songs: ["1"] }`, as the parameters they are sent as, or a `TypeError` |
 | `initOf(fn, options, set?, also?)`, `tReadOptions` | The options every function for an endpoint takes, turned into what `request` takes |
 | `walkOf(fn, options, set?, also?)`, `tWalkOptions` | The same for a function that walks pages, with the most pages its walk may ask for |
@@ -301,6 +304,8 @@ from nothing: a name looked up in it is one of its functions or is not there, `c
 | --- | --- |
 | `segmentOf(fn, name, value)` | A string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not `.` or `..`. It comes back percent-encoded, so a question mark, a hash or a space stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
+| `textOf(fn, name, value)` | A string of 1 to 256 characters, whatever they are: it is sent as one parameter. |
+| `inStorefront(fn, client, storefront, finish)` | A storefront as `segmentOf` takes a segment, or `undefined` for the client's. Named by the call, what `finish` makes of it is there at once. Otherwise it gives a function for that, to be called when a request is about to be made, which is when the client is asked. |
 | `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 names, each the name of a type of resource: lowercase words with hyphens between, such as `library-songs`, in at most 64 characters. Under each is a list as `listOf` takes one, and the lists hold at most 300 ids between them, since together they are one URL. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out, and one at least has to be left in. Which types there are is Apple's to say. |
 | `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |

@@ -1,6 +1,6 @@
 // The options a function for an endpoint takes, and how they become what `request` takes. Written once, so that
 // the same option means the same thing whichever function it is handed to.
-import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, copyOf, gotFor, isItem, isPlain, lengthOf, listed, optionsOf } from "./check";
+import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, copyOf, gotFor, isItem, isName, isPlain, lengthOf, listed, optionsOf } from "./check";
 import type { tParams, tRequestInit, tSchemaLike } from "./client";
 import { got } from "./got";
 
@@ -45,7 +45,6 @@ const MAX_PARAMS = 100;
 
 type tValue = NonNullable<tParams[string]>;
 
-const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
 const isCursor = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_LENGTH;
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 

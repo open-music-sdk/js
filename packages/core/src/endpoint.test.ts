@@ -16,6 +16,7 @@ import { createClient, type tAppleMusicClient, type tClientOptions, type tSchema
 import {
   endpoint,
   endpointNamespace,
+  inStorefront,
   relationshipGetter,
   resourceGetter,
   resourceLister,
@@ -1141,6 +1142,52 @@ describe("the resource patterns: where the collection is", () => {
     });
     expect(await rejection(fn(music, "1"))).toBe(mistake);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("inStorefront: the storefront a call is for, as one segment of a path", () => {
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
+  const path = (storefront: string) => `v1/catalog/${storefront}/songs`;
+
+  test("named by the call, it is there at once, and the client is not asked", () => {
+    const { music } = apple([], { storefront: "us" });
+    const storefront = vi.spyOn(music, "storefront");
+    expect(inStorefront("getSong", music, "gb", path)).toBe("v1/catalog/gb/songs");
+    expect(storefront).not.toHaveBeenCalled();
+  });
+
+  test("not named, it is left for later: the client is asked when what it gives is called, and not before", async () => {
+    const { music } = apple([], { storefront: "us" });
+    const storefront = vi.spyOn(music, "storefront");
+    const later = inStorefront("getSong", music, undefined, path);
+    expect(later).toBeTypeOf("function");
+    expect(storefront).not.toHaveBeenCalled();
+    expect(await (later as () => Promise<string>)()).toBe("v1/catalog/us/songs");
+    expect(storefront).toHaveBeenCalledTimes(1);
+  });
+
+  test("it is encoded as a segment is, so one that is only odd stays where it was put", () => {
+    expect(inStorefront("getSong", apple().music, "u s?x", path)).toBe("v1/catalog/u%20s%3Fx/songs");
+  });
+
+  test.each<[string, unknown, string]>([
+    ["empty", "", "0 characters"],
+    ["two dots", "..", "2 characters"],
+    ["one that would leave the catalog", "../me/library", "13 characters"],
+    ["a number", 5, "5"],
+    ["null", null, "null"],
+  ])("a storefront the call names that is %s is a TypeError naming the function and the option, thrown there and then", (_name, storefront, what) => {
+    expect(() => inStorefront("getSong", apple().music, storefront, path)).toThrow(new TypeError(`getSong: storefront ${SEGMENT}${what}`));
+  });
+
+  test("the client's own storefront is held to the same, when it comes", async () => {
+    const later = inStorefront("getSong", apple([], { storefront: "../me/library" }).music, undefined, path) as () => Promise<string>;
+    expect(await rejection(later())).toEqual(new TypeError(`getSong: storefront ${SEGMENT}13 characters`));
+  });
+
+  test("a client that answers with its storefront itself, and not a promise of it, is asked the same", async () => {
+    const wrapped = { storefront: () => "gb" } as unknown as tAppleMusicClient;
+    expect(await (inStorefront("getSong", wrapped, undefined, path) as () => Promise<string>)()).toBe("v1/catalog/gb/songs");
   });
 });
 

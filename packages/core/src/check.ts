@@ -58,6 +58,18 @@ export const MAX_NAME = 64;
 /** The longest a piece of text that is no name may be, such as a cursor Apple gave. */
 export const MAX_LENGTH = 256;
 
+/** Whether `value` is a name: a string of 1 to 64 characters, which is what an id, a type or a code may be wherever it is sent. */
+export const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
+
+/**
+ * `value` as a piece of text that is no name, such as what someone typed into a search box: a string of 1 to 256
+ * characters. It is sent in the URL, so how long it may be is not left open.
+ */
+export function textOf(fn: string, name: string, value: unknown): string {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_LENGTH) return value;
+  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters; got ${got(value)}`);
+}
+
 /**
  * What a segment may not hold: a slash, a backslash, a percent sign, or a control character. No id, name or code
  * of Apple's holds one. Encoded, each would stay inside the segment as far as a URL goes, and that is as far as
@@ -105,6 +117,16 @@ export function lengthOf(value: unknown): number | undefined {
  * list can be given to hand over more than its length said.
  */
 export const copyOf = (list: unknown, length: number): unknown[] => Array.from({ length }, (_, index) => (list as readonly unknown[])[index]);
+
+/**
+ * A caller's list as this call's own copy of its items, whatever they are: asked its length once and read by index,
+ * as `listOf` reads a list of strings. `undefined` when it is no list, or holds fewer than `least` items or more
+ * than `most`, and a list too long is not read at all. What each item has to be is the caller's to check.
+ */
+export function itemsOf(value: unknown, least: number, most: number): unknown[] | undefined {
+  const length = lengthOf(value);
+  return length !== undefined && length >= least && length <= most ? copyOf(value, length) : undefined;
+}
 
 /**
  * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken

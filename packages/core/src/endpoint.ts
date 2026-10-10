@@ -278,6 +278,33 @@ function given<C>(builder: string, collection: unknown, also: unknown): readonly
   return [collection as tCollection<C>, Object.fromEntries(kinds) as tAlsoKinds, user];
 }
 
+/** The option of a function that asks one storefront's catalog: whose catalog. */
+export interface tStorefrontOption {
+  /**
+   * The storefront whose catalog is asked, by its id, such as `"gb"`. Default: the client's, which is the one it
+   * was created with, or else the listener's, which the client looks up once.
+   */
+  readonly storefront?: string | undefined;
+}
+
+/** The option of a function for a resource that has views: which of them to send with the resource. */
+export interface tViewsOption<Views> {
+  /** The views to send with the resource, by name, such as `["top-songs"]`. Default: none. */
+  readonly views?: readonly (keyof Views & string)[] | undefined;
+}
+
+/**
+ * What `finish` makes of the storefront a call is for. When the call named it, that is there and then. When it did
+ * not, the client has to say which it is, and may have to ask Apple for the listener's: that is left for when the
+ * request is about to be made, so a walk nobody loops over asks for nothing. Either way the storefront is handed
+ * over as one segment of a path, checked and encoded, so one from outside cannot move the request to another path.
+ */
+export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | tLater<T> {
+  const checked = (id: unknown) => finish(segmentOf(fn, "storefront", id));
+  // Waited for whatever the client gives: a client is known by its methods, and a wrapped one may answer with the storefront itself where createClient's answers with a promise of it.
+  return storefront === undefined ? async () => checked(await client.storefront()) : checked(storefront);
+}
+
 /** What a request is made with, with the collection's say on the Music User Token where it has one. */
 const pinned = <I extends object>(init: I, user: boolean | undefined): I => (user === undefined ? init : { ...init, user });
 

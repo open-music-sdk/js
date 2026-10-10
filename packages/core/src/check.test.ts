@@ -1,6 +1,6 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, listOf, optionsOf, segmentOf, typedIdsOf } from "./check";
+import { clientOf, has, isName, itemsOf, listOf, optionsOf, segmentOf, textOf, typedIdsOf } from "./check";
 import { createClient } from "./client";
 
 const SECRET = "s3cretT0ken";
@@ -470,6 +470,99 @@ describe("listOf", () => {
     const asked = vi.fn(() => SECRET);
     thrown(() => listOf("fn", "ids", [{ toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }]));
     expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("isName", () => {
+  test.each(["1", "songs", "i.eoDlqXxsaz8Nb", "library-playlist-folders", "n".repeat(64), "a b", "a/b"])("%j is a name: a string of 1 to 64 characters, whatever they are", (value) => {
+    expect(isName(value)).toBe(true);
+  });
+
+  test.each<[string, unknown]>([
+    ["an empty string", ""],
+    ["one character too long", "n".repeat(65)],
+    ["a number", 1],
+    ["null", null],
+    ["undefined", undefined],
+    ["a list of one name", ["songs"]],
+    ["a String object", new String("songs")],
+  ])("%s is not", (_name, value) => {
+    expect(isName(value)).toBe(false);
+  });
+});
+
+describe("textOf", () => {
+  test.each(["x", "james brown", "a&types=albums #1 ?x=y/../\u00e9", "t".repeat(256)])("%j is text, and comes back as it is", (value) => {
+    expect(textOf("searchCatalog", "term", value)).toBe(value);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["empty", "", "0 characters"],
+    ["one character too long", "t".repeat(257), "257 characters"],
+    ["a number", 5, "5"],
+    ["a list", ["james"], "object"],
+    ["missing", undefined, "undefined"],
+    ["null", null, "null"],
+  ])("text that is %s is a TypeError naming the function and the argument", (_name, value, what) => {
+    expect(thrown(() => textOf("searchCatalog", "term", value))).toEqual(new TypeError(`searchCatalog: term must be a string of 1 to 256 characters; got ${what}`));
+  });
+
+  test("a mistake does not show the text: a token put where it belongs is described by its length", () => {
+    const token = `${SECRET}.${"p".repeat(300)}`;
+    const error = thrown(() => textOf("searchCatalog", "term", token));
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  });
+});
+
+describe("itemsOf", () => {
+  test("a list comes back as this call's own copy of its items, whatever they are", () => {
+    const track = { id: "1", type: "songs" };
+    const mine = [track, "2", 3, null];
+    const items = itemsOf(mine, 1, 300);
+    mine.push("later");
+    expect(items).toEqual([track, "2", 3, null]);
+    expect(items?.[0]).toBe(track);
+  });
+
+  test.each<[string, unknown]>([
+    ["one item, not a list", { id: "1" }],
+    ["a string", "12"],
+    ["undefined", undefined],
+    ["null", null],
+    ["an object that says it has a length", { length: 1, 0: "1" }],
+  ])("%s is no list", (_name, value) => {
+    expect(itemsOf(value, 0, 300)).toBeUndefined();
+  });
+
+  test("a list is held to the fewest and the most it may hold, each of which it may hold exactly", () => {
+    const list = (length: number) => Array.from({ length }, (_, i) => i);
+    expect([itemsOf(list(0), 0, 3), itemsOf(list(3), 1, 3)]).toEqual([[], [0, 1, 2]]);
+    expect([itemsOf(list(0), 1, 3), itemsOf(list(4), 1, 3)]).toEqual([undefined, undefined]);
+  });
+
+  test("a list is asked its length once and read by index as far as it said, not through its iterator", () => {
+    const asked = vi.fn();
+    const odd = new Proxy(["1", "2"], {
+      get: (target, key, receiver) => {
+        if (key === "length") asked();
+        if (key === Symbol.iterator) return () => ["9", "9", "9"][Symbol.iterator]();
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    expect(itemsOf(odd, 1, 300)).toEqual(["1", "2"]);
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  test("a list too long is not read: its length is all that is asked for", () => {
+    const read = vi.fn();
+    const long = new Proxy(Array.from({ length: 301 }, () => "1"), {
+      get: (target, key, receiver) => {
+        if (typeof key === "string" && /^\d+$/.test(key)) read(key);
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    expect(itemsOf(long, 1, 300)).toBeUndefined();
+    expect(read).not.toHaveBeenCalled();
   });
 });
 

@@ -4,16 +4,22 @@
 import {
   endpoint,
   got,
+  inStorefront,
   initOf,
+  isName,
+  itemsOf,
   listOf,
   optionsOf,
   resourceLister,
   resourcesFinder,
   segmentOf,
+  textOf,
   typedIdsOf,
   type tNone,
   type tReadOptions,
   type tRequestPlan,
+  type tStorefrontOption,
+  type tViewsOption,
 } from "@open-music-sdk/core";
 import type {
   tLibraryPlaylistFoldersResponse,
@@ -30,18 +36,8 @@ import type {
 } from "@open-music-sdk/types";
 
 const OPTIONS = "an options object";
-/** Longer than anything typed into a search box. What is searched for is sent in the URL, so it is not left open. */
-const MAX_TERM = 256;
 /** The most Apple documents taking in one request. Each track is a part of the body, so the list is not left open. */
 const MAX_TRACKS = 300;
-/** As long as an id or a type's name may be anywhere else: longer than any of Apple's, and shorter than a token. */
-const MAX_NAME = 64;
-
-/** The text to search for, as the caller gave it: a string with something in it. */
-function termOf(fn: string, term: unknown): string {
-  if (typeof term === "string" && term !== "" && term.length <= MAX_TERM) return term;
-  throw new TypeError(`${fn}: term must be a string of 1 to ${String(MAX_TERM)} characters; got ${got(term)}`);
-}
 
 /** A type of resource a search of the library can look for. */
 export type tLibrarySearchType = keyof tLibrarySearchResponseResults;
@@ -57,7 +53,7 @@ export interface tSearchLibraryOptions extends tReadOptions<tLibrarySearchRespon
  * and `offset` apply to every type asked for.
  */
 export const searchLibrary = /*#__PURE__*/ endpoint("searchLibrary", "answer", (_client, term: string, options: tSearchLibraryOptions): tRequestPlan<tLibrarySearchResponse> => {
-  const text = termOf("searchLibrary", term);
+  const text = textOf("searchLibrary", "term", term);
   const bag = optionsOf("searchLibrary", options, OPTIONS);
   return ["v1/me/library/search", initOf<tLibrarySearchResponse>("searchLibrary", bag, { term: text, types: listOf("searchLibrary", "types", bag.types) })];
 });
@@ -101,12 +97,10 @@ export const addToFavorites = /*#__PURE__*/ endpoint("addToFavorites", "answer",
 /** A track to add to a playlist: its id, and whether it is a song or a music video, of the catalog or of the library. */
 export type tPlaylistTrack = tLibraryPlaylistTracksRequestData;
 
-const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
-
 /** The tracks to add, as this call's own list of `{ id, type }` and nothing else of what each one held. */
 function tracksOf(fn: string, tracks: unknown): tPlaylistTrack[] {
   const length: unknown = Array.isArray(tracks) ? tracks.length : undefined;
-  const given = typeof length === "number" && length >= 1 && length <= MAX_TRACKS ? Array.from({ length }, (_, index) => (tracks as readonly unknown[])[index]) : [];
+  const given = itemsOf(tracks, 1, MAX_TRACKS) ?? [];
   const own = given.map((track) => {
     const { id, type } = (typeof track === "object" && track !== null ? track : {}) as { id?: unknown; type?: unknown };
     return isName(id) && isName(type) ? ({ id, type } as tPlaylistTrack) : undefined;
@@ -115,7 +109,7 @@ function tracksOf(fn: string, tracks: unknown): tPlaylistTrack[] {
   if (own.length > 0 && bad === -1) return own as tPlaylistTrack[];
   const what = typeof length !== "number" ? got(tracks) : bad === -1 ? `a list of ${String(length)}` : `${got(given[bad])} at index ${String(bad)}`;
   throw new TypeError(
-    `${fn}: tracks must be a list of 1 to ${String(MAX_TRACKS)} tracks, each an object with an id and a type that are strings of 1 to ${String(MAX_NAME)} characters, such as { id: "1", type: "songs" }; got ${what}`,
+    `${fn}: tracks must be a list of 1 to ${String(MAX_TRACKS)} tracks, each an object with an id and a type that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ${what}`,
   );
 }
 
@@ -175,20 +169,11 @@ export const listRecentlyPlayedTracks = /*#__PURE__*/ resourceLister<tPaginatedR
 /** The radio stations the listener played lately, newest first, a page at a time. */
 export const listRecentlyPlayedStations = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse>("listRecentlyPlayedStations", () => "v1/me/recent/radio-stations");
 
-/** The option of `getMusicSummariesByYear`: which views to send with each summary. */
-export interface tMusicSummaryViewsOption {
-  /** The views to send with each summary, by name, such as `["top-songs"]`. Default: none. */
-  readonly views?: readonly (keyof tMusicSummaryViews)[] | undefined;
-}
-
 /** The listener's replay: a summary of what they played in each of the years given. The one year Apple takes at present is `"latest"`. */
-export const getMusicSummariesByYear = /*#__PURE__*/ resourcesFinder<tMusicSummariesResponse, tNone, tMusicSummaryViewsOption>("getMusicSummariesByYear", "year", () => "v1/me/music-summaries", { views: "list" });
+export const getMusicSummariesByYear = /*#__PURE__*/ resourcesFinder<tMusicSummariesResponse, tNone, tViewsOption<tMusicSummaryViews>>("getMusicSummariesByYear", "year", () => "v1/me/music-summaries", { views: "list" });
 
-/** The options of `getPersonalStation`. */
-export interface tPersonalStationOptions extends tReadOptions<tStationsResponse> {
-  /** The storefront whose catalog the station is in, by its id, such as `"gb"`. Default: the client's, which is the one it was created with, or else the listener's. */
-  readonly storefront?: string | undefined;
-}
+/** The options of `getPersonalStation`: the station is in a storefront's catalog, so they say whose, as a catalog function's do. */
+export type tPersonalStationOptions = tReadOptions<tStationsResponse> & tStorefrontOption;
 
 /**
  * The listener's own station, which plays what Apple picks for them. It is kept in the catalog, and is the one
@@ -197,10 +182,8 @@ export interface tPersonalStationOptions extends tReadOptions<tStationsResponse>
 export const getPersonalStation = /*#__PURE__*/ endpoint("getPersonalStation", "resource", (client, options?: tPersonalStationOptions) => {
   const bag = optionsOf("getPersonalStation", options, OPTIONS);
   const init = { ...initOf<tStationsResponse>("getPersonalStation", bag, { "filter[identity]": "personal" }), user: true };
-  // One segment of a path, checked and encoded, so a storefront from outside cannot send the listener's token to another path.
-  const stations = (storefront: unknown): tRequestPlan<tStationsResponse> => [`v1/catalog/${segmentOf("getPersonalStation", "storefront", storefront)}/stations`, init];
-  // Which storefront is the client's may mean asking Apple, and is left for when the request is about to be made.
-  return bag.storefront === undefined ? async () => stations(await client.storefront()) : stations(bag.storefront);
+  // The storefront is one segment of the path, checked and encoded, so one from outside cannot send the listener's token anywhere but to the stations.
+  return inStorefront("getPersonalStation", client, bag.storefront, (storefront): tRequestPlan<tStationsResponse> => [`v1/catalog/${storefront}/stations`, init]);
 });
 
 /** The options of `getUserStorefront`. */

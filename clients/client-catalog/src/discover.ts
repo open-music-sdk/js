@@ -1,6 +1,6 @@
 // The functions for the catalog's endpoints that follow no pattern: search and its hints and suggestions, the
 // charts, resources of several types at once, the live radio stations, and the language a storefront answers in.
-import { endpoint, got, initOf, listOf, optionsOf, typedIdsOf, type tReadOptions, type tRequestPlan } from "@open-music-sdk/core";
+import { endpoint, inStorefront, initOf, listOf, optionsOf, textOf, typedIdsOf, type tReadOptions, type tRequestPlan, type tStorefrontOption } from "@open-music-sdk/core";
 import type {
   tChartResponse,
   tChartResponseResults,
@@ -12,17 +12,9 @@ import type {
   tSearchSuggestionsResponse,
   tStationsResponse,
 } from "@open-music-sdk/types";
-import { NO_LISTENER, inStorefront, type tStorefrontOption } from "./storefront";
+import { NO_LISTENER } from "./storefront";
 
 const OPTIONS = "an options object";
-/** Longer than anything typed into a search box. What is searched for is sent in the URL, so it is not left open. */
-const MAX_TERM = 256;
-
-/** The text to search for, as the caller gave it: a string with something in it. */
-function termOf(fn: string, term: unknown): string {
-  if (typeof term === "string" && term !== "" && term.length <= MAX_TERM) return term;
-  throw new TypeError(`${fn}: term must be a string of 1 to ${String(MAX_TERM)} characters; got ${got(term)}`);
-}
 
 /** A type of resource a search of the catalog can look for. */
 export type tCatalogSearchType = Exclude<keyof tSearchResponseResults, "top">;
@@ -40,7 +32,7 @@ export interface tSearchCatalogOptions extends tReadOptions<tSearchResponse>, tS
  * `offset` apply to every type asked for.
  */
 export const searchCatalog = /*#__PURE__*/ endpoint("searchCatalog", "answer", (client, term: string, options: tSearchCatalogOptions) => {
-  const text = termOf("searchCatalog", term);
+  const text = textOf("searchCatalog", "term", term);
   const bag = optionsOf("searchCatalog", options, OPTIONS);
   const init = { ...initOf<tSearchResponse>("searchCatalog", bag, { term: text, types: listOf("searchCatalog", "types", bag.types) }, { with: "list" }), ...NO_LISTENER };
   return inStorefront("searchCatalog", client, bag.storefront, (storefront): tRequestPlan<tSearchResponse> => [`v1/catalog/${storefront}/search`, init]);
@@ -51,7 +43,7 @@ export type tSearchHintsOptions = tReadOptions<tSearchHintsResponse> & tStorefro
 
 /** The terms a search might be for, given the start of one: what to offer as someone types. */
 export const getSearchHints = /*#__PURE__*/ endpoint("getSearchHints", "answer", (client, term: string, options?: tSearchHintsOptions) => {
-  const text = termOf("getSearchHints", term);
+  const text = textOf("getSearchHints", "term", term);
   const bag = optionsOf("getSearchHints", options, OPTIONS);
   const init = { ...initOf<tSearchHintsResponse>("getSearchHints", bag, { term: text }), ...NO_LISTENER };
   return inStorefront("getSearchHints", client, bag.storefront, (storefront): tRequestPlan<tSearchHintsResponse> => [`v1/catalog/${storefront}/search/hints`, init]);
@@ -67,7 +59,7 @@ export interface tSearchSuggestionsOptions extends tReadOptions<tSearchSuggestio
 
 /** Suggestions for a search, given the start of one: terms to search for, resources that match, or both. */
 export const getSearchSuggestions = /*#__PURE__*/ endpoint("getSearchSuggestions", "answer", (client, term: string, options: tSearchSuggestionsOptions) => {
-  const text = termOf("getSearchSuggestions", term);
+  const text = textOf("getSearchSuggestions", "term", term);
   const bag = optionsOf("getSearchSuggestions", options, OPTIONS);
   const init = { ...initOf<tSearchSuggestionsResponse>("getSearchSuggestions", bag, { term: text, kinds: listOf("getSearchSuggestions", "kinds", bag.kinds) }, { types: "list" }), ...NO_LISTENER };
   return inStorefront("getSearchSuggestions", client, bag.storefront, (storefront): tRequestPlan<tSearchSuggestionsResponse> => [`v1/catalog/${storefront}/search/suggestions`, init]);
