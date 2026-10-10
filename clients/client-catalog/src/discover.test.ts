@@ -12,6 +12,7 @@ interface tReply {
 const SECRET = "s3cretT0ken";
 const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 const TERM = "term must be a string of 1 to 256 characters; got ";
+const STOREFRONT = 'storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
 const responses: Response[] = [];
@@ -113,6 +114,12 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     ["getLanguageTag: languages that are one string", loose(api.getLanguageTag), ["fr"], `getLanguageTag: acceptLanguage ${LIST}2 characters`],
     ["getLanguageTag: no languages", loose(api.getLanguageTag), [[]], `getLanguageTag: acceptLanguage ${LIST}a list of 0`],
     ["getLanguageTag: a storefront that is empty", loose(api.getLanguageTag), [["fr"], { storefront: "" }], 'getLanguageTag: storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 0 characters'],
+    ["getSearchHints: a storefront that is two dots", loose(api.getSearchHints), ["x", { storefront: ".." }], `getSearchHints: ${STOREFRONT}2 characters`],
+    ["getSearchSuggestions: a storefront that is a path", loose(api.getSearchSuggestions), ["x", { kinds: ["terms"], storefront: "us/x" }], `getSearchSuggestions: ${STOREFRONT}4 characters`],
+    ["getCharts: a storefront that is a number", loose(api.getCharts), [{ types: ["songs"], storefront: 1 }], `getCharts: ${STOREFRONT}1`],
+    ["getCharts: options that are a list", loose(api.getCharts), [["songs"]], "getCharts: expected an options object; got a list"],
+    ["getCatalogResources: a storefront that is empty", loose(api.getCatalogResources), [{ songs: ["1"] }, { storefront: "" }], `getCatalogResources: ${STOREFRONT}0 characters`],
+    ["getLiveRadioStations: a storefront that is two dots", loose(api.getLiveRadioStations), [{ storefront: ".." }], `getLiveRadioStations: ${STOREFRONT}2 characters`],
   ])("%s", async (_name, fn, args, message) => {
     const { music, calls } = apple();
     expect(await rejection(fn(music, ...args))).toEqual(new TypeError(message));
@@ -124,6 +131,21 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     expect((await rejection(loose(api.searchCatalog)(music, "", { limit: 0 }))).message).toContain("searchCatalog: term ");
     expect((await rejection(loose(api.getCatalogResources)(music, {}, { limit: 0 }))).message).toContain("getCatalogResources: ids ");
     expect((await rejection(loose(api.getLanguageTag)(music, [], { storefront: "" }))).message).toContain("getLanguageTag: acceptLanguage ");
+  });
+
+  test("an argument is checked before the options are looked at at all: options that are no object do not hide an earlier mistake", async () => {
+    const { music } = apple();
+    expect((await rejection(loose(api.searchCatalog)(music, "", "songs"))).message).toContain("searchCatalog: term ");
+    expect((await rejection(loose(api.getCatalogResources)(music, {}, "gb"))).message).toContain("getCatalogResources: ids ");
+    expect((await rejection(loose(api.getLanguageTag)(music, [], "gb"))).message).toContain("getLanguageTag: acceptLanguage ");
+    expect((await rejection(loose(api.searchCatalog)(music, "x", "songs"))).message).toBe("searchCatalog: expected an options object; got 5 characters");
+  });
+
+  test("a term of 256 characters, which is the most there may be, is sent: the check can tell", async () => {
+    const { music, calls } = apple();
+    await api.searchCatalog(music, "t".repeat(256), { types: ["songs"] });
+    await api.getSearchHints(music, "t".repeat(256));
+    expect(calls.map((call) => new URL(call.url).searchParams.get("term")?.length)).toEqual([256, 256]);
   });
 
   test("a mistake does not show a value: a token put where the term, a type or the ids belong", async () => {

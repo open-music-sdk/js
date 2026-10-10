@@ -108,6 +108,35 @@ describe("the package entry", () => {
     ]);
   });
 
+  test("exports the documented types and nothing else", () => {
+    // A type leaves nothing at runtime to list, so the names are read from the entry: the modules it exports whole, and the types it names.
+    const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+    const whole = [...read("index.ts").matchAll(/^export \* from "\.\/(\w+)";/gm)].flatMap((module) => [...read(`${module[1] ?? ""}.ts`).matchAll(/^export (?:type|interface) (\w+)/gm)]);
+    const named = [...read("index.ts").matchAll(/^export type \{ ([^}]+) \}/gm)].flatMap((line) => (line[1] ?? "").split(", "));
+    expect([...whole.map((declared) => declared[1]), ...named].sort()).toEqual([
+      "tCatalog",
+      "tCatalogFunctions",
+      "tCatalogIds",
+      "tCatalogResourcesOptions",
+      "tCatalogSearchType",
+      "tCatalogType",
+      "tChartsOptions",
+      "tLanguageTagOptions",
+      "tLiveRadioStationsOptions",
+      "tRestrictOption",
+      "tSearchCatalogOptions",
+      "tSearchHintsOptions",
+      "tSearchSuggestionsOptions",
+      "tStorefrontOption",
+      "tViewAttributes",
+      "tViewEndpoint",
+      "tViewOptions",
+      "tViewPage",
+      "tViewsOption",
+      "tWithOption",
+    ]);
+  });
+
   test("is the only one", () => {
     expect(Object.keys(manifest.exports)).toEqual(["."]);
   });

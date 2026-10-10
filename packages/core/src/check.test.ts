@@ -667,6 +667,15 @@ describe("typedIdsOf", () => {
     );
   });
 
+  test("a type's name is held to what a name is before its list is read: a list's error says the name it is under, so no other name gets that far", () => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { "Not A Type": "not a list" })).message).toBe(`${TYPE}10 characters`);
+  });
+
+  test("the types are checked in the order they were given, so the first mistake is the one named", () => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: "not a list", "Not A Type": ["1"] })).message).toContain("getCatalogResources: ids.songs must be a list");
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { "Not A Type": ["1"], songs: "not a list" })).message).toBe(`${TYPE}10 characters`);
+  });
+
   test("a mistake does not show a value: a token put where the ids belong, where a type's name does, or among the ids", () => {
     const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
     for (const value of [token, { [token]: ["1"] }, { songs: [token] }, { songs: token }]) {

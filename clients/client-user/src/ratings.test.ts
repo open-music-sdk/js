@@ -160,6 +160,14 @@ describe("what a rating function is handed is checked before Apple is asked", ()
     expect((await rejection(api.setSongRating(music, "1", 1, { language: "" }))).message).toContain("setSongRating: language ");
   });
 
+  test("a rating to take away is named in the same order: the id before the options, whatever the options are", async () => {
+    const { music, calls } = apple();
+    expect((await rejection(api.deleteSongRating(music, "", { language: "" }))).message).toContain("deleteSongRating: id ");
+    expect((await rejection(api.deleteSongRating(music, "", "en-GB" as never))).message).toContain("deleteSongRating: id ");
+    expect((await rejection(api.deleteSongRating(music, "1", { language: "" }))).message).toContain("deleteSongRating: language ");
+    expect(calls).toHaveLength(0);
+  });
+
   test("an id cannot move a rating to another resource's, or out of the ratings", async () => {
     const { music, calls } = apple();
     for (const id of ["../albums/1", "../../library/playlists/p.1", "..%2Falbums%2F1", "1\\..\\2"]) {

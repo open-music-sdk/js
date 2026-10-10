@@ -258,6 +258,28 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     expect((await rejection(loose(api.addLibraryPlaylistTracks)(music, "p.1", [{ id: "1", type: "songs" }], { limit: 0 }))).message).toContain("addLibraryPlaylistTracks: limit ");
   });
 
+  test("an argument is checked before the options are looked at at all: options that are no object do not hide an earlier mistake", async () => {
+    const { music } = apple();
+    expect((await rejection(loose(api.searchLibrary)(music, "", "library-songs"))).message).toContain("searchLibrary: term ");
+    expect((await rejection(loose(api.getLibraryResources)(music, {}, "en-GB"))).message).toContain("getLibraryResources: ids ");
+    expect((await rejection(loose(api.searchLibrary)(music, "x", "library-songs"))).message).toBe("searchLibrary: expected an options object; got 13 characters");
+  });
+
+  test("what is the most there may be is taken, so the checks can tell: 300 tracks, an id and a type of 64 characters, a term of 256", async () => {
+    const { music, calls, bodies } = apple([{ status: 204 }, { status: 204 }]);
+    await api.addLibraryPlaylistTracks(
+      music,
+      "p.1",
+      Array.from({ length: 300 }, (_, i) => ({ id: String(i), type: "songs" as const })),
+    );
+    await loose(api.addLibraryPlaylistTracks)(music, "p.1", [{ id: "i".repeat(64), type: "t".repeat(64) }]);
+    await api.searchLibrary(music, "t".repeat(256), { types: ["library-songs"] });
+    const [most, longest] = (await bodies()) as { data: { id: string; type: string }[] }[];
+    expect(most?.data).toHaveLength(300);
+    expect(longest?.data).toEqual([{ id: "i".repeat(64), type: "t".repeat(64) }]);
+    expect(new URL(calls[2]?.url ?? "").searchParams.get("term")).toHaveLength(256);
+  });
+
   test("a mistake does not show a value: a token put where the term, the ids, a type or a track belongs", async () => {
     const token = `${SECRET}.${"p".repeat(260)}`;
     const { music, calls } = apple();
