@@ -139,6 +139,12 @@ export function pageOf(page: unknown, path: string, status: number | undefined):
   return { data: (data as readonly unknown[] | null | undefined) ?? [], next: next ?? undefined };
 }
 
+/** The next link of a body as Apple sent it: its `next`, when that is a string, and nothing otherwise. */
+function linkOf(body: unknown): string | undefined {
+  const next: unknown = typeof body === "object" && body !== null ? (body as { next?: unknown }).next : undefined;
+  return typeof next === "string" ? next : undefined;
+}
+
 /**
  * Whether a value handed over as a page is one: an object that holds a `data` list or a `next` link, and nothing
  * else under either name. What only looks like an object to walk, such as a URL, a Response or a whole search
@@ -314,9 +320,21 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       params = undefined;
     }
     for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {
-      const page = pageOf(await request<unknown>(next, { ...each, params }), next, 200);
+      // What Apple sent is kept beside what a schema made of it. The items are the schema's to shape, and where the
+      // next page is, is Apple's to say: a schema that hands back only the fields it knows would otherwise end the
+      // walk at its first page, without a word.
+      let sent: unknown;
+      const answered = await request<unknown>(next, {
+        ...each,
+        params,
+        onResponse: (res, req, outcome) => {
+          sent = outcome.body;
+          each.onResponse?.(res, req, outcome);
+        },
+      });
+      const page = pageOf(answered, next, 200);
       yield* page.data as readonly T[];
-      next = page.next;
+      next = linkOf(sent);
       params = undefined; // a next link already carries the query
     }
   }

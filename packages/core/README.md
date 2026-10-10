@@ -112,6 +112,10 @@ A page's own items come first, as they were when the walk reached the page, and 
 until they run out. With a page, `init.params` is not sent, since its `next` link already carries the
 query; `schema` and `signal` apply to the pages that are fetched.
 
+Each page's items are what a `schema` made of them, and its `next` link is the one Apple sent. So a
+schema that hands back only the fields it knows, as some libraries' do, does not end a walk at its
+first page.
+
 A page is an object with a `data` list, a `next` link or both. Anything else handed over is a
 `TypeError` and nothing is asked for: a `URL`, a `Response`, a resource, or a whole search answer, none
 of which holds either. The one exception is nothing at all, which is what an empty answer comes to and

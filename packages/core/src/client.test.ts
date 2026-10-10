@@ -889,6 +889,43 @@ describe("paginate", () => {
     expect(await items(music.paginate("v1/catalog/us/songs"))).toEqual([]);
   });
 
+  describe("where the next page is, is Apple's to say, whatever a schema makes of the answer", () => {
+    const three = () => [{ body: { data: [1, 2], next: "/v1/x?offset=2" } }, { body: { data: [3, 4], next: "/v1/x?offset=4" } }, { body: { data: [5] } }];
+    /** A schema as a library that keeps only the fields it was told of makes one: what it hands back has `data` and no `next`. */
+    const strict: tSchemaLike<{ data: number[] }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data } }) } };
+
+    test("a schema that hands back only the fields it knows does not end the walk at its first page", async () => {
+      const { music, calls } = client(three());
+      expect(await items(music.paginate("v1/x", { schema: strict }))).toEqual([1, 2, 3, 4, 5]);
+      expect(calls.map((call) => new URL(call.url).search)).toEqual(["", "?offset=2", "?offset=4"]);
+    });
+
+    test("the check can tell: the first page such a schema gives has no next link, which a walk that went by it would stop at", async () => {
+      const { music } = client(three());
+      expect(await music.request("v1/x", { schema: strict })).toEqual({ data: [1, 2] });
+    });
+
+    test("the items are still the schema's: what it makes of each page is what is yielded", async () => {
+      const doubled: tSchemaLike<{ data: number[] }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data.map((n) => n * 2) } }) } };
+      const { music } = client(three());
+      expect(await items(music.paginate("v1/x", { schema: doubled }))).toEqual([2, 4, 6, 8, 10]);
+    });
+
+    test("a next link a schema put there, where Apple sent none, is not followed", async () => {
+      const inventive: tSchemaLike<{ data: number[]; next: string }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data, next: "/v1/me/library/songs" } }) } };
+      const { music, calls } = client([{ body: { data: [1] } }, { body: { data: [2] } }]);
+      expect(await items(music.paginate("v1/x", { schema: inventive }))).toEqual([1]);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("an onResponse given for the walk is still told of every page", async () => {
+      const seen: unknown[] = [];
+      const { music } = client(three());
+      await items(music.paginate("v1/x", { schema: strict, onResponse: (_res, _req, outcome) => seen.push(outcome.body) }));
+      expect(seen).toEqual([{ data: [1, 2], next: "/v1/x?offset=2" }, { data: [3, 4], next: "/v1/x?offset=4" }, { data: [5] }]);
+    });
+  });
+
   test("breaking out stops fetching", async () => {
     const { music, calls } = client([{ body: { data: [1, 2], next: "/v1/x?offset=2" } }, { body: { data: [3] } }]);
     for await (const item of music.paginate<number>("v1/x")) if (item === 2) break;
