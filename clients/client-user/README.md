@@ -167,10 +167,12 @@ await mine.setAlbumRating("1613600183", 1);
 
 - What a function is handed to send is copied as the function is called, all the way down, so nothing
   done to your object afterwards changes what is sent.
-- A playlist or a folder to create has to be a plain object. What it holds beyond that is Apple's to
-  judge: it is sent as it is, and a refusal is Apple's `ApiError`.
-- Of each track, its `id` and its `type` are sent and nothing else it held. A call takes 1 to 300
-  tracks.
+- A playlist or a folder to create has to be a plain object, and still one once it is made into JSON.
+  What it holds beyond that is Apple's to judge: it is sent as it is, and a refusal is Apple's
+  `ApiError`. That goes for how much it holds as well: nothing here limits its size, so limit it
+  yourself if it comes from outside your app.
+- A track is a plain object with an `id` and a `type` of its own, each a string of 1 to 64 characters.
+  Those two are sent and nothing else it held. A call takes 1 to 300 tracks.
 - A rating's value is `1` or `-1`. Anything else is a `TypeError`.
 - `addToLibrary` and `addToFavorites` take ids by type of catalog resource. Apple's documentation does
   not list the types either takes, so a type is any name that could be one, and Apple says whether it

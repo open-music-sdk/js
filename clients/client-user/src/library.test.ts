@@ -14,7 +14,7 @@ const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters wit
 const TERM = "term must be a string of 1 to 256 characters; got ";
 const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 const TRACKS =
-  'addLibraryPlaylistTracks: tracks must be a list of 1 to 300 tracks, each an object with an id and a type that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ';
+  'addLibraryPlaylistTracks: tracks must be a list of 1 to 300 tracks, each a plain object with an id and a type of its own that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ';
 const item = (id: string) => ({ id, type: "library-songs" });
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
@@ -233,6 +233,9 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     ["addLibraryPlaylistTracks: a track with no type", loose(api.addLibraryPlaylistTracks), ["p.1", [{ id: "1" }]], `${TRACKS}object at index 0`],
     ["addLibraryPlaylistTracks: a track whose id is a number", loose(api.addLibraryPlaylistTracks), ["p.1", [{ id: 1, type: "songs" }]], `${TRACKS}object at index 0`],
     ["addLibraryPlaylistTracks: a track that is null", loose(api.addLibraryPlaylistTracks), ["p.1", [null]], `${TRACKS}null at index 0`],
+    ["addLibraryPlaylistTracks: a track whose id and type are inherited", loose(api.addLibraryPlaylistTracks), ["p.1", [track, Object.create(track)]], `${TRACKS}object at index 1`],
+    ["addLibraryPlaylistTracks: a track that is a list with an id and a type put on it", loose(api.addLibraryPlaylistTracks), ["p.1", [Object.assign(["x"], track)]], `${TRACKS}object at index 0`],
+    ["addLibraryPlaylistTracks: a track that is a Map", loose(api.addLibraryPlaylistTracks), ["p.1", [new Map(Object.entries(track))]], `${TRACKS}object at index 0`],
     ["getRootLibraryPlaylistFolder: options that are a string", loose(api.getRootLibraryPlaylistFolder), ["root"], "getRootLibraryPlaylistFolder: expected an options object; got 4 characters"],
     ["listRecentlyPlayed: types that hold two in one", loose(api.listRecentlyPlayed), [{ types: ["albums,playlists"] }], `listRecentlyPlayed: types ${LIST}16 characters at index 0`],
     ["listRecentlyPlayed: types that are one string, not a list", loose(api.listRecentlyPlayed), [{ types: "albums" }], `listRecentlyPlayed: types ${LIST}6 characters`],
@@ -289,6 +292,23 @@ describe("what a caller puts in is what is sent, and nothing more", () => {
       ["term", term],
       ["types", "library-songs"],
     ]);
+  });
+
+  test("a type put on Object.prototype by other code is not a track's: a track that holds only its id is still refused", async () => {
+    Object.assign(Object.prototype, { type: "songs" });
+    try {
+      const { music, calls } = apple();
+      expect((await rejection(loose(api.addLibraryPlaylistTracks)(music, "p.1", [{ id: "1" }]))).message).toBe(`${TRACKS}object at index 0`);
+      expect(calls).toHaveLength(0);
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "type");
+    }
+  });
+
+  test("a track with no prototype at all is a track like any other", async () => {
+    const { music, bodies } = apple([{ status: 204 }]);
+    await api.addLibraryPlaylistTracks(music, "p.1", [Object.assign(Object.create(null) as object, { id: "1", type: "songs" }) as api.tPlaylistTrack]);
+    expect(await bodies()).toEqual([{ data: [{ id: "1", type: "songs" }] }]);
   });
 
   test("of each track, its id and its type are sent and nothing else it held", async () => {

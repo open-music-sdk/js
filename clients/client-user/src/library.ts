@@ -7,9 +7,11 @@ import {
   inStorefront,
   initOf,
   isName,
+  isPlain,
   itemsOf,
   listOf,
   optionsOf,
+  ownOf,
   resourceLister,
   resourcesFinder,
   segmentOf,
@@ -97,19 +99,22 @@ export const addToFavorites = /*#__PURE__*/ endpoint("addToFavorites", "answer",
 /** A track to add to a playlist: its id, and whether it is a song or a music video, of the catalog or of the library. */
 export type tPlaylistTrack = tLibraryPlaylistTracksRequestData;
 
-/** The tracks to add, as this call's own list of `{ id, type }` and nothing else of what each one held. */
+/**
+ * The tracks to add, as this call's own list of `{ id, type }` and nothing else of what each one held. A track is a
+ * plain object, and its id and type are the ones it holds itself: one it inherits, or that other code has put on
+ * Object.prototype, is not the track's.
+ */
 function tracksOf(fn: string, tracks: unknown): tPlaylistTrack[] {
-  const length: unknown = Array.isArray(tracks) ? tracks.length : undefined;
-  const given = itemsOf(tracks, 1, MAX_TRACKS) ?? [];
-  const own = given.map((track) => {
-    const { id, type } = (typeof track === "object" && track !== null ? track : {}) as { id?: unknown; type?: unknown };
+  const given = itemsOf(tracks, 1, MAX_TRACKS);
+  const own = (given ?? []).map((track) => {
+    const { id, type } = isPlain(track) ? ownOf(track as { readonly id?: unknown; readonly type?: unknown }) : {};
     return isName(id) && isName(type) ? ({ id, type } as tPlaylistTrack) : undefined;
   });
   const bad = own.indexOf(undefined);
-  if (own.length > 0 && bad === -1) return own as tPlaylistTrack[];
-  const what = typeof length !== "number" ? got(tracks) : bad === -1 ? `a list of ${String(length)}` : `${got(given[bad])} at index ${String(bad)}`;
+  if (given !== undefined && bad === -1) return own as tPlaylistTrack[];
+  const what = given !== undefined ? `${got(given[bad])} at index ${String(bad)}` : Array.isArray(tracks) ? `a list of ${String(tracks.length)}` : got(tracks);
   throw new TypeError(
-    `${fn}: tracks must be a list of 1 to ${String(MAX_TRACKS)} tracks, each an object with an id and a type that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ${what}`,
+    `${fn}: tracks must be a list of 1 to ${String(MAX_TRACKS)} tracks, each a plain object with an id and a type of its own that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ${what}`,
   );
 }
 

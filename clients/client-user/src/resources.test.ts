@@ -224,6 +224,26 @@ describe("a new playlist, and a new playlist folder", () => {
     expect(calls).toHaveLength(0);
   });
 
+  test.each<[string, unknown]>([
+    ["a string", "Road"],
+    ["a list", [{ attributes: { name: "Road" } }]],
+    ["null", null],
+    ["a number", 5],
+  ])("handed an object whose own toJSON makes it %s, each is a TypeError: what is sent has to be what was checked", async (_name, made) => {
+    const { music, calls } = apple();
+    const playlist = { attributes: { name: "Road" }, toJSON: () => made };
+    expect(await rejection(api.createLibraryPlaylist(music, playlist))).toEqual(new TypeError(`${PLAYLIST}, which JSON keeps an object; got one it makes something else of`));
+    expect(await rejection(api.createLibraryPlaylistFolder(music, playlist))).toEqual(new TypeError(`${FOLDER}, which JSON keeps an object; got one it makes something else of`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the check can tell: a toJSON that gives another object is taken, and that object is what is sent", async () => {
+    const { music, bodies } = apple([{ status: 201, body: created }]);
+    const draft = { attributes: { name: "Draft" }, toJSON: () => ({ attributes: { name: "Road" } }) };
+    await api.createLibraryPlaylist(music, draft);
+    expect(await bodies()).toEqual([{ attributes: { name: "Road" } }]);
+  });
+
   test("what is handed over is checked before the options are, and both before Apple is asked", async () => {
     const { music, calls } = apple();
     expect((await rejection(api.createLibraryPlaylist(music, [] as never, { limit: 0 }))).message).toContain("expected a playlist to create");
