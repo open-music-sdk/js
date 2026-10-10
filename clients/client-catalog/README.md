@@ -156,8 +156,15 @@ const tracks = await getAlbumRelationship(music, "1613600183", "tracks"); // dat
 const versions = await getAlbumView(music, "1613600183", "other-versions"); // data: tAlbum[]
 ```
 
-A `schema` for one is a schema of that page. At runtime a name is any one segment of a path, and Apple
-says whether there is such a relationship or view.
+A `schema` for one is a schema of that page, and `validate` has one for each: a relationship's is
+named for the resource and the relationship, such as `albumRelationshipsAlbumTracksRelationship`, and a
+view's likewise, such as `albumViewsAlbumOtherVersionsView`. A view's validator wants the view's
+attributes, so pass `with: ["attributes"]` beside it. The validators of the answers as Apple documents
+them, `relationshipResponse` and `relationshipViewResponse`, do not fit: they say only that a page holds
+resources, and these functions say which.
+
+At runtime a name is any one segment of a path, and Apple says whether there is such a relationship or
+view.
 
 The `library` relationship of a song, an album, a playlist and a music video is the listener's copy of
 it, and needs their token. It is not among the names these functions take.

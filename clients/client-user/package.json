@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@open-music-sdk/client-catalog": "workspace:*",
+    "@open-music-sdk/validate": "workspace:*",
     "@types/node": "catalog:",
     "tooling-tsdown-config": "workspace:*",
     "tooling-vitest-config": "workspace:*",

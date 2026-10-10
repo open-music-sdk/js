@@ -1,5 +1,13 @@
 import { createClient, isAppleMusicError, type tAppleMusicClient, type tClientOptions } from "@open-music-sdk/core";
 import type { tAlbum, tAlbumsResponse, tArtist, tGenre, tMusicVideo, tPlaylist, tRecordLabel, tSong, tSongsResponse, tStorefront } from "@open-music-sdk/types";
+import {
+  albumRelationshipsAlbumArtistsRelationship,
+  albumRelationshipsAlbumTracksRelationship,
+  albumViewsAlbumOtherVersionsView,
+  artistViewsArtistTopSongsView,
+  genresResponse,
+  songsResponse,
+} from "@open-music-sdk/validate";
 import { afterEach, describe, expect, expectTypeOf, test } from "vitest";
 import * as api from "./resources";
 
@@ -364,5 +372,51 @@ describe("the types: a function is about the generated type its name says, and a
       () => api.getSongs(music, "1"),
     ];
     expect(calls).toHaveLength(11);
+  });
+});
+
+describe("a validator from the family fits as a schema, though this package depends on none", () => {
+  const album = { id: "1", type: "albums", href: "/v1/catalog/us/albums/1" };
+
+  test("the types: a resource's answer, a relationship's page by its name and a view's page by its name each take their own validator, and no other's", () => {
+    const { music } = apple();
+    const calls = [
+      () => api.getSong(music, "1", { schema: songsResponse }),
+      () => api.listGenres(music, { schema: genresResponse }),
+      () => api.getAlbumRelationship(music, "1", "tracks", { schema: albumRelationshipsAlbumTracksRelationship }),
+      () => api.getAlbumRelationship.bound(music)("1", "artists", { schema: albumRelationshipsAlbumArtistsRelationship }),
+      () => api.getAlbumView(music, "1", "other-versions", { schema: albumViewsAlbumOtherVersionsView }),
+      () => api.getArtistView.bound(music)("1", "top-songs", { schema: artistViewsArtistTopSongsView }),
+      // @ts-expect-error -- a validator of another relationship's page is not one of this page
+      () => api.getAlbumRelationship(music, "1", "tracks", { schema: albumRelationshipsAlbumArtistsRelationship }),
+      // @ts-expect-error -- nor is a validator of another view's
+      () => api.getAlbumView(music, "1", "other-versions", { schema: artistViewsArtistTopSongsView }),
+      // @ts-expect-error -- nor a resource's answer's, of a view
+      () => api.getAlbumView(music, "1", "other-versions", { schema: songsResponse }),
+    ];
+    expect(calls).toHaveLength(9);
+  });
+
+  test("a view asked for with its attributes passes the view's validator, called with a client or walked", async () => {
+    const answer = { data: [album], attributes: { title: "Other Versions" } };
+    const { music, sent } = apple([{ body: answer }, { body: answer }]);
+    const options = { with: ["attributes"], schema: albumViewsAlbumOtherVersionsView } as const;
+    expect(await api.getAlbumView(music, "9", "other-versions", options)).toEqual(answer);
+    expect(await all(api.getAlbumView.bound(music)("9", "other-versions", options))).toEqual([album]);
+    expect(sent()).toEqual(["GET /v1/catalog/us/albums/9/view/other-versions?with=attributes", "GET /v1/catalog/us/albums/9/view/other-versions?with=attributes"]);
+  });
+
+  test("an answer the validator does not pass is a ValidationError: what is no album, and a view asked for without the attributes its validator wants", async () => {
+    const { music } = apple([{ body: { data: [{ id: 1 }], attributes: { title: "Other Versions" } } }, { body: { data: [album] } }]);
+    for (let asked = 0; asked < 2; asked++) {
+      const error = await rejection(api.getAlbumView(music, "9", "other-versions", { schema: albumViewsAlbumOtherVersionsView }));
+      expect(isAppleMusicError(error, "ValidationError")).toBe(true);
+    }
+  });
+
+  test("a relationship's page passes the validator of that relationship", async () => {
+    const answer = { data: [song("1")] };
+    const { music } = apple([{ body: answer }]);
+    expect(await api.getAlbumRelationship(music, "9", "tracks", { schema: albumRelationshipsAlbumTracksRelationship })).toEqual(answer);
   });
 });

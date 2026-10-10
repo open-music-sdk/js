@@ -224,6 +224,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/types
     devDependencies:
+      '@open-music-sdk/validate':
+        specifier: workspace:*
+        version: link:../../packages/validate
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -252,6 +255,9 @@ importers:
       '@open-music-sdk/client-catalog':
         specifier: workspace:*
         version: link:../client-catalog
+      '@open-music-sdk/validate':
+        specifier: workspace:*
+        version: link:../../packages/validate
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

@@ -65,8 +65,14 @@ export interface tWithOption {
   readonly with?: readonly "attributes"[] | undefined;
 }
 
-/** What Apple answers when a view is asked for by name: a page of what it holds. */
-export type tViewPage<Views, K extends keyof Views> = Omit<tRelationshipViewResponse, "data"> & { data: tRelated<Views, K>[] };
+/** What the view `K` says of itself beside what it holds, such as its title, as the generated types have it. */
+export type tViewAttributes<Views, K extends keyof Views> = NonNullable<Views[K]> extends { readonly attributes?: infer Attributes } ? Attributes : never;
+
+/**
+ * What Apple answers when a view is asked for by name: a page of what it holds, with the view's own attributes when
+ * they were asked for. Both are typed from the view, so that a validator of the view is a validator of this page.
+ */
+export type tViewPage<Views, K extends keyof Views> = Omit<tRelationshipViewResponse, "data" | "attributes"> & { data: tRelated<Views, K>[]; attributes?: tViewAttributes<Views, K> };
 
 /** The options of a function for a view. */
 export type tViewOptions<Views, K extends keyof Views> = tEndpointOptions<tViewPage<Views, K>, tStorefrontOption, tWithOption> & tWalkOptions;

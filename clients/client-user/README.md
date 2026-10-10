@@ -142,7 +142,11 @@ Some functions take one more:
 | `storefront` | `getPersonalStation` | The storefront whose catalog the station is in |
 
 Nothing is validated unless a `schema` is passed, and this package does not depend on a validator. The
-ones in [`@open-music-sdk/validate`](../../packages/validate) fit, such as `librarySongsResponse`.
+ones in [`@open-music-sdk/validate`](../../packages/validate) fit, such as `librarySongsResponse`. A
+relationship's is named for the resource and the relationship, such as
+`libraryAlbumRelationshipsLibraryAlbumTracksRelationship`. The validator of the answer as Apple
+documents it, `relationshipResponse`, does not fit: it says only that a page holds resources, and these
+functions say which.
 
 An option a function does not take is not sent. An object written in place with a misspelt option does
 not compile; a caller without the types is not told.

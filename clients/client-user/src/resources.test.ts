@@ -11,6 +11,7 @@ import type {
   tPersonalRecommendation,
   tResource,
 } from "@open-music-sdk/types";
+import { libraryAlbumRelationshipsLibraryAlbumArtistsRelationship, libraryAlbumRelationshipsLibraryAlbumTracksRelationship, libraryPlaylistsResponse, librarySongsResponse } from "@open-music-sdk/validate";
 import { afterEach, describe, expect, expectTypeOf, test, vi } from "vitest";
 import * as api from "./resources";
 
@@ -279,5 +280,30 @@ describe("the types: a function is about the generated type its name says, and a
       () => api.getLibrarySongs(music, "i.1"),
     ];
     expect(calls).toHaveLength(5);
+  });
+});
+
+describe("a validator from the family fits as a schema, though this package depends on none", () => {
+  test("the types: a resource's answer, a new resource's and a relationship's page by its name each take their own validator, and no other's", () => {
+    const { music } = apple();
+    const calls = [
+      () => api.getLibrarySong(music, "i.1", { schema: librarySongsResponse }),
+      () => api.listLibrarySongs.bound(music)({ schema: librarySongsResponse }),
+      () => api.createLibraryPlaylist(music, { attributes: { name: "Road" } }, { schema: libraryPlaylistsResponse }),
+      () => api.getLibraryAlbumRelationship(music, "l.1", "tracks", { schema: libraryAlbumRelationshipsLibraryAlbumTracksRelationship }),
+      () => api.getLibraryAlbumRelationship.bound(music)("l.1", "artists", { schema: libraryAlbumRelationshipsLibraryAlbumArtistsRelationship }),
+      // @ts-expect-error -- a validator of another relationship's page is not one of this page
+      () => api.getLibraryAlbumRelationship(music, "l.1", "tracks", { schema: libraryAlbumRelationshipsLibraryAlbumArtistsRelationship }),
+      // @ts-expect-error -- nor is a song's answer's a playlist's
+      () => api.getLibraryPlaylist(music, "p.1", { schema: librarySongsResponse }),
+    ];
+    expect(calls).toHaveLength(7);
+  });
+
+  test("an answer the validator passes is what comes back, and one it does not pass is a ValidationError", async () => {
+    const answer = { data: [song("i.1")] };
+    const { music } = apple([{ body: answer }, { body: { data: [{ id: 1 }] } }]);
+    expect(await api.getLibrarySong(music, "i.1", { schema: librarySongsResponse })).toEqual(answer);
+    expect(isAppleMusicError(await rejection(api.getLibrarySong(music, "i.1", { schema: librarySongsResponse })), "ValidationError")).toBe(true);
   });
 });
