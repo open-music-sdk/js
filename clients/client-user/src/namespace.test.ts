@@ -1,8 +1,10 @@
 import { createClient, isAppleMusicError, type tClientOptions } from "@open-music-sdk/core";
 import type { tLibraryAlbum, tLibraryArtist, tLibraryMusicVideo, tLibraryPlaylist, tLibrarySearchResponse, tLibrarySong, tRating, tResource } from "@open-music-sdk/types";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { afterEach, describe, expect, expectTypeOf, test } from "vitest";
 import * as api from "./index";
-import { user, type tUser } from "./namespace";
+import { user, type tUser, type tUserFunctions } from "./namespace";
 
 /** One answer from Apple. */
 interface tReply {
@@ -219,5 +221,64 @@ describe("the types: a function of the namespace takes what the package's takes,
   test("the namespace's type is the one the function gives", () => {
     expectTypeOf(mine).toEqualTypeOf<tUser>();
     expectTypeOf<keyof tUser>().toEqualTypeOf<Exclude<keyof typeof api, "user">>();
+  });
+
+  test("the interface the namespace is typed from names every function the package exports, each with the type it is declared with", () => {
+    expectTypeOf<tUserFunctions>().toEqualTypeOf<Readonly<Omit<typeof api, "user">>>();
+  });
+});
+
+describe("a function of the namespace says what the package's function says: an editor shows the same documentation for both", () => {
+  const names = Object.entries(api)
+    .filter(([, value]) => typeof (value as { bound?: unknown }).bound === "function")
+    .map(([name]) => name);
+  /** A module as an app would write one, never saved: read by the compiler as if it were beside this file. */
+  const source = [
+    'import type { tAppleMusicClient } from "@open-music-sdk/core";',
+    'import * as api from "./index";',
+    "declare const music: tAppleMusicClient;",
+    "const bound = api.user(music);",
+    ...names.flatMap((name) => [`export const direct_${name} = api.${name};`, `export const bound_${name} = bound.${name};`]),
+    // A function named again with nothing written above the name: what each one is in the declarations a package is published with, where a module is a list of names.
+    "const renamed = { getLibrarySong: api.getLibrarySong };",
+    "export const lost = renamed.getLibrarySong;",
+  ].join("\n");
+
+  /** What an editor shows as the documentation of each name asked about, by the text the name ends. */
+  function documentation(ends: readonly string[]): string[] {
+    const slashed = (url: URL) => fileURLToPath(url).replace(/\\/g, "/");
+    const root = slashed(new URL("..", import.meta.url)).replace(/\/$/, "");
+    const probe = `${root}/src/hover.probe.ts`;
+    const config = ts.getParsedCommandLineOfConfigFile(`${root}/tsconfig.json`, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined });
+    const service = ts.createLanguageService({
+      getCompilationSettings: () => config?.options ?? {},
+      getScriptFileNames: () => [probe],
+      getScriptVersion: () => "1",
+      getScriptSnapshot: (name) => {
+        const text = name === probe ? source : ts.sys.readFile(name);
+        return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
+      },
+      getCurrentDirectory: () => root,
+      getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+      fileExists: (name) => name === probe || ts.sys.fileExists(name),
+      readFile: (name) => (name === probe ? source : ts.sys.readFile(name)),
+      readDirectory: (...args) => ts.sys.readDirectory(...args),
+      directoryExists: (name) => ts.sys.directoryExists(name),
+      getDirectories: (name) => ts.sys.getDirectories(name),
+    });
+    expect(service.getSemanticDiagnostics(probe)).toEqual([]);
+    return ends.map((end) => ts.displayPartsToString(service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1)?.documentation));
+  }
+
+  test("every one of the 79 is documented, and its documentation is there on the function of the namespace", { timeout: 120_000 }, () => {
+    const direct = documentation(names.map((name) => `direct_${name} = api.${name}`));
+    const ofTheNamespace = documentation(names.map((name) => `bound_${name} = bound.${name}`));
+    expect(names.filter((_, index) => direct[index] === "")).toEqual([]);
+    expect(ofTheNamespace).toEqual(direct);
+    expect(names).toHaveLength(79);
+  });
+
+  test("the check that says so can tell: a function named again with nothing written above the name shows no documentation", { timeout: 120_000 }, () => {
+    expect(documentation(["lost = renamed.getLibrarySong"])).toEqual([""]);
   });
 });
