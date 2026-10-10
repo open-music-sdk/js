@@ -1,0 +1,53 @@
+{
+  "name": "@open-music-sdk/client-catalog",
+  "version": "0.0.0",
+  "description": "The Apple Music API's catalog, one typed function per endpoint: songs, albums, artists, playlists, search, charts, storefronts. Developer token only.",
+  "license": "MIT",
+  "keywords": [
+    "apple-music-api",
+    "apple-music",
+    "musickit",
+    "typescript",
+    "sdk",
+    "api-client",
+    "catalog",
+    "search",
+    "charts"
+  ],
+  "homepage": "https://github.com/open-music-sdk/js/tree/main/clients/client-catalog#readme",
+  "bugs": "https://github.com/open-music-sdk/js/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-music-sdk/js.git",
+    "directory": "clients/client-catalog"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown --sourcemap",
+    "prepack": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@open-music-sdk/core": "workspace:^",
+    "@open-music-sdk/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tooling-tsdown-config": "workspace:*",
+    "tooling-vitest-config": "workspace:*",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  }
+}
