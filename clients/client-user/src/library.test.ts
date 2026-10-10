@@ -231,8 +231,8 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     ["listRecentlyPlayed: types that are one string, not a list", loose(api.listRecentlyPlayed), [{ types: "albums" }], `listRecentlyPlayed: types ${LIST}6 characters`],
     ["listRecentlyPlayedTracks: types that are a number", loose(api.listRecentlyPlayedTracks), [{ types: 5 }], `listRecentlyPlayedTracks: types ${LIST}5`],
     ["getMusicSummariesByYear: views that are one string, not a list", loose(api.getMusicSummariesByYear), [["latest"], { views: "top-songs" }], `getMusicSummariesByYear: views ${LIST}9 characters`],
-    ["getMusicSummariesByYear: a year that is one string", loose(api.getMusicSummariesByYear), ["latest"], `getMusicSummariesByYear: year ${LIST}6 characters`],
-    ["getMusicSummariesByYear: no years", loose(api.getMusicSummariesByYear), [[]], `getMusicSummariesByYear: year ${LIST}a list of 0`],
+    ["getMusicSummariesByYear: a year that is one string", loose(api.getMusicSummariesByYear), ["latest"], `getMusicSummariesByYear: values ${LIST}6 characters`],
+    ["getMusicSummariesByYear: no years", loose(api.getMusicSummariesByYear), [[]], `getMusicSummariesByYear: values ${LIST}a list of 0`],
     ["getUserStorefront: a limit of zero", loose(api.getUserStorefront), [{ limit: 0 }], "getUserStorefront: limit must be a whole number above 0; got 0"],
   ])("%s", async (_name, fn, args, message) => {
     const { music, calls } = apple();

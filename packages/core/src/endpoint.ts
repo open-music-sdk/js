@@ -2,7 +2,7 @@
 // client, it resolves to what Apple answered. Bound to a client, it hands over what the answer holds: the resource,
 // the list of them, or every item of every page. The client packages are made of these.
 import type { tRelationshipResponse } from "@open-music-sdk/types";
-import { clientOf, listOf, optionsOf, ownOf, segmentOf } from "./check";
+import { clientOf, isBracketed, listOf, optionsOf, ownOf, segmentOf } from "./check";
 import { pageOf, type tAppleMusicClient, type tPage, type tRequestInit } from "./client";
 import { AppleMusicError } from "./errors";
 import { got } from "./got";
@@ -80,11 +80,20 @@ function made(body: unknown): unknown {
 }
 
 /**
+ * The name a declaration gives its function, checked. It is the first thing a declaration is handed and the first
+ * thing checked, by every function that makes one, so that a mistake in a declaration is named in the order it was
+ * written, as a mistake in a call is.
+ */
+function named(builder: string, fn: unknown): void {
+  if (typeof fn !== "string" || fn === "") throw new TypeError(`${builder}: fn must be the name of the function, a string with something in it; got ${got(fn)}`);
+}
+
+/**
  * What every declaration comes to, whichever function made it. `builder` is that function's name: a declaration is
  * checked as it is made, so a mistake in one is found when the module loads and names what was called.
  */
 function declare<A extends readonly unknown[], R, U>(builder: string, fn: string, unwrap: tUnwrap, plan: tPlan<A, R>): tEndpoint<A, R, U> {
-  if (typeof fn !== "string" || fn === "") throw new TypeError(`${builder}: fn must be the name of the function, a string with something in it; got ${got(fn)}`);
+  named(builder, fn);
   if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${got(unwrap)}`);
   if (typeof plan !== "function") throw new TypeError(`${builder}: plan must be a function; got ${got(plan)}`);
   const planFor = plan as unknown as tPlan<unknown[], unknown>;
@@ -281,6 +290,7 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>> {
+  named("resourceGetter", fn);
   const [locate, names, user] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
   // Here and below, what a call was handed is checked in the order it was handed over, so the first mistake is the one named.
   return declare("resourceGetter", fn, "resource", (client, id: string, options?: tEndpointOptions<R, C, E>) => {
@@ -291,7 +301,7 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   });
 }
 
-/** What the two below come to: `GET {collection}?{param}=`, for the list a caller hands over, which a mistake in it calls `name`. */
+/** What the two below come to: `GET {collection}?{param}=`, for the list a caller hands over, which a mistake in it calls `name`, as the function's signature does. */
 function picked<R extends tResources, C extends object, E extends object>(
   builder: string,
   fn: string,
@@ -300,6 +310,7 @@ function picked<R extends tResources, C extends object, E extends object>(
   collection: unknown,
   also: unknown,
 ): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+  named(builder, fn);
   const [locate, names, user] = given<C>(builder, collection, also);
   return declare(builder, fn, "resources", (client, values: readonly string[], options?: tEndpointOptions<R, C, E>) => {
     const list = listOf(fn, name, values);
@@ -320,7 +331,8 @@ export function resourcesGetter<R extends tResources = never, C extends object =
 
 /**
  * A function for the resources a filter picks out of a collection: `GET {collection}?filter[{filter}]=`. `filter`
- * is the filter's name as Apple writes it, such as `isrc`, and the function takes the values to look for.
+ * is the filter's name as Apple writes it, such as `isrc`, and the function takes the values to look for, which a
+ * mistake in them calls `values`, as the function's own signature does.
  */
 export function resourcesFinder<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
@@ -328,8 +340,9 @@ export function resourcesFinder<R extends tResources = never, C extends object =
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
-  if (typeof filter !== "string" || !/^[a-z]+(-[a-z]+)*$/.test(filter)) throw new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between, such as "isrc"; got ${got(filter)}`);
-  return picked("resourcesFinder", fn, `filter[${filter}]`, filter, collection, (also as readonly unknown[])[0]);
+  named("resourcesFinder", fn);
+  if (!isBracketed(filter)) throw new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between and at most 64 characters, such as "isrc"; got ${got(filter)}`);
+  return picked("resourcesFinder", fn, `filter[${filter}]`, "values", collection, (also as readonly unknown[])[0]);
 }
 
 /** A function for a whole collection, a page at a time: `GET {collection}`. */
@@ -338,6 +351,7 @@ export function resourceLister<R extends tResources = never, C extends object = 
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions], tPaged<R>, AsyncIterable<tItem<R>>> {
+  named("resourceLister", fn);
   const [locate, names, user] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
   return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions) => {
     const bag = optionsOf(fn, options, OPTIONS);
@@ -366,6 +380,7 @@ export interface tRelationshipEndpoint<Rels, C = tNone> {
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
+  named("relationshipGetter", fn);
   const [locate, , user] = given<C>("relationshipGetter", collection, undefined);
   const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C> & tWalkOptions) => {
     const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;

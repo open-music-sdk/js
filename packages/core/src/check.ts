@@ -115,8 +115,12 @@ export const listOf = (fn: string, name: string, value: unknown): readonly strin
 /** More types than Apple has of resource. Each one is a list of ids, so how many there may be is not left open. */
 const MAX_TYPES = 32;
 
-/** A type of resource as Apple names them, such as `songs` or `library-playlists`: what goes in the brackets after `ids`. */
-const isType = (name: string): boolean => name.length <= MAX_NAME && /^[a-z]+(-[a-z]+)*$/.test(name);
+/**
+ * A name as Apple writes the ones that go in brackets, a type of resource after `ids` or a filter after `filter`:
+ * lowercase words with hyphens between, such as `library-playlists` or `storefront-chart`, and no longer than a
+ * name may be. Held to that, it stays inside its brackets.
+ */
+export const isBracketed = (name: unknown): name is string => typeof name === "string" && name.length <= MAX_NAME && /^[a-z]+(-[a-z]+)*$/.test(name);
 
 /**
  * `value` as ids by type, such as `{ songs: ["1"], albums: ["2"] }`, as the parameters they are sent as:
@@ -129,7 +133,7 @@ export function typedIdsOf(fn: string, name: string, value: unknown): Record<str
   const given = Object.entries(value).filter(([, ids]: [string, unknown]) => ids !== undefined);
   if (given.length === 0 || given.length > MAX_TYPES) throw new TypeError(`${fn}: ${name} must hold the ids of 1 to ${String(MAX_TYPES)} types; got ${String(given.length)}`);
   const lists = given.map(([type, ids]: [string, unknown]): [string, readonly string[]] => {
-    if (!isType(type)) throw new TypeError(`${fn}: ${name} holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ${got(type)}`);
+    if (!isBracketed(type)) throw new TypeError(`${fn}: ${name} holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ${got(type)}`);
     return [`ids[${type}]`, listOf(fn, `${name}.${type}`, ids)];
   });
   return Object.fromEntries(lists);

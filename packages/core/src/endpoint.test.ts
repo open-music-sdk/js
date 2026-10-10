@@ -274,6 +274,20 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     expect(() => builder(undefined, () => SONGS)).toThrow(new TypeError(`${name}: fn must be the name of the function, a string with something in it; got undefined`));
   });
 
+  test.each(builders)("%s: a mistake in a declaration is named in the order it was written, the name before the collection and the rest", (name, builder) => {
+    const unnamed = new TypeError(`${name}: fn must be the name of the function, a string with something in it; got 5`);
+    expect(() => builder(5, 5)).toThrow(unnamed);
+    expect(() => builder(5, () => SONGS, ["views"])).toThrow(unnamed);
+  });
+
+  test("resourcesFinder: the name comes before the filter, and the filter before the collection", () => {
+    const finder = resourcesFinder as unknown as (fn: unknown, filter: unknown, collection: unknown) => unknown;
+    expect(() => finder(5, 5, 5)).toThrow(new TypeError("resourcesFinder: fn must be the name of the function, a string with something in it; got 5"));
+    expect(() => finder("", "isrc", 5)).toThrow(new TypeError("resourcesFinder: fn must be the name of the function, a string with something in it; got 0 characters"));
+    expect(() => finder("find", 5, 5)).toThrow(/^resourcesFinder: filter must be the name of a filter/);
+    expect(() => finder("find", "isrc", 5)).toThrow(new TypeError("resourcesFinder: collection must be a function that gives the collection's path; got 5"));
+  });
+
   test.each(builders)("%s: a collection that is a path, and not a function that gives one, is a TypeError naming it", (name, builder) => {
     expect(() => builder("getSong", SONGS)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got 19 characters`));
     expect(() => builder("getSong", undefined)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got undefined`));
@@ -1035,12 +1049,16 @@ describe("resourcesFinder: the resources a filter picks out of a collection", ()
     ["an empty list", [], "a list of 0"],
     ["a list holding two in one", ["A,B"], "3 characters at index 0"],
     ["missing", undefined, "undefined"],
-  ])("values that are %s are a TypeError naming the function and the filter, before the collection or Apple is asked", async (_name, values, what) => {
+  ])("values that are %s are a TypeError naming the function and the argument as its signature names it, before the collection or Apple is asked", async (_name, values, what) => {
     const { music, calls } = apple();
     const collection = vi.fn<tCollection>(() => SONGS);
     const error = await rejection(resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection)(music, values as string[]));
-    expect(error).toEqual(new TypeError(`getSongsByIsrc: isrc must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`));
+    expect(error).toEqual(new TypeError(`getSongsByIsrc: values must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`));
     expect([collection.mock.calls.length, calls.length]).toEqual([0, 0]);
+  });
+
+  test("the argument has one name: the signature's, which is the one a mistake in it is told by", () => {
+    expectTypeOf(getSongsByIsrc).parameters.toEqualTypeOf<[client: tAppleMusicClient, values: readonly string[], options?: tEndpointOptions<tSongsResponse>]>();
   });
 
   test.each<[string, unknown, string]>([
@@ -1050,10 +1068,21 @@ describe("resourcesFinder: the resources a filter picks out of a collection", ()
     ["one that would close the brackets and add a parameter", "isrc]&ids[", "10 characters"],
     ["in capitals", "ISRC", "4 characters"],
     ["a list", ["isrc"], "object"],
+    ["one that begins with a hyphen", "-isrc", "5 characters"],
+    ["one that ends with a hyphen", "isrc-", "5 characters"],
+    ["one with two hyphens together", "storefront--chart", "17 characters"],
+    ["one with a digit in it", "isrc2", "5 characters"],
+    ["one character longer than a name may be", "a".repeat(65), "65 characters"],
   ])("a filter's name that is %s is a TypeError naming resourcesFinder, as the declaration is made", (_name, filter, what) => {
     expect(() => resourcesFinder<tSongsResponse>("getSongsByIsrc", filter as string, () => SONGS)).toThrow(
-      new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between, such as "isrc"; got ${what}`),
+      new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between and at most 64 characters, such as "isrc"; got ${what}`),
     );
+  });
+
+  test("a filter's name of 64 characters is taken, as a type's name of that length is", async () => {
+    const { music, sent } = apple();
+    await resourcesFinder<tSongsResponse>("find", "a".repeat(64), () => SONGS)(music, ["1"]);
+    expect(sent()).toEqual([`GET /v1/catalog/us/songs?filter[${"a".repeat(64)}]=1`]);
   });
 
   test("the types: it has to say what its answer is, and to name every option it adds", () => {
@@ -1458,7 +1487,7 @@ describe("what a plan gives is read as what it holds itself, never as what is fo
       for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
     }
   }
-  const addToLibrary = endpoint("addToLibrary", "answer", (): tRequestPlan<undefined> => ["v1/me/library", { method: "POST", params: { "ids[songs]": ["1"] } }]);
+  const addToLibrary = endpoint("addToLibrary", "answer", (): tRequestPlan<unknown> => ["v1/me/library", { method: "POST", params: { "ids[songs]": ["1"] } }]);
 
   test("an onResponse there that is no function does not turn a request that was answered into a failure", async () => {
     const { music, sent } = apple([{ status: 202 }, { body: { data: [song("1")] } }, { body: { data: [song("1")] } }], { userToken: "user" });

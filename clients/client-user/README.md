@@ -80,7 +80,7 @@ Fourteen follow no pattern:
 | `listRecentlyPlayed(client, options?)` | The albums, playlists and stations played lately |
 | `listRecentlyPlayedTracks(client, options?)` | The tracks played lately |
 | `listRecentlyPlayedStations(client, options?)` | The radio stations played lately |
-| `getMusicSummariesByYear(client, years, options?)` | The listener's replay. The one year Apple takes at present is `"latest"`. |
+| `getMusicSummariesByYear(client, values, options?)` | The listener's replay. The one year Apple takes at present is `"latest"`. |
 | `getPersonalStation(client, options?)` | The listener's own station |
 | `getUserStorefront(client, options?)` | The storefront the listener's account is in |
 

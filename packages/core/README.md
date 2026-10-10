@@ -199,7 +199,7 @@ client and hands over what the answer holds:
 | --- | --- | --- |
 | `resourceGetter<R, C, E>(fn, collection, also?)` | `GET {collection}/{id}` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
 | `resourcesGetter<R, C, E>(fn, collection, also?)` | `GET {collection}?ids=` | The list of them as Apple sent it, empty when Apple sent none |
-| `resourcesFinder<R, C, E>(fn, filter, collection, also?)` | `GET {collection}?filter[{filter}]=` | The list, likewise. `filter` is the filter's name, such as `isrc`, and the function takes the values to look for. |
+| `resourcesFinder<R, C, E>(fn, filter, collection, also?)` | `GET {collection}?filter[{filter}]=` | The list, likewise. `filter` is the filter's name, such as `isrc`: lowercase words with hyphens between, in at most 64 characters. The function takes the values to look for, as `values`. |
 | `resourceLister<R, C, E>(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
 | `relationshipGetter<Rels, C>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back, and of a `schema` for it. |
 | `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, what a write has `written`, or the `answer` as it is |
