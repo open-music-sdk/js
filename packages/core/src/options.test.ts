@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createClient, type tSchemaLike } from "./client";
 import { isAppleMusicError } from "./errors";
-import { initOf, type tReadOptions } from "./options";
+import { initOf, walkOf, type tReadOptions } from "./options";
 
 const SECRET = "s3cretT0ken";
 const noop = () => undefined;
@@ -415,6 +415,51 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     const odd = { toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked };
     for (const options of [{ language: odd }, { limit: odd }, { offset: odd }, { include: [odd] }, { params: { a: odd } }]) thrown(() => initOf("fn", loose(options)));
     expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("walkOf: the options of a function that walks pages", () => {
+  test("it gives what initOf gives, and the most pages the walk may ask for when the caller named one", () => {
+    const options = { language: "en-GB", limit: 5, params: { "fields[songs]": "name" } };
+    expect(walkOf("fn", { ...options, maxPages: 3 }, { ids: ["1"] }, [])).toEqual({ ...initOf("fn", options, { ids: ["1"] }), maxPages: 3 });
+  });
+
+  test.each<[string, object | undefined]>([
+    ["no options", undefined],
+    ["no limit among the options", { limit: 5 }],
+    ["a limit that is undefined", { maxPages: undefined }],
+  ])("with %s, it gives no limit at all, so a walk goes on to the last page", (_name, options) => {
+    expect(walkOf("fn", options)).not.toHaveProperty("maxPages");
+    expect(walkOf("fn", options)).toEqual(initOf("fn", options));
+  });
+
+  test("a further option the function names is sent, as with initOf", () => {
+    expect(walkOf("fn", loose({ views: ["top-songs"], maxPages: 2 }), {}, ["views"])).toMatchObject({ params: { views: ["top-songs"] }, maxPages: 2 });
+  });
+
+  test("the limit is not a parameter: it is never among what is sent", () => {
+    expect(walkOf("fn", { maxPages: 2 }).params).toEqual({});
+  });
+
+  test.each<[string, unknown, string]>([
+    ["zero", 0, "0"],
+    ["below zero", -1, "-1"],
+    ["not whole", 1.5, "1.5"],
+    ["not a number", Number.NaN, "NaN"],
+    ["without end", Number.POSITIVE_INFINITY, "Infinity"],
+    ["a string", "2", "1 characters"],
+    ["null", null, "null"],
+  ])("a limit that is %s is a TypeError naming the function and the option", (_name, maxPages, what) => {
+    expect(thrown(() => walkOf("listGenres", loose({ maxPages })))).toEqual(new TypeError(`listGenres: maxPages must be a whole number above 0; got ${what}`));
+  });
+
+  test("the other options are checked as initOf checks them, under the function's name", () => {
+    expect(thrown(() => walkOf("listGenres", { limit: 0, maxPages: 2 })).message).toBe("listGenres: limit must be a whole number above 0; got 0");
+    expect(thrown(() => walkOf("listGenres", loose([]))).message).toBe("listGenres: expected an options object; got a list");
+  });
+
+  test("initOf itself takes no notice of a limit: a function that asks for one thing has no walk to hold", () => {
+    expect(initOf("fn", loose({ maxPages: 0 }))).toEqual({ params: {}, schema: undefined, signal: undefined });
   });
 });
 

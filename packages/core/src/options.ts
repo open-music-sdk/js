@@ -30,6 +30,16 @@ export interface tReadOptions<T = unknown> {
   readonly signal?: AbortSignal | undefined;
 }
 
+/** What a function that walks pages takes beside the rest: how far a walk may go. */
+export interface tWalkOptions {
+  /**
+   * The most pages a walk may ask Apple for: a whole number above zero. Default: no limit, so a walk goes on for as
+   * long as each page names a next one. It is the walk's alone: called with a client, a function asks for the one
+   * page it resolves to, whatever this says.
+   */
+  readonly maxPages?: number | undefined;
+}
+
 /** More than any endpoint takes. Each one is a URL made longer, so the bag is not left open. */
 const MAX_PARAMS = 100;
 
@@ -58,6 +68,11 @@ function limitOf(fn: string, value: unknown): number | undefined {
 function offsetOf(fn: string, value: unknown): number | string | undefined {
   if (value === undefined || isCursor(value) || (Number.isSafeInteger(value) && (value as number) >= 0)) return value as number | string | undefined;
   throw new TypeError(`${fn}: offset must be a whole number from 0, or a cursor of 1 to ${String(MAX_LENGTH)} characters; got ${got(value)}`);
+}
+
+function maxPagesOf(fn: string, value: unknown): number | undefined {
+  if (value === undefined || (Number.isSafeInteger(value) && (value as number) > 0)) return value as number | undefined;
+  throw new TypeError(`${fn}: maxPages must be a whole number above 0; got ${got(value)}`);
 }
 
 function schemaOf<T>(fn: string, value: unknown): tSchemaLike<T> | undefined {
@@ -153,4 +168,15 @@ export function initOf<T>(fn: string, options: tReadOptions<T> | undefined, set:
   ];
   for (const [key, value] of given) if (value !== undefined && value !== null) query.set(key, value);
   return { params: Object.fromEntries(query), schema: schemaOf(fn, schema), signal: signalOf(fn, signal) };
+}
+
+/**
+ * As `initOf`, for a function that walks pages: what it gives also holds `maxPages`, the most pages the walk may
+ * ask for, when the caller gave one. It is what `paginate` takes, and `request` has no use for it.
+ */
+export function walkOf<T>(fn: string, options: (tReadOptions<T> & tWalkOptions) | undefined, set: tParams = {}, also: readonly string[] = []): tRequestInit<T> & tWalkOptions {
+  const bag = optionsOf(fn, options, "an options object");
+  const init = initOf<T>(fn, bag, set, also);
+  const maxPages = maxPagesOf(fn, bag.maxPages);
+  return maxPages === undefined ? init : { ...init, maxPages };
 }

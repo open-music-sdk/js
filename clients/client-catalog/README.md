@@ -126,6 +126,7 @@ Some functions take one more:
 
 | Option | Of | |
 | --- | --- | --- |
+| `maxPages` | Every `list…`, `get<X>Relationship` and `get<X>View` | The most pages a walk may ask for, when the function is one of `catalog(client)`'s. Default: no limit. Called with a client, the function asks for one page whatever this says. |
 | `views` | `getAlbum`, `getArtist`, `getPlaylist`, `getMusicVideo`, `getRecordLabel` | The views to send with the resource, such as `["top-songs"]` |
 | `restrict` | The three `…ByEquivalents` | `["explicit"]` leaves explicit content out |
 | `with` | The five `get<X>View` | `["attributes"]` sends the view's own attributes, such as its title |

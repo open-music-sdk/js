@@ -47,6 +47,7 @@ try {
 | `listOf(fn, name, value)` | A caller's list of ids, types or codes as the call's own copy, or a `TypeError` |
 | `typedIdsOf(fn, name, value)` | A caller's ids by type, such as `{ songs: ["1"] }`, as the parameters they are sent as, or a `TypeError` |
 | `initOf(fn, options, set?, also?)`, `tReadOptions` | The options every function for an endpoint takes, turned into what `request` takes |
+| `walkOf(fn, options, set?, also?)`, `tWalkOptions` | The same for a function that walks pages, with the most pages its walk may ask for |
 | `endpoint`, `resourceGetter`, `resourcesGetter`, `resourcesFinder`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
 | `endpointNamespace(fn, client, endpoints)` | Every such function bound to one client, its answers unwrapped |
 
@@ -320,6 +321,11 @@ option read once and copied.
 | `params` | Any other query parameter, as a plain object of at most 100. A name is one as Apple writes them, such as `ids[albums]` or `limit[songs:tracks]`: letters, digits, `-`, `_`, `.` and `:`, with any part in brackets after, in at most 64 characters. A value is a string of at most 256 characters, a number, `true` or `false`, or a list of at most 300 numbers and strings, each string as `listOf` takes them. Null, undefined and a list of nothing are not sent. |
 | `schema` | A Standard Schema the answer is held to: an object or a function with a `validate` under `~standard`. |
 | `signal` | An `AbortSignal`. Aborts the request. |
+
+A function that walks pages takes one more, `maxPages` (`tWalkOptions`): the most pages its walk may
+ask for, a whole number above zero, with no limit by default. `walkOf` is `initOf` for such a function,
+and what it gives holds the limit for `paginate`. It is the walk's alone: called with a client, the
+function asks for the one page it resolves to.
 
 Three things fill the query, and the later wins: the caller's `params`; then the options that are
 given; then `set`, which is what the function itself puts there, such as the ids it was handed.

@@ -6,10 +6,10 @@ import { clientOf, listOf, optionsOf, segmentOf } from "./check";
 import { pageOf, type tAppleMusicClient, type tPage, type tRequestInit } from "./client";
 import { AppleMusicError } from "./errors";
 import { got } from "./got";
-import { initOf, type tReadOptions } from "./options";
+import { initOf, walkOf, type tReadOptions, type tWalkOptions } from "./options";
 
-/** A request as `client.request` takes it: where it goes, and what goes with it. */
-export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R>];
+/** A request as `client.request` takes it: where it goes, and what goes with it. A walk's may also say how many pages it may ask for. */
+export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R> & tWalkOptions];
 
 /**
  * A function for one endpoint. Called with a client it resolves to what Apple answered. `bound(client)` is the same
@@ -247,7 +247,7 @@ function given<C>(builder: string, collection: unknown, also: unknown): readonly
 }
 
 /** What a request is made with, with the collection's say on the Music User Token where it has one. */
-const pinned = <R>(init: tRequestInit<R>, user: boolean | undefined): tRequestInit<R> => (user === undefined ? init : { ...init, user });
+const pinned = <I extends object>(init: I, user: boolean | undefined): I => (user === undefined ? init : { ...init, user });
 
 /**
  * A function for the resource with one id in a collection: `GET {collection}/{id}`. `R` is the answer's type and has
@@ -314,11 +314,11 @@ export function resourceLister<R extends tResources = never, C extends object = 
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E>], tPaged<R>, AsyncIterable<tItem<R>>> {
+): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions], tPaged<R>, AsyncIterable<tItem<R>>> {
   const [locate, names, user] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
-  return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E>) => {
+  return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions) => {
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = pinned(initOf<tPaged<R>>(fn, bag, {}, names), user);
+    const init = pinned(walkOf<tPaged<R>>(fn, bag, {}, names), user);
     return located<tPaged<R>>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
@@ -335,17 +335,19 @@ export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipRe
  * and the name asked for decides what comes back, and so what a `schema` for it has to be a schema of.
  */
 export interface tRelationshipEndpoint<Rels, C = tNone> {
-  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>): Promise<tRelationshipPage<Rels, K>>;
-  readonly bound: (client: tAppleMusicClient) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>) => AsyncIterable<tRelated<Rels, K>>;
+  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions): Promise<tRelationshipPage<Rels, K>>;
+  readonly bound: (
+    client: tAppleMusicClient,
+  ) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions) => AsyncIterable<tRelated<Rels, K>>;
 }
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
   const [locate, , user] = given<C>("relationshipGetter", collection, undefined);
-  const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C>) => {
+  const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C> & tWalkOptions) => {
     const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = pinned(initOf<tRelationshipResponse>(fn, bag), user);
+    const init = pinned(walkOf<tRelationshipResponse>(fn, bag), user);
     return located<tRelationshipResponse>(fn, locate(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.

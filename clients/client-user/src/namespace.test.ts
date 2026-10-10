@@ -147,6 +147,21 @@ describe("what its functions hand over", () => {
     expect(calls).toHaveLength(1);
   });
 
+  test("a list and a relationship each ask for no more pages than maxPages says, and do not send it", async () => {
+    const endless = () => Array.from({ length: 10 }, (_, index) => ({ body: { data: [song(`i.${String(index)}`)], next: `/v1/me/library/songs?offset=${String(index + 1)}` } }));
+    for (const walk of [(mine: tUser) => mine.listLibrarySongs({ maxPages: 2 }), (mine: tUser) => mine.getLibraryPlaylistRelationship("p.1", "tracks", { maxPages: 2 }), (mine: tUser) => mine.listRecentlyPlayed({ maxPages: 2 })]) {
+      const { music, calls } = apple(endless());
+      expect(await all<unknown>(walk(user(music)))).toHaveLength(2);
+      expect(calls.map((call) => new URL(call.url).search)).toEqual(["", "?offset=1"]);
+    }
+  });
+
+  test("a maxPages that is no limit is a TypeError naming the function, thrown as it is called", () => {
+    const { music, calls } = apple();
+    expect(() => user(music).listLibrarySongs({ maxPages: 0 })).toThrow(new TypeError("listLibrarySongs: maxPages must be a whole number above 0; got 0"));
+    expect(calls).toHaveLength(0);
+  });
+
   test("a list asks for nothing until it is looped over, and can be looped over again", async () => {
     const { music, calls } = apple([{ body: { data: [song("i.1")] } }, { body: { data: [song("i.2")] } }]);
     const songs = user(music).listLibrarySongs();

@@ -134,6 +134,7 @@ Some functions take one more:
 
 | Option | Of | |
 | --- | --- | --- |
+| `maxPages` | Every `list…` and `get<X>Relationship` | The most pages a walk may ask for, when the function is one of `user(client)`'s. Default: no limit. Called with a client, the function asks for one page whatever this says. |
 | `types` | `searchLibrary` | The types to look for, such as `["library-songs"]`. Required. |
 | `types` | `listRecentlyPlayed`, `listRecentlyPlayedTracks` | The types to keep to |
 | `views` | `getMusicSummariesByYear` | The views to send with each summary, such as `["top-songs"]` |

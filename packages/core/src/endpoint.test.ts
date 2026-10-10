@@ -752,6 +752,66 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       expect(calls).toHaveLength(1);
     });
 
+    describe("maxPages: how many pages a walk may ask for", () => {
+      /** Apple, answering every request with one item and a link to the next, without end. */
+      const endless = () => Array.from({ length: 30 }, (_, index) => ({ body: { data: [index], next: `/v1/me/library/songs?offset=${String(index + 1)}` } }));
+
+      test.each([1, 3])("with a limit of %i, a whole collection is walked that far and no further", async (maxPages) => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        expect(await all(listLibrarySongs.bound(music)({ maxPages }))).toHaveLength(maxPages);
+        expect(calls).toHaveLength(maxPages);
+      });
+
+      test("a relationship's walk is held to its limit in the same way", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        expect(await all(getAlbumRelationship.bound(music)("1", "tracks", { maxPages: 2 }))).toHaveLength(2);
+        expect(calls).toHaveLength(2);
+      });
+
+      test("pages that hold nothing and each name a next are asked for only as far as the limit, where leaving the loop could not stop them", async () => {
+        const empty = Array.from({ length: 30 }, (_, index) => ({ body: { data: [], next: `/v1/me/library/songs?offset=${String(index + 1)}` } }));
+        const { music, calls } = apple(empty, { userToken: "user" });
+        expect(await all(listLibrarySongs.bound(music)({ maxPages: 4 }))).toEqual([]);
+        expect(calls).toHaveLength(4);
+      });
+
+      test("the check can tell: with no limit, the same walk goes on for as long as it is looped over", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        const seen: unknown[] = [];
+        for await (const item of listLibrarySongs.bound(music)()) if (seen.push(item) === 12) break;
+        expect(calls).toHaveLength(12);
+      });
+
+      test("the limit is not sent to Apple, and the other options still are", async () => {
+        const { music, sent } = apple([{ body: { data: [] } }], { userToken: "user" });
+        await all(listLibrarySongs.bound(music)({ limit: 5, maxPages: 2 }));
+        expect(sent()).toEqual(["GET /v1/me/library/songs?limit=5"]);
+      });
+
+      test("a limit that is no limit is a TypeError naming the function, thrown as it is called", () => {
+        const { music, calls } = apple();
+        expect(() => listLibrarySongs.bound(music)({ maxPages: 0 })).toThrow(new TypeError("listLibrarySongs: maxPages must be a whole number above 0; got 0"));
+        expect(() => getAlbumRelationship.bound(music)("1", "tracks", { maxPages: 1.5 })).toThrow(new TypeError("getAlbumRelationship: maxPages must be a whole number above 0; got 1.5"));
+        expect(calls).toHaveLength(0);
+      });
+
+      test("called with a client, a function asks for its one page whatever the limit says, and still checks it", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        await listLibrarySongs(music, { maxPages: 3 });
+        expect(calls).toHaveLength(1);
+        expect(await rejection(listLibrarySongs(music, { maxPages: 0 }))).toEqual(new TypeError("listLibrarySongs: maxPages must be a whole number above 0; got 0"));
+      });
+
+      test("the types: a function that walks takes a limit, and one that asks for one thing does not", () => {
+        expectTypeOf(listLibrarySongs).parameter(1).toExtend<{ readonly maxPages?: number | undefined } | undefined>();
+        const wrong = [
+          // @ts-expect-error -- one song is one request: there is no walk to hold
+          () => getSong(apple().music, "1", { maxPages: 2 }),
+        ];
+        expect(wrong).toHaveLength(1);
+      });
+    });
+
     test("the signal aborts the walk between pages", async () => {
       const { music, calls } = apple(pages(), { userToken: "user" });
       const controller = new AbortController();
