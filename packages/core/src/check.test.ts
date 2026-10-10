@@ -1,3 +1,4 @@
+import { runInNewContext } from "node:vm";
 import { describe, expect, test, vi } from "vitest";
 import { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
 import { createClient } from "./client";
@@ -86,11 +87,9 @@ describe("optionsOf", () => {
       expect(Object.getPrototypeOf(optionsOf("fn", options, "an options object"))).toBeNull();
     });
 
-    test("what the caller's object inherits is not in it", () => {
+    test("an object that inherits from another is not a plain one, so what it inherits is never taken for its own: it is refused", () => {
       const options = Object.assign(Object.create({ limit: 5, storefront: "zz" }) as { limit?: number; storefront?: string; language?: string }, { language: "en-GB" });
-      const bag = optionsOf("fn", options, "an options object");
-      expect(Object.entries(bag)).toEqual([["language", "en-GB"]]);
-      expect([bag.limit, bag.storefront]).toEqual([undefined, undefined]);
+      expect(thrown(() => optionsOf("fn", options, "an options object")).message).toBe("fn: expected an options object; got an object that is not a plain one");
     });
 
     test("what other code has put on Object.prototype is not in it, passed an object or passed none", () => {
@@ -133,6 +132,28 @@ describe("optionsOf", () => {
     expect(error).toBeInstanceOf(TypeError);
     expect(error.message).toMatch(/^validateUserToken: expected an options object; got /);
     expect(error.message).not.toContain(SECRET);
+  });
+
+  // Each of these holds what it holds elsewhere than in properties of its own, so read as a bag it would be an empty one, and what the caller meant by it would be dropped without a word.
+  test.each<[string, object, string]>([
+    ["a list", [{ limit: 5 }], "a list"],
+    ["a Map", new Map([["limit", 5]]), "an object that is not a plain one"],
+    ["a URLSearchParams", new URLSearchParams("limit=5"), "an object that is not a plain one"],
+    ["a class's instance", new (class Options {
+      limit = 5;
+    })(), "an object that is not a plain one"],
+    ["a Date", new Date(0), "an object that is not a plain one"],
+    ["bytes", new Uint8Array(4), "an object that is not a plain one"],
+  ])("%s is not an options object: a TypeError that says which it was", (_name, options, what) => {
+    expect(thrown(() => optionsOf("fn", options, "an options object"))).toEqual(new TypeError(`fn: expected an options object; got ${what}`));
+  });
+
+  test.each<[string, object]>([
+    ["an object made with no prototype", Object.assign(Object.create(null) as object, { limit: 5 })],
+    ["an object from another realm, whose Object.prototype is not this one", runInNewContext("({ limit: 5 })") as object],
+    ["a bag this function gave", optionsOf("fn", { limit: 5 }, "an options object")],
+  ])("%s is as plain as one written here", (_name, options) => {
+    expect(Object.entries(optionsOf("fn", options, "an options object"))).toEqual([["limit", 5]]);
   });
 
   test("what was expected is said in the caller's words", () => {

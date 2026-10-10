@@ -260,7 +260,7 @@ another copy of this package. A namespace is frozen, and its type holds what it 
 | --- | --- |
 | `segmentOf(fn, name, value)` | A string of 1 to 64 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
-| `optionsOf(fn, options, what)` | An object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. |
+| `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |
 
 `segmentOf` is what keeps a caller's id from moving a request: put into a path as it is,
@@ -282,7 +282,7 @@ option read once and copied.
 | `include`, `extend` | Lists of names, as `listOf` takes them. A list of nothing is not sent. |
 | `limit` | A whole number above zero. |
 | `offset` | A whole number from zero, or a cursor as Apple gave it, of 1 to 256 characters. |
-| `params` | Any other query parameter, sent as given: at most 100, each a string, a number, `true` or `false`, or a list of at most 300 strings and numbers. Null, undefined and a list of nothing are not sent. |
+| `params` | Any other query parameter, as a plain object of at most 100. A name is one as Apple writes them, such as `ids[albums]` or `limit[songs:tracks]`: letters, digits, `-`, `_`, `.` and `:`, with any part in brackets after, in at most 64 characters. A value is a string of at most 256 characters, a number, `true` or `false`, or a list of at most 300 numbers and strings, each string as `listOf` takes them. Null, undefined and a list of nothing are not sent. |
 | `schema` | A Standard Schema the answer is held to: an object or a function with a `validate` under `~standard`. |
 | `signal` | An `AbortSignal`. Aborts the request. |
 
@@ -290,3 +290,9 @@ Three things fill the query, and the later wins: the caller's `params`; then the
 given; then `set`, which is what the function itself puts there, such as the ids it was handed.
 `also` names any further options a function takes, such as `views`, each sent under its own name; an
 option a function does not name is not sent.
+
+`params` is held to what a query parameter can be, so that what is put there by mistake is refused
+before anything is sent. A `URLSearchParams` or a `Map` is a `TypeError`, where it would have been read
+as no parameters at all. A name that does not fit is described in its error and not repeated, and one
+that fits is short enough to be named there. `request` itself takes `params` as they come, for a
+parameter that fits none of this.

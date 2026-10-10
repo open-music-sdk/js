@@ -1,6 +1,6 @@
 // The options a function for an endpoint takes, and how they become what `request` takes. Written once, so that
 // the same option means the same thing whichever function it is handed to.
-import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, copyOf, lengthOf, listed, optionsOf } from "./check";
+import { MAX_ITEMS, MAX_LENGTH, MAX_NAME, copyOf, gotFor, isItem, isPlain, lengthOf, listed, optionsOf } from "./check";
 import type { tParams, tRequestInit, tSchemaLike } from "./client";
 import { got } from "./got";
 
@@ -83,26 +83,47 @@ function alsoOf(fn: string, name: string, value: unknown): tValue | undefined {
   throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, a number, true or false, or a list of strings; got ${got(value)}`);
 }
 
-/** One of the caller's own parameters as it can be sent, a list as this call's copy; `undefined` when it cannot be. */
+/**
+ * A parameter's name as Apple writes them: `include`, `ids[albums]`, `limit[songs:tracks]`. One that fits is too
+ * short to be a token and holds nothing a log could be misled by, so the error about its value can name it. One
+ * that does not fit is described, as any value is.
+ */
+const isKey = (key: string): boolean => key.length <= MAX_NAME && /^[a-z][\w.:-]*(\[[\w.:-]+\])*$/i.test(key);
+
+/**
+ * One of the caller's own parameters as it can be sent, a list as this call's copy; `undefined` when it cannot be.
+ * Text is held to a length and a list's items to what a list's are everywhere here, so nothing a caller put under
+ * a name by mistake is sent to Apple at whatever length it has.
+ */
 function sendable(given: unknown): tValue | undefined {
-  if (!Array.isArray(given)) return typeof given === "string" || isNumber(given) || typeof given === "boolean" ? given : undefined;
+  if (!Array.isArray(given)) return (typeof given === "string" && given.length <= MAX_LENGTH) || isNumber(given) || typeof given === "boolean" ? given : undefined;
   // A list too long is not read: its length is all that is asked for, and asked once.
   const length = lengthOf(given);
   const list = length !== undefined && length <= MAX_ITEMS ? copyOf(given, length) : [undefined];
-  return list.every((each) => typeof each === "string" || isNumber(each)) ? list : undefined;
+  return list.every((each) => isItem(each) || isNumber(each)) ? list : undefined;
 }
 
 /** The caller's own parameters. Null, undefined and a list of nothing mean absent. */
 function paramsOf(fn: string, value: unknown): [string, tValue][] {
   if (value === undefined) return [];
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError(`${fn}: params must be an object of query parameters; got ${got(value)}`);
+  // Asked before anything of it is read: a Map or a URLSearchParams would be read as no parameters at all, and a Buffer as one for each of its bytes.
+  if (!isPlain(value)) throw new TypeError(`${fn}: params must be a plain object of query parameters; got ${gotFor(value)}`);
   const entries: [string, unknown][] = Object.entries(value);
   if (entries.length > MAX_PARAMS) throw new TypeError(`${fn}: params must hold at most ${String(MAX_PARAMS)} parameters; got ${String(entries.length)}`);
   const out: [string, tValue][] = [];
   for (const [key, given] of entries) {
+    if (!isKey(key)) {
+      throw new TypeError(
+        `${fn}: params holds a name that is not a parameter's, which is letters, digits, "-", "_", "." and ":", with any part in brackets after, as in ids[albums], and at most ${String(MAX_NAME)} characters; got ${got(key)}`,
+      );
+    }
     if (given === undefined || given === null) continue;
     const item = sendable(given);
-    if (item === undefined) throw new TypeError(`${fn}: params.${key} must be a string, a number, true or false, or a list of at most ${String(MAX_ITEMS)} strings and numbers; got ${got(given)}`);
+    if (item === undefined) {
+      throw new TypeError(
+        `${fn}: params.${key} must be a string of at most ${String(MAX_LENGTH)} characters, a number, true or false, or a list of at most ${String(MAX_ITEMS)} numbers and strings, each string of 1 to ${String(MAX_NAME)} characters with no comma in it; got ${got(given)}`,
+      );
+    }
     if (!Array.isArray(item) || item.length > 0) out.push([key, item]);
   }
   return out;
@@ -119,7 +140,7 @@ function paramsOf(fn: string, value: unknown): [string, tValue][] {
 export function initOf<T>(fn: string, options: tReadOptions<T> | undefined, set: tParams = {}, also: readonly string[] = []): tRequestInit<T> {
   const bag = optionsOf(fn, options, "an options object");
   const { language, include, extend, limit, offset, params, schema, signal } = bag;
-  // A Map, so that a parameter a caller names `__proto__` is one more parameter and nothing else.
+  // A Map, so that a name is a key and nothing else, whatever a function's own `set` or `also` names.
   const query = new Map<string, tValue>(paramsOf(fn, params));
   const given: [string, tParams[string]][] = [
     ["l", languageOf(fn, language)],

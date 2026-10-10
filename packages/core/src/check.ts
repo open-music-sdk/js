@@ -15,13 +15,28 @@ export const has = (value: unknown, methods: readonly string[]): boolean =>
 export const ownOf = <T extends object>(bag: T): T => Object.assign(Object.create(null) as T, bag);
 
 /**
+ * Whether `value` is a plain object: one written as `{…}`, or made with no prototype. A list, a Map, a
+ * URLSearchParams, a Buffer and a class's instance are not: what each holds is not in properties of its own, so
+ * read as a bag of them it would be an empty bag, and what the caller meant by it would be dropped without a word.
+ * The prototype is asked about rather than compared, so an object from another realm is as plain as one from here.
+ */
+export function isPlain(value: unknown): value is object {
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === null || Object.getPrototypeOf(proto) === null;
+}
+
+/** What `value` is, for the error that says it was to be a plain object: `got`, which tells a list and a Map from neither. */
+export const gotFor = (value: unknown): string => (Array.isArray(value) ? "a list" : typeof value === "object" && value !== null ? "an object that is not a plain one" : got(value));
+
+/**
  * An options bag as this call's own: what the caller's object holds itself, and the empty bag when none was
- * given. The types rule anything but an object out, and a caller without them can still pass it.
+ * given. The types rule anything but a plain object out, and a caller without them can still pass it.
  */
 export function optionsOf<T extends object>(fn: string, options: T | undefined, what: string): T {
   if (options === undefined) return ownOf({} as T);
-  if (typeof options === "object" && (options as unknown) !== null) return ownOf(options);
-  throw new TypeError(`${fn}: expected ${what}; got ${got(options)}`);
+  if (isPlain(options)) return ownOf(options);
+  throw new TypeError(`${fn}: expected ${what}; got ${gotFor(options)}`);
 }
 
 /**
@@ -64,7 +79,7 @@ export function segmentOf(fn: string, name: string, value: unknown): string {
 export const MAX_ITEMS = 300;
 
 /** One value of a list: a list is sent joined by commas, so an item with a comma in it would arrive as two. */
-const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_NAME && !item.includes(",");
+export const isItem = (item: unknown): item is string => typeof item === "string" && item !== "" && item.length <= MAX_NAME && !item.includes(",");
 
 /**
  * How long a caller's list says it is, asked once; `undefined` for what is no list. Everything after goes by this

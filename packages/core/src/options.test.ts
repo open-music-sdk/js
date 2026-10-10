@@ -203,14 +203,11 @@ describe("initOf: what it gives is this call's own", () => {
     expect([include.asked.times, ids.asked.times, none.asked.times]).toEqual([1, 1, 1]);
   });
 
-  test("a parameter named __proto__ is one more parameter and nothing else", () => {
-    const init = initOf("fn", { params: JSON.parse('{"__proto__": ["polluted"], "x": 1}') as Record<string, string[] | number> });
-    expect(Object.entries(init.params ?? {})).toEqual([
-      ["__proto__", ["polluted"]],
-      ["x", 1],
-    ]);
-    expect(Object.getPrototypeOf(init.params)).toBe(Object.prototype);
+  test("a parameter named __proto__, as JSON can name one, is no parameter's name: it is refused, and nothing comes to inherit from it", () => {
+    const params = JSON.parse('{"__proto__": ["polluted"], "x": 1}') as Record<string, string[] | number>;
+    expect(thrown(() => initOf("fn", { params })).message).toContain("params holds a name that is not a parameter's");
     expect(({} as { polluted?: unknown }).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(initOf("fn", { params: { x: 1 } }).params)).toBe(Object.prototype);
   });
 });
 
@@ -241,20 +238,30 @@ describe("initOf: an option is one the caller passed, never one found on Object.
     expect(polluted(planted, () => ({} as tReadOptions).limit)).toBe(9);
   });
 
-  test("an option the caller's object inherits is not one it passed", () => {
+  test("an object that inherits its options from another is no plain object, so nothing it inherits is taken for passed: it is refused", () => {
     const options = Object.assign(Object.create({ limit: 9, params: { inherited: 1 } }) as tReadOptions, { language: "en-GB" });
-    expect(initOf("fn", options).params).toEqual({ l: "en-GB" });
+    expect(thrown(() => initOf("fn", options)).message).toBe("fn: expected an options object; got an object that is not a plain one");
   });
 });
 
 describe("initOf: what it is handed is checked, and a mistake names the function and the option", () => {
   const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
-  const PARAM = "getSong: params.a must be a string, a number, true or false, or a list of at most 300 strings and numbers; got ";
+  const PARAM =
+    "getSong: params.a must be a string of at most 256 characters, a number, true or false, or a list of at most 300 numbers and strings, each string of 1 to 64 characters with no comma in it; got ";
+  const PLAIN = "getSong: params must be a plain object of query parameters; got ";
+  const KEY =
+    'getSong: params holds a name that is not a parameter\'s, which is letters, digits, "-", "_", "." and ":", with any part in brackets after, as in ids[albums], and at most 64 characters; got ';
+  class Options {
+    limit = 5;
+  }
 
   test.each<[string, unknown, string]>([
     ["options that are null", null, "getSong: expected an options object; got null"],
     ["options that are a string", "en-GB", "getSong: expected an options object; got 5 characters"],
     ["options that are a number", 25, "getSong: expected an options object; got 25"],
+    ["options that are a list", [{ limit: 5 }], "getSong: expected an options object; got a list"],
+    ["options that are a Map", new Map([["limit", 5]]), "getSong: expected an options object; got an object that is not a plain one"],
+    ["options that are a class's instance", new Options(), "getSong: expected an options object; got an object that is not a plain one"],
     ["an empty language", { language: "" }, "getSong: language must be a string of 1 to 64 characters; got 0 characters"],
     ["a language one character too long", { language: "l".repeat(65) }, "getSong: language must be a string of 1 to 64 characters; got 65 characters"],
     ["a language that is null", { language: null }, "getSong: language must be a string of 1 to 64 characters; got null"],
@@ -278,10 +285,30 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     ["an empty cursor", { offset: "" }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got 0 characters"],
     ["a cursor one character too long", { offset: "c".repeat(257) }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got 257 characters"],
     ["an offset that is null", { offset: null }, "getSong: offset must be a whole number from 0, or a cursor of 1 to 256 characters; got null"],
-    ["params that are null", { params: null }, "getSong: params must be an object of query parameters; got null"],
-    ["params as a query string", { params: "a=b" }, "getSong: params must be an object of query parameters; got 3 characters"],
-    ["params as a list", { params: ["a"] }, "getSong: params must be an object of query parameters; got object"],
-    ["params as a function", { params: noop }, "getSong: params must be an object of query parameters; got function"],
+    ["params that are null", { params: null }, `${PLAIN}null`],
+    ["params as a query string", { params: "a=b" }, `${PLAIN}3 characters`],
+    ["params as a list", { params: ["a"] }, `${PLAIN}a list`],
+    ["params as a function", { params: noop }, `${PLAIN}function`],
+    ["params as a URLSearchParams, which would be read as none", { params: new URLSearchParams("a=1") }, `${PLAIN}an object that is not a plain one`],
+    ["params as a Map, which would be read as none", { params: new Map([["a", 1]]) }, `${PLAIN}an object that is not a plain one`],
+    ["params as bytes, which would be read as one for each", { params: new Uint8Array(4) }, `${PLAIN}an object that is not a plain one`],
+    ["params as a class's instance", { params: new Options() }, `${PLAIN}an object that is not a plain one`],
+    ["a param with no name", { params: { "": 1 } }, `${KEY}0 characters`],
+    ["a param whose name is one character too long", { params: { ["a".repeat(65)]: 1 } }, `${KEY}65 characters`],
+    ["a param whose name has a line break in it", { params: { "a\nERROR forged": 1 } }, `${KEY}14 characters`],
+    ["a param whose name has a space in it", { params: { "a b": 1 } }, `${KEY}3 characters`],
+    ["a param whose name is two parameters", { params: { "a=1&b": 1 } }, `${KEY}5 characters`],
+    ["a param whose name starts with a bracket", { params: { "[albums]": 1 } }, `${KEY}8 characters`],
+    ["a param whose name starts with a digit", { params: { "1a": 1 } }, `${KEY}2 characters`],
+    ["a param whose name has a bracket left open", { params: { "ids[albums": 1 } }, `${KEY}10 characters`],
+    ["a param whose name has nothing in its brackets", { params: { "ids[]": 1 } }, `${KEY}5 characters`],
+    ["a param whose name goes on after its brackets", { params: { "ids[albums]x": 1 } }, `${KEY}12 characters`],
+    ["a param whose name is not ASCII", { params: { "idé": 1 } }, `${KEY}3 characters`],
+    ["a param whose name is bad, though its value is absent", { params: { "a b": undefined } }, `${KEY}3 characters`],
+    ["a param that is text one character too long", { params: { a: "t".repeat(257) } }, `${PARAM}257 characters`],
+    ["a param list holding an empty string", { params: { a: ["1", ""] } }, `${PARAM}object`],
+    ["a param list holding two in one", { params: { a: ["1,2"] } }, `${PARAM}object`],
+    ["a param list holding a string one character too long", { params: { a: ["i".repeat(65)] } }, `${PARAM}object`],
     ["a param that is an object", { params: { a: {} } }, `${PARAM}object`],
     ["a param that is not a number", { params: { a: Number.NaN } }, `${PARAM}NaN`],
     ["a param that is a function", { params: { a: noop } }, `${PARAM}function`],
@@ -320,6 +347,38 @@ describe("initOf: what it is handed is checked, and a mistake names the function
     const list = (length: number) => Array.from({ length }, (_, i) => i);
     expect(initOf("fn", { params: { ids: list(300) } }).params).toEqual({ ids: list(300) });
     expect(() => initOf("fn", { params: { ids: list(301) } })).toThrow(TypeError);
+  });
+
+  test.each(["l", "include", "ids[library-playlist-folders]", "filter[storefront-chart]", "acceptLanguage", "limit[songs:tracks]", "fields[albums]", "art[url]", "a.b_c-d:e9", "a[b][c]", "n".repeat(64)])(
+    "a param named as Apple names them, %s, is sent under that name",
+    (name) => {
+      expect(initOf("fn", { params: { [name]: 1 } }).params).toEqual({ [name]: 1 });
+    },
+  );
+
+  test("text of 256 characters is taken, and a list's strings of 64", () => {
+    const params = { term: "t".repeat(256), ids: ["i".repeat(64), 5] };
+    expect(initOf("fn", { params }).params).toEqual(params);
+  });
+
+  test("an empty string is text, and is sent as it is", () => {
+    expect(initOf("fn", { params: { term: "" } }).params).toEqual({ term: "" });
+  });
+
+  test("a name that fits is named in the error about its value, and one that does not is only described", () => {
+    expect(thrown(() => initOf("getSong", loose({ params: { "ids[albums]": {} } }))).message).toContain("getSong: params.ids[albums] must be");
+    const token = `${"h".repeat(60)}.${"p".repeat(80)}.${"s".repeat(86)}`;
+    const error = thrown(() => initOf("getSong", { params: { [token]: 1 } }));
+    expect(error.message).toBe(`${KEY}228 characters`);
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
+  });
+
+  test("params that are no plain object are refused before anything of them is read", () => {
+    const ownKeys = vi.fn((target: Uint8Array) => Reflect.ownKeys(target));
+    const get = vi.fn((target: Uint8Array, key: string | symbol): unknown => Reflect.get(target, key));
+    const bytes: unknown = new Proxy(new Uint8Array(8), { ownKeys, get });
+    expect(() => initOf("fn", loose({ params: bytes }))).toThrow(TypeError);
+    expect([ownKeys.mock.calls.length, get.mock.calls.length]).toEqual([0, 0]);
   });
 
   test("a param list too long is not read: its length is all that is asked for", () => {
