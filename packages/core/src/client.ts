@@ -104,7 +104,8 @@ export interface tAppleMusicClient {
    * The items of `data` across every `next` page. Breaking out of the loop stops fetching.
    *
    * `from` is a path, or a page already fetched: the page's own items come first and nothing is asked for until
-   * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A
+   * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A page
+   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError. A
    * promise of a page is not a page: await it, so that what it rejects with reaches the code that asked.
    *
    * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
@@ -136,6 +137,17 @@ export function pageOf(page: unknown, path: string, status: number | undefined):
   if (data != null && !Array.isArray(data)) throw shape("data is not an array");
   if (next != null && typeof next !== "string") throw shape("next is not a string");
   return { data: (data as readonly unknown[] | null | undefined) ?? [], next: next ?? undefined };
+}
+
+/**
+ * Whether a value handed over as a page is one: an object that holds a `data` list or a `next` link, and nothing
+ * else under either name. What only looks like an object to walk, such as a URL, a Response or a whole search
+ * answer, holds neither, and would otherwise be a walk over nothing that says nothing.
+ */
+function isPage(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const { data, next } = value as { data?: unknown; next?: unknown };
+  return (data == null || Array.isArray(data)) && (next == null || typeof next === "string") && (data != null || next != null);
 }
 
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
@@ -281,15 +293,16 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
     let params = each.params;
     if (typeof from === "string") next = from;
     else {
-      // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else that is no object is the caller's mistake.
-      if ((from as unknown) !== undefined && (typeof from !== "object" || (from as unknown) === null)) throw new TypeError(`paginate: expected a path or a page; got ${got(from)}`);
       // A promise handed over would have nothing listening to it until a loop started, so one that rejects first
       // would be nobody's to catch. It is the caller's to await.
-      if (typeof (from as { then?: unknown } | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
-      const first = pageOf(from, "the page given to paginate", 200);
+      if (typeof (from as { then?: unknown } | null | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
+      // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else has to be a page,
+      // and one that is not is the caller's mistake: nothing was asked for, so it is no answer of Apple's.
+      if ((from as unknown) !== undefined && !isPage(from)) throw new TypeError(`paginate: expected a path or a page, which is an object with a data list, a next link or both; got ${got(from)}`);
+      const first = ((from as unknown) ?? {}) as { readonly data?: readonly T[] | null; readonly next?: string | null };
       // The walk's own copy, so that it goes over the page as it was handed, whatever is done to the page meanwhile.
-      yield* first.data.slice() as readonly T[];
-      next = first.next;
+      yield* (first.data ?? []).slice();
+      next = first.next ?? undefined;
       params = undefined;
     }
     for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {

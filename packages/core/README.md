@@ -98,10 +98,13 @@ if (tracks) for await (const track of music.paginate(tracks)) { /* that page's t
 
 A page's own items come first, as they were when the walk reached the page, and Apple is not asked
 until they run out. With a page, `init.params` is not sent, since its `next` link already carries the
-query; `schema` and `signal` apply to the pages that are fetched. Nothing at all, which is what an
-empty answer comes to, is a last, empty page. Anything else that is no object is a `TypeError`, and so
-is a promise of a page: await it first, so that what it rejects with is caught where the request was
-made.
+query; `schema` and `signal` apply to the pages that are fetched.
+
+A page is an object with a `data` list, a `next` link or both. Anything else handed over is a
+`TypeError` and nothing is asked for: a `URL`, a `Response`, a resource, or a whole search answer, none
+of which holds either. The one exception is nothing at all, which is what an empty answer comes to and
+is a last, empty page. A promise of a page is a `TypeError` too: await it first, so that what it
+rejects with is caught where the request was made.
 
 | Option | |
 | --- | --- |

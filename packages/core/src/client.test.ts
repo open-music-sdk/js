@@ -908,11 +908,20 @@ describe("paginate", () => {
       expect(calls).toHaveLength(0);
     });
 
-    test.each([{}, { data: [] }, { data: undefined }])("a page with nothing in it, %j, yields nothing", async (page: { data?: number[] | undefined }) => {
+    test.each([{ data: [] }, { data: [], next: undefined }, { data: [], next: null }])("a page with nothing in it, %j, yields nothing", async (page) => {
       const { music, calls } = client();
-      expect(await items(music.paginate(page))).toEqual([]);
+      expect(await items(music.paginate(page as { data: number[] }))).toEqual([]);
       expect(calls).toHaveLength(0);
     });
+
+    test.each([{ next: "/v1/x?offset=1" }, { data: undefined, next: "/v1/x?offset=1" }, { data: null, next: "/v1/x?offset=1" }])(
+      "a page that holds a next link and no items, %j, is a page: the rest is asked for",
+      async (page) => {
+        const { music, url } = client([{ body: { data: [2] } }]);
+        expect(await items(music.paginate(page as { next: string }))).toEqual([2]);
+        expect(url()).toBe("https://api.music.apple.com/v1/x?offset=1");
+      },
+    );
 
     test("an answer, once awaited, is handed over as it is", async () => {
       const { music, calls } = client([{ body: { data: [1], next: "/v1/x?offset=1" } }, { body: { data: [2] } }]);
@@ -1054,31 +1063,31 @@ describe("paginate", () => {
       expect([header("music-user-token", 0), header("music-user-token", 1)]).toEqual([null, null]);
     });
 
-    test.each<[string, unknown]>([
-      ["data as a number", { data: 5 }],
-      ["data as a string", { data: "abc" }],
-      ["data as an object", { data: { id: "1" } }],
-      ["next as a number", { data: [], next: 7 }],
-      ["next as an object", { data: [], next: {} }],
-      ["a list", [1, 2]],
-    ])("%s is no page: an ApiError that says so, and nothing is asked for", async (_, page) => {
-      const { music, calls } = client();
-      const e = await failure(items(music.paginate(page as { data: number[] })));
-      expect(e._tag).toBe("ApiError");
-      expect(e.message).toContain("the page given to paginate");
-      expect(calls).toHaveLength(0);
-    });
-
+    // Nothing was asked for, so what is wrong with a page in hand is no answer of Apple's: it is told as the caller's.
     test.each<[string, unknown, string]>([
       ["null", null, "null"],
       ["a number", 5, "5"],
       ["true", true, "boolean"],
       ["a function", () => ({ data: [] }), "function"],
-    ])("%s handed over is the caller's mistake: a TypeError, and nothing is asked for", async (_, page, what) => {
-      const { music, calls } = client();
+      ["a list", [1, 2], "object"],
+      ["data as a number", { data: 5 }, "object"],
+      ["data as a string", { data: "abc" }, "object"],
+      ["data as an object", { data: { id: "1" } }, "object"],
+      ["data as a number beside a sound next link", { data: 5, next: "/v1/x?offset=1" }, "object"],
+      ["next as a number", { data: [], next: 7 }, "object"],
+      ["next as an object", { data: [], next: {} }, "object"],
+      ["next as a number with no data", { next: 7 }, "object"],
+      ["an object that holds neither", {}, "object"],
+      ["an object whose data and next are both undefined", { data: undefined, next: undefined }, "object"],
+      ["a URL", new URL("https://api.music.apple.com/v1/x"), "object"],
+      ["a Map", new Map([["data", [1]]]), "object"],
+      ["a Response", new Response("{}"), "object"],
+      ["a resource", { id: "1", type: "songs", attributes: { name: "x" } }, "object"],
+      ["a whole search answer, whose pages are under results", { results: { songs: { data: [1], next: "/v1/x?offset=1" } } }, "object"],
+    ])("%s handed over is no page: a TypeError that says what a page is, and nothing is asked for", async (_, page, what) => {
+      const { music, calls } = client([{ body: { data: [9] } }]);
       const error: unknown = await items(music.paginate(page as { data: number[] })).catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(TypeError);
-      expect((error as Error).message).toBe(`paginate: expected a path or a page; got ${what}`);
+      expect(error).toEqual(new TypeError(`paginate: expected a path or a page, which is an object with a data list, a next link or both; got ${what}`));
       expect(calls).toHaveLength(0);
     });
   });
