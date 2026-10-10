@@ -109,6 +109,13 @@ describe("what a rating function resolves to", () => {
     }
   });
 
+  test("a rating that is set and answered with nothing is set all the same: bound, it gives undefined and no error", async () => {
+    const { music, sent } = apple([{ status: 204 }, { body: { data: [] } }]);
+    expect(await api.setSongRating.bound(music)("1", 1)).toBeUndefined();
+    expect(await api.setLibrarySongRating.bound(music)("i.1", -1)).toBeUndefined();
+    expect(sent()).toEqual(["PUT /v1/me/ratings/songs/1", "PUT /v1/me/ratings/library-songs/i.1"]);
+  });
+
   test("a rating taken away resolves to nothing, called with a client or bound, since Apple answers with nothing", async () => {
     const { music } = apple([{ status: 204 }, { status: 204 }]);
     await expect(api.deleteSongRating(music, "1")).resolves.toBeUndefined();
@@ -186,7 +193,7 @@ describe("the types", () => {
     expectTypeOf(api.setSongRating).returns.resolves.toEqualTypeOf<tRatingsResponse>();
     expectTypeOf(api.getSongRating.bound(music)).returns.resolves.toEqualTypeOf<tRating>();
     expectTypeOf(api.getSongRatings.bound(music)).returns.resolves.toEqualTypeOf<tRating[]>();
-    expectTypeOf(api.setLibraryPlaylistRating.bound(music)).returns.resolves.toEqualTypeOf<tRating>();
+    expectTypeOf(api.setLibraryPlaylistRating.bound(music)).returns.resolves.toEqualTypeOf<tRating | undefined>();
     expectTypeOf(api.deleteSongRating).returns.resolves.toBeVoid();
     expectTypeOf(api.deleteSongRating.bound(music)).returns.resolves.toBeVoid();
   });

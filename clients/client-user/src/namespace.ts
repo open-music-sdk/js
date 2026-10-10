@@ -57,7 +57,8 @@ export interface tUserFunctions {
   readonly getLibraryPlaylistRelationship: typeof resources.getLibraryPlaylistRelationship;
   /**
    * Makes a playlist in the listener's library: `{ attributes: { name } }`, with its tracks and the folder to put it
-   * in under `relationships`. Resolves to the answer that holds the new playlist.
+   * in under `relationships`. Resolves to the answer that holds the new playlist. Bound, it gives the playlist, or
+   * `undefined` if Apple's answer holds none: the playlist was made either way.
    */
   readonly createLibraryPlaylist: typeof resources.createLibraryPlaylist;
   /** The playlist folder with an id in the listener's library. */
@@ -68,7 +69,8 @@ export interface tUserFunctions {
   readonly getLibraryPlaylistFolderRelationship: typeof resources.getLibraryPlaylistFolderRelationship;
   /**
    * Makes a playlist folder in the listener's library: `{ attributes: { name } }`, with the folder to put it in under
-   * `relationships`. Resolves to the answer that holds the new folder.
+   * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
+   * Apple's answer holds none: the folder was made either way.
    */
   readonly createLibraryPlaylistFolder: typeof resources.createLibraryPlaylistFolder;
   /** The recommendation with an id, of the ones made for the listener. */

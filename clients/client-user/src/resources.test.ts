@@ -172,11 +172,13 @@ describe("a new playlist, and a new playlist folder", () => {
     expect(await bodies()).toEqual([{ attributes: { name: "Road" } }, { attributes: { name: "Trips" } }]);
   });
 
-  test("bound, each gives the new resource, and says so with Apple's status when the answer holds none", async () => {
-    const { music } = apple([{ status: 201, body: created }, { status: 201, body: { data: [] } }]);
+  test("bound, each gives the new resource, and undefined when Apple's answer holds none: it was made either way, and an error would have it made twice", async () => {
+    const { music, sent } = apple([{ status: 201, body: created }, { status: 201, body: { data: [] } }, { status: 201 }, { status: 201, body: created }]);
     expect(await api.createLibraryPlaylist.bound(music)({ attributes: { name: "Road" } })).toEqual(created.data[0]);
-    const error = await rejection(api.createLibraryPlaylist.bound(music)({ attributes: { name: "Road" } }));
-    expect([isAppleMusicError(error, "ApiError"), (error as { status?: number }).status, error.message]).toEqual([true, 201, "createLibraryPlaylist: Apple answered with no resource"]);
+    expect(await api.createLibraryPlaylist.bound(music)({ attributes: { name: "Road" } })).toBeUndefined();
+    expect(await api.createLibraryPlaylistFolder.bound(music)({ attributes: { name: "Trips" } })).toBeUndefined();
+    expect(await api.createLibraryPlaylistFolder.bound(music)({ attributes: { name: "Trips" } })).toEqual(created.data[0]);
+    expect(sent()).toEqual(["POST /v1/me/library/playlists", "POST /v1/me/library/playlists", "POST /v1/me/library/playlist-folders", "POST /v1/me/library/playlist-folders"]);
   });
 
   test("the body is this call's own copy, all the way down: changing what was handed over afterwards changes nothing", async () => {
@@ -252,8 +254,8 @@ describe("the types: a function is about the generated type its name says, and a
     expectTypeOf(api.getLibraryAlbums.bound(music)).returns.resolves.toEqualTypeOf<tLibraryAlbum[]>();
     expectTypeOf(api.listLibraryPlaylists.bound(music)).returns.toEqualTypeOf<AsyncIterable<tLibraryPlaylist>>();
     expectTypeOf(api.listPersonalRecommendations.bound(music)).returns.toEqualTypeOf<AsyncIterable<tPersonalRecommendation>>();
-    expectTypeOf(api.createLibraryPlaylist.bound(music)).returns.resolves.toEqualTypeOf<tLibraryPlaylist>();
-    expectTypeOf(api.createLibraryPlaylistFolder.bound(music)).returns.resolves.toEqualTypeOf<tLibraryPlaylistFolder>();
+    expectTypeOf(api.createLibraryPlaylist.bound(music)).returns.resolves.toEqualTypeOf<tLibraryPlaylist | undefined>();
+    expectTypeOf(api.createLibraryPlaylistFolder.bound(music)).returns.resolves.toEqualTypeOf<tLibraryPlaylistFolder | undefined>();
   });
 
   test("a relationship's name decides the resources it gives, called with a client or bound", () => {

@@ -200,7 +200,7 @@ describe("the types: a function of the namespace takes what the package's takes,
     expectTypeOf(mine.getLibraryAlbums).returns.resolves.toEqualTypeOf<tLibraryAlbum[]>();
     expectTypeOf(mine.listLibraryPlaylists).returns.toEqualTypeOf<AsyncIterable<tLibraryPlaylist>>();
     expectTypeOf(mine.getLibraryResources).returns.resolves.toEqualTypeOf<tResource[]>();
-    expectTypeOf(mine.setSongRating).returns.resolves.toEqualTypeOf<tRating>();
+    expectTypeOf(mine.setSongRating).returns.resolves.toEqualTypeOf<tRating | undefined>();
     expectTypeOf(mine.deleteSongRating).returns.resolves.toBeVoid();
   });
 

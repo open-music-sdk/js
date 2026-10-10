@@ -15,9 +15,12 @@ export type tSetRatingOptions = tReadOptions<tRatingsResponse>;
 /** The options of a function that takes a rating away. Apple answers with nothing, so there is nothing for a `schema` to check. */
 export type tDeleteRatingOptions = tReadOptions<void>;
 
-/** A function that sets the listener's rating of the resource with an id: `PUT {collection}/{id}`. Bound, it gives the rating. */
-function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: string, value: tRatingValue, options?: tSetRatingOptions], tRatingsResponse, Promise<tItem<tRatingsResponse>>> {
-  return endpoint(fn, "resource", (_client, id: string, value: tRatingValue, options?: tSetRatingOptions): tRequestPlan<tRatingsResponse> => {
+/**
+ * A function that sets the listener's rating of the resource with an id: `PUT {collection}/{id}`. Bound, it gives
+ * the rating, or `undefined` if Apple's answer holds none: the rating was set either way.
+ */
+function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: string, value: tRatingValue, options?: tSetRatingOptions], tRatingsResponse, Promise<tItem<tRatingsResponse> | undefined>> {
+  return endpoint(fn, "written", (_client, id: string, value: tRatingValue, options?: tSetRatingOptions): tRequestPlan<tRatingsResponse> => {
     const segment = segmentOf(fn, "id", id);
     if ((value as unknown) !== 1 && (value as unknown) !== -1) throw new TypeError(`${fn}: value must be 1, for a like, or -1, for a dislike; got ${got(value)}`);
     const init = initOf<tRatingsResponse>(fn, optionsOf(fn, options, OPTIONS));

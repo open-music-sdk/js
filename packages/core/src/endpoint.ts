@@ -2,7 +2,7 @@
 // client, it resolves to what Apple answered. Bound to a client, it hands over what the answer holds: the resource,
 // the list of them, or every item of every page. The client packages are made of these.
 import type { tRelationshipResponse } from "@open-music-sdk/types";
-import { clientOf, listOf, optionsOf, segmentOf } from "./check";
+import { clientOf, listOf, optionsOf, ownOf, segmentOf } from "./check";
 import { pageOf, type tAppleMusicClient, type tPage, type tRequestInit } from "./client";
 import { AppleMusicError } from "./errors";
 import { got } from "./got";
@@ -33,11 +33,15 @@ export type tPaged<R> = R & { readonly next?: string | undefined };
 
 /**
  * How a bound function hands the answer over: the one `resource` it holds, the `resources` it holds, every item
- * of all its `pages`, or the `answer` as it is.
+ * of all its `pages`, what a write has `written`, or the `answer` as it is.
+ *
+ * `written` is for a function that makes or changes something. It hands over the resource the answer holds, as
+ * `resource` does, and `undefined` where a success holds none: the write happened either way, and an error there
+ * would have a caller make the same thing again.
  */
-export type tUnwrap = "resource" | "resources" | "pages" | "answer";
+export type tUnwrap = "resource" | "resources" | "pages" | "written" | "answer";
 
-const UNWRAPS: readonly unknown[] = ["resource", "resources", "pages", "answer"] satisfies readonly tUnwrap[];
+const UNWRAPS: readonly unknown[] = ["resource", "resources", "pages", "written", "answer"] satisfies readonly tUnwrap[];
 /** The client's methods a function for an endpoint may call. */
 const METHODS = ["paginate", "request", "storefront"] as const;
 const OPTIONS = "an options object";
@@ -69,13 +73,19 @@ const begun = (planned: unknown): unknown => (typeof planned === "function" ? (p
 /** What a plan gave, checked: there and then when it is there at once, and when it comes otherwise. */
 const settled = (fn: string, planned: unknown): tRequestPlan<unknown> | Promise<tRequestPlan<unknown>> => (isWaited(planned) ? Promise.resolve(planned).then((late) => planOf(fn, late)) : planOf(fn, planned));
 
+/** The first resource a write's answer holds under `data`, read as the answer's own, or `undefined` when it holds none or is no such answer. */
+function made(body: unknown): unknown {
+  const data: unknown = typeof body === "object" && body !== null ? ownOf(body as { readonly data?: unknown }).data : undefined;
+  return Array.isArray(data) ? ((data[0] as unknown) ?? undefined) : undefined;
+}
+
 /**
  * What every declaration comes to, whichever function made it. `builder` is that function's name: a declaration is
  * checked as it is made, so a mistake in one is found when the module loads and names what was called.
  */
 function declare<A extends readonly unknown[], R, U>(builder: string, fn: string, unwrap: tUnwrap, plan: tPlan<A, R>): tEndpoint<A, R, U> {
   if (typeof fn !== "string" || fn === "") throw new TypeError(`${builder}: fn must be the name of the function, a string with something in it; got ${got(fn)}`);
-  if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages" or "answer"; got ${got(unwrap)}`);
+  if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${got(unwrap)}`);
   if (typeof plan !== "function") throw new TypeError(`${builder}: plan must be a function; got ${got(plan)}`);
   const planFor = plan as unknown as tPlan<unknown[], unknown>;
 
@@ -115,6 +125,8 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
       };
     return async (...args: unknown[]): Promise<unknown> => {
       const { body, status } = await ask(music, args);
+      // A write that succeeded has happened, whatever its answer holds: the resource when there is one, and nothing otherwise.
+      if (unwrap === "written") return made(body);
       const { data } = pageOf(body, fn, status);
       if (unwrap === "resources") return data;
       // A success that holds no resource is not the resource: it is said, with the status it came with, not handed over as undefined.
@@ -139,6 +151,7 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>>;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>>;
 export function endpoint<A extends readonly unknown[], R extends tPage<unknown>>(fn: string, unwrap: "pages", plan: tPlan<A, R>): tEndpoint<A, R, AsyncIterable<tItem<R>>>;
+export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "written", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R> | undefined>>;
 export function endpoint<A extends readonly unknown[], R>(fn: string, unwrap: "answer", plan: tPlan<A, R>): tEndpoint<A, R, Promise<R>>;
 export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unknown>): tEndpoint<unknown[], unknown, unknown> {
   return declare("endpoint", fn, unwrap, plan);

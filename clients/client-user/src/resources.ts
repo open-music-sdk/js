@@ -93,11 +93,12 @@ export type tCreateLibraryPlaylistOptions = tReadOptions<tLibraryPlaylistsRespon
 
 /**
  * Makes a playlist in the listener's library: `{ attributes: { name } }`, with its tracks and the folder to put it
- * in under `relationships`. Resolves to the answer that holds the new playlist.
+ * in under `relationships`. Resolves to the answer that holds the new playlist. Bound, it gives the playlist, or
+ * `undefined` if Apple's answer holds none: the playlist was made either way.
  */
 export const createLibraryPlaylist = /*#__PURE__*/ endpoint(
   "createLibraryPlaylist",
-  "resource",
+  "written",
   (_client, playlist: tLibraryPlaylistCreationRequest, options?: tCreateLibraryPlaylistOptions): tRequestPlan<tLibraryPlaylistsResponse> => {
     const body = bodyOf("createLibraryPlaylist", playlist, "a playlist to create, as { attributes: { name } }");
     const init = initOf<tLibraryPlaylistsResponse>("createLibraryPlaylist", optionsOf("createLibraryPlaylist", options, OPTIONS));
@@ -119,11 +120,12 @@ export type tCreateLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistF
 
 /**
  * Makes a playlist folder in the listener's library: `{ attributes: { name } }`, with the folder to put it in under
- * `relationships`. Resolves to the answer that holds the new folder.
+ * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
+ * Apple's answer holds none: the folder was made either way.
  */
 export const createLibraryPlaylistFolder = /*#__PURE__*/ endpoint(
   "createLibraryPlaylistFolder",
-  "resource",
+  "written",
   (_client, folder: tLibraryPlaylistFolderCreationRequest, options?: tCreateLibraryPlaylistFolderOptions): tRequestPlan<tLibraryPlaylistFoldersResponse> => {
     const body = bodyOf("createLibraryPlaylistFolder", folder, "a playlist folder to create, as { attributes: { name } }");
     const init = initOf<tLibraryPlaylistFoldersResponse>("createLibraryPlaylistFolder", optionsOf("createLibraryPlaylistFolder", options, OPTIONS));

@@ -202,9 +202,12 @@ client and hands over what the answer holds:
 | `resourcesFinder<R, C, E>(fn, filter, collection, also?)` | `GET {collection}?filter[{filter}]=` | The list, likewise. `filter` is the filter's name, such as `isrc`, and the function takes the values to look for. |
 | `resourceLister<R, C, E>(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
 | `relationshipGetter<Rels, C>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back, and of a `schema` for it. |
-| `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, or the `answer` as it is |
+| `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, what a write has `written`, or the `answer` as it is |
 
-`endpoint` is what the other four are made with, for anything they do not cover.
+`endpoint` is what the others are made with, for anything they do not cover. Its `written` is for a
+function that makes or changes something: bound, it gives the resource the answer holds, and
+`undefined` where a success holds none. The write happened either way, and an error there would have a
+caller do it again.
 
 ### A declaration
 
@@ -235,7 +238,7 @@ An option of `E` that `also` leaves out, misspells, or calls a name where its ty
 compile. So an option that is typed is an option that is sent, and a call is held to the type: where a
 list was declared, one string is a `TypeError`, and not a list of one. A declaration is checked as it
 is made: a name with something in it, a `collection` that is a function, an `also` that says what each
-option is, one of the four `unwrap`s, a `plan` that is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
+option is, one of the five `unwrap`s, a `plan` that is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
 called. What a declaration gives is frozen.
 
 ### The collection

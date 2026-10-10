@@ -90,7 +90,8 @@ And `user(client)`, which is all 79 bound to one client.
 
 | | `getLibrarySong(client, id)` | `user(client).getLibrarySong(id)` |
 | --- | --- | --- |
-| One resource: `get<X>`, `create<X>`, `get<X>Rating`, `set<X>Rating`, `getRootLibraryPlaylistFolder`, `getPersonalStation`, `getUserStorefront` | Apple's answer, `{ data: [song] }` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
+| One resource: `get<X>`, `get<X>Rating`, `getRootLibraryPlaylistFolder`, `getPersonalStation`, `getUserStorefront` | Apple's answer, `{ data: [song] }` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
+| A write that answers with a resource: `create<X>`, `set<X>Rating` | Apple's answer, `{ data: [playlist] }` | The resource, or `undefined` if Apple's answer holds none. The write happened either way, so it is not an error. |
 | Several: `get<X>s`, `get<X>Ratings`, `getLibraryResources`, `getMusicSummariesByYear` | Apple's answer, `{ data: [...] }` | The list, empty when Apple sent none |
 | A collection or a relationship: every `list…`, `get<X>Relationship` | Apple's answer, which is the first page: `{ data, next }` | Every item of every page, as an `AsyncIterable` |
 | `searchLibrary` | Apple's answer | The same answer: it holds no `data` to hand over in its place |

@@ -257,8 +257,8 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     ["misspelt", "resorce", "7 characters"],
     ["missing", undefined, "undefined"],
     ["a number", 1, "1"],
-  ])("endpoint: an unwrap that is %s is a TypeError, and is not taken for one of the four", (_name, unwrap, what) => {
-    expect(() => endpoint("getSong", unwrap as "answer", plan)).toThrow(new TypeError(`endpoint: unwrap must be "resource", "resources", "pages" or "answer"; got ${what}`));
+  ])("endpoint: an unwrap that is %s is a TypeError, and is not taken for one of the five", (_name, unwrap, what) => {
+    expect(() => endpoint("getSong", unwrap as "answer", plan)).toThrow(new TypeError(`endpoint: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${what}`));
   });
 
   test.each<[string, unknown, string]>([
@@ -543,6 +543,54 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const error = await rejection(getSong.bound(music)("1"));
       expect(isAppleMusicError(error, "ApiError")).toBe(true);
       expect(error.message).toMatch(/^getSong: /);
+    });
+  });
+
+  describe("what a write has written", () => {
+    const createPlaylist = endpoint("createPlaylist", "written", (_client, name: string): tRequestPlan<tSongsResponse> => ["v1/me/library/playlists", { method: "POST", body: { attributes: { name } } }]);
+    const made = { id: "p.new", type: "library-playlists", href: "/v1/me/library/playlists/p.new" };
+
+    test("called with a client it resolves to Apple's answer, and bound to the resource the answer holds", async () => {
+      const { music } = apple([{ status: 201, body: { data: [made] } }, { status: 201, body: { data: [made] } }], { userToken: "user" });
+      expect(await createPlaylist(music, "Road")).toEqual({ data: [made] });
+      expect(await createPlaylist.bound(music)("Road")).toEqual(made);
+    });
+
+    test.each<[string, tReply]>([
+      ["an empty list", { status: 201, body: { data: [] } }],
+      ["no data", { status: 201, body: {} }],
+      ["no body at all", { status: 204 }],
+      ["a body that is no object", { status: 200, body: "done" }],
+      ["data that is no list", { status: 200, body: { data: "done" } }],
+    ])("bound, a success that holds %s is undefined and no error: the write happened, and saying it failed would have it done twice", async (_name, reply) => {
+      const { music, sent } = apple([reply], { userToken: "user" });
+      expect(await createPlaylist.bound(music)("Road")).toBeUndefined();
+      expect(sent()).toEqual(["POST /v1/me/library/playlists"]);
+    });
+
+    test("the check can tell: the same answers are an error to a function that asks for a resource, which has nothing to hand over", async () => {
+      const { music } = apple([{ body: { data: [] } }]);
+      expect(isAppleMusicError(await rejection(getSong.bound(music)("1")), "ApiError")).toBe(true);
+    });
+
+    test("a write Apple turns away is still the error Apple answered with", async () => {
+      const { music } = apple([{ status: 403 }], { userToken: "user" });
+      expect(isAppleMusicError(await rejection(createPlaylist.bound(music)("Road")), "UserTokenInvalid")).toBe(true);
+    });
+
+    test("data on Object.prototype is not what the answer holds", async () => {
+      Object.assign(Object.prototype, { data: [made] });
+      try {
+        const { music } = apple([{ status: 201, body: {} }], { userToken: "user" });
+        expect(await createPlaylist.bound(music)("Road")).toBeUndefined();
+      } finally {
+        Reflect.deleteProperty(Object.prototype, "data");
+      }
+    });
+
+    test("the types: bound, it gives the resource or undefined", () => {
+      expectTypeOf(createPlaylist.bound(apple().music)).returns.resolves.toEqualTypeOf<tSong | undefined>();
+      expectTypeOf(createPlaylist).returns.resolves.toEqualTypeOf<tSongsResponse>();
     });
   });
 
