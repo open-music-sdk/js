@@ -102,6 +102,29 @@ export const copyOf = (list: unknown, length: number): unknown[] => Array.from({
  */
 export const listOf = (fn: string, name: string, value: unknown): readonly string[] => listed(fn, name, value, 1);
 
+/** More types than Apple has of resource. Each one is a list of ids, so how many there may be is not left open. */
+const MAX_TYPES = 32;
+
+/** A type of resource as Apple names them, such as `songs` or `library-playlists`: what goes in the brackets after `ids`. */
+const isType = (name: string): boolean => name.length <= MAX_NAME && /^[a-z]+(-[a-z]+)*$/.test(name);
+
+/**
+ * `value` as ids by type, such as `{ songs: ["1"], albums: ["2"] }`, as the parameters they are sent as:
+ * `ids[songs]` and `ids[albums]`. Each list is one as `listOf` takes them. A type whose list is undefined is left
+ * out, and one at least has to be left in, since ids of no type ask for nothing. Which types there are is Apple's
+ * to say: a name is held to what a type's name looks like, so that it stays inside its brackets.
+ */
+export function typedIdsOf(fn: string, name: string, value: unknown): Record<string, readonly string[]> {
+  if (!isPlain(value)) throw new TypeError(`${fn}: ${name} must be a plain object of ids by type, such as { songs: ["1"] }; got ${gotFor(value)}`);
+  const given = Object.entries(value).filter(([, ids]: [string, unknown]) => ids !== undefined);
+  if (given.length === 0 || given.length > MAX_TYPES) throw new TypeError(`${fn}: ${name} must hold the ids of 1 to ${String(MAX_TYPES)} types; got ${String(given.length)}`);
+  const lists = given.map(([type, ids]: [string, unknown]): [string, readonly string[]] => {
+    if (!isType(type)) throw new TypeError(`${fn}: ${name} holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ${got(type)}`);
+    return [`ids[${type}]`, listOf(fn, `${name}.${type}`, ids)];
+  });
+  return Object.fromEntries(lists);
+}
+
 /** As `listOf`, for a list that may also hold nothing when `least` is 0: an option's list, where nothing means none. */
 export function listed(fn: string, name: string, value: unknown, least: 0 | 1): readonly string[] {
   const length = lengthOf(value);

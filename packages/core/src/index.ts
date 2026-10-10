@@ -1,5 +1,5 @@
 export { readBounded } from "./body";
-export { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
+export { clientOf, has, listOf, optionsOf, segmentOf, typedIdsOf } from "./check";
 export { createClient, parseToken } from "./client";
 export type {
   tAppleMusicClient,
@@ -15,7 +15,7 @@ export type {
   tTokenProvider,
   tUserTokenStore,
 } from "./client";
-export { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesGetter } from "./endpoint";
+export { endpoint, endpointNamespace, relationshipGetter, resourceGetter, resourceLister, resourcesFinder, resourcesGetter } from "./endpoint";
 export type {
   tAlso,
   tCollection,

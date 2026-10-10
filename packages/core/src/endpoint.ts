@@ -229,19 +229,45 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   });
 }
 
+/** What the two below come to: `GET {collection}?{param}=`, for the list a caller hands over, which a mistake in it calls `name`. */
+function picked<R extends tResources, C extends object, E extends object>(
+  builder: string,
+  fn: string,
+  param: string,
+  name: string,
+  collection: unknown,
+  also: unknown,
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+  const [locate, names] = given<C>(builder, collection, also);
+  return declare(builder, fn, "resources", (client, values: readonly string[], options?: tEndpointOptions<R, C, E>) => {
+    const list = listOf(fn, name, values);
+    const bag = optionsOf(fn, options, OPTIONS);
+    const init = initOf<R>(fn, bag, { [param]: list }, names);
+    return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
+  });
+}
+
 /** A function for the resources with the ids given: `GET {collection}?ids=`. */
 export function resourcesGetter<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[ids: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
-  const [locate, names] = given<C>("resourcesGetter", collection, (also as readonly unknown[])[0]);
-  return declare("resourcesGetter", fn, "resources", (client, ids: readonly string[], options?: tEndpointOptions<R, C, E>) => {
-    const list = listOf(fn, "ids", ids);
-    const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, { ids: list }, names);
-    return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
-  });
+  return picked("resourcesGetter", fn, "ids", "ids", collection, (also as readonly unknown[])[0]);
+}
+
+/**
+ * A function for the resources a filter picks out of a collection: `GET {collection}?filter[{filter}]=`. `filter`
+ * is the filter's name as Apple writes it, such as `isrc`, and the function takes the values to look for.
+ */
+export function resourcesFinder<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
+  fn: string,
+  filter: string,
+  collection: tCollectionGiven<R, C>,
+  ...also: tAlsoGiven<E>
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+  if (typeof filter !== "string" || !/^[a-z]+(-[a-z]+)*$/.test(filter)) throw new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between, such as "isrc"; got ${got(filter)}`);
+  return picked("resourcesFinder", fn, `filter[${filter}]`, filter, collection, (also as readonly unknown[])[0]);
 }
 
 /** A function for a whole collection, a page at a time: `GET {collection}`. */

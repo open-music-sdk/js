@@ -45,8 +45,9 @@ try {
 | `has(value, methods)`, `optionsOf(fn, options, what)`, `clientOf(fn, client, methods)` | The checks a package makes on what it is handed: an object with those methods, an options bag, a client. A mistake is a `TypeError` naming `fn` |
 | `segmentOf(fn, name, value)` | A caller's value as one segment of a path, percent-encoded, or a `TypeError` |
 | `listOf(fn, name, value)` | A caller's list of ids, types or codes as the call's own copy, or a `TypeError` |
+| `typedIdsOf(fn, name, value)` | A caller's ids by type, such as `{ songs: ["1"] }`, as the parameters they are sent as, or a `TypeError` |
 | `initOf(fn, options, set?, also?)`, `tReadOptions` | The options every function for an endpoint takes, turned into what `request` takes |
-| `endpoint`, `resourceGetter`, `resourcesGetter`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
+| `endpoint`, `resourceGetter`, `resourcesGetter`, `resourcesFinder`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
 | `endpointNamespace(fn, client, endpoints)` | Every such function bound to one client, its answers unwrapped |
 
 The rows from `segmentOf` down are for packages that put names to endpoints, as the client packages
@@ -182,6 +183,7 @@ client and hands over what the answer holds:
 | --- | --- | --- |
 | `resourceGetter<R, C, E>(fn, collection, also?)` | `GET {collection}/{id}` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
 | `resourcesGetter<R, C, E>(fn, collection, also?)` | `GET {collection}?ids=` | The list of them as Apple sent it, empty when Apple sent none |
+| `resourcesFinder<R, C, E>(fn, filter, collection, also?)` | `GET {collection}?filter[{filter}]=` | The list, likewise. `filter` is the filter's name, such as `isrc`, and the function takes the values to look for. |
 | `resourceLister<R, C, E>(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
 | `relationshipGetter<Rels, C>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back, and of a `schema` for it. |
 | `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, or the `answer` as it is |
@@ -260,6 +262,7 @@ another copy of this package. A namespace is frozen, and its type holds what it 
 | --- | --- |
 | `segmentOf(fn, name, value)` | A string of 1 to 64 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
+| `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 lists, each as `listOf` takes one, under the name of a type of resource: lowercase words with hyphens between, such as `library-songs`. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out. Which types there are is Apple's to say. |
 | `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |
 

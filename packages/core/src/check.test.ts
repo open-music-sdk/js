@@ -1,6 +1,6 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
+import { clientOf, has, listOf, optionsOf, segmentOf, typedIdsOf } from "./check";
 import { createClient } from "./client";
 
 const SECRET = "s3cretT0ken";
@@ -452,5 +452,82 @@ describe("listOf", () => {
     const asked = vi.fn(() => SECRET);
     thrown(() => listOf("fn", "ids", [{ toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }]));
     expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("typedIdsOf", () => {
+  const PLAIN = 'getCatalogResources: ids must be a plain object of ids by type, such as { songs: ["1"] }; got ';
+  const TYPE = "getCatalogResources: ids holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ";
+
+  test("ids by type come back as the parameters they are sent as, each list under ids and its type in brackets", () => {
+    expect(typedIdsOf("fn", "ids", { songs: ["1", "2"], "library-playlists": ["p.1"] })).toEqual({ "ids[songs]": ["1", "2"], "ids[library-playlists]": ["p.1"] });
+  });
+
+  test("a type whose list is undefined is left out, as an option that was not given is", () => {
+    expect(typedIdsOf("fn", "ids", { songs: ["1"], albums: undefined })).toEqual({ "ids[songs]": ["1"] });
+  });
+
+  test("each list is this call's own copy: changing the caller's afterwards changes nothing", () => {
+    const songs = ["1"];
+    const sent = typedIdsOf("fn", "ids", { songs });
+    songs.push("2");
+    expect(sent).toEqual({ "ids[songs]": ["1"] });
+  });
+
+  test.each<[string, unknown, string]>([
+    ["missing", undefined, "undefined"],
+    ["null", null, "null"],
+    ["one list, with no type", ["1", "2"], "a list"],
+    ["a string", "songs", "5 characters"],
+    ["a Map, which would be read as holding nothing", new Map([["songs", ["1"]]]), "an object that is not a plain one"],
+  ])("ids that are %s are a TypeError naming the function and the argument", (_name, value, what) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", value))).toEqual(new TypeError(`${PLAIN}${what}`));
+  });
+
+  test.each<[string, object]>([
+    ["no types at all", {}],
+    ["only types whose lists are undefined", { songs: undefined }],
+  ])("ids of %s ask for nothing, and are a TypeError", (_name, value) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", value))).toEqual(new TypeError("getCatalogResources: ids must hold the ids of 1 to 32 types; got 0"));
+  });
+
+  test("thirty-two types are taken, and one more is not", () => {
+    const types = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i) => ["a".repeat(i + 1), ["1"]]));
+    expect(Object.keys(typedIdsOf("fn", "ids", types(32)))).toHaveLength(32);
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", types(33))).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got 33");
+  });
+
+  test.each<[string, string]>([
+    ["one that would close its brackets and add a parameter", "songs]&ids[albums"],
+    ["one in capitals", "Songs"],
+    ["one with a space in it", "library songs"],
+    ["one that begins with a hyphen", "-songs"],
+    ["one with two hyphens together", "library--songs"],
+    ["an empty one", ""],
+    ["one longer than a name is", "s".repeat(65)],
+    ["__proto__, as JSON can name one", "__proto__"],
+  ])("a type's name that is %s is a TypeError that describes it and does not repeat it", (_name, type) => {
+    const ids = JSON.parse(`{${JSON.stringify(type)}: ["1"]}`) as object;
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", ids))).toEqual(new TypeError(`${TYPE}${String(type.length)} characters`));
+    expect(({} as { polluted?: unknown }).polluted).toBeUndefined();
+  });
+
+  test.each<[string, unknown, string]>([
+    ["one string, not a list", "1", "1 characters"],
+    ["an empty list", [], "a list of 0"],
+    ["a list holding two in one", ["1,2"], "3 characters at index 0"],
+    ["null", null, "null"],
+  ])("a type's list that is %s is a TypeError naming the type it is under", (_name, list, what) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: ["1"], albums: list })).message).toBe(
+      `getCatalogResources: ids.albums must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`,
+    );
+  });
+
+  test("a mistake does not show a value: a token put where the ids belong, where a type's name does, or among the ids", () => {
+    const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
+    for (const value of [token, { [token]: ["1"] }, { songs: [token] }, { songs: token }]) {
+      const error = thrown(() => typedIdsOf("getCatalogResources", "ids", value));
+      expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
+    }
   });
 });

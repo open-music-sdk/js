@@ -19,6 +19,7 @@ import {
   relationshipGetter,
   resourceGetter,
   resourceLister,
+  resourcesFinder,
   resourcesGetter,
   type tCollection,
   type tEndpointOptions,
@@ -239,6 +240,7 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     ["resourceGetter", resourceGetter as never],
     ["resourcesGetter", resourcesGetter as never],
     ["resourceLister", resourceLister as never],
+    ["resourcesFinder", (fn, collection, also) => (resourcesFinder as unknown as (fn: unknown, filter: string, collection: unknown, also: unknown) => unknown)(fn, "isrc", collection, also)],
     ["relationshipGetter", relationshipGetter as never],
   ];
 
@@ -277,7 +279,7 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     expect(() => builder("getSong", undefined)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got undefined`));
   });
 
-  test.each(builders.slice(0, 3))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
+  test.each(builders.slice(0, 4))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
     const message = (what: string) => new TypeError(`${name}: also must be an object that names each further option, such as { views: true }; got ${what}`);
     expect(() => builder("getSong", () => SONGS, ["views"])).toThrow(message("object"));
     expect(() => builder("getSong", () => SONGS, "views")).toThrow(message("5 characters"));
@@ -795,6 +797,79 @@ describe("the resource patterns: what each asks Apple for", () => {
     const { music, sent } = apple([{ body: { data: [song("1")], next: "/v1/catalog/us/albums/9/tracks?offset=1" } }, { body: { data: [song("2")] } }]);
     expect(await all(getAlbumRelationship.bound(music)("9", "tracks", { limit: 1 }))).toEqual([song("1"), song("2")]);
     expect(sent()).toEqual(["GET /v1/catalog/us/albums/9/tracks?limit=1", "GET /v1/catalog/us/albums/9/tracks?offset=1"]);
+  });
+});
+
+describe("resourcesFinder: the resources a filter picks out of a collection", () => {
+  interface tRestrict {
+    readonly restrict?: readonly "explicit"[] | undefined;
+  }
+  const getSongsByIsrc = resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", () => SONGS);
+
+  test("it asks the collection for the values under the filter's name, with the options beside them", async () => {
+    const { music, sent } = apple();
+    await getSongsByIsrc(music, ["USUM71900001", "GBUM71900002"], { include: ["albums"], language: "en-GB" });
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?l=en-GB&include=albums&filter[isrc]=USUM71900001,GBUM71900002"]);
+  });
+
+  test("called with a client it resolves to Apple's answer, and bound to the list the answer holds", async () => {
+    const answer = { data: [song("1"), song("2")] };
+    const { music } = apple([{ body: answer }, { body: answer }]);
+    expect(await getSongsByIsrc(music, ["USUM71900001"])).toEqual(answer);
+    expect(await getSongsByIsrc.bound(music)(["USUM71900001"])).toEqual(answer.data);
+    expectTypeOf(getSongsByIsrc).parameters.toEqualTypeOf<[client: tAppleMusicClient, values: readonly string[], options?: tEndpointOptions<tSongsResponse>]>();
+    expectTypeOf(getSongsByIsrc.bound(music)).returns.resolves.toEqualTypeOf<tSong[]>();
+  });
+
+  test("the values it is handed win over the same filter put among the caller's params", async () => {
+    const { music, sent } = apple();
+    await getSongsByIsrc(music, ["A"], { params: { "filter[isrc]": ["B"], "filter[upc]": ["C"] } });
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?filter[isrc]=A&filter[upc]=C"]);
+  });
+
+  test("a filter with a hyphen in its name is sent under that name, and an option the declaration adds beside it", async () => {
+    const equivalents = resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS, { restrict: true });
+    const chart = resourcesFinder<tSongsResponse>("getPlaylistsByStorefrontChart", "storefront-chart", () => "v1/catalog/us/playlists");
+    const { music, sent } = apple();
+    await equivalents(music, ["1"], { restrict: ["explicit"] });
+    await chart(music, ["us"]);
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?restrict=explicit&filter[equivalents]=1", "GET /v1/catalog/us/playlists?filter[storefront-chart]=us"]);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["one string, not a list", "USUM71900001", "12 characters"],
+    ["an empty list", [], "a list of 0"],
+    ["a list holding two in one", ["A,B"], "3 characters at index 0"],
+    ["missing", undefined, "undefined"],
+  ])("values that are %s are a TypeError naming the function and the filter, before the collection or Apple is asked", async (_name, values, what) => {
+    const { music, calls } = apple();
+    const collection = vi.fn<tCollection>(() => SONGS);
+    const error = await rejection(resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection)(music, values as string[]));
+    expect(error).toEqual(new TypeError(`getSongsByIsrc: isrc must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`));
+    expect([collection.mock.calls.length, calls.length]).toEqual([0, 0]);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["missing", undefined, "undefined"],
+    ["empty", "", "0 characters"],
+    ["written with its brackets", "filter[isrc]", "12 characters"],
+    ["one that would close the brackets and add a parameter", "isrc]&ids[", "10 characters"],
+    ["in capitals", "ISRC", "4 characters"],
+    ["a list", ["isrc"], "object"],
+  ])("a filter's name that is %s is a TypeError naming resourcesFinder, as the declaration is made", (_name, filter, what) => {
+    expect(() => resourcesFinder<tSongsResponse>("getSongsByIsrc", filter as string, () => SONGS)).toThrow(
+      new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between, such as "isrc"; got ${what}`),
+    );
+  });
+
+  test("the types: it has to say what its answer is, and to name every option it adds", () => {
+    const declarations = [
+      // @ts-expect-error -- the answer's type is not said, so there is nothing a collection can be
+      () => resourcesFinder("getSongsByIsrc", "isrc", () => SONGS),
+      // @ts-expect-error -- an option is added and not named
+      () => resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS),
+    ];
+    expect(declarations).toHaveLength(2);
   });
 });
 
