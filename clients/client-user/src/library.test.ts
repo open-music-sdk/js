@@ -155,6 +155,13 @@ describe("the listener's own station is in the catalog, and is asked for with th
     expect(sent()).toEqual(["GET /v1/me/storefront", "GET /v1/catalog/jp/stations?filter[identity]=personal", "GET /v1/catalog/jp/stations?filter[identity]=personal"]);
   });
 
+  test("a client that answers with its storefront itself, and not a promise of it, is asked the same: a client is known by its methods", async () => {
+    const { music, sent } = apple();
+    const wrapped = { request: music.request.bind(music), paginate: music.paginate.bind(music), storefront: () => "gb" } as unknown as tAppleMusicClient;
+    await api.getPersonalStation(wrapped);
+    expect(sent()).toEqual(["GET /v1/catalog/gb/stations?filter[identity]=personal"]);
+  });
+
   test("it is always asked for by the one filter there is, whatever the caller's params say", async () => {
     const { music, sent } = apple();
     await api.getPersonalStation(music, { params: { "filter[identity]": "someone-else", "filter[featured]": "x" } });

@@ -27,7 +27,8 @@ const collection = <C>(where: (fn: string, client: tAppleMusicClient, options: C
  */
 export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | tLater<T> {
   const checked = (id: unknown) => finish(segmentOf(fn, "storefront", id));
-  return storefront === undefined ? () => client.storefront().then(checked) : checked(storefront);
+  // Waited for whatever the client gives: a client is known by its methods, and a wrapped one may answer with the storefront itself where createClient's answers with a promise of it.
+  return storefront === undefined ? async () => checked(await client.storefront()) : checked(storefront);
 }
 
 /** The collection of one type of resource in a storefront's catalog, such as `songs`, as a declaration takes it. */

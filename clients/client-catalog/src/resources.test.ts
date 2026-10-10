@@ -116,6 +116,15 @@ describe("whose catalog is asked", () => {
     expect(sent()).toEqual(["GET /v1/me/storefront", "GET /v1/me/storefront", "GET /v1/catalog/jp/genres"]);
   });
 
+  test("a client that answers with its storefront itself, and not a promise of it, is asked the same: a client is known by its methods", async () => {
+    const { music, sent } = apple();
+    const wrapped = { request: music.request.bind(music), paginate: music.paginate.bind(music), storefront: () => "gb" } as unknown as tAppleMusicClient;
+    await api.getSong(wrapped, "1");
+    await api.getAlbumView(wrapped, "1", "other-versions");
+    expect(await all(api.listGenres.bound(wrapped)())).toEqual([song("1")]);
+    expect(sent()).toEqual(["GET /v1/catalog/gb/songs/1", "GET /v1/catalog/gb/albums/1/view/other-versions", "GET /v1/catalog/gb/genres"]);
+  });
+
   test("a storefront the call names saves that lookup", async () => {
     const { music, sent } = apple([], { storefront: undefined, userToken: "listener" });
     await api.getSong(music, "1", { storefront: "gb" });

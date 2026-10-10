@@ -200,7 +200,7 @@ export const getPersonalStation = /*#__PURE__*/ endpoint("getPersonalStation", "
   // One segment of a path, checked and encoded, so a storefront from outside cannot send the listener's token to another path.
   const stations = (storefront: unknown): tRequestPlan<tStationsResponse> => [`v1/catalog/${segmentOf("getPersonalStation", "storefront", storefront)}/stations`, init];
   // Which storefront is the client's may mean asking Apple, and is left for when the request is about to be made.
-  return bag.storefront === undefined ? () => client.storefront().then(stations) : stations(bag.storefront);
+  return bag.storefront === undefined ? async () => stations(await client.storefront()) : stations(bag.storefront);
 });
 
 /** The options of `getUserStorefront`. */
