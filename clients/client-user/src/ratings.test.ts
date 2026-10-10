@@ -10,7 +10,7 @@ interface tReply {
 }
 
 const SECRET = "s3cretT0ken";
-const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 const VALUE = "value must be 1, for a like, or -1, for a dislike; got ";
 const rating = (id: string, value: 1 | -1 = 1) => ({ id, type: "ratings", href: `/v1/me/ratings/songs/${id}`, attributes: { value } });
 
@@ -155,9 +155,15 @@ describe("what a rating function is handed is checked before Apple is asked", ()
 
   test("an id cannot move a rating to another resource's, or out of the ratings", async () => {
     const { music, calls } = apple();
-    await api.setSongRating(music, "../albums/1", 1);
+    for (const id of ["../albums/1", "../../library/playlists/p.1", "..%2Falbums%2F1", "1\\..\\2"]) {
+      const what = `${String(id.length)} characters`;
+      expect(await rejection(api.setSongRating(music, id, 1))).toEqual(new TypeError(`setSongRating: id ${SEGMENT}${what}`));
+      expect(await rejection(api.deleteSongRating(music, id))).toEqual(new TypeError(`deleteSongRating: id ${SEGMENT}${what}`));
+      expect(await rejection(api.getSongRating(music, id))).toEqual(new TypeError(`getSongRating: id ${SEGMENT}${what}`));
+    }
+    expect(calls).toHaveLength(0);
     await api.deleteSongRating(music, "1?ids=2");
-    expect(calls.map((request) => new URL(request.url).pathname + new URL(request.url).search)).toEqual(["/v1/me/ratings/songs/..%2Falbums%2F1", "/v1/me/ratings/songs/1%3Fids%3D2"]);
+    expect(calls.map((request) => new URL(request.url).pathname + new URL(request.url).search)).toEqual(["/v1/me/ratings/songs/1%3Fids%3D2"]);
   });
 
   test("a token put where an id belongs is refused before it is sent, and is not shown", async () => {

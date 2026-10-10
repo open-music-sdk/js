@@ -12,7 +12,7 @@ interface tReply {
 const SECRET = "s3cretT0ken";
 const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 const TERM = "term must be a string of 1 to 256 characters; got ";
-const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 const TRACKS =
   'addLibraryPlaylistTracks: tracks must be a list of 1 to 300 tracks, each an object with an id and a type that are strings of 1 to 64 characters, such as { id: "1", type: "songs" }; got ';
 const item = (id: string) => ({ id, type: "library-songs" });
@@ -161,7 +161,19 @@ describe("the listener's own station is in the catalog, and is asked for with th
     expect(sent()).toEqual(["GET /v1/catalog/us/stations?filter[identity]=personal&filter[featured]=x"]);
   });
 
-  test.each(["../../me/library/songs", "..\\me", "us/stations/ra.1?x=", "//evil.example/x"])("a storefront of %j is one segment after /v1/catalog, so the token goes nowhere but to the stations", async (storefront) => {
+  test.each(["../../me/library/songs", "..\\me", "us/stations/ra.1?x=", "//evil.example/x", "..%2F..%2Fme", "us\nx"])("a storefront of %j is refused, so the token is sent nowhere at all", async (storefront) => {
+    const { music, calls } = apple();
+    expect(await rejection(api.getPersonalStation(music, { storefront }))).toEqual(new TypeError(`getPersonalStation: storefront ${SEGMENT}${String(storefront.length)} characters`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a client's own storefront is held to the same, so one that is no storefront takes the token nowhere either", async () => {
+    const { music, calls } = apple([], { storefront: "../me/library" });
+    expect(await rejection(api.getPersonalStation(music))).toEqual(new TypeError(`getPersonalStation: storefront ${SEGMENT}13 characters`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each(["u s", "us?filter[identity]=x", "us#x"])("a storefront of %j is one segment after /v1/catalog, so the token goes nowhere but to the stations", async (storefront) => {
     const { music, calls } = apple();
     await api.getPersonalStation(music, { storefront });
     const url = new URL(calls[0]?.url ?? "");
@@ -297,8 +309,12 @@ describe("what a caller puts in is what is sent, and nothing more", () => {
 
   test("a playlist's id cannot move the tracks to another playlist's, or out of the playlists", async () => {
     const { music, calls } = apple([{ status: 204 }]);
-    await api.addLibraryPlaylistTracks(music, "../p.2", [{ id: "1", type: "songs" }]);
-    expect(new URL(calls[0]?.url ?? "").pathname).toBe("/v1/me/library/playlists/..%2Fp.2/tracks");
+    for (const id of ["../p.2", "p.1/../p.2", "p.1%2F..%2Fp.2", ".."]) {
+      expect(await rejection(api.addLibraryPlaylistTracks(music, id, [{ id: "1", type: "songs" }]))).toEqual(new TypeError(`addLibraryPlaylistTracks: id ${SEGMENT}${String(id.length)} characters`));
+    }
+    expect(calls).toHaveLength(0);
+    await api.addLibraryPlaylistTracks(music, "p.1?x=2", [{ id: "1", type: "songs" }]);
+    expect(calls.map((call) => new URL(call.url).pathname + new URL(call.url).search)).toEqual(["/v1/me/library/playlists/p.1%3Fx%3D2/tracks"]);
   });
 
   test("the root folder is always asked for by the one filter there is, whatever the caller's params say", async () => {

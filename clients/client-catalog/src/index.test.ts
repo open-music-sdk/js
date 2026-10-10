@@ -237,19 +237,20 @@ describe("what a server is asked, from a function to the wire", () => {
     }
   });
 
-  test("an id, a name or a storefront that would leave the catalog arrives as one segment of it", async () => {
+  test("an id, a name or a storefront that would leave the catalog never reaches the wire, and what is only odd arrives as one segment", async () => {
     const { asked, music, close } = await wire();
     try {
-      await api.getSong(music, "../../../me/library/songs");
-      await api.getSong(music, "1", { storefront: "../me" });
-      await api.getAlbumRelationship(music, "1", "../../../../me/storefront" as "tracks");
+      const refused = [
+        api.getSong(music, "../../../me/library/songs"),
+        api.getSong(music, "1", { storefront: "../me" }),
+        api.getAlbumRelationship(music, "1", "../../../../me/storefront" as "tracks"),
+        api.getAlbumView(music, "..%2F..%2Fme", "other-versions"),
+      ];
+      for (const each of refused) expect(await each.catch((e: unknown) => e)).toBeInstanceOf(TypeError);
+      expect(asked).toEqual([]);
       await api.getAlbumView(music, "1?include=library", "other-versions");
-      expect(asked.map((each) => each.url)).toEqual([
-        "/v1/catalog/us/songs/..%2F..%2F..%2Fme%2Flibrary%2Fsongs",
-        "/v1/catalog/..%2Fme/songs/1",
-        "/v1/catalog/us/albums/1/..%2F..%2F..%2F..%2Fme%2Fstorefront",
-        "/v1/catalog/us/albums/1%3Finclude%3Dlibrary/view/other-versions",
-      ]);
+      await api.getSong(music, "1#x", { storefront: "u s" });
+      expect(asked.map((each) => each.url)).toEqual(["/v1/catalog/us/albums/1%3Finclude%3Dlibrary/view/other-versions", "/v1/catalog/u%20s/songs/1%23x"]);
       expect(asked.every((each) => each.headers["music-user-token"] === undefined)).toBe(true);
     } finally {
       await close();

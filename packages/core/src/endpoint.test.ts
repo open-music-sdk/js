@@ -588,8 +588,8 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const related = getAlbumRelationship.bound(music);
       expect(() => list({ limit: 0 })).toThrow(new TypeError("listLibrarySongs: limit must be a whole number above 0; got 0"));
       expect(() => list("en-GB" as unknown as tReadOptions<tLibrarySongsResponse>)).toThrow(new TypeError("listLibrarySongs: expected an options object; got 5 characters"));
-      expect(() => related("..", "tracks")).toThrow(new TypeError('getAlbumRelationship: id must be a string of 1 to 64 characters, and not "." or ".."; got 2 characters'));
-      expect(() => related("1", "" as "tracks")).toThrow(new TypeError('getAlbumRelationship: name must be a string of 1 to 64 characters, and not "." or ".."; got 0 characters'));
+      expect(() => related("..", "tracks")).toThrow(new TypeError('getAlbumRelationship: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 2 characters'));
+      expect(() => related("1", "" as "tracks")).toThrow(new TypeError('getAlbumRelationship: name must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 0 characters'));
       expect(calls).toHaveLength(0);
     });
 
@@ -1274,7 +1274,7 @@ describe("the resource patterns: what a function is handed is checked before any
   const several = resourcesGetter<tSongsResponse>("getSongs", collection);
   const whole = resourceLister<tLibrarySongsResponse>("listLibrarySongs", collection);
   const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
-  const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
   const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 
   test.each<[string, (music: tAppleMusicClient) => Promise<unknown>, string]>([
@@ -1348,7 +1348,21 @@ describe("the resource patterns: what a function is handed is checked before any
 });
 
 describe("the resource patterns: a value in a path cannot move the request to another endpoint", () => {
-  const hostile = ["../../../me/library/songs", "..\\..\\..\\me\\library\\songs", "%2e%2e/%2e%2e/%2e%2e/me/library/songs", "/v1/me/library/songs", "1/../../../../me/storefront", "1?include=library", "1#x"];
+  /** What a URL, or a server that decodes a path before it reads it, would take for a way out of the segment. */
+  const leaving = ["../../../me/library/songs", "..\\..\\..\\me\\library\\songs", "%2e%2e/%2e%2e/%2e%2e/me/library/songs", "..%2F..%2F..%2Fme", "/v1/me/library/songs", "1/../../../../me/storefront", "1\n2"];
+  /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+  const hostile = ["1?include=library", "1#x", "1 2", "1&ids=2"];
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
+
+  test.each(leaving)("an id or a relationship name of %j is refused by every function, and Apple is not asked", async (value) => {
+    const { music, calls } = apple([], { userToken: "user" });
+    const what = `${String(value.length)} characters`;
+    expect(await rejection(getSong(music, value))).toEqual(new TypeError(`getSong: id ${SEGMENT}${what}`));
+    expect(await rejection(getAlbumRelationship(music, value, "tracks"))).toEqual(new TypeError(`getAlbumRelationship: id ${SEGMENT}${what}`));
+    expect(await rejection(getAlbumRelationship(music, "1", value as "tracks"))).toEqual(new TypeError(`getAlbumRelationship: name ${SEGMENT}${what}`));
+    expect(() => getAlbumRelationship.bound(music)("1", value as "tracks")).toThrow(TypeError);
+    expect(calls).toHaveLength(0);
+  });
 
   test.each(hostile)("an id of %j stays the one segment after the collection, and a listener's token is not sent with it", async (id) => {
     const { music, calls, userTokens } = apple([], { userToken: "user" });

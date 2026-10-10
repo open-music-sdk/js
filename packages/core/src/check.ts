@@ -59,20 +59,30 @@ export const MAX_NAME = 64;
 export const MAX_LENGTH = 256;
 
 /**
- * `value` as one segment of a path, percent-encoded. Whatever it holds stays inside the segment: a slash, a
- * question mark or a hash is encoded, and "." and "..", which no encoding protects because a URL parser reads
- * them as "here" and "one up", are refused. So a value from outside cannot turn a request for one endpoint into a
- * request for another, where a different token may be sent.
+ * What a segment may not hold: a slash, a backslash, a percent sign, or a control character. No id, name or code
+ * of Apple's holds one. Encoded, each would stay inside the segment as far as a URL goes, and that is as far as
+ * this package can see: a server that decodes a path before it reads it would find a slash there again. So what
+ * could be read as one, or as the start of an encoding of one, is not sent at all.
+ */
+const UNFIT = /[/\\%\p{Cc}]/u;
+
+/**
+ * `value` as one segment of a path, percent-encoded. A question mark, a hash or a space is encoded and stays in
+ * the segment. What could be read as leaving it is refused: a slash, a backslash, a percent sign and a control
+ * character, and "." and "..", which a URL parser reads as "here" and "one up". So a value from outside cannot turn
+ * a request for one endpoint into a request for another, where a different token may be sent.
  */
 export function segmentOf(fn: string, name: string, value: unknown): string {
-  if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== "..") {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== ".." && !UNFIT.test(value)) {
     try {
       return encodeURIComponent(value);
     } catch {
       // Half of a surrogate pair: not text that can be sent, and refused like anything else that is no segment.
     }
   }
-  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, and not "." or ".."; got ${got(value)}`);
+  throw new TypeError(
+    `${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${got(value)}`,
+  );
 }
 
 /** The most Apple documents taking in one request, which is for songs by id. Each item is a URL made longer, so the list is not left open. */

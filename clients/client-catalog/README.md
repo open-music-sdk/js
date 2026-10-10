@@ -183,13 +183,14 @@ is a `TypeError` that names the function and the argument and describes the valu
 it, since a value in the wrong place may be a token:
 
 ```
-getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got 228 characters
+getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 228 characters
 searchCatalog: types must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got undefined
 ```
 
-- An id, a relationship's or a view's name and a storefront are each one segment of a path, encoded.
-  Whatever one holds, the request stays in the catalog: `../../me/library` is asked for as a song
-  with that odd id, and is not found.
+- An id, a relationship's or a view's name and a storefront are each one segment of a path. One that
+  holds a slash, a backslash, a percent sign or a control character is refused, as `.` and `..` are:
+  none of Apple's does, and `../../me/library` is a request for somewhere else. Anything else is
+  encoded, so the request stays in the catalog whatever it holds.
 - An id, a name, a type or a storefront is at most 64 characters, which is longer than any of Apple's
   and shorter than a token, so a token put where one belongs is refused before it is sent.
 - A search term is at most 256 characters. Lists are at most 300 long.

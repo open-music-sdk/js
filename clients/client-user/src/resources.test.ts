@@ -21,7 +21,7 @@ interface tReply {
 }
 
 const SECRET = "s3cretT0ken";
-const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 const song = (id: string) => ({ id, type: "library-songs", href: `/v1/me/library/songs/${id}` });
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
@@ -88,7 +88,19 @@ describe("whose library is asked", () => {
 });
 
 describe("a value put in a path stays where it was put, so a request for one of the listener's resources cannot become one for another", () => {
-  const hostile = ["../../ratings/songs/1", "..\\..\\storefront", "%2e%2e/%2e%2e/storefront", "/v1/me/storefront", "//evil.example/x", "i.1?include=catalog", "i.1#fragment", "a b"];
+  /** What a URL, or a server that decodes a path before it reads it, would take for a way out of the segment. */
+  const leaving = ["../../ratings/songs/1", "..\\..\\storefront", "%2e%2e/%2e%2e/storefront", "..%2F..%2Fratings", "/v1/me/storefront", "//evil.example/x", "i.1\nx"];
+  /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+  const hostile = ["i.1?include=catalog", "i.1#fragment", "a b", "i.1&ids=i.2"];
+
+  test.each(leaving)("an id or a relationship's name of %j is refused, and Apple is not asked", async (value) => {
+    const { music, calls } = apple();
+    const what = `${String(value.length)} characters`;
+    expect(await rejection(api.getLibrarySong(music, value))).toEqual(new TypeError(`getLibrarySong: id ${SEGMENT}${what}`));
+    expect(await rejection(api.getLibraryAlbumRelationship(music, value, "tracks"))).toEqual(new TypeError(`getLibraryAlbumRelationship: id ${SEGMENT}${what}`));
+    expect(await rejection(api.getLibraryAlbumRelationship(music, "l.1", value as "tracks"))).toEqual(new TypeError(`getLibraryAlbumRelationship: name ${SEGMENT}${what}`));
+    expect(calls).toHaveLength(0);
+  });
   /** The path of the one request sent, in segments, and what followed it. */
   const asked = async (call: (music: tAppleMusicClient) => Promise<unknown>) => {
     const { music, calls } = apple();

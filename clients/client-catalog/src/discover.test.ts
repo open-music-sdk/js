@@ -90,7 +90,7 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     ["searchCatalog: types that are an empty list", loose(api.searchCatalog), ["x", { types: [] }], `searchCatalog: types ${LIST}a list of 0`],
     ["searchCatalog: a with that is an object", loose(api.searchCatalog), ["x", { types: ["songs"], with: {} }], "searchCatalog: with must be a string of 1 to 64 characters, a number, true or false, or a list of strings; got object"],
     ["searchCatalog: options that are a list", loose(api.searchCatalog), ["x", ["songs"]], "searchCatalog: expected an options object; got a list"],
-    ["searchCatalog: a storefront that is two dots", loose(api.searchCatalog), ["x", { types: ["songs"], storefront: ".." }], 'searchCatalog: storefront must be a string of 1 to 64 characters, and not "." or ".."; got 2 characters'],
+    ["searchCatalog: a storefront that is two dots", loose(api.searchCatalog), ["x", { types: ["songs"], storefront: ".." }], 'searchCatalog: storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 2 characters'],
     ["getSearchHints: a term that is empty", loose(api.getSearchHints), [""], `getSearchHints: ${TERM}0 characters`],
     ["getSearchHints: a limit of zero", loose(api.getSearchHints), ["x", { limit: 0 }], "getSearchHints: limit must be a whole number above 0; got 0"],
     ["getSearchSuggestions: a term that is a number", loose(api.getSearchSuggestions), [5, { kinds: ["terms"] }], `getSearchSuggestions: ${TERM}5`],
@@ -106,7 +106,7 @@ describe("what a function is handed is checked before Apple is asked, and a mist
     ["getLiveRadioStations: options that are a string", loose(api.getLiveRadioStations), ["gb"], "getLiveRadioStations: expected an options object; got 2 characters"],
     ["getLanguageTag: languages that are one string", loose(api.getLanguageTag), ["fr"], `getLanguageTag: acceptLanguage ${LIST}2 characters`],
     ["getLanguageTag: no languages", loose(api.getLanguageTag), [[]], `getLanguageTag: acceptLanguage ${LIST}a list of 0`],
-    ["getLanguageTag: a storefront that is empty", loose(api.getLanguageTag), [["fr"], { storefront: "" }], 'getLanguageTag: storefront must be a string of 1 to 64 characters, and not "." or ".."; got 0 characters'],
+    ["getLanguageTag: a storefront that is empty", loose(api.getLanguageTag), [["fr"], { storefront: "" }], 'getLanguageTag: storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 0 characters'],
   ])("%s", async (_name, fn, args, message) => {
     const { music, calls } = apple();
     expect(await rejection(fn(music, ...args))).toEqual(new TypeError(message));

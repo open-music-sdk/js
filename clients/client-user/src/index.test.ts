@@ -279,19 +279,21 @@ describe("what a server is asked, from a function to the wire", () => {
     }
   });
 
-  test("an id or a name that would leave its collection arrives as one segment of it", async () => {
+  test("an id, a name or a storefront that would leave its collection never reaches the wire, and what is only odd arrives as one segment", async () => {
     const { asked, music, close } = await wire();
     try {
-      await api.getLibrarySong(music, "../../ratings/songs/1");
-      await api.deleteSongRating(music, "../../library/songs/i.1");
-      await api.getLibraryAlbumRelationship(music, "l.1", "../../../storefront" as "tracks");
-      await api.getPersonalStation(music, { storefront: "../me/library" });
-      expect(asked.map((each) => `${each.method ?? ""} ${each.url ?? ""}`)).toEqual([
-        "GET /v1/me/library/songs/..%2F..%2Fratings%2Fsongs%2F1",
-        "DELETE /v1/me/ratings/songs/..%2F..%2Flibrary%2Fsongs%2Fi.1",
-        "GET /v1/me/library/albums/l.1/..%2F..%2F..%2Fstorefront",
-        "GET /v1/catalog/..%2Fme%2Flibrary/stations?filter%5Bidentity%5D=personal",
-      ]);
+      const refused = [
+        api.getLibrarySong(music, "../../ratings/songs/1"),
+        api.deleteSongRating(music, "../../library/songs/i.1"),
+        api.getLibraryAlbumRelationship(music, "l.1", "../../../storefront" as "tracks"),
+        api.getPersonalStation(music, { storefront: "../me/library" }),
+        api.addLibraryPlaylistTracks(music, "p.1%2F..%2Fp.2", [{ id: "1", type: "songs" }]),
+      ];
+      for (const each of refused) expect(await each.catch((e: unknown) => e)).toBeInstanceOf(TypeError);
+      expect(asked).toEqual([]);
+      await api.getLibrarySong(music, "i.1?include=catalog");
+      await api.deleteSongRating(music, "1#x");
+      expect(asked.map((each) => `${each.method ?? ""} ${each.url ?? ""}`)).toEqual(["GET /v1/me/library/songs/i.1%3Finclude%3Dcatalog", "DELETE /v1/me/ratings/songs/1%23x"]);
     } finally {
       await close();
     }

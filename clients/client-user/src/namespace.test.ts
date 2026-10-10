@@ -183,7 +183,7 @@ describe("what its functions hand over", () => {
 
   test("a mistake in what a function is handed is a TypeError naming the function, as it is with a client", async () => {
     const { music, calls } = apple();
-    expect(await rejection(user(music).getLibrarySong(".."))).toEqual(new TypeError('getLibrarySong: id must be a string of 1 to 64 characters, and not "." or ".."; got 2 characters'));
+    expect(await rejection(user(music).getLibrarySong(".."))).toEqual(new TypeError('getLibrarySong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 2 characters'));
     expect(() => user(music).listLibrarySongs({ limit: 0 })).toThrow(new TypeError("listLibrarySongs: limit must be a whole number above 0; got 0"));
     expect(calls).toHaveLength(0);
   });

@@ -7,7 +7,7 @@ import * as api from "./resources";
 type tReply = { status?: number; body?: unknown } | Error;
 
 const SECRET = "s3cretT0ken";
-const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
 const song = (id: string) => ({ id, type: "songs", href: `/v1/catalog/us/songs/${id}` });
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
@@ -160,7 +160,30 @@ describe("whose catalog is asked", () => {
 });
 
 describe("a value put in a path stays where it was put, so a request for the catalog cannot become one for the listener", () => {
-  const hostile = ["../../../me/library/songs", "..\\..\\me", "%2e%2e/%2e%2e/me", "/v1/me/storefront", "//evil.example/x", "1?include=library", "1#fragment", "a b"];
+  /** What a URL, or a server that decodes a path before it reads it, would take for a way out of the segment. */
+  const leaving = ["../../../me/library/songs", "..\\..\\me", "%2e%2e/%2e%2e/me", "..%2F..%2Fme", "/v1/me/storefront", "//evil.example/x", "us\nx"];
+  /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+  const hostile = ["1?include=library", "1#fragment", "a b", "1&ids=2"];
+
+  test.each(leaving)("an id, a storefront, or a relationship's or view's name of %j is refused, and Apple is not asked", async (value) => {
+    const { music, calls } = apple([], { userToken: "listener" });
+    const what = `${String(value.length)} characters`;
+    expect(await rejection(api.getSong(music, value))).toEqual(new TypeError(`getSong: id ${SEGMENT}${what}`));
+    expect(await rejection(api.getSong(music, "1", { storefront: value }))).toEqual(new TypeError(`getSong: storefront ${SEGMENT}${what}`));
+    expect(await rejection(api.getAlbumRelationship(music, "1", value as "tracks"))).toEqual(new TypeError(`getAlbumRelationship: name ${SEGMENT}${what}`));
+    expect(await rejection(api.getAlbumView(music, "1", value as "other-versions"))).toEqual(new TypeError(`getAlbumView: name ${SEGMENT}${what}`));
+    expect(await rejection(api.getAlbumView(music, value, "other-versions"))).toEqual(new TypeError(`getAlbumView: id ${SEGMENT}${what}`));
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a client's own storefront is held to the same, whether it was given to the client or is the one Apple answered with", async () => {
+    const given = apple([], { storefront: "../me/library" });
+    expect(await rejection(api.getSong(given.music, "1"))).toEqual(new TypeError(`getSong: storefront ${SEGMENT}13 characters`));
+    expect(await rejection(api.getAlbumView(given.music, "1", "other-versions"))).toEqual(new TypeError(`getAlbumView: storefront ${SEGMENT}13 characters`));
+    const answered = apple([{ body: { data: [{ id: "../../me/library", type: "storefronts" }] } }], { storefront: undefined, userToken: "listener" });
+    expect(await rejection(api.getSong(answered.music, "1"))).toEqual(new TypeError(`getSong: storefront ${SEGMENT}16 characters`));
+    expect([given.calls.length, answered.sent()]).toEqual([0, ["GET /v1/me/storefront"]]);
+  });
   /** The path of the one request sent, in segments, and whether it carried the listener's token. */
   const asked = async (call: (music: tAppleMusicClient) => Promise<unknown>) => {
     const { music, calls, userTokens } = apple([], { userToken: "listener" });

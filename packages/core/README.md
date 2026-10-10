@@ -293,7 +293,7 @@ another copy of this package. A namespace is frozen, and its type holds what it 
 
 | Check | Takes |
 | --- | --- |
-| `segmentOf(fn, name, value)` | A string of 1 to 64 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
+| `segmentOf(fn, name, value)` | A string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not `.` or `..`. It comes back percent-encoded, so a question mark, a hash or a space stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
 | `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 lists, each as `listOf` takes one, under the name of a type of resource: lowercase words with hyphens between, such as `library-songs`. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out. Which types there are is Apple's to say. |
 | `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
@@ -302,6 +302,11 @@ another copy of this package. A namespace is frozen, and its type holds what it 
 `segmentOf` is what keeps a caller's id from moving a request: put into a path as it is,
 `../../../me/library/songs` after `v1/catalog/us/songs/` is a request for the listener's library, and
 under `/v1/me` the client sends the Music User Token.
+
+A slash is refused, not encoded. Encoded, it would stay in its segment as far as a URL goes, which is
+as far as this package can see: a server that decodes a path before it reads it would find the slash
+there again. No id, name or code of Apple's holds a slash, a backslash, a percent sign or a control
+character, so a value that does is a mistake, and is not sent.
 
 Sixty-four characters is longer than any id, name or code Apple gives out, and well short of a token.
 A token put where an id belongs is therefore refused before it is sent, and is not repeated in the

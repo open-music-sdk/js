@@ -214,15 +214,9 @@ describe("segmentOf", () => {
   );
 
   test.each([
-    ["a/b", "a%2Fb"],
-    ["../../me/library/songs", "..%2F..%2Fme%2Flibrary%2Fsongs"],
-    ["a\\b", "a%5Cb"],
     ["a?b=1&c", "a%3Fb%3D1%26c"],
     ["a#b", "a%23b"],
     ["a b", "a%20b"],
-    ["a\tb\n", "a%09b%0A"],
-    ["%2e%2e", "%252e%252e"],
-    ["%2F", "%252F"],
     ["a;b", "a%3Bb"],
     ["a:b@c", "a%3Ab%40c"],
     ["é", "%C3%A9"],
@@ -239,22 +233,40 @@ describe("segmentOf", () => {
 
   describe("whatever a segment holds, the request still goes where it was going", () => {
     const BASE = "https://api.music.apple.com/";
-    const hostile = [
+    /** What a URL would read as leaving the segment, written every way it can be. Each holds a slash, a backslash, a percent sign or a control character. */
+    const leaving = [
       "../../../me/library/songs",
       "..\\..\\..\\me\\library\\songs",
       "%2e%2e/%2e%2e/%2e%2e/me",
       ".%2e",
       "%2E%2E",
+      "%2F",
+      "..%2F..%2Fme",
+      "%252e%252e%252fme",
       "/v1/me/storefront",
       "//evil.example/x",
       "https://evil.example/x",
-      "1?include=library",
-      "1#fragment",
       "1/../../../me",
-      " ",
+      "a/b",
+      "a\\b",
+      "a%b",
       "\t",
       "a\r\nb",
+      "a\u0000b",
+      "a\u007fb",
+      "a\u0085b",
     ];
+    /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+    const hostile = ["1?include=library", "1#fragment", " ", "a b", "..a", "a..", "...", "1&ids=2", "a=b", "a;b", "a@b:c"];
+
+    test.each(leaving)("%j is refused, so it is neither sent nor left to whoever reads the path to decode", (value) => {
+      const error = thrown(() => segmentOf("getSong", "id", value));
+      expect(error).toEqual(
+        new TypeError(
+          `getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${String(value.length)} characters`,
+        ),
+      );
+    });
 
     test.each(hostile)("%j stays the one segment after /v1/catalog/us/songs", (value) => {
       const url = new URL(`v1/catalog/us/songs/${segmentOf("getSong", "id", value)}`, BASE);
@@ -270,6 +282,12 @@ describe("segmentOf", () => {
       expect(new URL("v1/catalog/us/songs/../../../me/library/songs", BASE).pathname).toBe("/v1/me/library/songs");
       expect(new URL("v1/catalog/us/songs/%2e%2e/%2e%2e/%2e%2e/me", BASE).pathname).toBe("/v1/me");
       expect(new URL("v1/catalog/us/songs/1?include=library", BASE).search).toBe("?include=library");
+    });
+
+    test("and an encoded slash, which a URL keeps in its segment, leaves all the same for a reader that decodes a path before it reads it", () => {
+      const encoded = encodeURIComponent("../../../me/library/songs");
+      expect(new URL(`v1/catalog/us/songs/${encoded}`, BASE).pathname).toBe(`/v1/catalog/us/songs/${encoded}`);
+      expect(new URL(`v1/catalog/us/songs/${decodeURIComponent(encoded)}`, BASE).pathname).toBe("/v1/me/library/songs");
     });
   });
 
@@ -289,7 +307,7 @@ describe("segmentOf", () => {
   ])("%s is a TypeError naming the function and the argument, and saying what it got", (_name, value, what) => {
     const error = thrown(() => segmentOf("getSong", "id", value));
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${what}`);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${what}`);
   });
 
   test("the argument is named as the caller names it", () => {
@@ -300,7 +318,7 @@ describe("segmentOf", () => {
     // The size and shape of a developer token: three runs of base64url with dots between, every character one a segment may hold.
     const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
     const error = thrown(() => segmentOf("getSong", "id", token));
-    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${String(token.length)} characters`);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${String(token.length)} characters`);
     expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
   });
 

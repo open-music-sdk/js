@@ -178,13 +178,14 @@ is a `TypeError` that names the function and the argument and describes the valu
 it, since a value in the wrong place may be a token:
 
 ```
-getLibrarySong: id must be a string of 1 to 64 characters, and not "." or ".."; got 228 characters
+getLibrarySong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 228 characters
 setSongRating: value must be 1, for a like, or -1, for a dislike; got 5
 ```
 
-- An id and a relationship's name are each one segment of a path, encoded. Whatever one holds, the
-  request stays where it was going: `../../ratings/songs/1` is asked for as a library song with that
-  odd id, and is not found.
+- An id, a relationship's name and a storefront are each one segment of a path. One that holds a
+  slash, a backslash, a percent sign or a control character is refused, as `.` and `..` are: none of
+  Apple's does, and `../../ratings/songs/1` is a request for somewhere else. Anything else is encoded,
+  so the request stays where it was going whatever it holds.
 - An id, a name or a type is at most 64 characters, which is longer than any of Apple's and shorter
   than a token, so a token put where one belongs is refused before it is sent.
 - A search term is at most 256 characters. Lists are at most 300 long.
