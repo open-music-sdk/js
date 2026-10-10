@@ -255,6 +255,16 @@ So a storefront from outside cannot move a request under `/v1/me`, where the cli
 User Token. The path is described by what is wrong with it and never shown. A collection that checks
 its own parts with `segmentOf` gets to name the option that was wrong.
 
+A collection also has the say on the Music User Token, as a `user` property of its own:
+
+```ts
+const genres: tCollection = Object.assign(() => "v1/catalog/us/genres", { user: false });
+```
+
+Left out, the client goes by the path and sends the token under `/v1/me`. `false` means nothing asked
+of the collection carries it, and that holds for every page of a walk, wherever a next link points:
+it is how a catalog says that nothing in it is the listener's. `true` sends it outside `/v1/me`.
+
 ### When a function is called
 
 Everything a function is handed is checked before Apple or `collection` is asked, in the order it was

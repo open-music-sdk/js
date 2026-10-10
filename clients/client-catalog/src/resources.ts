@@ -47,7 +47,7 @@ import type {
   tStationsResponse,
   tStorefrontsResponse,
 } from "@open-music-sdk/types";
-import { catalogOf, inStorefront, type tStorefrontOption } from "./storefront";
+import { NO_LISTENER, catalogOf, inStorefront, storefronts, type tStorefrontOption } from "./storefront";
 
 /** The option of a function for a resource that has views: which of them to send with the resource. */
 export interface tViewsOption<Views> {
@@ -88,15 +88,12 @@ function viewGetter<Views>(fn: string, type: string): tViewEndpoint<Views> {
   const declared = endpoint(fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipViewResponse, tStorefrontOption, tWithOption>) => {
     const segments = `${segmentOf(fn, "id", id)}/view/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, "an options object");
-    const init = initOf<tRelationshipViewResponse>(fn, bag, {}, ["with"]);
+    const init = { ...initOf<tRelationshipViewResponse>(fn, bag, {}, ["with"]), ...NO_LISTENER };
     return inStorefront(fn, client, bag.storefront, (storefront): tRequestPlan<tRelationshipViewResponse> => [`v1/catalog/${storefront}/${type}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.
   return declared as unknown as tViewEndpoint<Views>;
 }
-
-/** Storefronts are not in any storefront's catalog: they are the list of them. */
-const storefronts = () => "v1/storefronts";
 
 // Each collection is made once and marked as having no effect of its own, as every declaration below is, so that a
 // bundler leaves out of an app whatever the app did not import.

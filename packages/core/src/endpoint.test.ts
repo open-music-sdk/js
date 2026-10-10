@@ -921,6 +921,92 @@ describe("the resource patterns: where the collection is", () => {
   });
 });
 
+describe("the resource patterns: a collection says whether what is asked of it carries the Music User Token", () => {
+  /** A collection at a path, with its say on the listener's token, or with none. */
+  const at = (path: string, user?: unknown): tCollection => Object.assign(() => path, user === undefined ? {} : { user }) as tCollection;
+  /** A call of every pattern over one collection, with a client and bound: seven requests when no page names a next. */
+  const every = (collection: tCollection) => {
+    const one = resourceGetter<tSongsResponse>("getSong", collection);
+    const several = resourcesGetter<tSongsResponse>("getSongs", collection);
+    const found = resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection);
+    const whole = resourceLister<tSongsResponse>("listSongs", collection);
+    const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
+    return async (music: tAppleMusicClient) => {
+      await one(music, "1");
+      await several(music, ["1"]);
+      await found(music, ["A"]);
+      await whole(music);
+      await related(music, "1", "tracks");
+      await all(whole.bound(music)());
+      await all(related.bound(music)("1", "tracks"));
+    };
+  };
+  const seven = (token: string | null) => Array.from({ length: 7 }, () => token);
+
+  test("false: nothing asked of it carries the token, though the client holds one and the path is the listener's", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/me/library/songs", false))(music);
+    expect(userTokens()).toEqual(seven(null));
+  });
+
+  test("false holds for every page of a walk, wherever a next link points", async () => {
+    const page = { body: { data: [song("1")], next: "/v1/me/library/songs?offset=1" } };
+    const { music, sent, userTokens } = apple([page, { body: { data: [song("2")] } }, page, { body: { data: [song("2")] } }], { userToken: "listener" });
+    const collection = at("v1/catalog/us/genres", false);
+    expect(await all(resourceLister<tSongsResponse>("listGenres", collection).bound(music)())).toEqual([song("1"), song("2")]);
+    expect(await all(relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection).bound(music)("1", "tracks"))).toEqual([song("1"), song("2")]);
+    expect(sent()).toEqual(["GET /v1/catalog/us/genres", "GET /v1/me/library/songs?offset=1", "GET /v1/catalog/us/genres/1/tracks", "GET /v1/me/library/songs?offset=1"]);
+    expect(userTokens()).toEqual([null, null, null, null]);
+  });
+
+  test("the check can tell: with no say from the collection, the same walk does carry the token to where that link points", async () => {
+    const { music, userTokens } = apple([{ body: { data: [song("1")], next: "/v1/me/library/songs?offset=1" } }, { body: { data: [] } }], { userToken: "listener" });
+    await all(resourceLister<tSongsResponse>("listGenres", at("v1/catalog/us/genres")).bound(music)());
+    expect(userTokens()).toEqual([null, "listener"]);
+  });
+
+  test("true: everything asked of it carries the token, though the path is the catalog's", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/catalog/us/stations", true))(music);
+    expect(userTokens()).toEqual(seven("listener"));
+  });
+
+  test("left out: the client goes by the path, and sends the token under /v1/me alone", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/catalog/us/songs"))(music);
+    await every(at("v1/me/library/songs"))(music);
+    expect(userTokens()).toEqual([...seven(null), ...seven("listener")]);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["a string", "no", "2 characters"],
+    ["a number", 0, "0"],
+    ["null", null, "null"],
+  ])("a say that is %s is a TypeError naming the builder, as the declaration is made", (_name, user, what) => {
+    const builders: [string, (collection: tCollection) => unknown][] = [
+      ["resourceGetter", (collection) => resourceGetter<tSongsResponse>("getSong", collection)],
+      ["resourcesGetter", (collection) => resourcesGetter<tSongsResponse>("getSongs", collection)],
+      ["resourcesFinder", (collection) => resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection)],
+      ["resourceLister", (collection) => resourceLister<tSongsResponse>("listSongs", collection)],
+      ["relationshipGetter", (collection) => relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection)],
+    ];
+    for (const [builder, declare] of builders) {
+      expect(() => declare(at(SONGS, user))).toThrow(new TypeError(`${builder}: collection.user must be true or false where it is given; got ${what}`));
+    }
+  });
+
+  test("the say is the collection's own: a user put on Object.prototype by other code is not it", async () => {
+    Object.assign(Object.prototype, { user: true });
+    try {
+      const { music, userTokens } = apple([], { userToken: "listener" });
+      await every(at("v1/catalog/us/songs"))(music);
+      expect(userTokens()).toEqual(seven(null));
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "user");
+    }
+  });
+});
+
 describe("the resource patterns: what a collection gives is checked, so that what goes into it cannot move the request", () => {
   /** A collection that puts a storefront into its path as it comes, which is what the check is there for. */
   const catalog: tCollection<tStore> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/songs`;

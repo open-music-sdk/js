@@ -86,10 +86,13 @@ without asking for it again:
 
 ```ts
 const page = await listGenres(music, { limit: 50 });
-for await (const genre of music.paginate(page)) {
+for await (const genre of music.paginate(page, { user: false })) {
   // the genres of that page, then the rest
 }
 ```
+
+`user: false` there is what the functions of this package pass themselves: no Music User Token,
+wherever a next link points.
 
 ## The storefront
 
@@ -198,10 +201,13 @@ rate limit a `RateLimited`.
 
 ## Tokens
 
-No function here sends a Music User Token, whichever client it is handed: the catalog's paths are not
-the listener's, and a value in a path cannot make them so. The one request that does carry it is the
-client's own lookup of the listener's storefront, described above, which happens when neither the call
-nor the client names a storefront.
+No function here sends a Music User Token, whichever client it is handed. Every request is made with
+`user: false`, which holds for each page of a walk as well: if an answer's next link pointed at the
+listener's library, the walk would go there without their token. A value in a path cannot make a
+catalog's path the listener's either.
+
+The one request that does carry the token is the client's own lookup of the listener's storefront,
+described above, which happens when neither the call nor the client names a storefront.
 
 ## Not here
 

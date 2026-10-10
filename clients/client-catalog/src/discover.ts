@@ -12,7 +12,7 @@ import type {
   tSearchSuggestionsResponse,
   tStationsResponse,
 } from "@open-music-sdk/types";
-import { inStorefront, type tStorefrontOption } from "./storefront";
+import { NO_LISTENER, inStorefront, type tStorefrontOption } from "./storefront";
 
 const OPTIONS = "an options object";
 /** Longer than anything typed into a search box. What is searched for is sent in the URL, so it is not left open. */
@@ -42,7 +42,7 @@ export interface tSearchCatalogOptions extends tReadOptions<tSearchResponse>, tS
 export const searchCatalog = /*#__PURE__*/ endpoint("searchCatalog", "answer", (client, term: string, options: tSearchCatalogOptions) => {
   const text = termOf("searchCatalog", term);
   const bag = optionsOf("searchCatalog", options, OPTIONS);
-  const init = initOf<tSearchResponse>("searchCatalog", bag, { term: text, types: listOf("searchCatalog", "types", bag.types) }, ["with"]);
+  const init = { ...initOf<tSearchResponse>("searchCatalog", bag, { term: text, types: listOf("searchCatalog", "types", bag.types) }, ["with"]), ...NO_LISTENER };
   return inStorefront("searchCatalog", client, bag.storefront, (storefront): tRequestPlan<tSearchResponse> => [`v1/catalog/${storefront}/search`, init]);
 });
 
@@ -53,7 +53,7 @@ export type tSearchHintsOptions = tReadOptions<tSearchHintsResponse> & tStorefro
 export const getSearchHints = /*#__PURE__*/ endpoint("getSearchHints", "answer", (client, term: string, options?: tSearchHintsOptions) => {
   const text = termOf("getSearchHints", term);
   const bag = optionsOf("getSearchHints", options, OPTIONS);
-  const init = initOf<tSearchHintsResponse>("getSearchHints", bag, { term: text });
+  const init = { ...initOf<tSearchHintsResponse>("getSearchHints", bag, { term: text }), ...NO_LISTENER };
   return inStorefront("getSearchHints", client, bag.storefront, (storefront): tRequestPlan<tSearchHintsResponse> => [`v1/catalog/${storefront}/search/hints`, init]);
 });
 
@@ -69,7 +69,7 @@ export interface tSearchSuggestionsOptions extends tReadOptions<tSearchSuggestio
 export const getSearchSuggestions = /*#__PURE__*/ endpoint("getSearchSuggestions", "answer", (client, term: string, options: tSearchSuggestionsOptions) => {
   const text = termOf("getSearchSuggestions", term);
   const bag = optionsOf("getSearchSuggestions", options, OPTIONS);
-  const init = initOf<tSearchSuggestionsResponse>("getSearchSuggestions", bag, { term: text, kinds: listOf("getSearchSuggestions", "kinds", bag.kinds) }, ["types"]);
+  const init = { ...initOf<tSearchSuggestionsResponse>("getSearchSuggestions", bag, { term: text, kinds: listOf("getSearchSuggestions", "kinds", bag.kinds) }, ["types"]), ...NO_LISTENER };
   return inStorefront("getSearchSuggestions", client, bag.storefront, (storefront): tRequestPlan<tSearchSuggestionsResponse> => [`v1/catalog/${storefront}/search/suggestions`, init]);
 });
 
@@ -88,7 +88,7 @@ export interface tChartsOptions extends tReadOptions<tChartResponse>, tStorefron
 /** The charts of a storefront, by type of resource, each one a first page. `limit` and `offset` apply to every chart. */
 export const getCharts = /*#__PURE__*/ endpoint("getCharts", "answer", (client, options: tChartsOptions) => {
   const bag = optionsOf("getCharts", options, OPTIONS);
-  const init = initOf<tChartResponse>("getCharts", bag, { types: listOf("getCharts", "types", bag.types) }, ["chart", "genre", "with"]);
+  const init = { ...initOf<tChartResponse>("getCharts", bag, { types: listOf("getCharts", "types", bag.types) }, ["chart", "genre", "with"]), ...NO_LISTENER };
   return inStorefront("getCharts", client, bag.storefront, (storefront): tRequestPlan<tChartResponse> => [`v1/catalog/${storefront}/charts`, init]);
 });
 
@@ -118,7 +118,7 @@ export type tCatalogResourcesOptions = tReadOptions<tResourceCollectionResponse>
 export const getCatalogResources = /*#__PURE__*/ endpoint("getCatalogResources", "resources", (client, ids: tCatalogIds, options?: tCatalogResourcesOptions) => {
   const lists = typedIdsOf("getCatalogResources", "ids", ids);
   const bag = optionsOf("getCatalogResources", options, OPTIONS);
-  const init = initOf<tResourceCollectionResponse>("getCatalogResources", bag, lists);
+  const init = { ...initOf<tResourceCollectionResponse>("getCatalogResources", bag, lists), ...NO_LISTENER };
   return inStorefront("getCatalogResources", client, bag.storefront, (storefront): tRequestPlan<tResourceCollectionResponse> => [`v1/catalog/${storefront}`, init]);
 });
 
@@ -128,7 +128,7 @@ export type tLiveRadioStationsOptions = tReadOptions<tStationsResponse> & tStore
 /** The live radio stations of Apple Music, such as Apple Music 1. */
 export const getLiveRadioStations = /*#__PURE__*/ endpoint("getLiveRadioStations", "resources", (client, options?: tLiveRadioStationsOptions) => {
   const bag = optionsOf("getLiveRadioStations", options, OPTIONS);
-  const init = initOf<tStationsResponse>("getLiveRadioStations", bag, { "filter[featured]": "apple-music-live-radio" });
+  const init = { ...initOf<tStationsResponse>("getLiveRadioStations", bag, { "filter[featured]": "apple-music-live-radio" }), ...NO_LISTENER };
   return inStorefront("getLiveRadioStations", client, bag.storefront, (storefront): tRequestPlan<tStationsResponse> => [`v1/catalog/${storefront}/stations`, init]);
 });
 
@@ -142,6 +142,6 @@ export type tLanguageTagOptions = tReadOptions<tLangageTagResponse> & tStorefron
 export const getLanguageTag = /*#__PURE__*/ endpoint("getLanguageTag", "answer", (client, acceptLanguage: readonly string[], options?: tLanguageTagOptions) => {
   const accepted = listOf("getLanguageTag", "acceptLanguage", acceptLanguage);
   const bag = optionsOf("getLanguageTag", options, OPTIONS);
-  const init = initOf<tLangageTagResponse>("getLanguageTag", bag, { acceptLanguage: accepted });
+  const init = { ...initOf<tLangageTagResponse>("getLanguageTag", bag, { acceptLanguage: accepted }), ...NO_LISTENER };
   return inStorefront("getLanguageTag", client, bag.storefront, (storefront): tRequestPlan<tLangageTagResponse> => [`v1/language/${storefront}/tag`, init]);
 });

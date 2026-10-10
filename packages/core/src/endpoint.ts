@@ -136,7 +136,15 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
  * "." or "..", and no question mark, hash or backslash. So a storefront from outside cannot move a request, and a
  * collection that checks its own parts, with `segmentOf`, gets to name the option that was wrong.
  */
-export type tCollection<C = tNone> = (fn: string, client: tAppleMusicClient, options: C) => string | Promise<string>;
+export interface tCollection<C = tNone> {
+  (fn: string, client: tAppleMusicClient, options: C): string | Promise<string>;
+  /**
+   * Whether what is asked of this collection carries the Music User Token. Left out, the client goes by the path,
+   * and sends it under /v1/me. `false` holds for every page of a walk, wherever a next link points: it is how a
+   * catalog says that nothing asked of it is the listener's.
+   */
+  readonly user?: boolean | undefined;
+}
 
 /** No options of that kind: an object, so that what is left of the options is still nothing but an object. */
 export type tNone = object;
@@ -204,11 +212,17 @@ function located<R>(fn: string, path: string | Promise<string>, finish: (collect
  * The collection and the further options a declaration was given, checked as it is made. The names are this
  * declaration's own copy, so nothing done to the object afterwards changes what its function sends.
  */
-function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: readonly string[]] {
+function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: readonly string[], user: boolean | undefined] {
   if (typeof collection !== "function") throw new TypeError(`${builder}: collection must be a function that gives the collection's path; got ${got(collection)}`);
+  // Its own, and not one found on a prototype: `user` put on Object.prototype by other code is not this collection's say.
+  const user: unknown = Object.hasOwn(collection, "user") ? (collection as { user?: unknown }).user : undefined;
+  if (user !== undefined && typeof user !== "boolean") throw new TypeError(`${builder}: collection.user must be true or false where it is given; got ${got(user)}`);
   if (also !== undefined && (typeof also !== "object" || also === null || Array.isArray(also))) throw new TypeError(`${builder}: also must be an object that names each further option, such as { views: true }; got ${got(also)}`);
-  return [collection as tCollection<C>, Object.keys(also ?? {})];
+  return [collection as tCollection<C>, Object.keys(also ?? {}), user];
 }
+
+/** What a request is made with, with the collection's say on the Music User Token where it has one. */
+const pinned = <R>(init: tRequestInit<R>, user: boolean | undefined): tRequestInit<R> => (user === undefined ? init : { ...init, user });
 
 /**
  * A function for the resource with one id in a collection: `GET {collection}/{id}`. `R` is the answer's type and has
@@ -219,12 +233,12 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>> {
-  const [locate, names] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
+  const [locate, names, user] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
   // Here and below, what a call was handed is checked in the order it was handed over, so the first mistake is the one named.
   return declare("resourceGetter", fn, "resource", (client, id: string, options?: tEndpointOptions<R, C, E>) => {
     const segment = segmentOf(fn, "id", id);
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, {}, names);
+    const init = pinned(initOf<R>(fn, bag, {}, names), user);
     return located<R>(fn, locate(fn, client, bag), (path) => [`${path}/${segment}`, init]);
   });
 }
@@ -238,11 +252,11 @@ function picked<R extends tResources, C extends object, E extends object>(
   collection: unknown,
   also: unknown,
 ): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
-  const [locate, names] = given<C>(builder, collection, also);
+  const [locate, names, user] = given<C>(builder, collection, also);
   return declare(builder, fn, "resources", (client, values: readonly string[], options?: tEndpointOptions<R, C, E>) => {
     const list = listOf(fn, name, values);
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, { [param]: list }, names);
+    const init = pinned(initOf<R>(fn, bag, { [param]: list }, names), user);
     return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
@@ -276,10 +290,10 @@ export function resourceLister<R extends tResources = never, C extends object = 
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E>], tPaged<R>, AsyncIterable<tItem<R>>> {
-  const [locate, names] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
+  const [locate, names, user] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
   return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E>) => {
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<tPaged<R>>(fn, bag, {}, names);
+    const init = pinned(initOf<tPaged<R>>(fn, bag, {}, names), user);
     return located<tPaged<R>>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
@@ -302,11 +316,11 @@ export interface tRelationshipEndpoint<Rels, C = tNone> {
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
-  const [locate] = given<C>("relationshipGetter", collection, undefined);
+  const [locate, , user] = given<C>("relationshipGetter", collection, undefined);
   const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C>) => {
     const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<tRelationshipResponse>(fn, bag);
+    const init = pinned(initOf<tRelationshipResponse>(fn, bag), user);
     return located<tRelationshipResponse>(fn, locate(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.

@@ -1602,6 +1602,33 @@ describe("an option is one that was passed, never one found on Object.prototype"
     expect(calls).toHaveLength(3);
   });
 
+  test("paginate: a next link and items planted there are not every page's, so a walk ends where Apple's answers end and goes nowhere else", async () => {
+    const { music, calls, url, header } = client([{ body: { data: [1] } }, { body: { data: [9] } }], { userToken: "user" });
+    const seen = await polluted({ next: "/v1/me/library/songs", data: [7] }, async () => {
+      const out: number[] = [];
+      for await (const item of music.paginate<number>("v1/catalog/us/genres")) out.push(item);
+      for await (const item of music.paginate<number>({ data: [2] })) out.push(item);
+      return out;
+    });
+    expect(seen).toEqual([1, 2]);
+    expect([calls.length, url(), header("music-user-token")]).toEqual([1, "https://api.music.apple.com/v1/catalog/us/genres", null]);
+  });
+
+  test("paginate: an object that holds neither of its own is no page, though both are planted there", async () => {
+    const { music, calls } = client();
+    const error: unknown = await polluted({ next: "/v1/me/library/songs", data: [7] }, async () => {
+      const out: unknown[] = [];
+      for await (const item of music.paginate({})) out.push(item);
+      return out;
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the check that says so can tell: an ordinary object does appear to hold the planted link, which a walk that read it would follow", async () => {
+    expect(await polluted({ next: "/v1/me/library/songs" }, () => Promise.resolve(({} as { next?: string }).next))).toBe("/v1/me/library/songs");
+  });
+
   test("createClient: a listener's token, a storefront, a hook and a fetch planted there are not the client's", async () => {
     const plantedFetch = vi.fn();
     const onRequest = vi.fn();

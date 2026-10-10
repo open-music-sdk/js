@@ -28,12 +28,15 @@ const isListeners = (endpoint: tDocumented) => endpoint.path.startsWith("v1/me")
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
 const responses: Response[] = [];
 
-/** A client over a fetch that answers every request with one resource, and records every Request it saw. */
-function apple(options: Partial<tClientOptions> = {}) {
+/**
+ * A client over a fetch that answers every request with one resource, and records every Request it saw. With
+ * `next`, the first answer names it as its next page, as an answer that is not Apple's own might.
+ */
+function apple(options: Partial<tClientOptions> = {}, next?: string) {
   const calls: Request[] = [];
   const fetch = (input: RequestInfo | URL): Promise<Response> => {
     calls.push(input instanceof Request ? input : new Request(input));
-    const res = new Response(JSON.stringify({ data: [{ id: "1", type: "songs" }] }));
+    const res = new Response(JSON.stringify({ data: [{ id: "1", type: "songs" }], ...(next !== undefined && calls.length === 1 ? { next } : {}) }));
     responses.push(res);
     return Promise.resolve(res);
   };
@@ -264,6 +267,44 @@ describe("the catalog is asked with the developer token alone", () => {
       ["Bearer dev", null],
       ["Bearer dev", null],
     ]);
+  });
+
+  describe("a next link that points at the listener's library takes a walk there, and the token stays behind", () => {
+    const LIBRARY = "/v1/me/library/songs?limit=100";
+    const paths = (calls: Request[]) => calls.map((request) => new URL(request.url).pathname);
+
+    test.each(rows)("$name, as the namespace has it, sends no Music User Token to wherever its answer's next link points", async (each) => {
+      const { music, calls } = apple({ userToken: "listener" }, LIBRARY);
+      await callBound(music, each);
+      expect(calls.map((request) => request.headers.get("music-user-token"))).toEqual(calls.map(() => null));
+    });
+
+    test("the check can tell: the eighteen that walk pages did follow that link, so it is not for want of a second request that none carried the token", async () => {
+      const followed: string[] = [];
+      for (const each of rows) {
+        const { music, calls } = apple({ userToken: "listener" }, LIBRARY);
+        await callBound(music, each);
+        if (calls.length > 1) followed.push(each.name);
+        expect(paths(calls).slice(1)).toEqual(calls.length > 1 ? ["/v1/me/library/songs"] : []);
+      }
+      expect(followed).toHaveLength(18);
+    });
+
+    test("the first page a function resolved to is walked from the same way when the walk is told so", async () => {
+      const { music, calls } = apple({ userToken: "listener" }, LIBRARY);
+      const page = await api.listGenres(music);
+      for await (const item of music.paginate(page, { user: false })) expect(item).toBeDefined();
+      expect([paths(calls), calls.map((request) => request.headers.get("music-user-token"))]).toEqual([
+        ["/v1/catalog/us/genres", "/v1/me/library/songs"],
+        [null, null],
+      ]);
+    });
+
+    test("the check can tell: a walk that is not told so does carry the token there", async () => {
+      const { music, calls } = apple({ userToken: "listener" }, LIBRARY);
+      for await (const item of music.paginate("v1/catalog/us/genres")) expect(item).toBeDefined();
+      expect(calls.map((request) => request.headers.get("music-user-token"))).toEqual([null, "listener"]);
+    });
   });
 
   test("the check can tell: the same client does send the token to a path of the listener's", async () => {
