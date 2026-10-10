@@ -50,8 +50,11 @@ try {
 | `endpoint`, `resourceGetter`, `resourcesGetter`, `resourcesFinder`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
 | `endpointNamespace(fn, client, endpoints)` | Every such function bound to one client, its answers unwrapped |
 
-The rows from `segmentOf` down are for packages that put names to endpoints, as the client packages
-do; see [Declaring endpoints](#declaring-endpoints). An app has no need of them.
+The rows from `segmentOf` down are for packages that put names to endpoints; see
+[Declaring endpoints](#declaring-endpoints). An app has no need of them: the two that are made with
+them, [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
+[`@open-music-sdk/client-user`](../../clients/client-user), have a function for every endpoint, so
+that `request` is for the rare path neither names.
 
 `isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
 with a string `_tag`, not by constructor. An error is recognised whichever copy of this package made
