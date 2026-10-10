@@ -8,6 +8,7 @@ type tReply = { status?: number; body?: unknown } | Error;
 
 const SECRET = "s3cretT0ken";
 const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
+const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 const song = (id: string) => ({ id, type: "songs", href: `/v1/catalog/us/songs/${id}` });
 
 /** Every Response the fake Apple handed out, so the suite can insist each body was read. */
@@ -231,6 +232,9 @@ describe("a value put in a path stays where it was put, so a request for the cat
     ["getAlbumView: an id that is missing", (music) => api.getAlbumView(music, undefined as unknown as string, "other-versions"), `getAlbumView: id ${SEGMENT}undefined`],
     ["getAlbumView: a name that is two dots", (music) => api.getAlbumView(music, "1", ".." as "other-versions"), `getAlbumView: name ${SEGMENT}2 characters`],
     ["getAlbumView: a name that is a number", (music) => api.getAlbumView(music, "1", 5 as unknown as "other-versions"), `getAlbumView: name ${SEGMENT}5`],
+    ["getAlbum: views that are one string, not a list", (music) => api.getAlbum(music, "1", { views: "other-versions" as never }), `getAlbum: views ${LIST}14 characters`],
+    ["getSongsByEquivalents: a restrict that is true", (music) => api.getSongsByEquivalents(music, ["1"], { restrict: true as never }), `getSongsByEquivalents: restrict ${LIST}boolean`],
+    ["getAlbumView: a with that is one string, not a list", (music) => api.getAlbumView(music, "1", "other-versions", { with: "attributes" as never }), `getAlbumView: with ${LIST}10 characters`],
   ])("%s is a TypeError, and Apple is not asked", async (_name, call, message) => {
     const { music, calls } = apple();
     expect(await rejection(call(music))).toEqual(new TypeError(message));

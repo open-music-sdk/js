@@ -227,7 +227,7 @@ describe("the types: one declaration gives both forms, and the name asked for de
     }
     type tOptions = tReadOptions<tSongsResponse> & tStore & tViews;
     const collection: tCollection<tStore> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/artists`;
-    const getArtist = resourceGetter<tSongsResponse, tStore, tViews>("getArtist", collection, { views: true });
+    const getArtist = resourceGetter<tSongsResponse, tStore, tViews>("getArtist", collection, { views: "list" });
     expectTypeOf(getArtist).parameter(2).toEqualTypeOf<tOptions | undefined>();
     expectTypeOf(endpointNamespace("catalog", apple().music, { getArtist }).getArtist).parameter(1).toEqualTypeOf<tOptions | undefined>();
   });
@@ -280,8 +280,11 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
   });
 
   test.each(builders.slice(0, 4))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
-    const message = (what: string) => new TypeError(`${name}: also must be an object that names each further option, such as { views: true }; got ${what}`);
+    const message = (what: string) => new TypeError(`${name}: also must be an object that says what each further option is, a "list" or a "name", such as { views: "list" }; got ${what}`);
     expect(() => builder("getSong", () => SONGS, ["views"])).toThrow(message("object"));
+    // What an option is has to be said: naming it is not enough, and neither is a kind there is not.
+    expect(() => builder("getSong", () => SONGS, { views: Boolean("named") })).toThrow(message("object"));
+    expect(() => builder("getSong", () => SONGS, { views: "list", chart: "text" })).toThrow(message("object"));
     expect(() => builder("getSong", () => SONGS, "views")).toThrow(message("5 characters"));
     expect(() => builder("getSong", () => SONGS, null)).toThrow(message("null"));
   });
@@ -296,9 +299,9 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
   });
 
   test("the options it names are its own copy: naming another afterwards changes nothing", async () => {
-    const also: { views: true; with?: true } = { views: true };
+    const also: { views: "list"; with?: "list" } = { views: "list" };
     const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", also);
-    also.with = true;
+    also.with = "list";
     const { music, sent } = apple();
     await getArtist(music, "1", { views: ["top-songs"], with: ["attributes"] } as { views: string[] });
     expect(sent()).toEqual(["GET /v1/catalog/us/artists/1?views=top-songs"]);
@@ -310,7 +313,7 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
       readonly with?: readonly string[] | undefined;
     }
     const declarations = [
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true, with: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "list", with: "list" }),
       // @ts-expect-error -- the answer's type is not said, so there is nothing a collection can be
       () => resourceGetter("getSong", () => SONGS),
       // @ts-expect-error -- so too for the resources with some ids
@@ -322,13 +325,18 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
       // @ts-expect-error -- two options are added and none is named
       () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS),
       // @ts-expect-error -- one of the two is not named
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "list" }),
       // @ts-expect-error -- a name that is misspelt is not one of the options
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { veiws: true, with: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { veiws: "list", with: "list" }),
       // @ts-expect-error -- an option is named that the function does not add
-      () => resourceGetter<tSongsResponse>("getSong", () => SONGS, { views: true }),
+      () => resourceGetter<tSongsResponse>("getSong", () => SONGS, { views: "list" }),
+      // @ts-expect-error -- an option whose type is a list is declared a name
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "name", with: "list" }),
+      // @ts-expect-error -- an option whose type is one string is declared a list
+      () => resourceGetter<tSongsResponse, tNone, { readonly chart?: string | undefined }>("getCharts", () => SONGS, { chart: "list" }),
+      () => resourceGetter<tSongsResponse, tNone, { readonly chart?: string | undefined }>("getCharts", () => SONGS, { chart: "name" }),
     ];
-    expect(declarations).toHaveLength(9);
+    expect(declarations).toHaveLength(12);
   });
 });
 
@@ -895,7 +903,7 @@ describe("the resource patterns: what each asks Apple for", () => {
   });
 
   test("an option is sent only by a function declared to take it", async () => {
-    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", { views: true });
+    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", { views: "list" });
     const { music, sent } = apple();
     await getArtist(music, "1", { views: ["top-songs", "singles"] });
     await getSong(music, "1", { views: ["top-songs"] } as tReadOptions<tSongsResponse>);
@@ -906,9 +914,9 @@ describe("the resource patterns: what each asks Apple for", () => {
     interface tViews {
       readonly views?: readonly string[] | undefined;
     }
-    const one = resourceGetter<tSongsResponse, tNone, tViews>("getArtist", () => "v1/catalog/us/artists", { views: true });
-    const several = resourcesGetter<tSongsResponse, tNone, tViews>("getArtists", () => "v1/catalog/us/artists", { views: true });
-    const whole = resourceLister<tSongsResponse, tNone, tViews>("listArtists", () => "v1/catalog/us/artists", { views: true });
+    const one = resourceGetter<tSongsResponse, tNone, tViews>("getArtist", () => "v1/catalog/us/artists", { views: "list" });
+    const several = resourcesGetter<tSongsResponse, tNone, tViews>("getArtists", () => "v1/catalog/us/artists", { views: "list" });
+    const whole = resourceLister<tSongsResponse, tNone, tViews>("listArtists", () => "v1/catalog/us/artists", { views: "list" });
     const { music, sent } = apple();
     await one(music, "1", { views: ["top-songs"] });
     await several(music, ["1"], { views: ["top-songs"] });
@@ -966,7 +974,7 @@ describe("resourcesFinder: the resources a filter picks out of a collection", ()
   });
 
   test("a filter with a hyphen in its name is sent under that name, and an option the declaration adds beside it", async () => {
-    const equivalents = resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS, { restrict: true });
+    const equivalents = resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS, { restrict: "list" });
     const chart = resourcesFinder<tSongsResponse>("getPlaylistsByStorefrontChart", "storefront-chart", () => "v1/catalog/us/playlists");
     const { music, sent } = apple();
     await equivalents(music, ["1"], { restrict: ["explicit"] });

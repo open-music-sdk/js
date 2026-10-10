@@ -99,48 +99,73 @@ describe("initOf: three things fill the query, and the later wins", () => {
   });
 });
 
-describe("initOf: a further option is sent only by a function that names it", () => {
-  const options = loose({ views: ["top-songs", "singles"], with: "attributes", restrict: true, count: 3 });
+describe("initOf: a further option is sent only by a function that names it, and is held to what the function says it is", () => {
+  const options = loose({ views: ["top-songs", "singles"], chart: "most-played", genre: "20" });
+  const kinds = { views: "list", chart: "name", genre: "name" } as const;
+  const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 
-  test("named, it is sent under its own name: one value or a list of them", () => {
-    expect(initOf("fn", options, {}, ["views", "with", "restrict", "count"]).params).toEqual({ views: ["top-songs", "singles"], with: "attributes", restrict: true, count: 3 });
+  test("named, it is sent under its own name: a list as a list, and a name as it is", () => {
+    expect(initOf("fn", options, {}, kinds).params).toEqual({ views: ["top-songs", "singles"], chart: "most-played", genre: "20" });
   });
 
   test("not named, it is not sent: an option a function does not take cannot reach Apple by being passed", () => {
     expect(initOf("fn", options).params).toEqual({});
-    expect(initOf("fn", options, {}, ["views"]).params).toEqual({ views: ["top-songs", "singles"] });
+    expect(initOf("fn", options, {}, { views: "list" }).params).toEqual({ views: ["top-songs", "singles"] });
   });
 
   test("it wins over params, and loses to what the function sets", () => {
-    expect(initOf("fn", loose({ views: ["a"], params: { views: ["z"] } }), {}, ["views"]).params).toEqual({ views: ["a"] });
-    expect(initOf("fn", loose({ views: ["a"] }), { views: ["set"] }, ["views"]).params).toEqual({ views: ["set"] });
+    expect(initOf("fn", loose({ views: ["a"], params: { views: ["z"] } }), {}, { views: "list" }).params).toEqual({ views: ["a"] });
+    expect(initOf("fn", loose({ views: ["a"] }), { views: ["set"] }, { views: "list" }).params).toEqual({ views: ["set"] });
+    expect(initOf("fn", loose({ chart: "mine", params: { chart: "theirs" } }), {}, { chart: "name" }).params).toEqual({ chart: "mine" });
   });
 
   test.each<[string, unknown]>([
     ["undefined", undefined],
     ["a list of nothing", []],
-  ])("%s is not given, and leaves params alone", (_name, views) => {
-    expect(initOf("fn", loose({ views, params: { views: ["z"] } }), {}, ["views"]).params).toEqual({ views: ["z"] });
+  ])("a list that is %s is not given, and leaves params alone", (_name, views) => {
+    expect(initOf("fn", loose({ views, params: { views: ["z"] } }), {}, { views: "list" }).params).toEqual({ views: ["z"] });
+  });
+
+  test("a name that is undefined is not given, and leaves params alone", () => {
+    expect(initOf("fn", loose({ chart: undefined, params: { chart: "z" } }), {}, { chart: "name" }).params).toEqual({ chart: "z" });
+  });
+
+  test.each<[string, unknown, string]>([
+    ["null", null, "null"],
+    ["one string, which is not a list of one", "top-songs", "9 characters"],
+    ["one string that holds two, which would be sent as two", "top-songs,singles", "17 characters"],
+    ["a number", 5, "5"],
+    ["true", true, "boolean"],
+    ["an object", { name: "top-songs" }, "object"],
+    ["a function", noop, "function"],
+    ["a list holding a number", ["a", 2], "2 at index 1"],
+    ["a list holding two in one", ["a,b"], "3 characters at index 0"],
+  ])("where a list was declared, %s is a TypeError naming the function and the option", (_name, views, what) => {
+    expect(thrown(() => initOf("getArtist", loose({ views }), {}, { views: "list" }))).toEqual(new TypeError(`getArtist: views ${LIST}${what}`));
   });
 
   test.each<[string, unknown, string]>([
     ["null", null, "null"],
     ["an empty string", "", "0 characters"],
     ["a string one character too long", "s".repeat(65), "65 characters"],
-    ["not a number", Number.NaN, "NaN"],
-    ["infinity", Number.POSITIVE_INFINITY, "Infinity"],
-    ["an object", { name: "top-songs" }, "object"],
-    ["a function", noop, "function"],
-  ])("%s is a TypeError naming the option", (_name, views, what) => {
-    const error = thrown(() => initOf("getArtist", loose({ views }), {}, ["views"]));
-    expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toBe(`getArtist: views must be a string of 1 to 64 characters, a number, true or false, or a list of strings; got ${what}`);
+    ["a number", 5, "5"],
+    ["true", true, "boolean"],
+    ["a list, though it holds one name", ["most-played"], "object"],
+    ["an object", { name: "most-played" }, "object"],
+  ])("where a name was declared, %s is a TypeError naming the function and the option", (_name, chart, what) => {
+    expect(thrown(() => initOf("getCharts", loose({ chart }), {}, { chart: "name" }))).toEqual(new TypeError(`getCharts: chart must be a string of 1 to 64 characters; got ${what}`));
   });
 
-  test("a list is held to what a list of ids is", () => {
-    expect(thrown(() => initOf("getArtist", loose({ views: ["a", 2] }), {}, ["views"])).message).toBe(
-      "getArtist: views must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got 2 at index 1",
-    );
+  test("a name is sent as it is, so one that holds a comma arrives as one value and not as two", () => {
+    expect(initOf("fn", loose({ chart: "a,b" }), {}, { chart: "name" }).params).toEqual({ chart: "a,b" });
+  });
+
+  test.each<[string, unknown, string]>([
+    ["true, as a declaration once said it", true, "boolean"],
+    ["a kind there is not", "number", "6 characters"],
+    ["undefined", undefined, "undefined"],
+  ])("an option declared as %s is the declaration's mistake, and is said to be", (_name, kind, what) => {
+    expect(thrown(() => initOf("getArtist", loose({ views: ["a"] }), {}, { views: kind } as never))).toEqual(new TypeError(`getArtist: its option views has to be declared a "list" or a "name"; got ${what}`));
   });
 });
 
@@ -165,7 +190,7 @@ describe("initOf: what it gives is this call's own", () => {
         return target[String(key)];
       },
     });
-    initOf("fn", loose(options), {}, ["views"]);
+    initOf("fn", loose(options), {}, { views: "list" });
     expect(reads.sort()).toEqual(Object.keys(values).sort());
   });
 
@@ -227,11 +252,11 @@ describe("initOf: an option is one the caller passed, never one found on Object.
     ["no options", undefined],
     ["an empty bag", {}],
   ])("with every option planted there, a call with %s still sends nothing", (_name, options) => {
-    expect(polluted(planted, () => initOf("fn", options, {}, ["views"]))).toEqual({ params: {}, schema: undefined, signal: undefined });
+    expect(polluted(planted, () => initOf("fn", options, {}, { views: "list" }))).toEqual({ params: {}, schema: undefined, signal: undefined });
   });
 
   test("an option the caller did pass is the one sent, beside planted ones that are not", () => {
-    expect(polluted(planted, () => initOf("fn", { limit: 2 }, {}, ["views"])).params).toEqual({ limit: 2 });
+    expect(polluted(planted, () => initOf("fn", { limit: 2 }, {}, { views: "list" })).params).toEqual({ limit: 2 });
   });
 
   test("the check that says so can tell: an ordinary object does appear to hold what was planted", () => {
@@ -421,7 +446,7 @@ describe("initOf: what it is handed is checked, and a mistake names the function
 describe("walkOf: the options of a function that walks pages", () => {
   test("it gives what initOf gives, and the most pages the walk may ask for when the caller named one", () => {
     const options = { language: "en-GB", limit: 5, params: { "fields[songs]": "name" } };
-    expect(walkOf("fn", { ...options, maxPages: 3 }, { ids: ["1"] }, [])).toEqual({ ...initOf("fn", options, { ids: ["1"] }), maxPages: 3 });
+    expect(walkOf("fn", { ...options, maxPages: 3 }, { ids: ["1"] }, {})).toEqual({ ...initOf("fn", options, { ids: ["1"] }), maxPages: 3 });
   });
 
   test.each<[string, object | undefined]>([
@@ -434,7 +459,7 @@ describe("walkOf: the options of a function that walks pages", () => {
   });
 
   test("a further option the function names is sent, as with initOf", () => {
-    expect(walkOf("fn", loose({ views: ["top-songs"], maxPages: 2 }), {}, ["views"])).toMatchObject({ params: { views: ["top-songs"] }, maxPages: 2 });
+    expect(walkOf("fn", loose({ views: ["top-songs"], maxPages: 2 }), {}, { views: "list" })).toMatchObject({ params: { views: ["top-songs"] }, maxPages: 2 });
   });
 
   test("the limit is not a parameter: it is never among what is sent", () => {

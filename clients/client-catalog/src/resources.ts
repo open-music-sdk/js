@@ -89,7 +89,7 @@ function viewGetter<Views>(fn: string, type: string): tViewEndpoint<Views> {
   const declared = endpoint(fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipViewResponse, tStorefrontOption, tWithOption> & tWalkOptions) => {
     const segments = `${segmentOf(fn, "id", id)}/view/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, "an options object");
-    const init = { ...walkOf<tRelationshipViewResponse>(fn, bag, {}, ["with"]), ...NO_LISTENER };
+    const init = { ...walkOf<tRelationshipViewResponse>(fn, bag, {}, { with: "list" }), ...NO_LISTENER };
     return inStorefront(fn, client, bag.storefront, (storefront): tRequestPlan<tRelationshipViewResponse> => [`v1/catalog/${storefront}/${type}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.
@@ -120,20 +120,20 @@ export const getSongs = /*#__PURE__*/ resourcesGetter<tSongsResponse, tStorefron
 /** The songs with the ISRCs given. One ISRC may be that of more than one song. */
 export const getSongsByIsrc = /*#__PURE__*/ resourcesFinder<tSongsResponse, tStorefrontOption>("getSongsByIsrc", "isrc", songs);
 /** The songs in this storefront that are the equivalents of the songs with the ids given, which may be from another. */
-export const getSongsByEquivalents = /*#__PURE__*/ resourcesFinder<tSongsResponse, tStorefrontOption, tRestrictOption>("getSongsByEquivalents", "equivalents", songs, { restrict: true });
+export const getSongsByEquivalents = /*#__PURE__*/ resourcesFinder<tSongsResponse, tStorefrontOption, tRestrictOption>("getSongsByEquivalents", "equivalents", songs, { restrict: "list" });
 /** One relationship of a song, such as its `albums`, a page at a time. The `library` relationship needs the listener, and is not among the names. */
 export const getSongRelationship = /*#__PURE__*/ relationshipGetter<Omit<tSongRelationships, "library">, tStorefrontOption>("getSongRelationship", songs);
 
 // Albums
 
 /** The album with an id. */
-export const getAlbum = /*#__PURE__*/ resourceGetter<tAlbumsResponse, tStorefrontOption, tViewsOption<tAlbumViews>>("getAlbum", albums, { views: true });
+export const getAlbum = /*#__PURE__*/ resourceGetter<tAlbumsResponse, tStorefrontOption, tViewsOption<tAlbumViews>>("getAlbum", albums, { views: "list" });
 /** The albums with the ids given. */
 export const getAlbums = /*#__PURE__*/ resourcesGetter<tAlbumsResponse, tStorefrontOption>("getAlbums", albums);
 /** The albums with the UPCs given. */
 export const getAlbumsByUpc = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tStorefrontOption>("getAlbumsByUpc", "upc", albums);
 /** The albums in this storefront that are the equivalents of the albums with the ids given, which may be from another. */
-export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tStorefrontOption, tRestrictOption>("getAlbumsByEquivalents", "equivalents", albums, { restrict: true });
+export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tStorefrontOption, tRestrictOption>("getAlbumsByEquivalents", "equivalents", albums, { restrict: "list" });
 /** One relationship of an album, such as its `tracks`, a page at a time. The `library` relationship needs the listener, and is not among the names. */
 export const getAlbumRelationship = /*#__PURE__*/ relationshipGetter<Omit<tAlbumRelationships, "library">, tStorefrontOption>("getAlbumRelationship", albums);
 /** One view of an album, such as `other-versions`, a page at a time. */
@@ -142,7 +142,7 @@ export const getAlbumView = /*#__PURE__*/ viewGetter<tAlbumViews>("getAlbumView"
 // Artists
 
 /** The artist with an id. */
-export const getArtist = /*#__PURE__*/ resourceGetter<tArtistsResponse, tStorefrontOption, tViewsOption<tArtistViews>>("getArtist", artists, { views: true });
+export const getArtist = /*#__PURE__*/ resourceGetter<tArtistsResponse, tStorefrontOption, tViewsOption<tArtistViews>>("getArtist", artists, { views: "list" });
 /** The artists with the ids given. */
 export const getArtists = /*#__PURE__*/ resourcesGetter<tArtistsResponse, tStorefrontOption>("getArtists", artists);
 /** One relationship of an artist, such as their `albums`, a page at a time. */
@@ -153,7 +153,7 @@ export const getArtistView = /*#__PURE__*/ viewGetter<tArtistViews>("getArtistVi
 // Playlists
 
 /** The playlist with an id. */
-export const getPlaylist = /*#__PURE__*/ resourceGetter<tPlaylistsResponse, tStorefrontOption, tViewsOption<tPlaylistViews>>("getPlaylist", playlists, { views: true });
+export const getPlaylist = /*#__PURE__*/ resourceGetter<tPlaylistsResponse, tStorefrontOption, tViewsOption<tPlaylistViews>>("getPlaylist", playlists, { views: "list" });
 /** The playlists with the ids given. */
 export const getPlaylists = /*#__PURE__*/ resourcesGetter<tPlaylistsResponse, tStorefrontOption>("getPlaylists", playlists);
 /** The chart playlists of the storefronts with the ids given: each storefront's own charts, kept as playlists. */
@@ -166,13 +166,13 @@ export const getPlaylistView = /*#__PURE__*/ viewGetter<tPlaylistViews>("getPlay
 // Music videos
 
 /** The music video with an id. */
-export const getMusicVideo = /*#__PURE__*/ resourceGetter<tMusicVideosResponse, tStorefrontOption, tViewsOption<tMusicVideoViews>>("getMusicVideo", musicVideos, { views: true });
+export const getMusicVideo = /*#__PURE__*/ resourceGetter<tMusicVideosResponse, tStorefrontOption, tViewsOption<tMusicVideoViews>>("getMusicVideo", musicVideos, { views: "list" });
 /** The music videos with the ids given. */
 export const getMusicVideos = /*#__PURE__*/ resourcesGetter<tMusicVideosResponse, tStorefrontOption>("getMusicVideos", musicVideos);
 /** The music videos with the ISRCs given. One ISRC may be that of more than one music video. */
 export const getMusicVideosByIsrc = /*#__PURE__*/ resourcesFinder<tMusicVideosResponse, tStorefrontOption>("getMusicVideosByIsrc", "isrc", musicVideos);
 /** The music videos in this storefront that are the equivalents of the ones with the ids given, which may be from another. */
-export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicVideosResponse, tStorefrontOption, tRestrictOption>("getMusicVideosByEquivalents", "equivalents", musicVideos, { restrict: true });
+export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicVideosResponse, tStorefrontOption, tRestrictOption>("getMusicVideosByEquivalents", "equivalents", musicVideos, { restrict: "list" });
 /** One relationship of a music video, such as its `artists`, a page at a time. The `library` relationship needs the listener, and is not among the names. */
 export const getMusicVideoRelationship = /*#__PURE__*/ relationshipGetter<Omit<tMusicVideoRelationships, "library">, tStorefrontOption>("getMusicVideoRelationship", musicVideos);
 /** One view of a music video, such as `more-by-artist`, a page at a time. */
@@ -228,7 +228,7 @@ export const getActivityRelationship = /*#__PURE__*/ relationshipGetter<tActivit
 // Record labels
 
 /** The record label with an id. */
-export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse, tStorefrontOption, tViewsOption<tRecordLabelViews>>("getRecordLabel", recordLabels, { views: true });
+export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse, tStorefrontOption, tViewsOption<tRecordLabelViews>>("getRecordLabel", recordLabels, { views: "list" });
 /** The record labels with the ids given. */
 export const getRecordLabels = /*#__PURE__*/ resourcesGetter<tRecordLabelsResponse, tStorefrontOption>("getRecordLabels", recordLabels);
 /** One view of a record label, such as `latest-releases`, a page at a time. */

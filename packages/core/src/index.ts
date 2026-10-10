@@ -38,7 +38,7 @@ export { AppleMusicError, isAppleMusicError } from "./errors";
 export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors";
 export { got } from "./got";
 export { initOf, walkOf } from "./options";
-export type { tReadOptions, tWalkOptions } from "./options";
+export type { tAlsoKind, tAlsoKinds, tReadOptions, tWalkOptions } from "./options";
 export { createRateLimiter } from "./rate-limit";
 export type { tRateLimiter } from "./rate-limit";
 export { parseRetryAfter, retry, retryable } from "./retry";

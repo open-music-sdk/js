@@ -211,7 +211,7 @@ client and hands over what the answer holds:
 `R` is the type of Apple's answer, and has to be said: a declaration that leaves it out does not
 compile. `C` is the options the collection reads, such as a storefront. `E` is the options the
 function adds that are sent as parameters under their own names, such as `views`, and `also` names
-every one of them:
+every one of them and says what it is, a `"list"` of names or one `"name"`:
 
 ```ts
 import { resourceGetter, segmentOf, type tCollection } from "@open-music-sdk/core";
@@ -226,15 +226,16 @@ const artists: tCollection<tStorefront> = (fn, client, { storefront }) => {
   return storefront === undefined ? () => client.storefront().then(path) : path(storefront);
 };
 
-export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: true });
+export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: "list" });
 
 await getArtist(music, "178834", { storefront: "gb", views: ["top-songs"] });
 ```
 
-An option of `E` that `also` leaves out, or misspells, does not compile, so an option that is typed is
-an option that is sent. A declaration is checked as it is made: a name with something in it, a
-`collection` that is a function, an `also` that is an object, one of the four `unwrap`s, a `plan` that
-is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
+An option of `E` that `also` leaves out, misspells, or calls a name where its type is a list, does not
+compile. So an option that is typed is an option that is sent, and a call is held to the type: where a
+list was declared, one string is a `TypeError`, and not a list of one. A declaration is checked as it
+is made: a name with something in it, a `collection` that is a function, an `also` that says what each
+option is, one of the four `unwrap`s, a `plan` that is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
 called. What a declaration gives is frozen.
 
 ### The collection
@@ -334,7 +335,8 @@ function asks for the one page it resolves to.
 
 Three things fill the query, and the later wins: the caller's `params`; then the options that are
 given; then `set`, which is what the function itself puts there, such as the ids it was handed.
-`also` names any further options a function takes, such as `views`, each sent under its own name; an
+`also` names any further options a function takes, such as `views`, with what each one is,
+`{ views: "list", chart: "name" }`. Each is checked as that and sent under its own name; an
 option a function does not name is not sent.
 
 `params` is held to what a query parameter can be, so that what is put there by mistake is refused

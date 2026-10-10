@@ -42,7 +42,7 @@ export interface tSearchCatalogOptions extends tReadOptions<tSearchResponse>, tS
 export const searchCatalog = /*#__PURE__*/ endpoint("searchCatalog", "answer", (client, term: string, options: tSearchCatalogOptions) => {
   const text = termOf("searchCatalog", term);
   const bag = optionsOf("searchCatalog", options, OPTIONS);
-  const init = { ...initOf<tSearchResponse>("searchCatalog", bag, { term: text, types: listOf("searchCatalog", "types", bag.types) }, ["with"]), ...NO_LISTENER };
+  const init = { ...initOf<tSearchResponse>("searchCatalog", bag, { term: text, types: listOf("searchCatalog", "types", bag.types) }, { with: "list" }), ...NO_LISTENER };
   return inStorefront("searchCatalog", client, bag.storefront, (storefront): tRequestPlan<tSearchResponse> => [`v1/catalog/${storefront}/search`, init]);
 });
 
@@ -69,7 +69,7 @@ export interface tSearchSuggestionsOptions extends tReadOptions<tSearchSuggestio
 export const getSearchSuggestions = /*#__PURE__*/ endpoint("getSearchSuggestions", "answer", (client, term: string, options: tSearchSuggestionsOptions) => {
   const text = termOf("getSearchSuggestions", term);
   const bag = optionsOf("getSearchSuggestions", options, OPTIONS);
-  const init = { ...initOf<tSearchSuggestionsResponse>("getSearchSuggestions", bag, { term: text, kinds: listOf("getSearchSuggestions", "kinds", bag.kinds) }, ["types"]), ...NO_LISTENER };
+  const init = { ...initOf<tSearchSuggestionsResponse>("getSearchSuggestions", bag, { term: text, kinds: listOf("getSearchSuggestions", "kinds", bag.kinds) }, { types: "list" }), ...NO_LISTENER };
   return inStorefront("getSearchSuggestions", client, bag.storefront, (storefront): tRequestPlan<tSearchSuggestionsResponse> => [`v1/catalog/${storefront}/search/suggestions`, init]);
 });
 
@@ -88,7 +88,7 @@ export interface tChartsOptions extends tReadOptions<tChartResponse>, tStorefron
 /** The charts of a storefront, by type of resource, each one a first page. `limit` and `offset` apply to every chart. */
 export const getCharts = /*#__PURE__*/ endpoint("getCharts", "answer", (client, options: tChartsOptions) => {
   const bag = optionsOf("getCharts", options, OPTIONS);
-  const init = { ...initOf<tChartResponse>("getCharts", bag, { types: listOf("getCharts", "types", bag.types) }, ["chart", "genre", "with"]), ...NO_LISTENER };
+  const init = { ...initOf<tChartResponse>("getCharts", bag, { types: listOf("getCharts", "types", bag.types) }, { chart: "name", genre: "name", with: "list" }), ...NO_LISTENER };
   return inStorefront("getCharts", client, bag.storefront, (storefront): tRequestPlan<tChartResponse> => [`v1/catalog/${storefront}/charts`, init]);
 });
 

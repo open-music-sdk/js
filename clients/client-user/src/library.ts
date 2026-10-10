@@ -157,7 +157,7 @@ export interface tRecentlyPlayedTypesOption {
 }
 
 /** What the listener played lately, newest first, a page at a time: the albums, playlists and stations, not the tracks in them. */
-export const listRecentlyPlayed = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse, tNone, tRecentlyPlayedTypesOption>("listRecentlyPlayed", () => "v1/me/recent/played", { types: true });
+export const listRecentlyPlayed = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse, tNone, tRecentlyPlayedTypesOption>("listRecentlyPlayed", () => "v1/me/recent/played", { types: "list" });
 
 /** The option of `listRecentlyPlayedTracks`: which types of track. */
 export interface tRecentlyPlayedTrackTypesOption {
@@ -169,7 +169,7 @@ export interface tRecentlyPlayedTrackTypesOption {
 export const listRecentlyPlayedTracks = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse, tNone, tRecentlyPlayedTrackTypesOption>(
   "listRecentlyPlayedTracks",
   () => "v1/me/recent/played/tracks",
-  { types: true },
+  { types: "list" },
 );
 
 /** The radio stations the listener played lately, newest first, a page at a time. */
@@ -182,7 +182,7 @@ export interface tMusicSummaryViewsOption {
 }
 
 /** The listener's replay: a summary of what they played in each of the years given. The one year Apple takes at present is `"latest"`. */
-export const getMusicSummariesByYear = /*#__PURE__*/ resourcesFinder<tMusicSummariesResponse, tNone, tMusicSummaryViewsOption>("getMusicSummariesByYear", "year", () => "v1/me/music-summaries", { views: true });
+export const getMusicSummariesByYear = /*#__PURE__*/ resourcesFinder<tMusicSummariesResponse, tNone, tMusicSummaryViewsOption>("getMusicSummariesByYear", "year", () => "v1/me/music-summaries", { views: "list" });
 
 /** The options of `getPersonalStation`. */
 export interface tPersonalStationOptions extends tReadOptions<tStationsResponse> {

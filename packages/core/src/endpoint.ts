@@ -6,7 +6,7 @@ import { clientOf, listOf, optionsOf, segmentOf } from "./check";
 import { pageOf, type tAppleMusicClient, type tPage, type tRequestInit } from "./client";
 import { AppleMusicError } from "./errors";
 import { got } from "./got";
-import { initOf, walkOf, type tReadOptions, type tWalkOptions } from "./options";
+import { initOf, walkOf, type tAlsoKinds, type tReadOptions, type tWalkOptions } from "./options";
 
 /** A request as `client.request` takes it: where it goes, and what goes with it. A walk's may also say how many pages it may ask for. */
 export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R> & tWalkOptions];
@@ -177,8 +177,12 @@ export type tNone = object;
  */
 export type tEndpointOptions<T, C = tNone, E = tNone> = tReadOptions<T> & C & E;
 
-/** Every option of `E` by name. All of them have to be there, and nothing else can be: an option that is typed is an option that is sent. */
-export type tAlso<E> = { readonly [K in keyof E]-?: true };
+/**
+ * Every option of `E` by name, with what it is: a `"list"` where its type is a list, and a `"name"` where it is one
+ * string. All of them have to be there, and nothing else can be: an option that is typed is an option that is sent,
+ * and is held, when a call is made, to being what its type says.
+ */
+export type tAlso<E> = { readonly [K in keyof E]-?: NonNullable<E[K]> extends readonly unknown[] ? "list" : "name" };
 
 /** `also` as a declaration takes it: required when there are options to name, and not to be given when there are none. */
 type tAlsoGiven<E> = [keyof E] extends [never] ? [also?: undefined] : [also: tAlso<E>];
@@ -237,13 +241,16 @@ function located<R>(fn: string, path: string | Promise<string> | tLater<string>,
  * The collection and the further options a declaration was given, checked as it is made. The names are this
  * declaration's own copy, so nothing done to the object afterwards changes what its function sends.
  */
-function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: readonly string[], user: boolean | undefined] {
+function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: tAlsoKinds, user: boolean | undefined] {
   if (typeof collection !== "function") throw new TypeError(`${builder}: collection must be a function that gives the collection's path; got ${got(collection)}`);
   // Its own, and not one found on a prototype: `user` put on Object.prototype by other code is not this collection's say.
   const user: unknown = Object.hasOwn(collection, "user") ? (collection as { user?: unknown }).user : undefined;
   if (user !== undefined && typeof user !== "boolean") throw new TypeError(`${builder}: collection.user must be true or false where it is given; got ${got(user)}`);
-  if (also !== undefined && (typeof also !== "object" || also === null || Array.isArray(also))) throw new TypeError(`${builder}: also must be an object that names each further option, such as { views: true }; got ${got(also)}`);
-  return [collection as tCollection<C>, Object.keys(also ?? {}), user];
+  const kinds: [string, unknown][] = typeof also === "object" && also !== null && !Array.isArray(also) ? Object.entries(also) : [];
+  if ((also !== undefined && (typeof also !== "object" || also === null || Array.isArray(also))) || kinds.some(([, kind]) => kind !== "list" && kind !== "name")) {
+    throw new TypeError(`${builder}: also must be an object that says what each further option is, a "list" or a "name", such as { views: "list" }; got ${got(also)}`);
+  }
+  return [collection as tCollection<C>, Object.fromEntries(kinds) as tAlsoKinds, user];
 }
 
 /** What a request is made with, with the collection's say on the Music User Token where it has one. */
