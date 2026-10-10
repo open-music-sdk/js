@@ -536,6 +536,73 @@ describe("retrying", () => {
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
   });
 
+  describe("a POST makes something each time it is carried out, so it is sent again only when the first was not", () => {
+    const post = { method: "POST", body: { attributes: { name: "Road" } } } as const;
+
+    test.each([500, 502, 503])("after a %s, which leaves open whether Apple acted, it is not sent again: the error is the caller's to weigh", async (status) => {
+      const { music, calls } = client([{ status }, { status: 201, body: { data: [song] } }], { retry: quick });
+      expect((await failure(music.request("v1/me/library/playlists", { ...post, user: false }))).status).toBe(status);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("after a fetch that throws, or an answer whose body is lost on the way, it is not sent again", async () => {
+      const thrown = client([new TypeError("fetch failed"), { status: 201, body: {} }], { retry: quick });
+      expect((await failure(thrown.music.request("v1/x", post)))._tag).toBe("NetworkError");
+      expect(thrown.calls).toHaveLength(1);
+      let asked = 0;
+      const lost = (): Promise<Response> => {
+        asked += 1;
+        const body = new ReadableStream<Uint8Array>({
+          pull: (controller) => {
+            controller.error(new TypeError("terminated"));
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 201 }));
+      };
+      expect((await failure(createClient({ developerToken: "dev", fetch: lost, retry: quick }).request("v1/x", post)))._tag).toBe("NetworkError");
+      expect(asked).toBe(1);
+    });
+
+    test("with no retry policy given, the default one holds a POST to the same", async () => {
+      const { music, calls } = client([{ status: 500 }, { status: 201, body: {} }], { retry: undefined });
+      expect((await failure(music.request("v1/x", post))).status).toBe(500);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("after a 429, which says Apple turned it away, it is sent again", async () => {
+      const { music, calls } = client([{ status: 429 }, { status: 201, body: { data: [song] } }], { retry: quick });
+      expect(await music.request("v1/x", post)).toEqual({ data: [song] });
+      expect(calls).toHaveLength(2);
+    });
+
+    test("when there was no developer token to send it with, it was not sent, and is tried again", async () => {
+      let asked = 0;
+      const developerToken = () => {
+        asked += 1;
+        if (asked === 1) throw new AppleMusicError("DeveloperTokenUnavailable", "token source down");
+        return "dev";
+      };
+      const { music, calls } = client([{ status: 201, body: {} }], { developerToken, retry: quick });
+      expect(await music.request("v1/x", post)).toEqual({});
+      expect([asked, calls.length]).toEqual([2, 1]);
+    });
+
+    test.each(["GET", "PUT", "DELETE"] as const)("the check can tell: a %s, which comes to the same however often it is carried out, is sent again after a 500", async (method) => {
+      const { music, calls } = client([{ status: 500 }, { body: { ok: true } }], { retry: quick });
+      expect(await music.request("v1/x", { method })).toEqual({ ok: true });
+      expect(calls).toHaveLength(2);
+    });
+
+    test("a caller's retryOn can hold a POST back further, and cannot have it sent again where it would not be", async () => {
+      const eager = client([{ status: 500 }, { status: 201, body: {} }], { retry: { ...quick, retryOn: () => true } });
+      expect((await failure(eager.music.request("v1/x", post))).status).toBe(500);
+      expect(eager.calls).toHaveLength(1);
+      const never = client([{ status: 429 }, { status: 201, body: {} }], { retry: { ...quick, retryOn: () => false } });
+      expect((await failure(never.music.request("v1/x", post)))._tag).toBe("RateLimited");
+      expect(never.calls).toHaveLength(1);
+    });
+  });
+
   describe("a developer token provider that cannot get a token", () => {
     const unavailable = (status?: number) => new AppleMusicError("DeveloperTokenUnavailable", "token source down", { status });
     /** A provider that throws each error in turn, then answers "dev". */

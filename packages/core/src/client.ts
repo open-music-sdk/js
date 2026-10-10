@@ -150,6 +150,14 @@ function isPage(value: unknown): boolean {
   return (data == null || Array.isArray(data)) && (next == null || typeof next === "string") && (data != null || next != null);
 }
 
+/**
+ * Whether an error says the request was not carried out: Apple turned it away for coming too fast, or there was no
+ * developer token to send it with. A POST makes something each time it is carried out, a playlist or a track added
+ * to one, and a failure of any other kind leaves open whether it was: the connection may have dropped after Apple
+ * acted. So a POST is sent again only after one of these, and never on the chance that the first did nothing.
+ */
+const unsent = (error: AppleMusicError): boolean => error._tag === "RateLimited" || error._tag === "DeveloperTokenUnavailable";
+
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
 
@@ -233,7 +241,7 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
         if (outcome.error) throw outcome.error;
         return outcome.value;
       },
-      policy,
+      init.method === "POST" ? { ...policy, retryOn: (error) => unsent(error) && policy.retryOn(error) } : policy,
       signal,
     );
   }

@@ -84,8 +84,16 @@ it, so two versions installed side by side do not break your error handling.
 The default policy makes two attempts with a 250 ms base delay and a 4 s cap, and waits for a
 `Retry-After` of up to 60 s (`maxRetryAfterMs`); a longer one is not waited for, the `RateLimited`
 error reaches you at once with `retryAfterMs` attached. Pass `retry: false` to make one attempt, or
-a `tRetryPolicy` to tune it. Rate limiting is opt-in: Apple publishes no numbers, so
-create a limiter with yours and share one instance across every client on the same developer token.
+a `tRetryPolicy` to tune it.
+
+A `POST` is held back further, whatever the policy. It makes something each time it is carried out, a
+playlist or a track added to one, and a 5xx or a lost connection leaves open whether Apple carried it
+out. So a `POST` is sent again only after a 429, or when there was no developer token to send it with:
+the two failures that say it was not. After any other, the error reaches you, and whether to try again
+is yours to decide.
+
+Rate limiting is opt-in: Apple publishes no numbers, so create a limiter with yours and share one
+instance across every client on the same developer token.
 
 ## Pages
 
