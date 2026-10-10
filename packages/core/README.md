@@ -219,8 +219,11 @@ import type { tArtistViews, tArtistsResponse } from "@open-music-sdk/types";
 interface tStorefront { readonly storefront?: string }
 interface tViews { readonly views?: readonly (keyof tArtistViews)[] }
 
-const artists: tCollection<tStorefront> = async (fn, client, options) =>
-  `v1/catalog/${segmentOf(fn, "storefront", options.storefront ?? (await client.storefront()))}/artists`;
+const artists: tCollection<tStorefront> = (fn, client, { storefront }) => {
+  const path = (id: unknown) => `v1/catalog/${segmentOf(fn, "storefront", id)}/artists`;
+  // Named by the call, the path is there at once. Otherwise the client is asked, when a request is about to be made.
+  return storefront === undefined ? () => client.storefront().then(path) : path(storefront);
+};
 
 export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: true });
 
@@ -235,8 +238,9 @@ called. What a declaration gives is frozen.
 
 ### The collection
 
-`collection` is `(fn, client, options) => string | Promise<string>`: where the collection is for one
-call, so that a catalog can put a storefront in its path. What it gives is checked before it is asked
+`collection` is `(fn, client, options) => string`: where the collection is for one call, so that a
+catalog can put a storefront in its path. It may also give a function for the path, to be called when
+a request is about to be made, or a promise of the path. What it gives is checked before it is asked
 for, and refused with the reason:
 
 | A path that | Is refused because |
@@ -275,8 +279,11 @@ handed over, and a mistake is a `TypeError` naming the function and the argument
 - Bound and walking pages, a function checks and takes what it is handed as it is called, and a
   mistake is thrown there. What it gives asks Apple for nothing until a loop starts, and can be looped
   again, each loop asking afresh.
-- Where the collection has to be waited for, as for a storefront no option named, it is asked as the
-  function is called. If that fails before a loop starts, the loop is where it is heard.
+- Where the collection has to ask the client for part of its path, as for a storefront no option named,
+  it gives a function for the path in place of the path. That function is called when a request is
+  about to be made: at once for a function that asks for one thing, and as each loop starts for one
+  that walks pages. So a walk nobody loops over asks for nothing, and a lookup that fails in one loop
+  is tried again by the next.
 
 A function is known by its shape, a function with a `bound` method, so a namespace binds one made by
 another copy of this package. A namespace is frozen, and its type holds what it holds.

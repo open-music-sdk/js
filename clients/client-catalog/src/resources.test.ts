@@ -98,6 +98,23 @@ describe("whose catalog is asked", () => {
     expect(userTokens()).toEqual(["listener", null, null]);
   });
 
+  test("a function that walks pages asks for nothing as it is called, the listener's storefront included", async () => {
+    const { music, calls } = apple([], { storefront: undefined, userToken: "listener" });
+    api.listGenres.bound(music)();
+    api.getAlbumRelationship.bound(music)("1", "tracks");
+    api.getAlbumView.bound(music)("1", "other-versions");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the loop is what looks the storefront up, and a lookup that fails is tried again by the next loop", async () => {
+    const { music, sent } = apple([{ status: 500 }, { body: { data: [{ id: "jp", type: "storefronts" }] } }, { body: { data: [song("1")] } }], { storefront: undefined, userToken: "listener" });
+    const genres = api.listGenres.bound(music)();
+    expect(isAppleMusicError(await rejection(all(genres)), "ApiError")).toBe(true);
+    expect(await all(genres)).toEqual([song("1")]);
+    expect(sent()).toEqual(["GET /v1/me/storefront", "GET /v1/me/storefront", "GET /v1/catalog/jp/genres"]);
+  });
+
   test("a storefront the call names saves that lookup", async () => {
     const { music, sent } = apple([], { storefront: undefined, userToken: "listener" });
     await api.getSong(music, "1", { storefront: "gb" });

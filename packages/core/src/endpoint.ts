@@ -42,7 +42,17 @@ const UNWRAPS: readonly unknown[] = ["resource", "resources", "pages", "answer"]
 const METHODS = ["paginate", "request", "storefront"] as const;
 const OPTIONS = "an options object";
 
-type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tRequestPlan<R> | Promise<tRequestPlan<R>>;
+/**
+ * What is left for when a request is about to be made: a function that is not called until then. It is how a plan,
+ * or a collection, puts off what means asking the client, such as which storefront is the listener's. Everything a
+ * call was handed is checked as the call is made; this is the part that has to wait.
+ */
+export type tLater<T> = () => T | Promise<T>;
+
+/** What a plan gives: the request, a promise of it, or the rest of the plan to run when the request is about to be made. */
+export type tPlanned<R> = tRequestPlan<R> | Promise<tRequestPlan<R>> | tLater<tRequestPlan<R>>;
+
+type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tPlanned<R>;
 
 const isWaited = (value: unknown): value is PromiseLike<unknown> => typeof (value as { then?: unknown } | null | undefined)?.then === "function";
 
@@ -52,6 +62,9 @@ function planOf(fn: string, planned: unknown): tRequestPlan<unknown> {
   if (typeof path !== "string" || !(init === undefined || (typeof init === "object" && init !== null))) throw new TypeError(`${fn}: its plan must give [path, init]; got ${got(planned)}`);
   return init === undefined ? [path] : [path, init];
 }
+
+/** What a plan gave, with whatever it left for later begun: the request is about to be made. */
+const begun = (planned: unknown): unknown => (typeof planned === "function" ? (planned as () => unknown)() : planned);
 
 /** What a plan gave, checked: there and then when it is there at once, and when it comes otherwise. */
 const settled = (fn: string, planned: unknown): tRequestPlan<unknown> | Promise<tRequestPlan<unknown>> => (isWaited(planned) ? Promise.resolve(planned).then((late) => planOf(fn, late)) : planOf(fn, planned));
@@ -68,7 +81,7 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
 
   /** One call, planned and asked for: what Apple answered, and with what status, when the client says. */
   const ask = async (music: tAppleMusicClient, args: unknown[]): Promise<{ readonly body: unknown; readonly status: number | undefined }> => {
-    const [path, init = {}] = await settled(fn, planFor(music, ...args));
+    const [path, init = {}] = await settled(fn, begun(planFor(music, ...args)));
     let status: number | undefined;
     const body = await music.request(path, {
       ...init,
@@ -86,13 +99,16 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
     if (unwrap === "answer") return (...args: unknown[]) => send(music, ...args);
     if (unwrap === "pages")
       return (...args: unknown[]): AsyncIterable<unknown> => {
-        const planned = settled(fn, planFor(music, ...args));
-        // A plan that has to wait, for a storefront say, may fail while no loop is listening. That is kept for
-        // the loop to hear, and is nobody's unhandled rejection in the meantime.
-        void Promise.resolve(planned).catch(() => undefined);
+        // Planned as the function is called, so that what it was handed is checked and taken here. What the plan
+        // left for later is the part that asks the client, and it is begun by each loop as the loop starts.
+        const planned: unknown = planFor(music, ...args);
+        const now = typeof planned === "function" ? undefined : settled(fn, planned);
+        // A plan that is a promise is already on its way, and may fail while no loop is listening. That is kept
+        // for the loop to hear, and is nobody's unhandled rejection in the meantime.
+        void Promise.resolve(now).catch(() => undefined);
         return {
           async *[Symbol.asyncIterator]() {
-            const [path, init] = await planned;
+            const [path, init] = await (now ?? settled(fn, begun(planned)));
             yield* music.paginate(path, init as tRequestInit<tPage<unknown>>);
           },
         };
@@ -117,7 +133,8 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
  *
  * A bound function that walks pages is planned when it is called, like any other, so what it is handed is checked
  * and taken then: a mistake the plan throws is thrown from the call. Apple is asked for nothing until a loop
- * starts, and each loop over what the call gave asks afresh.
+ * starts, and each loop over what the call gave asks afresh. A plan that has to ask the client for something gives
+ * the rest of itself as a function, a `tLater`, which is what keeps that asking for the loop as well.
  */
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>>;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>>;
@@ -132,12 +149,17 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
  * the options the call was given, of which `C` is the part it reads, and may ask the client, as a catalog does for
  * a storefront no option named. Everything else a call was handed has been checked by the time it is asked.
  *
+ * A collection that has to ask the client gives a function for the path, a `tLater`, in place of the path. That
+ * function is called when a request is about to be made: at once for a function that asks for one thing, and as
+ * each loop starts for one that walks pages, so that a walk nobody loops over asks for nothing at all. A promise is
+ * taken too, and is on its way from the moment the collection gave it.
+ *
  * What it gives is checked before it is asked for: plain ASCII segments with single slashes between, none of them
  * "." or "..", and no question mark, hash or backslash. So a storefront from outside cannot move a request, and a
  * collection that checks its own parts, with `segmentOf`, gets to name the option that was wrong.
  */
 export interface tCollection<C = tNone> {
-  (fn: string, client: tAppleMusicClient, options: C): string | Promise<string>;
+  (fn: string, client: tAppleMusicClient, options: C): string | Promise<string> | tLater<string>;
   /**
    * Whether what is asked of this collection carries the Music User Token. Left out, the client goes by the path,
    * and sends it under /v1/me. `false` holds for every page of a walk, wherever a next link points: it is how a
@@ -200,12 +222,15 @@ function collectionOf(fn: string, path: unknown): string {
 }
 
 /**
- * A plan finished with the collection's path: there and then when the collection gives it at once, and when it
- * comes when it has to be waited for. Either way the path is checked before it is used. The plans below are not
- * async for this reason: what they check, they check as they are called, and throw there.
+ * A plan finished with the collection's path: there and then when the collection gives it at once, when it comes
+ * when it is a promise, and when the request is about to be made when the collection left it for later. Whichever,
+ * the path is checked before it is used. The plans below are not async for this reason: what they check, they
+ * check as they are called, and throw there.
  */
-function located<R>(fn: string, path: string | Promise<string>, finish: (collection: string) => tRequestPlan<R>): tRequestPlan<R> | Promise<tRequestPlan<R>> {
-  return isWaited(path) ? Promise.resolve(path).then((given) => finish(collectionOf(fn, given))) : finish(collectionOf(fn, path));
+function located<R>(fn: string, path: string | Promise<string> | tLater<string>, finish: (collection: string) => tRequestPlan<R>): tPlanned<R> {
+  const found = (given: string | Promise<string>) => (isWaited(given) ? Promise.resolve(given).then((late) => finish(collectionOf(fn, late))) : finish(collectionOf(fn, given)));
+  // Left for later by the collection, and so by the plan: the path is asked for, and checked, when the request is about to be made.
+  return typeof path === "function" ? () => found(path()) : found(path);
 }
 
 /**

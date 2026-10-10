@@ -1,5 +1,5 @@
 // Where the catalog is: every storefront has its own, so every path into one holds the storefront's id.
-import { segmentOf, type tAppleMusicClient, type tCollection } from "@open-music-sdk/core";
+import { segmentOf, type tAppleMusicClient, type tCollection, type tLater } from "@open-music-sdk/core";
 
 /** The option every function that asks a catalog takes: whose catalog. */
 export interface tStorefrontOption {
@@ -17,16 +17,17 @@ export interface tStorefrontOption {
 export const NO_LISTENER = { user: false } as const;
 
 /** A collection of this package's: where it is, and that nothing asked of it carries a listener's token. */
-const collection = <C>(where: (fn: string, client: tAppleMusicClient, options: C) => string | Promise<string>): tCollection<C> => Object.assign(where, NO_LISTENER);
+const collection = <C>(where: (fn: string, client: tAppleMusicClient, options: C) => string | tLater<string>): tCollection<C> => Object.assign(where, NO_LISTENER);
 
 /**
- * What `finish` makes of the storefront a call is for: there and then when the call named it, and once the client
- * has said which it is otherwise. Either way it is handed over as one segment of a path, checked and encoded, so a
- * storefront from outside cannot move the request out of the catalog.
+ * What `finish` makes of the storefront a call is for. When the call named it, that is there and then. When it did
+ * not, the client has to say which it is, and may have to ask Apple for the listener's: that is left for when the
+ * request is about to be made, so a walk nobody loops over asks for nothing. Either way the storefront is handed
+ * over as one segment of a path, checked and encoded, so one from outside cannot move the request out of the catalog.
  */
-export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | Promise<T> {
+export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | tLater<T> {
   const checked = (id: unknown) => finish(segmentOf(fn, "storefront", id));
-  return storefront === undefined ? client.storefront().then(checked) : checked(storefront);
+  return storefront === undefined ? () => client.storefront().then(checked) : checked(storefront);
 }
 
 /** The collection of one type of resource in a storefront's catalog, such as `songs`, as a declaration takes it. */

@@ -619,7 +619,85 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       expect(sent()).toEqual(["GET /v1/me/library/songs?limit=9", "GET /v1/me/library/songs?limit=9"]);
     });
 
-    describe("where the collection has to be waited for", () => {
+    describe("where the collection leaves its path for when a request is about to be made", () => {
+      /** A collection that has to ask for part of its path, as a catalog asks the client which storefront is the listener's. */
+      const asking = (ask: () => string | Promise<string>) => {
+        const later = vi.fn(ask);
+        const collection = vi.fn<tCollection>(() => later);
+        return { later, collection, walk: resourceLister<tLibrarySongsResponse>("listSongs", collection), one: resourceGetter<tSongsResponse>("getSong", collection) };
+      };
+
+      test("a function that walks pages asks for nothing as it is called: not Apple, and not the path either", async () => {
+        const { later, collection, walk } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, calls } = apple();
+        walk.bound(music)();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect([collection.mock.calls.length, later.mock.calls.length, calls.length]).toEqual([1, 0, 0]);
+      });
+
+      test("each loop asks for the path as it starts, and then for the pages", async () => {
+        const { later, walk } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, sent } = apple();
+        const songs = walk.bound(music)();
+        await all(songs);
+        await all(songs);
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs", "GET /v1/catalog/gb/songs"]);
+      });
+
+      test("a path that could not be had fails that loop and no other: the next loop asks again", async () => {
+        const down = new Error("the storefront could not be had");
+        let asked = 0;
+        const { walk } = asking(() => (++asked === 1 ? Promise.reject(down) : "v1/catalog/gb/songs"));
+        const { music, sent } = apple([{ body: { data: [song("1")] } }]);
+        const songs = walk.bound(music)();
+        expect(await rejection(all(songs))).toBe(down);
+        expect(await all(songs)).toEqual([song("1")]);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs"]);
+      });
+
+      test("what the call was handed is still checked as it is called, before the path is asked for", () => {
+        const { later, walk } = asking(() => "v1/catalog/gb/songs");
+        const { music } = apple();
+        expect(() => walk.bound(music)({ limit: 0 })).toThrow(new TypeError("listSongs: limit must be a whole number above 0; got 0"));
+        expect(later).not.toHaveBeenCalled();
+      });
+
+      test("the path is checked when it comes, as any collection's is", async () => {
+        const { walk, one } = asking(() => "v1/catalog/../me/library/songs");
+        const { music, calls } = apple();
+        expect((await rejection(all(walk.bound(music)()))).message).toContain("listSongs: the path of the collection holds a segment that is");
+        expect((await rejection(one(music, "1"))).message).toContain("getSong: the path of the collection holds a segment that is");
+        expect(calls).toHaveLength(0);
+      });
+
+      test("a function that asks for one thing asks for the path at once, since its request is about to be made", async () => {
+        const { later, one } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, sent } = apple([{ body: { data: [song("1")] } }, { body: { data: [song("1")] } }]);
+        await one(music, "1");
+        await one.bound(music)("1");
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs/1", "GET /v1/catalog/gb/songs/1"]);
+      });
+
+      test("a plan written by hand can leave its own rest for later in the same way", async () => {
+        const later = vi.fn((): tRequestPlan<tLibrarySongsResponse> => ["v1/me/library/songs"]);
+        const walk = endpoint("listSongs", "pages", (_client, options?: { limit?: number }) => {
+          if (options?.limit === 0) throw new TypeError("listSongs: limit must be a whole number above 0; got 0");
+          return later;
+        });
+        const { music, sent } = apple([], { userToken: "user" });
+        expect(() => walk.bound(music)({ limit: 0 })).toThrow(TypeError);
+        const songs = walk.bound(music)();
+        expect(later).not.toHaveBeenCalled();
+        await all(songs);
+        await walk(music);
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/me/library/songs", "GET /v1/me/library/songs"]);
+      });
+    });
+
+    describe("where the collection gives a promise of its path, which is on its way from then on", () => {
       /** What rejected with nobody listening while `run` ran and for a turn after, with the test runner's own listeners set aside. */
       async function unheard(run: () => unknown): Promise<unknown[]> {
         const kept = process.listeners("unhandledRejection");
@@ -1116,7 +1194,7 @@ describe("the resource patterns: what a collection gives is checked, so that wha
 
   test("the check that says so can catch it: the same storefront put into a path with no check does reach the listener's library, token and all", async () => {
     const { music, sent, userTokens } = apple([], { userToken: "user" });
-    await music.request(await catalog("getSong", music, { storefront: "../me/library" }));
+    await music.request((await catalog("getSong", music, { storefront: "../me/library" })) as string);
     expect(sent()).toEqual(["GET /v1/me/library/songs"]);
     expect(userTokens()).toEqual(["user"]);
   });

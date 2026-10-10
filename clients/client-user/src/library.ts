@@ -199,7 +199,8 @@ export const getPersonalStation = /*#__PURE__*/ endpoint("getPersonalStation", "
   const init = { ...initOf<tStationsResponse>("getPersonalStation", bag, { "filter[identity]": "personal" }), user: true };
   // One segment of a path, checked and encoded, so a storefront from outside cannot send the listener's token to another path.
   const stations = (storefront: unknown): tRequestPlan<tStationsResponse> => [`v1/catalog/${segmentOf("getPersonalStation", "storefront", storefront)}/stations`, init];
-  return bag.storefront === undefined ? client.storefront().then(stations) : stations(bag.storefront);
+  // Which storefront is the client's may mean asking Apple, and is left for when the request is about to be made.
+  return bag.storefront === undefined ? () => client.storefront().then(stations) : stations(bag.storefront);
 });
 
 /** The options of `getUserStorefront`. */
