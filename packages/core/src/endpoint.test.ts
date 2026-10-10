@@ -1512,6 +1512,34 @@ describe("what a plan gives is read as what it holds itself, never as what is fo
   });
 });
 
+describe("endpointNamespace: a name looked up in a namespace is one of its functions, or is not there", () => {
+  const namespace = () => endpointNamespace("catalog", apple().music, declared) as unknown as Record<string, unknown>;
+
+  test.each(["constructor", "toString", "hasOwnProperty", "valueOf", "__proto__", "isPrototypeOf"])("%s, which every ordinary object has, is not in it", (name) => {
+    expect(namespace()[name]).toBeUndefined();
+    expect(name in namespace()).toBe(false);
+  });
+
+  test("it inherits from nothing, so nothing put on Object.prototype by other code is found there either", () => {
+    Object.assign(Object.prototype, { getEverything: () => "planted" });
+    try {
+      expect(Object.getPrototypeOf(namespace())).toBeNull();
+      expect(namespace().getEverything).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "getEverything");
+    }
+  });
+
+  test("the check can tell: an ordinary object does answer to those names", () => {
+    expect(typeof ({} as Record<string, unknown>).constructor).toBe("function");
+  });
+
+  test("what it does hold is all there, and is still frozen", () => {
+    expect(Object.keys(namespace()).sort()).toEqual(Object.keys(declared).sort());
+    expect(Object.isFrozen(namespace())).toBe(true);
+  });
+});
+
 describe("endpointNamespace", () => {
   test("every function for an endpoint is there under its own name, bound to the client", async () => {
     const { music, sent } = apple([{ body: { data: [song("1")] } }, { body: { data: [song("1"), song("2")] } }]);
@@ -1579,7 +1607,9 @@ describe("endpointNamespace", () => {
     endpoints.__proto__ = getSong;
     const catalog = endpointNamespace("catalog", apple().music, endpoints);
     expect(Object.keys(catalog)).toEqual(["__proto__"]);
-    expect(Object.getPrototypeOf(catalog)).toBe(Object.prototype);
+    // One more name the namespace holds itself: it has not become what the namespace inherits from, which is nothing.
+    expect(Object.getPrototypeOf(catalog)).toBeNull();
+    expect(typeof Object.getOwnPropertyDescriptor(catalog, "__proto__")?.value).toBe("function");
   });
 
   test.each<[string, unknown, string]>([

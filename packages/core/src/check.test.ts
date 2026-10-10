@@ -512,7 +512,40 @@ describe("typedIdsOf", () => {
   test("thirty-two types are taken, and one more is not", () => {
     const types = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i) => ["a".repeat(i + 1), ["1"]]));
     expect(Object.keys(typedIdsOf("fn", "ids", types(32)))).toHaveLength(32);
-    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", types(33))).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got 33");
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", types(33))).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got more than 32");
+  });
+
+  test("names whose lists are undefined count as names: there may be thirty-two, whatever is under them", () => {
+    const names = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i): [string, string[] | undefined] => ["a".repeat(i + 1), i === 0 ? ["1"] : undefined]));
+    expect(typedIdsOf("fn", "ids", names(32))).toEqual({ "ids[a]": ["1"] });
+    expect(() => typedIdsOf("fn", "ids", names(33))).toThrow(TypeError);
+  });
+
+  test("an object of very many names is refused for how many it holds, before a list under any of them is read", () => {
+    const read = vi.fn((target: object, key: string | symbol): unknown => Reflect.get(target, key));
+    const described = vi.fn((target: object, key: string | symbol) => Reflect.getOwnPropertyDescriptor(target, key));
+    const many = Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`t${String(i)}`, ["1"]]));
+    const watched: unknown = new Proxy(many, { get: read, getOwnPropertyDescriptor: described });
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", watched)).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got more than 32");
+    expect(read).not.toHaveBeenCalled();
+    expect(described.mock.calls.length).toBeLessThan(100);
+  });
+
+  test("three hundred ids over all the types are taken, and one more is not: together they are one URL", () => {
+    const ids = (count: number) => Array.from({ length: count }, (_, i) => String(i));
+    expect(Object.values(typedIdsOf("fn", "ids", { songs: ids(200), albums: ids(100) })).flat()).toHaveLength(300);
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: ids(200), albums: ids(100), artists: ["1"] }))).toEqual(
+      new TypeError("getCatalogResources: ids must hold at most 300 ids over all its types; got 301"),
+    );
+  });
+
+  test("a name put on Object.prototype by other code is not one of an object's own, and is neither counted nor sent", () => {
+    Object.assign(Object.prototype, { planted: ["9"] });
+    try {
+      expect(typedIdsOf("fn", "ids", { songs: ["1"] })).toEqual({ "ids[songs]": ["1"] });
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "planted");
+    }
   });
 
   test.each<[string, string]>([

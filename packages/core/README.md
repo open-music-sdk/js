@@ -291,7 +291,9 @@ handed over, and a mistake is a `TypeError` naming the function and the argument
   is tried again by the next.
 
 A function is known by its shape, a function with a `bound` method, so a namespace binds one made by
-another copy of this package. A namespace is frozen, and its type holds what it holds.
+another copy of this package. A namespace is frozen, its type holds what it holds, and it inherits
+from nothing: a name looked up in it is one of its functions or is not there, `constructor` and
+`toString` included.
 
 ### What a function is handed
 
@@ -299,7 +301,7 @@ another copy of this package. A namespace is frozen, and its type holds what it 
 | --- | --- |
 | `segmentOf(fn, name, value)` | A string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not `.` or `..`. It comes back percent-encoded, so a question mark, a hash or a space stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
-| `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 lists, each as `listOf` takes one, under the name of a type of resource: lowercase words with hyphens between, such as `library-songs`. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out. Which types there are is Apple's to say. |
+| `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 names, each the name of a type of resource: lowercase words with hyphens between, such as `library-songs`, in at most 64 characters. Under each is a list as `listOf` takes one, and the lists hold at most 300 ids between them, since together they are one URL. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out, and one at least has to be left in. Which types there are is Apple's to say. |
 | `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |
 

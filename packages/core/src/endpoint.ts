@@ -414,6 +414,8 @@ export function endpointNamespace<F extends object>(fn: string, client: tAppleMu
   const music = clientOf(fn, client, METHODS);
   if (typeof endpoints !== "object" || (endpoints as unknown) === null) throw new TypeError(`${fn}: endpoints must be an object of functions for endpoints; got ${got(endpoints)}`);
   const bound = Object.entries(endpoints).flatMap(([name, value]: [string, unknown]) => (isEndpoint(value) ? [[name, value.bound(music)] as const] : []));
-  // From entries, so that a function named `__proto__` is one more function and nothing else.
-  return Object.freeze(Object.fromEntries(bound)) as tEndpointNamespace<F>;
+  // From entries, so that a function named `__proto__` is one more function and nothing else. And with nothing to
+  // inherit from, so that a name looked up in the namespace is one of its functions or is not there: not
+  // `constructor` or `toString`, which every ordinary object has.
+  return Object.freeze(ownOf(Object.fromEntries(bound))) as tEndpointNamespace<F>;
 }

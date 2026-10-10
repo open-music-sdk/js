@@ -115,6 +115,13 @@ export const listOf = (fn: string, name: string, value: unknown): readonly strin
 /** More types than Apple has of resource. Each one is a list of ids, so how many there may be is not left open. */
 const MAX_TYPES = 32;
 
+/** How many of its own names an object holds, counted no further than `most` and one: enough to say it holds too many, without reading them all. */
+function namesIn(value: object, most: number): number {
+  let held = 0;
+  for (const key in value) if (Object.hasOwn(value, key) && ++held > most) break;
+  return held;
+}
+
 /**
  * A name as Apple writes the ones that go in brackets, a type of resource after `ids` or a filter after `filter`:
  * lowercase words with hyphens between, such as `library-playlists` or `storefront-chart`, and no longer than a
@@ -127,15 +134,23 @@ export const isBracketed = (name: unknown): name is string => typeof name === "s
  * `ids[songs]` and `ids[albums]`. Each list is one as `listOf` takes them. A type whose list is undefined is left
  * out, and one at least has to be left in, since ids of no type ask for nothing. Which types there are is Apple's
  * to say: a name is held to what a type's name looks like, so that it stays inside its brackets.
+ *
+ * All of it goes into one URL, so all of it is bounded: the names by how many there may be, counted before anything
+ * is made of them, and the ids by how many there may be over every type together, which is as many as one list
+ * may hold.
  */
 export function typedIdsOf(fn: string, name: string, value: unknown): Record<string, readonly string[]> {
   if (!isPlain(value)) throw new TypeError(`${fn}: ${name} must be a plain object of ids by type, such as { songs: ["1"] }; got ${gotFor(value)}`);
+  const TYPES = `${fn}: ${name} must hold the ids of 1 to ${String(MAX_TYPES)} types; got `;
+  if (namesIn(value, MAX_TYPES) > MAX_TYPES) throw new TypeError(`${TYPES}more than ${String(MAX_TYPES)}`);
   const given = Object.entries(value).filter(([, ids]: [string, unknown]) => ids !== undefined);
-  if (given.length === 0 || given.length > MAX_TYPES) throw new TypeError(`${fn}: ${name} must hold the ids of 1 to ${String(MAX_TYPES)} types; got ${String(given.length)}`);
+  if (given.length === 0) throw new TypeError(`${TYPES}0`);
   const lists = given.map(([type, ids]: [string, unknown]): [string, readonly string[]] => {
     if (!isBracketed(type)) throw new TypeError(`${fn}: ${name} holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ${got(type)}`);
     return [`ids[${type}]`, listOf(fn, `${name}.${type}`, ids)];
   });
+  const total = lists.reduce((sum, [, ids]) => sum + ids.length, 0);
+  if (total > MAX_ITEMS) throw new TypeError(`${fn}: ${name} must hold at most ${String(MAX_ITEMS)} ids over all its types; got ${String(total)}`);
   return Object.fromEntries(lists);
 }
 
