@@ -77,8 +77,8 @@ And `catalog(client)`, which is all 58 bound to one client.
 
 The functions called with a client are separate exports, so a bundler leaves out of an app the ones it
 did not import. `catalog(client)` holds all of them, and suits code that holds a client and passes it
-around; it is what an integration offers as `music.catalog`. It is made once per client and cannot be
-changed.
+around; it is what an integration offers as `music.catalog`. Each call of `catalog(client)` makes a new
+one, so make it once and keep it. It cannot be changed.
 
 What walks pages asks for nothing until it is looped over, asks for each page as the one before runs
 out, and stops asking when the loop is left. The first page a function resolved to can be walked from
@@ -171,17 +171,14 @@ it, and needs their token. It is not among the names these functions take.
 
 ## Search and charts
 
-A search and the charts answer with their results by type, each type a first page of its own:
-`results.songs` is `{ data, next, href }`. `limit` and `offset` apply to every type asked for.
+A search answers with its results by type, each type a first page of its own: `results.songs` is
+`{ data, next, href }`. The charts answer by type as well, and each type is a list of charts, since one
+type can have several: `results.songs` is `[{ chart, name, data, next, href }]`. `limit` and `offset`
+apply to every type asked for.
 
 To get more of one type, ask again with a larger `offset`. The pages after the first cannot be walked
 with `paginate`: a `next` link of a search answers with results by type again, not with a page, so a
 walk yields the first page and stops.
-
-## What has not been run
-
-Every request is held to Apple's documentation by the tests: the method, the path and every documented
-parameter of each endpoint. None of it has been run against the live API.
 
 ## Mistakes and errors
 
@@ -217,6 +214,23 @@ catalog's path the listener's either.
 
 The one request that does carry the token is the client's own lookup of the listener's storefront,
 described above, which happens when neither the call nor the client names a storefront.
+
+## What Apple documents, and what it does not
+
+Every request is held to Apple's documentation by the tests: the method, the path, every documented
+parameter and the answer of each endpoint. None of it has been run against the live API, so what Apple
+does where its documentation is silent is not known here. Where this package differs from the
+documentation, it is in these:
+
+- Every function takes the same options, so most take some their endpoint is not documented with:
+  `limit` and `offset` where resources are asked for by id or by a filter, `offset` on a relationship
+  or a view, `include` and `extend` on a search or the charts. Only the three `list…` are documented
+  with all of them. One that is given is sent, and Apple says what it makes of it.
+- `getCharts` takes any name as its `chart`. The documentation lists `most-played` alone, and says the
+  others are the names an answer gives its charts.
+- The `library` relationship of a song, an album, a playlist and a music video is documented with the
+  others, and is left out here: see above.
+- The answer of `getLanguageTag` is a `tLangageTagResponse`. The spelling is the documentation's.
 
 ## Not here
 

@@ -61,7 +61,7 @@ Ratings have four functions for each of nine types: `Song`, `Album`, `MusicVideo
 | Pattern | Does |
 | --- | --- |
 | `get<X>Rating(client, id, options?)` | The listener's rating of one |
-| `get<X>Ratings(client, ids, options?)` | Their ratings of several. What they have not rated is left out. |
+| `get<X>Ratings(client, ids, options?)` | Their ratings of several |
 | `set<X>Rating(client, id, value, options?)` | Sets it: `1` for a like, `-1` for a dislike |
 | `delete<X>Rating(client, id, options?)` | Takes it away |
 
@@ -99,8 +99,8 @@ And `user(client)`, which is all 79 bound to one client.
 
 The functions called with a client are separate exports, so a bundler leaves out of an app the ones it
 did not import. `user(client)` holds all of them, and suits code that holds a listener's client and
-passes it around; it is what an integration offers as `music.user`. It is made once per client and
-cannot be changed.
+passes it around; it is what an integration offers as `music.user`. Each call of `user(client)` makes a
+new one, so make it once for a listener and keep it. It cannot be changed.
 
 What walks pages asks for nothing until it is looped over, asks for each page as the one before runs
 out, and stops asking when the loop is left. The first page a function resolved to can be walked from
@@ -142,14 +142,43 @@ Some functions take one more:
 | `storefront` | `getPersonalStation` | The storefront whose catalog the station is in |
 
 Nothing is validated unless a `schema` is passed, and this package does not depend on a validator. The
-ones in [`@open-music-sdk/validate`](../../packages/validate) fit, such as `librarySongsResponse`. A
-relationship's is named for the resource and the relationship, such as
-`libraryAlbumRelationshipsLibraryAlbumTracksRelationship`. The validator of the answer as Apple
-documents it, `relationshipResponse`, does not fit: it says only that a page holds resources, and these
-functions say which.
+ones in [`@open-music-sdk/validate`](../../packages/validate) fit:
+
+```ts
+import { librarySongsResponse } from "@open-music-sdk/validate";
+
+const { data } = await getLibrarySong(listener, "i.eoDlqXxsaz8Nb", { schema: librarySongsResponse });
+```
 
 An option a function does not take is not sent. An object written in place with a misspelt option does
 not compile; a caller without the types is not told.
+
+## Relationships
+
+The name is typed from the generated types, and decides what comes back:
+
+```ts
+const artists = await getLibraryAlbumRelationship(listener, "l.gACheFi", "artists"); // data: tLibraryArtist[]
+const tracks = await getLibraryAlbumRelationship(listener, "l.gACheFi", "tracks"); // data: (tLibrarySong | tLibraryMusicVideo)[]
+const album = await getLibraryAlbumRelationship(listener, "l.gACheFi", "catalog"); // data: tAlbum[]
+```
+
+A `schema` for one is a schema of that page, and `validate` has one for each, named for the resource
+and the relationship, such as `libraryAlbumRelationshipsLibraryAlbumTracksRelationship`. The validator
+of the answer as Apple documents it, `relationshipResponse`, does not fit: it says only that a page
+holds resources, and these functions say which.
+
+At runtime a name is any one segment of a path, and Apple says whether there is such a relationship.
+
+## Search
+
+A search answers with its results by type, each type a first page of its own:
+`results["library-songs"]` is `{ data, next, href }`. `limit` and `offset` apply to every type asked
+for.
+
+To get more of one type, ask again with a larger `offset`. The pages after the first cannot be walked
+with `paginate`: a `next` link of a search answers with results by type again, not with a page, so a
+walk yields the first page and stops.
 
 ## Writing
 
@@ -200,21 +229,34 @@ setSongRating: value must be 1, for a like, or -1, for a dislike; got 5
   pages throws it as it is called, before any loop.
 
 What Apple answers with is an `AppleMusicError` from `core`, to be told apart by its `_tag`: a token
-Apple no longer accepts is a `UserTokenInvalid`, a missing resource or a rating that was never set an
-`ApiError` with `status: 404`, a rate limit a `RateLimited`.
+Apple no longer accepts is a `UserTokenInvalid`, a missing resource an `ApiError` with `status: 404`, a
+rate limit a `RateLimited`.
 
 ## What Apple documents, and what it does not
 
-- Apple's documentation marks `types` as required for `listRecentlyPlayed` and
-  `listRecentlyPlayedTracks`. It is optional here, so a call without it is sent as it is, and Apple
-  says whether it will answer.
-- `listRecentlyAdded` is documented with `language` alone. The other options are sent if given.
-- A search answers with its results by type, each type a first page of its own. To get more of one
-  type, ask again with a larger `offset`: the pages after the first cannot be walked with `paginate`.
+Every request is held to Apple's documentation by the tests: the method, the path, every documented
+parameter and the answer of each endpoint. None of it has been run against the live API, so what Apple
+does where its documentation is silent is not known here: what it answers for a rating that was never
+set, for one, or for ids it has no rating of. Where this package differs from the documentation, it is
+in these:
+
+- Every function takes the same options, so most take some their endpoint is not documented with:
+  `limit` and `offset` where resources are asked for by id or by a filter, `offset` on a relationship,
+  `include` and `extend` on a search, and all four on a write and on `listRecentlyAdded`, which are
+  documented with `language` alone. One that is given is sent, and Apple says what it makes of it.
+- `types` is optional for `listRecentlyPlayed` and `listRecentlyPlayedTracks`. The documentation marks
+  it as required, while its own example asks without one and its sample answer holds several types. A
+  call without it is sent as it is.
+- `getUserStorefront` resolves to a `tStorefrontsResponse`. The documentation names a collection of any
+  resource as its answer, and what that holds is the listener's storefront.
+- `delete<X>Rating`, `addToLibrary` and `addToFavorites` resolve to nothing. The documentation names an
+  empty object as their answer, which holds nothing to hand over.
+- `addLibraryPlaylistTracks` resolves to nothing as well. The documentation names the playlist's tracks
+  as its answer, for a 204, which is a success with no body.
+- `addToLibrary` and `addToFavorites` take ids by any type. The documentation lists no types for
+  either: see above.
 - The generated type for a playlist to create wants `tracks` and `parent` together under
-  `relationships`, because Apple's documentation marks both as required there.
-- Every request is held to Apple's documentation by the tests: the method, the path and every
-  documented parameter of each endpoint. None of it has been run against the live API.
+  `relationships`, because the documentation marks both as required there.
 
 ## Not here
 
