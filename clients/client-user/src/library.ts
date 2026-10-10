@@ -161,7 +161,7 @@ export const listRecentlyPlayed = /*#__PURE__*/ resourceLister<tPaginatedResourc
 /** The option of `listRecentlyPlayedTracks`: which types of track. */
 export interface tRecentlyPlayedTrackTypesOption {
   /** The types of track to keep to, such as `["songs"]`. Apple's documentation says to name one at least. */
-  readonly types?: readonly tPlaylistTrack["type"][] | undefined;
+  readonly types?: readonly ("library-music-videos" | "library-songs" | "music-videos" | "songs")[] | undefined;
 }
 
 /** The tracks the listener played lately, newest first, a page at a time. */

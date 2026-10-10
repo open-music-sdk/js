@@ -166,6 +166,10 @@ resources, and these functions say which.
 At runtime a name is any one segment of a path, and Apple says whether there is such a relationship or
 view.
 
+A relationship is a page whatever it holds. One that holds a single resource at most, such as a song's
+`station`, is still `{ data: [station] }` when called with a client, and an `AsyncIterable` of that one
+from `catalog(client)`.
+
 The `library` relationship of a song, an album, a playlist and a music video is the listener's copy of
 it, and needs their token. It is not among the names these functions take.
 

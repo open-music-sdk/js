@@ -170,6 +170,10 @@ holds resources, and these functions say which.
 
 At runtime a name is any one segment of a path, and Apple says whether there is such a relationship.
 
+A relationship is a page whatever it holds. One that holds a single resource at most, such as a library
+album's `catalog`, is still `{ data: [album] }` when called with a client, and an `AsyncIterable` of
+that one from `user(client)`.
+
 ## Search
 
 A search answers with its results by type, each type a first page of its own:
