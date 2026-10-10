@@ -1,6 +1,7 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
+import { ownOf } from "./check";
 import { AppleMusicError, type tValidationIssue } from "./errors";
 import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
@@ -72,6 +73,12 @@ export interface tRequestInit<T = unknown> {
   /** Validates the parsed body; a failure throws ValidationError. */
   readonly schema?: tSchemaLike<T> | undefined;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Called as the client's own `onResponse` is, and after it, for this request alone: once per response, when the
+   * body has been read and the outcome decided. It is how a caller learns what `request` does not resolve to, such
+   * as the status of the answer or one of its headers.
+   */
+  readonly onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
 
 /** One page of a collection or relationship response. */
@@ -80,11 +87,34 @@ export interface tPage<T> {
   readonly next?: string | undefined;
 }
 
+/** What `paginate` takes: what `request` takes, for each page it asks for, and how many pages that may be. */
+export interface tPaginateInit<T> extends tRequestInit<tPage<T>> {
+  /**
+   * The most pages to ask Apple for: a whole number above zero. Default: no limit, so a walk goes on asking for as
+   * long as each page names a next one. At the limit the walk ends, whether or not there are more. A page handed
+   * over is not counted, since it was not asked for.
+   */
+  readonly maxPages?: number | undefined;
+}
+
 export interface tAppleMusicClient {
   /** `path` is "v1/...", "/v1/...", or a `next` subpath from a response. Resolves to the parsed body, or undefined when there is none. */
   request<T>(path: string, init?: tRequestInit<T>): Promise<T>;
-  /** The items of `data` across every `next` page. Breaking out of the loop stops fetching. */
-  paginate<T>(path: string, init?: tRequestInit<tPage<T>>): AsyncIterable<T>;
+  /**
+   * The items of `data` across every `next` page. Breaking out of the loop stops fetching.
+   *
+   * `from` is a path, or a page already fetched: the page's own items come first and nothing is asked for until
+   * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A page
+   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError. A
+   * promise of a page is not a page: await it, so that what it rejects with reaches the code that asked.
+   *
+   * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
+   * relationship's are. A search or a chart answers with its pages nested under `results`, and is not walked.
+   *
+   * A walk has no end but the last page unless `init.maxPages` gives it one. A `next` link is followed wherever on
+   * Apple's origin it points, so a page or a path from outside your app is as trusted as you make it.
+   */
+  paginate<T>(from: string | tPage<T>, init?: tPaginateInit<T>): AsyncIterable<T>;
   /** The configured storefront, or the listener's, resolved once. */
   storefront(): Promise<string>;
   /** A client for one listener. Shares the developer token, limiter, retry policy, and hooks. */
@@ -95,15 +125,29 @@ export interface tAppleMusicClient {
 
 type tSettled<T> = tResponseOutcome & ({ readonly value: T; readonly error: undefined } | { readonly error: AppleMusicError; readonly value?: undefined });
 
-/** A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a last, empty page. */
-function pageOf(page: unknown, path: string): { readonly data: readonly unknown[]; readonly next: string | undefined } {
+/**
+ * A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a
+ * last, empty page. `status` is that of the answer the page came in, for the error that says it was no page.
+ */
+export function pageOf(page: unknown, path: string, status: number | undefined): { readonly data: readonly unknown[]; readonly next: string | undefined } {
   if (page === undefined) return { data: [], next: undefined };
-  const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status: 200 });
+  const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status });
   if (typeof page !== "object" || page === null || Array.isArray(page)) throw shape("expected a page object");
   const { data, next } = page as { data?: unknown; next?: unknown };
   if (data != null && !Array.isArray(data)) throw shape("data is not an array");
   if (next != null && typeof next !== "string") throw shape("next is not a string");
   return { data: (data as readonly unknown[] | null | undefined) ?? [], next: next ?? undefined };
+}
+
+/**
+ * Whether a value handed over as a page is one: an object that holds a `data` list or a `next` link, and nothing
+ * else under either name. What only looks like an object to walk, such as a URL, a Response or a whole search
+ * answer, holds neither, and would otherwise be a walk over nothing that says nothing.
+ */
+function isPage(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const { data, next } = value as { data?: unknown; next?: unknown };
+  return (data == null || Array.isArray(data)) && (next == null || typeof next === "string") && (data != null || next != null);
 }
 
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
@@ -131,14 +175,18 @@ function credential(name: string, token: unknown): string {
 const formatIssues = (issues: readonly tValidationIssue[]) =>
   issues.map((i) => `${(i.path ?? []).map((s) => String(typeof s === "object" ? s.key : s)).join(".") || "<root>"}: ${i.message}`).join("; ");
 
-export function createClient(options: tClientOptions): tAppleMusicClient {
+export function createClient(given: tClientOptions): tAppleMusicClient {
+  // What the options hold themselves, and nothing they inherit: a `fetch` or a `userToken` that some other code has
+  // put on Object.prototype is not one this client was given. The same goes for what `request` and `paginate` take.
+  const options = ownOf(given);
   const developerToken = toProvider(options.developerToken);
   const userToken = options.userToken === undefined ? undefined : toProvider(options.userToken);
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const policy = resolveRetryPolicy(options.retry === false ? { maxAttempts: 1 } : options.retry);
   let storefrontPromise: Promise<string> | undefined;
 
-  async function request<T>(path: string, init: tRequestInit<T> = {}): Promise<T> {
+  async function request<T>(path: string, given: tRequestInit<T> = {}): Promise<T> {
+    const init = ownOf(given);
     const url = new URL(path, BASE_URL);
     // Both tokens ride on every request, so nothing may send one anywhere else: not an absolute URL,
     // not a scheme-relative one (the URL parser also reads `\\host` as one), not a downgrade to http.
@@ -169,6 +217,7 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
       }
       const outcome = await settle(res, init, user, url);
       options.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
+      init.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
       return outcome;
     };
 
@@ -236,11 +285,28 @@ export function createClient(options: tClientOptions): tAppleMusicClient {
     return { body, error: new AppleMusicError(tag, message + hint, details) };
   }
 
-  async function* paginate<T>(path: string, init: tRequestInit<tPage<T>> = {}): AsyncIterable<T> {
-    let next: string | undefined = path;
-    let params = init.params;
-    while (next !== undefined) {
-      const page = pageOf(await request<unknown>(next, { ...init, params }), next);
+  async function* paginate<T>(from: string | tPage<T>, init: tPaginateInit<T> = {}): AsyncIterable<T> {
+    // The limit is the walk's own: what is left is what each page is asked for with.
+    const { maxPages, ...each } = ownOf(init);
+    if (maxPages !== undefined && !(Number.isSafeInteger(maxPages) && maxPages > 0)) throw new TypeError(`paginate: maxPages must be a whole number above 0; got ${got(maxPages)}`);
+    let next: string | undefined;
+    let params = each.params;
+    if (typeof from === "string") next = from;
+    else {
+      // A promise handed over would have nothing listening to it until a loop started, so one that rejects first
+      // would be nobody's to catch. It is the caller's to await.
+      if (typeof (from as { then?: unknown } | null | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
+      // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else has to be a page,
+      // and one that is not is the caller's mistake: nothing was asked for, so it is no answer of Apple's.
+      if ((from as unknown) !== undefined && !isPage(from)) throw new TypeError(`paginate: expected a path or a page, which is an object with a data list, a next link or both; got ${got(from)}`);
+      const first = ((from as unknown) ?? {}) as { readonly data?: readonly T[] | null; readonly next?: string | null };
+      // The walk's own copy, so that it goes over the page as it was handed, whatever is done to the page meanwhile.
+      yield* (first.data ?? []).slice();
+      next = first.next ?? undefined;
+      params = undefined;
+    }
+    for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {
+      const page = pageOf(await request<unknown>(next, { ...each, params }), next, 200);
       yield* page.data as readonly T[];
       next = page.next;
       params = undefined; // a next link already carries the query
