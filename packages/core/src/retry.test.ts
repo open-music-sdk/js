@@ -208,6 +208,9 @@ describe("retry", () => {
   });
 
   test("aborting during the delay rejects with the reason and stops retrying", async () => {
+    // The delay is a random share of the backoff. Left to chance it is under the ten milliseconds waited below one
+    // run in a hundred, and the second attempt has then already been made.
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const fn = vi.fn(failing(fail("NetworkError")));
     const controller = new AbortController();
     const out = retry(fn, { maxAttempts: 5, baseDelayMs: 1000 }, controller.signal).then(

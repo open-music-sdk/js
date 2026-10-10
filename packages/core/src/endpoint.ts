@@ -2,14 +2,14 @@
 // client, it resolves to what Apple answered. Bound to a client, it hands over what the answer holds: the resource,
 // the list of them, or every item of every page. The client packages are made of these.
 import type { tRelationshipResponse } from "@open-music-sdk/types";
-import { clientOf, listOf, optionsOf, segmentOf } from "./check";
+import { clientOf, isBracketed, listOf, optionsOf, ownOf, segmentOf } from "./check";
 import { pageOf, type tAppleMusicClient, type tPage, type tRequestInit } from "./client";
 import { AppleMusicError } from "./errors";
 import { got } from "./got";
-import { initOf, type tReadOptions } from "./options";
+import { initOf, walkOf, type tAlsoKinds, type tReadOptions, type tWalkOptions } from "./options";
 
-/** A request as `client.request` takes it: where it goes, and what goes with it. */
-export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R>];
+/** A request as `client.request` takes it: where it goes, and what goes with it. A walk's may also say how many pages it may ask for. */
+export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R> & tWalkOptions];
 
 /**
  * A function for one endpoint. Called with a client it resolves to what Apple answered. `bound(client)` is the same
@@ -33,16 +33,30 @@ export type tPaged<R> = R & { readonly next?: string | undefined };
 
 /**
  * How a bound function hands the answer over: the one `resource` it holds, the `resources` it holds, every item
- * of all its `pages`, or the `answer` as it is.
+ * of all its `pages`, what a write has `written`, or the `answer` as it is.
+ *
+ * `written` is for a function that makes or changes something. It hands over the resource the answer holds, as
+ * `resource` does, and `undefined` where a success holds none: the write happened either way, and an error there
+ * would have a caller make the same thing again.
  */
-export type tUnwrap = "resource" | "resources" | "pages" | "answer";
+export type tUnwrap = "resource" | "resources" | "pages" | "written" | "answer";
 
-const UNWRAPS: readonly unknown[] = ["resource", "resources", "pages", "answer"] satisfies readonly tUnwrap[];
+const UNWRAPS: readonly unknown[] = ["resource", "resources", "pages", "written", "answer"] satisfies readonly tUnwrap[];
 /** The client's methods a function for an endpoint may call. */
 const METHODS = ["paginate", "request", "storefront"] as const;
 const OPTIONS = "an options object";
 
-type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tRequestPlan<R> | Promise<tRequestPlan<R>>;
+/**
+ * What is left for when a request is about to be made: a function that is not called until then. It is how a plan,
+ * or a collection, puts off what means asking the client, such as which storefront is the listener's. Everything a
+ * call was handed is checked as the call is made; this is the part that has to wait.
+ */
+export type tLater<T> = () => T | Promise<T>;
+
+/** What a plan gives: the request, a promise of it, or the rest of the plan to run when the request is about to be made. */
+export type tPlanned<R> = tRequestPlan<R> | Promise<tRequestPlan<R>> | tLater<tRequestPlan<R>>;
+
+type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tPlanned<R>;
 
 const isWaited = (value: unknown): value is PromiseLike<unknown> => typeof (value as { then?: unknown } | null | undefined)?.then === "function";
 
@@ -53,22 +67,43 @@ function planOf(fn: string, planned: unknown): tRequestPlan<unknown> {
   return init === undefined ? [path] : [path, init];
 }
 
+/** What a plan gave, with whatever it left for later begun: the request is about to be made. */
+const begun = (planned: unknown): unknown => (typeof planned === "function" ? (planned as () => unknown)() : planned);
+
 /** What a plan gave, checked: there and then when it is there at once, and when it comes otherwise. */
 const settled = (fn: string, planned: unknown): tRequestPlan<unknown> | Promise<tRequestPlan<unknown>> => (isWaited(planned) ? Promise.resolve(planned).then((late) => planOf(fn, late)) : planOf(fn, planned));
+
+/** The first resource a write's answer holds under `data`, read as the answer's own, or `undefined` when it holds none or is no such answer. */
+function made(body: unknown): unknown {
+  const data: unknown = typeof body === "object" && body !== null ? ownOf(body as { readonly data?: unknown }).data : undefined;
+  return Array.isArray(data) ? ((data[0] as unknown) ?? undefined) : undefined;
+}
+
+/**
+ * The name a declaration gives its function, checked. It is the first thing a declaration is handed and the first
+ * thing checked, by every function that makes one, so that a mistake in a declaration is named in the order it was
+ * written, as a mistake in a call is.
+ */
+function named(builder: string, fn: unknown): void {
+  if (typeof fn !== "string" || fn === "") throw new TypeError(`${builder}: fn must be the name of the function, a string with something in it; got ${got(fn)}`);
+}
 
 /**
  * What every declaration comes to, whichever function made it. `builder` is that function's name: a declaration is
  * checked as it is made, so a mistake in one is found when the module loads and names what was called.
  */
 function declare<A extends readonly unknown[], R, U>(builder: string, fn: string, unwrap: tUnwrap, plan: tPlan<A, R>): tEndpoint<A, R, U> {
-  if (typeof fn !== "string" || fn === "") throw new TypeError(`${builder}: fn must be the name of the function, a string with something in it; got ${got(fn)}`);
-  if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages" or "answer"; got ${got(unwrap)}`);
+  named(builder, fn);
+  if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${got(unwrap)}`);
   if (typeof plan !== "function") throw new TypeError(`${builder}: plan must be a function; got ${got(plan)}`);
   const planFor = plan as unknown as tPlan<unknown[], unknown>;
 
   /** One call, planned and asked for: what Apple answered, and with what status, when the client says. */
   const ask = async (music: tAppleMusicClient, args: unknown[]): Promise<{ readonly body: unknown; readonly status: number | undefined }> => {
-    const [path, init = {}] = await settled(fn, planFor(music, ...args));
+    const [path, planned = {}] = await settled(fn, begun(planFor(music, ...args)));
+    // What the plan's init holds itself. A hook that other code has put on Object.prototype is not the plan's, and
+    // is neither called nor, where it is no function, the reason a request that was answered is said to have failed.
+    const init = ownOf(planned);
     let status: number | undefined;
     const body = await music.request(path, {
       ...init,
@@ -86,19 +121,24 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
     if (unwrap === "answer") return (...args: unknown[]) => send(music, ...args);
     if (unwrap === "pages")
       return (...args: unknown[]): AsyncIterable<unknown> => {
-        const planned = settled(fn, planFor(music, ...args));
-        // A plan that has to wait, for a storefront say, may fail while no loop is listening. That is kept for
-        // the loop to hear, and is nobody's unhandled rejection in the meantime.
-        void Promise.resolve(planned).catch(() => undefined);
+        // Planned as the function is called, so that what it was handed is checked and taken here. What the plan
+        // left for later is the part that asks the client, and it is begun by each loop as the loop starts.
+        const planned: unknown = planFor(music, ...args);
+        const now = typeof planned === "function" ? undefined : settled(fn, planned);
+        // A plan that is a promise is already on its way, and may fail while no loop is listening. That is kept
+        // for the loop to hear, and is nobody's unhandled rejection in the meantime.
+        void Promise.resolve(now).catch(() => undefined);
         return {
           async *[Symbol.asyncIterator]() {
-            const [path, init] = await planned;
+            const [path, init] = await (now ?? settled(fn, begun(planned)));
             yield* music.paginate(path, init as tRequestInit<tPage<unknown>>);
           },
         };
       };
     return async (...args: unknown[]): Promise<unknown> => {
       const { body, status } = await ask(music, args);
+      // A write that succeeded has happened, whatever its answer holds: the resource when there is one, and nothing otherwise.
+      if (unwrap === "written") return made(body);
       const { data } = pageOf(body, fn, status);
       if (unwrap === "resources") return data;
       // A success that holds no resource is not the resource: it is said, with the status it came with, not handed over as undefined.
@@ -117,11 +157,13 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
  *
  * A bound function that walks pages is planned when it is called, like any other, so what it is handed is checked
  * and taken then: a mistake the plan throws is thrown from the call. Apple is asked for nothing until a loop
- * starts, and each loop over what the call gave asks afresh.
+ * starts, and each loop over what the call gave asks afresh. A plan that has to ask the client for something gives
+ * the rest of itself as a function, a `tLater`, which is what keeps that asking for the loop as well.
  */
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>>;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>>;
 export function endpoint<A extends readonly unknown[], R extends tPage<unknown>>(fn: string, unwrap: "pages", plan: tPlan<A, R>): tEndpoint<A, R, AsyncIterable<tItem<R>>>;
+export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "written", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R> | undefined>>;
 export function endpoint<A extends readonly unknown[], R>(fn: string, unwrap: "answer", plan: tPlan<A, R>): tEndpoint<A, R, Promise<R>>;
 export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unknown>): tEndpoint<unknown[], unknown, unknown> {
   return declare("endpoint", fn, unwrap, plan);
@@ -132,11 +174,24 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
  * the options the call was given, of which `C` is the part it reads, and may ask the client, as a catalog does for
  * a storefront no option named. Everything else a call was handed has been checked by the time it is asked.
  *
+ * A collection that has to ask the client gives a function for the path, a `tLater`, in place of the path. That
+ * function is called when a request is about to be made: at once for a function that asks for one thing, and as
+ * each loop starts for one that walks pages, so that a walk nobody loops over asks for nothing at all. A promise is
+ * taken too, and is on its way from the moment the collection gave it.
+ *
  * What it gives is checked before it is asked for: plain ASCII segments with single slashes between, none of them
  * "." or "..", and no question mark, hash or backslash. So a storefront from outside cannot move a request, and a
  * collection that checks its own parts, with `segmentOf`, gets to name the option that was wrong.
  */
-export type tCollection<C = tNone> = (fn: string, client: tAppleMusicClient, options: C) => string | Promise<string>;
+export interface tCollection<C = tNone> {
+  (fn: string, client: tAppleMusicClient, options: C): string | Promise<string> | tLater<string>;
+  /**
+   * Whether what is asked of this collection carries the Music User Token. Left out, the client goes by the path,
+   * and sends it under /v1/me. `false` holds for every page of a walk, wherever a next link points: it is how a
+   * catalog says that nothing asked of it is the listener's.
+   */
+  readonly user?: boolean | undefined;
+}
 
 /** No options of that kind: an object, so that what is left of the options is still nothing but an object. */
 export type tNone = object;
@@ -147,8 +202,12 @@ export type tNone = object;
  */
 export type tEndpointOptions<T, C = tNone, E = tNone> = tReadOptions<T> & C & E;
 
-/** Every option of `E` by name. All of them have to be there, and nothing else can be: an option that is typed is an option that is sent. */
-export type tAlso<E> = { readonly [K in keyof E]-?: true };
+/**
+ * Every option of `E` by name, with what it is: a `"list"` where its type is a list, and a `"name"` where it is one
+ * string. All of them have to be there, and nothing else can be: an option that is typed is an option that is sent,
+ * and is held, when a call is made, to being what its type says.
+ */
+export type tAlso<E> = { readonly [K in keyof E]-?: NonNullable<E[K]> extends readonly unknown[] ? "list" : "name" };
 
 /** `also` as a declaration takes it: required when there are options to name, and not to be given when there are none. */
 type tAlsoGiven<E> = [keyof E] extends [never] ? [also?: undefined] : [also: tAlso<E>];
@@ -192,23 +251,62 @@ function collectionOf(fn: string, path: unknown): string {
 }
 
 /**
- * A plan finished with the collection's path: there and then when the collection gives it at once, and when it
- * comes when it has to be waited for. Either way the path is checked before it is used. The plans below are not
- * async for this reason: what they check, they check as they are called, and throw there.
+ * A plan finished with the collection's path: there and then when the collection gives it at once, when it comes
+ * when it is a promise, and when the request is about to be made when the collection left it for later. Whichever,
+ * the path is checked before it is used. The plans below are not async for this reason: what they check, they
+ * check as they are called, and throw there.
  */
-function located<R>(fn: string, path: string | Promise<string>, finish: (collection: string) => tRequestPlan<R>): tRequestPlan<R> | Promise<tRequestPlan<R>> {
-  return isWaited(path) ? Promise.resolve(path).then((given) => finish(collectionOf(fn, given))) : finish(collectionOf(fn, path));
+function located<R>(fn: string, path: string | Promise<string> | tLater<string>, finish: (collection: string) => tRequestPlan<R>): tPlanned<R> {
+  const found = (given: string | Promise<string>) => (isWaited(given) ? Promise.resolve(given).then((late) => finish(collectionOf(fn, late))) : finish(collectionOf(fn, given)));
+  // Left for later by the collection, and so by the plan: the path is asked for, and checked, when the request is about to be made.
+  return typeof path === "function" ? () => found(path()) : found(path);
 }
 
 /**
  * The collection and the further options a declaration was given, checked as it is made. The names are this
  * declaration's own copy, so nothing done to the object afterwards changes what its function sends.
  */
-function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: readonly string[]] {
+function given<C>(builder: string, collection: unknown, also: unknown): readonly [collection: tCollection<C>, also: tAlsoKinds, user: boolean | undefined] {
   if (typeof collection !== "function") throw new TypeError(`${builder}: collection must be a function that gives the collection's path; got ${got(collection)}`);
-  if (also !== undefined && (typeof also !== "object" || also === null || Array.isArray(also))) throw new TypeError(`${builder}: also must be an object that names each further option, such as { views: true }; got ${got(also)}`);
-  return [collection as tCollection<C>, Object.keys(also ?? {})];
+  // Its own, and not one found on a prototype: `user` put on Object.prototype by other code is not this collection's say.
+  const user: unknown = Object.hasOwn(collection, "user") ? (collection as { user?: unknown }).user : undefined;
+  if (user !== undefined && typeof user !== "boolean") throw new TypeError(`${builder}: collection.user must be true or false where it is given; got ${got(user)}`);
+  const kinds: [string, unknown][] = typeof also === "object" && also !== null && !Array.isArray(also) ? Object.entries(also) : [];
+  if ((also !== undefined && (typeof also !== "object" || also === null || Array.isArray(also))) || kinds.some(([, kind]) => kind !== "list" && kind !== "name")) {
+    throw new TypeError(`${builder}: also must be an object that says what each further option is, a "list" or a "name", such as { views: "list" }; got ${got(also)}`);
+  }
+  return [collection as tCollection<C>, Object.fromEntries(kinds) as tAlsoKinds, user];
 }
+
+/** The option of a function that asks one storefront's catalog: whose catalog. */
+export interface tStorefrontOption {
+  /**
+   * The storefront whose catalog is asked, by its id, such as `"gb"`. Default: the client's, which is the one it
+   * was created with, or else the listener's, which the client looks up once.
+   */
+  readonly storefront?: string | undefined;
+}
+
+/** The option of a function for a resource that has views: which of them to send with the resource. */
+export interface tViewsOption<Views> {
+  /** The views to send with the resource, by name, such as `["top-songs"]`. Default: none. */
+  readonly views?: readonly (keyof Views & string)[] | undefined;
+}
+
+/**
+ * What `finish` makes of the storefront a call is for. When the call named it, that is there and then. When it did
+ * not, the client has to say which it is, and may have to ask Apple for the listener's: that is left for when the
+ * request is about to be made, so a walk nobody loops over asks for nothing. Either way the storefront is handed
+ * over as one segment of a path, checked and encoded, so one from outside cannot move the request to another path.
+ */
+export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | tLater<T> {
+  const checked = (id: unknown) => finish(segmentOf(fn, "storefront", id));
+  // Waited for whatever the client gives: a client is known by its methods, and a wrapped one may answer with the storefront itself where createClient's answers with a promise of it.
+  return storefront === undefined ? async () => checked(await client.storefront()) : checked(storefront);
+}
+
+/** What a request is made with, with the collection's say on the Music User Token where it has one. */
+const pinned = <I extends object>(init: I, user: boolean | undefined): I => (user === undefined ? init : { ...init, user });
 
 /**
  * A function for the resource with one id in a collection: `GET {collection}/{id}`. `R` is the answer's type and has
@@ -219,13 +317,33 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>> {
-  const [locate, names] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
+  named("resourceGetter", fn);
+  const [locate, names, user] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
   // Here and below, what a call was handed is checked in the order it was handed over, so the first mistake is the one named.
   return declare("resourceGetter", fn, "resource", (client, id: string, options?: tEndpointOptions<R, C, E>) => {
     const segment = segmentOf(fn, "id", id);
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, {}, names);
+    const init = pinned(initOf<R>(fn, bag, {}, names), user);
     return located<R>(fn, locate(fn, client, bag), (path) => [`${path}/${segment}`, init]);
+  });
+}
+
+/** What the two below come to: `GET {collection}?{param}=`, for the list a caller hands over, which a mistake in it calls `name`, as the function's signature does. */
+function picked<R extends tResources, C extends object, E extends object>(
+  builder: string,
+  fn: string,
+  param: string,
+  name: string,
+  collection: unknown,
+  also: unknown,
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+  named(builder, fn);
+  const [locate, names, user] = given<C>(builder, collection, also);
+  return declare(builder, fn, "resources", (client, values: readonly string[], options?: tEndpointOptions<R, C, E>) => {
+    const list = listOf(fn, name, values);
+    const bag = optionsOf(fn, options, OPTIONS);
+    const init = pinned(initOf<R>(fn, bag, { [param]: list }, names), user);
+    return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
 
@@ -235,13 +353,23 @@ export function resourcesGetter<R extends tResources = never, C extends object =
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
 ): tEndpoint<[ids: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
-  const [locate, names] = given<C>("resourcesGetter", collection, (also as readonly unknown[])[0]);
-  return declare("resourcesGetter", fn, "resources", (client, ids: readonly string[], options?: tEndpointOptions<R, C, E>) => {
-    const list = listOf(fn, "ids", ids);
-    const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<R>(fn, bag, { ids: list }, names);
-    return located<R>(fn, locate(fn, client, bag), (path) => [path, init]);
-  });
+  return picked("resourcesGetter", fn, "ids", "ids", collection, (also as readonly unknown[])[0]);
+}
+
+/**
+ * A function for the resources a filter picks out of a collection: `GET {collection}?filter[{filter}]=`. `filter`
+ * is the filter's name as Apple writes it, such as `isrc`, and the function takes the values to look for, which a
+ * mistake in them calls `values`, as the function's own signature does.
+ */
+export function resourcesFinder<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
+  fn: string,
+  filter: string,
+  collection: tCollectionGiven<R, C>,
+  ...also: tAlsoGiven<E>
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+  named("resourcesFinder", fn);
+  if (!isBracketed(filter)) throw new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between and at most 64 characters, such as "isrc"; got ${got(filter)}`);
+  return picked("resourcesFinder", fn, `filter[${filter}]`, "values", collection, (also as readonly unknown[])[0]);
 }
 
 /** A function for a whole collection, a page at a time: `GET {collection}`. */
@@ -249,11 +377,12 @@ export function resourceLister<R extends tResources = never, C extends object = 
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E>], tPaged<R>, AsyncIterable<tItem<R>>> {
-  const [locate, names] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
-  return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E>) => {
+): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions], tPaged<R>, AsyncIterable<tItem<R>>> {
+  named("resourceLister", fn);
+  const [locate, names, user] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
+  return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions) => {
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<tPaged<R>>(fn, bag, {}, names);
+    const init = pinned(walkOf<tPaged<R>>(fn, bag, {}, names), user);
     return located<tPaged<R>>(fn, locate(fn, client, bag), (path) => [path, init]);
   });
 }
@@ -270,17 +399,20 @@ export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipRe
  * and the name asked for decides what comes back, and so what a `schema` for it has to be a schema of.
  */
 export interface tRelationshipEndpoint<Rels, C = tNone> {
-  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>): Promise<tRelationshipPage<Rels, K>>;
-  readonly bound: (client: tAppleMusicClient) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C>) => AsyncIterable<tRelated<Rels, K>>;
+  <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions): Promise<tRelationshipPage<Rels, K>>;
+  readonly bound: (
+    client: tAppleMusicClient,
+  ) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions) => AsyncIterable<tRelated<Rels, K>>;
 }
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
-  const [locate] = given<C>("relationshipGetter", collection, undefined);
-  const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C>) => {
+  named("relationshipGetter", fn);
+  const [locate, , user] = given<C>("relationshipGetter", collection, undefined);
+  const declared = declare("relationshipGetter", fn, "pages", (client, id: string, name: string, options?: tEndpointOptions<tRelationshipResponse, C> & tWalkOptions) => {
     const segments = `${segmentOf(fn, "id", id)}/${segmentOf(fn, "name", name)}`;
     const bag = optionsOf(fn, options, OPTIONS);
-    const init = initOf<tRelationshipResponse>(fn, bag);
+    const init = pinned(walkOf<tRelationshipResponse>(fn, bag), user);
     return located<tRelationshipResponse>(fn, locate(fn, client, bag), (path) => [`${path}/${segments}`, init]);
   });
   // What is declared takes any name and gives any resource; the type handed out ties the one to the other.
@@ -309,6 +441,8 @@ export function endpointNamespace<F extends object>(fn: string, client: tAppleMu
   const music = clientOf(fn, client, METHODS);
   if (typeof endpoints !== "object" || (endpoints as unknown) === null) throw new TypeError(`${fn}: endpoints must be an object of functions for endpoints; got ${got(endpoints)}`);
   const bound = Object.entries(endpoints).flatMap(([name, value]: [string, unknown]) => (isEndpoint(value) ? [[name, value.bound(music)] as const] : []));
-  // From entries, so that a function named `__proto__` is one more function and nothing else.
-  return Object.freeze(Object.fromEntries(bound)) as tEndpointNamespace<F>;
+  // From entries, so that a function named `__proto__` is one more function and nothing else. And with nothing to
+  // inherit from, so that a name looked up in the namespace is one of its functions or is not there: not
+  // `constructor` or `toString`, which every ordinary object has.
+  return Object.freeze(ownOf(Object.fromEntries(bound))) as tEndpointNamespace<F>;
 }

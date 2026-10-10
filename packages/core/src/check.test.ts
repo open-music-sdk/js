@@ -1,6 +1,6 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, test, vi } from "vitest";
-import { clientOf, has, listOf, optionsOf, segmentOf } from "./check";
+import { clientOf, has, isName, itemsOf, listOf, optionsOf, segmentOf, textOf, typedIdsOf } from "./check";
 import { createClient } from "./client";
 
 const SECRET = "s3cretT0ken";
@@ -214,15 +214,9 @@ describe("segmentOf", () => {
   );
 
   test.each([
-    ["a/b", "a%2Fb"],
-    ["../../me/library/songs", "..%2F..%2Fme%2Flibrary%2Fsongs"],
-    ["a\\b", "a%5Cb"],
     ["a?b=1&c", "a%3Fb%3D1%26c"],
     ["a#b", "a%23b"],
     ["a b", "a%20b"],
-    ["a\tb\n", "a%09b%0A"],
-    ["%2e%2e", "%252e%252e"],
-    ["%2F", "%252F"],
     ["a;b", "a%3Bb"],
     ["a:b@c", "a%3Ab%40c"],
     ["é", "%C3%A9"],
@@ -239,22 +233,40 @@ describe("segmentOf", () => {
 
   describe("whatever a segment holds, the request still goes where it was going", () => {
     const BASE = "https://api.music.apple.com/";
-    const hostile = [
+    /** What a URL would read as leaving the segment, written every way it can be. Each holds a slash, a backslash, a percent sign or a control character. */
+    const leaving = [
       "../../../me/library/songs",
       "..\\..\\..\\me\\library\\songs",
       "%2e%2e/%2e%2e/%2e%2e/me",
       ".%2e",
       "%2E%2E",
+      "%2F",
+      "..%2F..%2Fme",
+      "%252e%252e%252fme",
       "/v1/me/storefront",
       "//evil.example/x",
       "https://evil.example/x",
-      "1?include=library",
-      "1#fragment",
       "1/../../../me",
-      " ",
+      "a/b",
+      "a\\b",
+      "a%b",
       "\t",
       "a\r\nb",
+      "a\u0000b",
+      "a\u007fb",
+      "a\u0085b",
     ];
+    /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+    const hostile = ["1?include=library", "1#fragment", " ", "a b", "..a", "a..", "...", "1&ids=2", "a=b", "a;b", "a@b:c"];
+
+    test.each(leaving)("%j is refused, so it is neither sent nor left to whoever reads the path to decode", (value) => {
+      const error = thrown(() => segmentOf("getSong", "id", value));
+      expect(error).toEqual(
+        new TypeError(
+          `getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${String(value.length)} characters`,
+        ),
+      );
+    });
 
     test.each(hostile)("%j stays the one segment after /v1/catalog/us/songs", (value) => {
       const url = new URL(`v1/catalog/us/songs/${segmentOf("getSong", "id", value)}`, BASE);
@@ -270,6 +282,12 @@ describe("segmentOf", () => {
       expect(new URL("v1/catalog/us/songs/../../../me/library/songs", BASE).pathname).toBe("/v1/me/library/songs");
       expect(new URL("v1/catalog/us/songs/%2e%2e/%2e%2e/%2e%2e/me", BASE).pathname).toBe("/v1/me");
       expect(new URL("v1/catalog/us/songs/1?include=library", BASE).search).toBe("?include=library");
+    });
+
+    test("and an encoded slash, which a URL keeps in its segment, leaves all the same for a reader that decodes a path before it reads it", () => {
+      const encoded = encodeURIComponent("../../../me/library/songs");
+      expect(new URL(`v1/catalog/us/songs/${encoded}`, BASE).pathname).toBe(`/v1/catalog/us/songs/${encoded}`);
+      expect(new URL(`v1/catalog/us/songs/${decodeURIComponent(encoded)}`, BASE).pathname).toBe("/v1/me/library/songs");
     });
   });
 
@@ -289,7 +307,7 @@ describe("segmentOf", () => {
   ])("%s is a TypeError naming the function and the argument, and saying what it got", (_name, value, what) => {
     const error = thrown(() => segmentOf("getSong", "id", value));
     expect(error).toBeInstanceOf(TypeError);
-    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${what}`);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${what}`);
   });
 
   test("the argument is named as the caller names it", () => {
@@ -300,7 +318,7 @@ describe("segmentOf", () => {
     // The size and shape of a developer token: three runs of base64url with dots between, every character one a segment may hold.
     const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
     const error = thrown(() => segmentOf("getSong", "id", token));
-    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, and not "." or ".."; got ${String(token.length)} characters`);
+    expect(error.message).toBe(`getSong: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${String(token.length)} characters`);
     expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
   });
 
@@ -452,5 +470,217 @@ describe("listOf", () => {
     const asked = vi.fn(() => SECRET);
     thrown(() => listOf("fn", "ids", [{ toString: asked, valueOf: asked, toJSON: asked, [Symbol.toPrimitive]: asked }]));
     expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("isName", () => {
+  test.each(["1", "songs", "i.eoDlqXxsaz8Nb", "library-playlist-folders", "n".repeat(64), "a b", "a/b"])("%j is a name: a string of 1 to 64 characters, whatever they are", (value) => {
+    expect(isName(value)).toBe(true);
+  });
+
+  test.each<[string, unknown]>([
+    ["an empty string", ""],
+    ["one character too long", "n".repeat(65)],
+    ["a number", 1],
+    ["null", null],
+    ["undefined", undefined],
+    ["a list of one name", ["songs"]],
+    ["a String object", new String("songs")],
+  ])("%s is not", (_name, value) => {
+    expect(isName(value)).toBe(false);
+  });
+});
+
+describe("textOf", () => {
+  test.each(["x", "james brown", "a&types=albums #1 ?x=y/../\u00e9", "t".repeat(256)])("%j is text, and comes back as it is", (value) => {
+    expect(textOf("searchCatalog", "term", value)).toBe(value);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["empty", "", "0 characters"],
+    ["one character too long", "t".repeat(257), "257 characters"],
+    ["a number", 5, "5"],
+    ["a list", ["james"], "object"],
+    ["missing", undefined, "undefined"],
+    ["null", null, "null"],
+  ])("text that is %s is a TypeError naming the function and the argument", (_name, value, what) => {
+    expect(thrown(() => textOf("searchCatalog", "term", value))).toEqual(new TypeError(`searchCatalog: term must be a string of 1 to 256 characters; got ${what}`));
+  });
+
+  test("a mistake does not show the text: a token put where it belongs is described by its length", () => {
+    const token = `${SECRET}.${"p".repeat(300)}`;
+    const error = thrown(() => textOf("searchCatalog", "term", token));
+    expect(`${error.message} ${error.stack ?? ""}`).not.toContain(SECRET);
+  });
+});
+
+describe("itemsOf", () => {
+  test("a list comes back as this call's own copy of its items, whatever they are", () => {
+    const track = { id: "1", type: "songs" };
+    const mine = [track, "2", 3, null];
+    const items = itemsOf(mine, 1, 300);
+    mine.push("later");
+    expect(items).toEqual([track, "2", 3, null]);
+    expect(items?.[0]).toBe(track);
+  });
+
+  test.each<[string, unknown]>([
+    ["one item, not a list", { id: "1" }],
+    ["a string", "12"],
+    ["undefined", undefined],
+    ["null", null],
+    ["an object that says it has a length", { length: 1, 0: "1" }],
+  ])("%s is no list", (_name, value) => {
+    expect(itemsOf(value, 0, 300)).toBeUndefined();
+  });
+
+  test("a list is held to the fewest and the most it may hold, each of which it may hold exactly", () => {
+    const list = (length: number) => Array.from({ length }, (_, i) => i);
+    expect([itemsOf(list(0), 0, 3), itemsOf(list(3), 1, 3)]).toEqual([[], [0, 1, 2]]);
+    expect([itemsOf(list(0), 1, 3), itemsOf(list(4), 1, 3)]).toEqual([undefined, undefined]);
+  });
+
+  test("a list is asked its length once and read by index as far as it said, not through its iterator", () => {
+    const asked = vi.fn();
+    const odd = new Proxy(["1", "2"], {
+      get: (target, key, receiver) => {
+        if (key === "length") asked();
+        if (key === Symbol.iterator) return () => ["9", "9", "9"][Symbol.iterator]();
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    expect(itemsOf(odd, 1, 300)).toEqual(["1", "2"]);
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  test("a list too long is not read: its length is all that is asked for", () => {
+    const read = vi.fn();
+    const long = new Proxy(Array.from({ length: 301 }, () => "1"), {
+      get: (target, key, receiver) => {
+        if (typeof key === "string" && /^\d+$/.test(key)) read(key);
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    expect(itemsOf(long, 1, 300)).toBeUndefined();
+    expect(read).not.toHaveBeenCalled();
+  });
+});
+
+describe("typedIdsOf", () => {
+  const PLAIN = 'getCatalogResources: ids must be a plain object of ids by type, such as { songs: ["1"] }; got ';
+  const TYPE = "getCatalogResources: ids holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ";
+
+  test("ids by type come back as the parameters they are sent as, each list under ids and its type in brackets", () => {
+    expect(typedIdsOf("fn", "ids", { songs: ["1", "2"], "library-playlists": ["p.1"] })).toEqual({ "ids[songs]": ["1", "2"], "ids[library-playlists]": ["p.1"] });
+  });
+
+  test("a type whose list is undefined is left out, as an option that was not given is", () => {
+    expect(typedIdsOf("fn", "ids", { songs: ["1"], albums: undefined })).toEqual({ "ids[songs]": ["1"] });
+  });
+
+  test("each list is this call's own copy: changing the caller's afterwards changes nothing", () => {
+    const songs = ["1"];
+    const sent = typedIdsOf("fn", "ids", { songs });
+    songs.push("2");
+    expect(sent).toEqual({ "ids[songs]": ["1"] });
+  });
+
+  test.each<[string, unknown, string]>([
+    ["missing", undefined, "undefined"],
+    ["null", null, "null"],
+    ["one list, with no type", ["1", "2"], "a list"],
+    ["a string", "songs", "5 characters"],
+    ["a Map, which would be read as holding nothing", new Map([["songs", ["1"]]]), "an object that is not a plain one"],
+  ])("ids that are %s are a TypeError naming the function and the argument", (_name, value, what) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", value))).toEqual(new TypeError(`${PLAIN}${what}`));
+  });
+
+  test.each<[string, object]>([
+    ["no types at all", {}],
+    ["only types whose lists are undefined", { songs: undefined }],
+  ])("ids of %s ask for nothing, and are a TypeError", (_name, value) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", value))).toEqual(new TypeError("getCatalogResources: ids must hold the ids of 1 to 32 types; got 0"));
+  });
+
+  test("thirty-two types are taken, and one more is not", () => {
+    const types = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i) => ["a".repeat(i + 1), ["1"]]));
+    expect(Object.keys(typedIdsOf("fn", "ids", types(32)))).toHaveLength(32);
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", types(33))).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got more than 32");
+  });
+
+  test("names whose lists are undefined count as names: there may be thirty-two, whatever is under them", () => {
+    const names = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i): [string, string[] | undefined] => ["a".repeat(i + 1), i === 0 ? ["1"] : undefined]));
+    expect(typedIdsOf("fn", "ids", names(32))).toEqual({ "ids[a]": ["1"] });
+    expect(() => typedIdsOf("fn", "ids", names(33))).toThrow(TypeError);
+  });
+
+  test("an object of very many names is refused for how many it holds, before a list under any of them is read", () => {
+    const read = vi.fn((target: object, key: string | symbol): unknown => Reflect.get(target, key));
+    const described = vi.fn((target: object, key: string | symbol) => Reflect.getOwnPropertyDescriptor(target, key));
+    const many = Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`t${String(i)}`, ["1"]]));
+    const watched: unknown = new Proxy(many, { get: read, getOwnPropertyDescriptor: described });
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", watched)).message).toBe("getCatalogResources: ids must hold the ids of 1 to 32 types; got more than 32");
+    expect(read).not.toHaveBeenCalled();
+    expect(described.mock.calls.length).toBeLessThan(100);
+  });
+
+  test("three hundred ids over all the types are taken, and one more is not: together they are one URL", () => {
+    const ids = (count: number) => Array.from({ length: count }, (_, i) => String(i));
+    expect(Object.values(typedIdsOf("fn", "ids", { songs: ids(200), albums: ids(100) })).flat()).toHaveLength(300);
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: ids(200), albums: ids(100), artists: ["1"] }))).toEqual(
+      new TypeError("getCatalogResources: ids must hold at most 300 ids over all its types; got 301"),
+    );
+  });
+
+  test("a name put on Object.prototype by other code is not one of an object's own, and is neither counted nor sent", () => {
+    Object.assign(Object.prototype, { planted: ["9"] });
+    try {
+      expect(typedIdsOf("fn", "ids", { songs: ["1"] })).toEqual({ "ids[songs]": ["1"] });
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "planted");
+    }
+  });
+
+  test.each<[string, string]>([
+    ["one that would close its brackets and add a parameter", "songs]&ids[albums"],
+    ["one in capitals", "Songs"],
+    ["one with a space in it", "library songs"],
+    ["one that begins with a hyphen", "-songs"],
+    ["one with two hyphens together", "library--songs"],
+    ["an empty one", ""],
+    ["one longer than a name is", "s".repeat(65)],
+    ["__proto__, as JSON can name one", "__proto__"],
+  ])("a type's name that is %s is a TypeError that describes it and does not repeat it", (_name, type) => {
+    const ids = JSON.parse(`{${JSON.stringify(type)}: ["1"]}`) as object;
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", ids))).toEqual(new TypeError(`${TYPE}${String(type.length)} characters`));
+    expect(({} as { polluted?: unknown }).polluted).toBeUndefined();
+  });
+
+  test.each<[string, unknown, string]>([
+    ["one string, not a list", "1", "1 characters"],
+    ["an empty list", [], "a list of 0"],
+    ["a list holding two in one", ["1,2"], "3 characters at index 0"],
+    ["null", null, "null"],
+  ])("a type's list that is %s is a TypeError naming the type it is under", (_name, list, what) => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: ["1"], albums: list })).message).toBe(
+      `getCatalogResources: ids.albums must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`,
+    );
+  });
+
+  test("a type's name is held to what a name is before its list is read: a list's error says the name it is under, so no other name gets that far", () => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { "Not A Type": "not a list" })).message).toBe(`${TYPE}10 characters`);
+  });
+
+  test("the types are checked in the order they were given, so the first mistake is the one named", () => {
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { songs: "not a list", "Not A Type": ["1"] })).message).toContain("getCatalogResources: ids.songs must be a list");
+    expect(thrown(() => typedIdsOf("getCatalogResources", "ids", { "Not A Type": ["1"], songs: "not a list" })).message).toBe(`${TYPE}10 characters`);
+  });
+
+  test("a mistake does not show a value: a token put where the ids belong, where a type's name does, or among the ids", () => {
+    const token = `eyJhbGciOiJFUzI1NiIsImtpZCI6IkFCQzEyM0RFRkcifQ.${"p".repeat(75)}.${"s".repeat(86)}`;
+    for (const value of [token, { [token]: ["1"] }, { songs: [token] }, { songs: token }]) {
+      const error = thrown(() => typedIdsOf("getCatalogResources", "ids", value));
+      expect(`${error.message} ${error.stack ?? ""}`).not.toContain(token);
+    }
   });
 });

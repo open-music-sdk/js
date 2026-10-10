@@ -58,21 +58,43 @@ export const MAX_NAME = 64;
 /** The longest a piece of text that is no name may be, such as a cursor Apple gave. */
 export const MAX_LENGTH = 256;
 
+/** Whether `value` is a name: a string of 1 to 64 characters, which is what an id, a type or a code may be wherever it is sent. */
+export const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
+
 /**
- * `value` as one segment of a path, percent-encoded. Whatever it holds stays inside the segment: a slash, a
- * question mark or a hash is encoded, and "." and "..", which no encoding protects because a URL parser reads
- * them as "here" and "one up", are refused. So a value from outside cannot turn a request for one endpoint into a
- * request for another, where a different token may be sent.
+ * `value` as a piece of text that is no name, such as what someone typed into a search box: a string of 1 to 256
+ * characters. It is sent in the URL, so how long it may be is not left open.
+ */
+export function textOf(fn: string, name: string, value: unknown): string {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_LENGTH) return value;
+  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_LENGTH)} characters; got ${got(value)}`);
+}
+
+/**
+ * What a segment may not hold: a slash, a backslash, a percent sign, or a control character. No id, name or code
+ * of Apple's holds one. Encoded, each would stay inside the segment as far as a URL goes, and that is as far as
+ * this package can see: a server that decodes a path before it reads it would find a slash there again. So what
+ * could be read as one, or as the start of an encoding of one, is not sent at all.
+ */
+const UNFIT = /[/\\%\p{Cc}]/u;
+
+/**
+ * `value` as one segment of a path, percent-encoded. A question mark, a hash or a space is encoded and stays in
+ * the segment. What could be read as leaving it is refused: a slash, a backslash, a percent sign and a control
+ * character, and "." and "..", which a URL parser reads as "here" and "one up". So a value from outside cannot turn
+ * a request for one endpoint into a request for another, where a different token may be sent.
  */
 export function segmentOf(fn: string, name: string, value: unknown): string {
-  if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== "..") {
+  if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== ".." && !UNFIT.test(value)) {
     try {
       return encodeURIComponent(value);
     } catch {
       // Half of a surrogate pair: not text that can be sent, and refused like anything else that is no segment.
     }
   }
-  throw new TypeError(`${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, and not "." or ".."; got ${got(value)}`);
+  throw new TypeError(
+    `${fn}: ${name} must be a string of 1 to ${String(MAX_NAME)} characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ${got(value)}`,
+  );
 }
 
 /** The most Apple documents taking in one request, which is for songs by id. Each item is a URL made longer, so the list is not left open. */
@@ -97,10 +119,62 @@ export function lengthOf(value: unknown): number | undefined {
 export const copyOf = (list: unknown, length: number): unknown[] => Array.from({ length }, (_, index) => (list as readonly unknown[])[index]);
 
 /**
+ * A caller's list as this call's own copy of its items, whatever they are: asked its length once and read by index,
+ * as `listOf` reads a list of strings. `undefined` when it is no list, or holds fewer than `least` items or more
+ * than `most`, and a list too long is not read at all. What each item has to be is the caller's to check.
+ */
+export function itemsOf(value: unknown, least: number, most: number): unknown[] | undefined {
+  const length = lengthOf(value);
+  return length !== undefined && length >= least && length <= most ? copyOf(value, length) : undefined;
+}
+
+/**
  * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken
  * before it is checked, so what was checked is what is sent.
  */
 export const listOf = (fn: string, name: string, value: unknown): readonly string[] => listed(fn, name, value, 1);
+
+/** More types than Apple has of resource. Each one is a list of ids, so how many there may be is not left open. */
+const MAX_TYPES = 32;
+
+/** How many of its own names an object holds, counted no further than `most` and one: enough to say it holds too many, without reading them all. */
+function namesIn(value: object, most: number): number {
+  let held = 0;
+  for (const key in value) if (Object.hasOwn(value, key) && ++held > most) break;
+  return held;
+}
+
+/**
+ * A name as Apple writes the ones that go in brackets, a type of resource after `ids` or a filter after `filter`:
+ * lowercase words with hyphens between, such as `library-playlists` or `storefront-chart`, and no longer than a
+ * name may be. Held to that, it stays inside its brackets.
+ */
+export const isBracketed = (name: unknown): name is string => typeof name === "string" && name.length <= MAX_NAME && /^[a-z]+(-[a-z]+)*$/.test(name);
+
+/**
+ * `value` as ids by type, such as `{ songs: ["1"], albums: ["2"] }`, as the parameters they are sent as:
+ * `ids[songs]` and `ids[albums]`. Each list is one as `listOf` takes them. A type whose list is undefined is left
+ * out, and one at least has to be left in, since ids of no type ask for nothing. Which types there are is Apple's
+ * to say: a name is held to what a type's name looks like, so that it stays inside its brackets.
+ *
+ * All of it goes into one URL, so all of it is bounded: the names by how many there may be, counted before anything
+ * is made of them, and the ids by how many there may be over every type together, which is as many as one list
+ * may hold.
+ */
+export function typedIdsOf(fn: string, name: string, value: unknown): Record<string, readonly string[]> {
+  if (!isPlain(value)) throw new TypeError(`${fn}: ${name} must be a plain object of ids by type, such as { songs: ["1"] }; got ${gotFor(value)}`);
+  const TYPES = `${fn}: ${name} must hold the ids of 1 to ${String(MAX_TYPES)} types; got `;
+  if (namesIn(value, MAX_TYPES) > MAX_TYPES) throw new TypeError(`${TYPES}more than ${String(MAX_TYPES)}`);
+  const given = Object.entries(value).filter(([, ids]: [string, unknown]) => ids !== undefined);
+  if (given.length === 0) throw new TypeError(`${TYPES}0`);
+  const lists = given.map(([type, ids]: [string, unknown]): [string, readonly string[]] => {
+    if (!isBracketed(type)) throw new TypeError(`${fn}: ${name} holds a name that is no type of resource, which is lowercase words with hyphens between, as library-songs is; got ${got(type)}`);
+    return [`ids[${type}]`, listOf(fn, `${name}.${type}`, ids)];
+  });
+  const total = lists.reduce((sum, [, ids]) => sum + ids.length, 0);
+  if (total > MAX_ITEMS) throw new TypeError(`${fn}: ${name} must hold at most ${String(MAX_ITEMS)} ids over all its types; got ${String(total)}`);
+  return Object.fromEntries(lists);
+}
 
 /** As `listOf`, for a list that may also hold nothing when `least` is 0: an option's list, where nothing means none. */
 export function listed(fn: string, name: string, value: unknown, least: 0 | 1): readonly string[] {

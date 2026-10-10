@@ -13,7 +13,7 @@ export interface tRetryPolicy {
    * `retryAfterMs` attached so the caller can decide. Default 60 000; at most 2^31 - 1 (setTimeout's limit).
    */
   readonly maxRetryAfterMs?: number | undefined;
-  /** Which errors deserve another attempt. Default: `retryable`. */
+  /** Which errors deserve another attempt. Default: `retryable`. A client asks this of a POST only for an error that says the POST was not carried out. */
   readonly retryOn?: ((error: AppleMusicError) => boolean) | undefined;
 }
 

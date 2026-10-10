@@ -16,9 +16,11 @@ import { createClient, type tAppleMusicClient, type tClientOptions, type tSchema
 import {
   endpoint,
   endpointNamespace,
+  inStorefront,
   relationshipGetter,
   resourceGetter,
   resourceLister,
+  resourcesFinder,
   resourcesGetter,
   type tCollection,
   type tEndpointOptions,
@@ -226,7 +228,7 @@ describe("the types: one declaration gives both forms, and the name asked for de
     }
     type tOptions = tReadOptions<tSongsResponse> & tStore & tViews;
     const collection: tCollection<tStore> = (_fn, _client, options) => `v1/catalog/${options.storefront ?? "us"}/artists`;
-    const getArtist = resourceGetter<tSongsResponse, tStore, tViews>("getArtist", collection, { views: true });
+    const getArtist = resourceGetter<tSongsResponse, tStore, tViews>("getArtist", collection, { views: "list" });
     expectTypeOf(getArtist).parameter(2).toEqualTypeOf<tOptions | undefined>();
     expectTypeOf(endpointNamespace("catalog", apple().music, { getArtist }).getArtist).parameter(1).toEqualTypeOf<tOptions | undefined>();
   });
@@ -239,6 +241,7 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     ["resourceGetter", resourceGetter as never],
     ["resourcesGetter", resourcesGetter as never],
     ["resourceLister", resourceLister as never],
+    ["resourcesFinder", (fn, collection, also) => (resourcesFinder as unknown as (fn: unknown, filter: string, collection: unknown, also: unknown) => unknown)(fn, "isrc", collection, also)],
     ["relationshipGetter", relationshipGetter as never],
   ];
 
@@ -255,8 +258,8 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     ["misspelt", "resorce", "7 characters"],
     ["missing", undefined, "undefined"],
     ["a number", 1, "1"],
-  ])("endpoint: an unwrap that is %s is a TypeError, and is not taken for one of the four", (_name, unwrap, what) => {
-    expect(() => endpoint("getSong", unwrap as "answer", plan)).toThrow(new TypeError(`endpoint: unwrap must be "resource", "resources", "pages" or "answer"; got ${what}`));
+  ])("endpoint: an unwrap that is %s is a TypeError, and is not taken for one of the five", (_name, unwrap, what) => {
+    expect(() => endpoint("getSong", unwrap as "answer", plan)).toThrow(new TypeError(`endpoint: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${what}`));
   });
 
   test.each<[string, unknown, string]>([
@@ -272,14 +275,31 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
     expect(() => builder(undefined, () => SONGS)).toThrow(new TypeError(`${name}: fn must be the name of the function, a string with something in it; got undefined`));
   });
 
+  test.each(builders)("%s: a mistake in a declaration is named in the order it was written, the name before the collection and the rest", (name, builder) => {
+    const unnamed = new TypeError(`${name}: fn must be the name of the function, a string with something in it; got 5`);
+    expect(() => builder(5, 5)).toThrow(unnamed);
+    expect(() => builder(5, () => SONGS, ["views"])).toThrow(unnamed);
+  });
+
+  test("resourcesFinder: the name comes before the filter, and the filter before the collection", () => {
+    const finder = resourcesFinder as unknown as (fn: unknown, filter: unknown, collection: unknown) => unknown;
+    expect(() => finder(5, 5, 5)).toThrow(new TypeError("resourcesFinder: fn must be the name of the function, a string with something in it; got 5"));
+    expect(() => finder("", "isrc", 5)).toThrow(new TypeError("resourcesFinder: fn must be the name of the function, a string with something in it; got 0 characters"));
+    expect(() => finder("find", 5, 5)).toThrow(/^resourcesFinder: filter must be the name of a filter/);
+    expect(() => finder("find", "isrc", 5)).toThrow(new TypeError("resourcesFinder: collection must be a function that gives the collection's path; got 5"));
+  });
+
   test.each(builders)("%s: a collection that is a path, and not a function that gives one, is a TypeError naming it", (name, builder) => {
     expect(() => builder("getSong", SONGS)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got 19 characters`));
     expect(() => builder("getSong", undefined)).toThrow(new TypeError(`${name}: collection must be a function that gives the collection's path; got undefined`));
   });
 
-  test.each(builders.slice(0, 3))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
-    const message = (what: string) => new TypeError(`${name}: also must be an object that names each further option, such as { views: true }; got ${what}`);
+  test.each(builders.slice(0, 4))("%s: an also that is not an object naming the options is a TypeError naming it", (name, builder) => {
+    const message = (what: string) => new TypeError(`${name}: also must be an object that says what each further option is, a "list" or a "name", such as { views: "list" }; got ${what}`);
     expect(() => builder("getSong", () => SONGS, ["views"])).toThrow(message("object"));
+    // What an option is has to be said: naming it is not enough, and neither is a kind there is not.
+    expect(() => builder("getSong", () => SONGS, { views: Boolean("named") })).toThrow(message("object"));
+    expect(() => builder("getSong", () => SONGS, { views: "list", chart: "text" })).toThrow(message("object"));
     expect(() => builder("getSong", () => SONGS, "views")).toThrow(message("5 characters"));
     expect(() => builder("getSong", () => SONGS, null)).toThrow(message("null"));
   });
@@ -294,9 +314,9 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
   });
 
   test("the options it names are its own copy: naming another afterwards changes nothing", async () => {
-    const also: { views: true; with?: true } = { views: true };
+    const also: { views: "list"; with?: "list" } = { views: "list" };
     const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", also);
-    also.with = true;
+    also.with = "list";
     const { music, sent } = apple();
     await getArtist(music, "1", { views: ["top-songs"], with: ["attributes"] } as { views: string[] });
     expect(sent()).toEqual(["GET /v1/catalog/us/artists/1?views=top-songs"]);
@@ -308,7 +328,7 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
       readonly with?: readonly string[] | undefined;
     }
     const declarations = [
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true, with: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "list", with: "list" }),
       // @ts-expect-error -- the answer's type is not said, so there is nothing a collection can be
       () => resourceGetter("getSong", () => SONGS),
       // @ts-expect-error -- so too for the resources with some ids
@@ -320,13 +340,18 @@ describe("a declaration is checked as it is made, so a mistake in one is found w
       // @ts-expect-error -- two options are added and none is named
       () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS),
       // @ts-expect-error -- one of the two is not named
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "list" }),
       // @ts-expect-error -- a name that is misspelt is not one of the options
-      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { veiws: true, with: true }),
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { veiws: "list", with: "list" }),
       // @ts-expect-error -- an option is named that the function does not add
-      () => resourceGetter<tSongsResponse>("getSong", () => SONGS, { views: true }),
+      () => resourceGetter<tSongsResponse>("getSong", () => SONGS, { views: "list" }),
+      // @ts-expect-error -- an option whose type is a list is declared a name
+      () => resourceGetter<tSongsResponse, tNone, tAdded>("getArtist", () => SONGS, { views: "name", with: "list" }),
+      // @ts-expect-error -- an option whose type is one string is declared a list
+      () => resourceGetter<tSongsResponse, tNone, { readonly chart?: string | undefined }>("getCharts", () => SONGS, { chart: "list" }),
+      () => resourceGetter<tSongsResponse, tNone, { readonly chart?: string | undefined }>("getCharts", () => SONGS, { chart: "name" }),
     ];
-    expect(declarations).toHaveLength(9);
+    expect(declarations).toHaveLength(12);
   });
 });
 
@@ -536,6 +561,54 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
     });
   });
 
+  describe("what a write has written", () => {
+    const createPlaylist = endpoint("createPlaylist", "written", (_client, name: string): tRequestPlan<tSongsResponse> => ["v1/me/library/playlists", { method: "POST", body: { attributes: { name } } }]);
+    const made = { id: "p.new", type: "library-playlists", href: "/v1/me/library/playlists/p.new" };
+
+    test("called with a client it resolves to Apple's answer, and bound to the resource the answer holds", async () => {
+      const { music } = apple([{ status: 201, body: { data: [made] } }, { status: 201, body: { data: [made] } }], { userToken: "user" });
+      expect(await createPlaylist(music, "Road")).toEqual({ data: [made] });
+      expect(await createPlaylist.bound(music)("Road")).toEqual(made);
+    });
+
+    test.each<[string, tReply]>([
+      ["an empty list", { status: 201, body: { data: [] } }],
+      ["no data", { status: 201, body: {} }],
+      ["no body at all", { status: 204 }],
+      ["a body that is no object", { status: 200, body: "done" }],
+      ["data that is no list", { status: 200, body: { data: "done" } }],
+    ])("bound, a success that holds %s is undefined and no error: the write happened, and saying it failed would have it done twice", async (_name, reply) => {
+      const { music, sent } = apple([reply], { userToken: "user" });
+      expect(await createPlaylist.bound(music)("Road")).toBeUndefined();
+      expect(sent()).toEqual(["POST /v1/me/library/playlists"]);
+    });
+
+    test("the check can tell: the same answers are an error to a function that asks for a resource, which has nothing to hand over", async () => {
+      const { music } = apple([{ body: { data: [] } }]);
+      expect(isAppleMusicError(await rejection(getSong.bound(music)("1")), "ApiError")).toBe(true);
+    });
+
+    test("a write Apple turns away is still the error Apple answered with", async () => {
+      const { music } = apple([{ status: 403 }], { userToken: "user" });
+      expect(isAppleMusicError(await rejection(createPlaylist.bound(music)("Road")), "UserTokenInvalid")).toBe(true);
+    });
+
+    test("data on Object.prototype is not what the answer holds", async () => {
+      Object.assign(Object.prototype, { data: [made] });
+      try {
+        const { music } = apple([{ status: 201, body: {} }], { userToken: "user" });
+        expect(await createPlaylist.bound(music)("Road")).toBeUndefined();
+      } finally {
+        Reflect.deleteProperty(Object.prototype, "data");
+      }
+    });
+
+    test("the types: bound, it gives the resource or undefined", () => {
+      expectTypeOf(createPlaylist.bound(apple().music)).returns.resolves.toEqualTypeOf<tSong | undefined>();
+      expectTypeOf(createPlaylist).returns.resolves.toEqualTypeOf<tSongsResponse>();
+    });
+  });
+
   describe("the resources", () => {
     test("are the list under data, as Apple sent it", async () => {
       const { music, sent } = apple([{ body: { data: [song("1"), song("2")], meta: { ignored: true } } }]);
@@ -586,8 +659,8 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const related = getAlbumRelationship.bound(music);
       expect(() => list({ limit: 0 })).toThrow(new TypeError("listLibrarySongs: limit must be a whole number above 0; got 0"));
       expect(() => list("en-GB" as unknown as tReadOptions<tLibrarySongsResponse>)).toThrow(new TypeError("listLibrarySongs: expected an options object; got 5 characters"));
-      expect(() => related("..", "tracks")).toThrow(new TypeError('getAlbumRelationship: id must be a string of 1 to 64 characters, and not "." or ".."; got 2 characters'));
-      expect(() => related("1", "" as "tracks")).toThrow(new TypeError('getAlbumRelationship: name must be a string of 1 to 64 characters, and not "." or ".."; got 0 characters'));
+      expect(() => related("..", "tracks")).toThrow(new TypeError('getAlbumRelationship: id must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 2 characters'));
+      expect(() => related("1", "" as "tracks")).toThrow(new TypeError('getAlbumRelationship: name must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 0 characters'));
       expect(calls).toHaveLength(0);
     });
 
@@ -617,7 +690,85 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       expect(sent()).toEqual(["GET /v1/me/library/songs?limit=9", "GET /v1/me/library/songs?limit=9"]);
     });
 
-    describe("where the collection has to be waited for", () => {
+    describe("where the collection leaves its path for when a request is about to be made", () => {
+      /** A collection that has to ask for part of its path, as a catalog asks the client which storefront is the listener's. */
+      const asking = (ask: () => string | Promise<string>) => {
+        const later = vi.fn(ask);
+        const collection = vi.fn<tCollection>(() => later);
+        return { later, collection, walk: resourceLister<tLibrarySongsResponse>("listSongs", collection), one: resourceGetter<tSongsResponse>("getSong", collection) };
+      };
+
+      test("a function that walks pages asks for nothing as it is called: not Apple, and not the path either", async () => {
+        const { later, collection, walk } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, calls } = apple();
+        walk.bound(music)();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect([collection.mock.calls.length, later.mock.calls.length, calls.length]).toEqual([1, 0, 0]);
+      });
+
+      test("each loop asks for the path as it starts, and then for the pages", async () => {
+        const { later, walk } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, sent } = apple();
+        const songs = walk.bound(music)();
+        await all(songs);
+        await all(songs);
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs", "GET /v1/catalog/gb/songs"]);
+      });
+
+      test("a path that could not be had fails that loop and no other: the next loop asks again", async () => {
+        const down = new Error("the storefront could not be had");
+        let asked = 0;
+        const { walk } = asking(() => (++asked === 1 ? Promise.reject(down) : "v1/catalog/gb/songs"));
+        const { music, sent } = apple([{ body: { data: [song("1")] } }]);
+        const songs = walk.bound(music)();
+        expect(await rejection(all(songs))).toBe(down);
+        expect(await all(songs)).toEqual([song("1")]);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs"]);
+      });
+
+      test("what the call was handed is still checked as it is called, before the path is asked for", () => {
+        const { later, walk } = asking(() => "v1/catalog/gb/songs");
+        const { music } = apple();
+        expect(() => walk.bound(music)({ limit: 0 })).toThrow(new TypeError("listSongs: limit must be a whole number above 0; got 0"));
+        expect(later).not.toHaveBeenCalled();
+      });
+
+      test("the path is checked when it comes, as any collection's is", async () => {
+        const { walk, one } = asking(() => "v1/catalog/../me/library/songs");
+        const { music, calls } = apple();
+        expect((await rejection(all(walk.bound(music)()))).message).toContain("listSongs: the path of the collection holds a segment that is");
+        expect((await rejection(one(music, "1"))).message).toContain("getSong: the path of the collection holds a segment that is");
+        expect(calls).toHaveLength(0);
+      });
+
+      test("a function that asks for one thing asks for the path at once, since its request is about to be made", async () => {
+        const { later, one } = asking(() => Promise.resolve("v1/catalog/gb/songs"));
+        const { music, sent } = apple([{ body: { data: [song("1")] } }, { body: { data: [song("1")] } }]);
+        await one(music, "1");
+        await one.bound(music)("1");
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/catalog/gb/songs/1", "GET /v1/catalog/gb/songs/1"]);
+      });
+
+      test("a plan written by hand can leave its own rest for later in the same way", async () => {
+        const later = vi.fn((): tRequestPlan<tLibrarySongsResponse> => ["v1/me/library/songs"]);
+        const walk = endpoint("listSongs", "pages", (_client, options?: { limit?: number }) => {
+          if (options?.limit === 0) throw new TypeError("listSongs: limit must be a whole number above 0; got 0");
+          return later;
+        });
+        const { music, sent } = apple([], { userToken: "user" });
+        expect(() => walk.bound(music)({ limit: 0 })).toThrow(TypeError);
+        const songs = walk.bound(music)();
+        expect(later).not.toHaveBeenCalled();
+        await all(songs);
+        await walk(music);
+        expect(later).toHaveBeenCalledTimes(2);
+        expect(sent()).toEqual(["GET /v1/me/library/songs", "GET /v1/me/library/songs"]);
+      });
+    });
+
+    describe("where the collection gives a promise of its path, which is on its way from then on", () => {
       /** What rejected with nobody listening while `run` ran and for a turn after, with the test runner's own listeners set aside. */
       async function unheard(run: () => unknown): Promise<unknown[]> {
         const kept = process.listeners("unhandledRejection");
@@ -670,6 +821,66 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
       const { music, calls } = apple(pages(), { userToken: "user" });
       for await (const item of listLibrarySongs.bound(music)()) if ((item as unknown) === 1) break;
       expect(calls).toHaveLength(1);
+    });
+
+    describe("maxPages: how many pages a walk may ask for", () => {
+      /** Apple, answering every request with one item and a link to the next, without end. */
+      const endless = () => Array.from({ length: 30 }, (_, index) => ({ body: { data: [index], next: `/v1/me/library/songs?offset=${String(index + 1)}` } }));
+
+      test.each([1, 3])("with a limit of %i, a whole collection is walked that far and no further", async (maxPages) => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        expect(await all(listLibrarySongs.bound(music)({ maxPages }))).toHaveLength(maxPages);
+        expect(calls).toHaveLength(maxPages);
+      });
+
+      test("a relationship's walk is held to its limit in the same way", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        expect(await all(getAlbumRelationship.bound(music)("1", "tracks", { maxPages: 2 }))).toHaveLength(2);
+        expect(calls).toHaveLength(2);
+      });
+
+      test("pages that hold nothing and each name a next are asked for only as far as the limit, where leaving the loop could not stop them", async () => {
+        const empty = Array.from({ length: 30 }, (_, index) => ({ body: { data: [], next: `/v1/me/library/songs?offset=${String(index + 1)}` } }));
+        const { music, calls } = apple(empty, { userToken: "user" });
+        expect(await all(listLibrarySongs.bound(music)({ maxPages: 4 }))).toEqual([]);
+        expect(calls).toHaveLength(4);
+      });
+
+      test("the check can tell: with no limit, the same walk goes on for as long as it is looped over", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        const seen: unknown[] = [];
+        for await (const item of listLibrarySongs.bound(music)()) if (seen.push(item) === 12) break;
+        expect(calls).toHaveLength(12);
+      });
+
+      test("the limit is not sent to Apple, and the other options still are", async () => {
+        const { music, sent } = apple([{ body: { data: [] } }], { userToken: "user" });
+        await all(listLibrarySongs.bound(music)({ limit: 5, maxPages: 2 }));
+        expect(sent()).toEqual(["GET /v1/me/library/songs?limit=5"]);
+      });
+
+      test("a limit that is no limit is a TypeError naming the function, thrown as it is called", () => {
+        const { music, calls } = apple();
+        expect(() => listLibrarySongs.bound(music)({ maxPages: 0 })).toThrow(new TypeError("listLibrarySongs: maxPages must be a whole number above 0; got 0"));
+        expect(() => getAlbumRelationship.bound(music)("1", "tracks", { maxPages: 1.5 })).toThrow(new TypeError("getAlbumRelationship: maxPages must be a whole number above 0; got 1.5"));
+        expect(calls).toHaveLength(0);
+      });
+
+      test("called with a client, a function asks for its one page whatever the limit says, and still checks it", async () => {
+        const { music, calls } = apple(endless(), { userToken: "user" });
+        await listLibrarySongs(music, { maxPages: 3 });
+        expect(calls).toHaveLength(1);
+        expect(await rejection(listLibrarySongs(music, { maxPages: 0 }))).toEqual(new TypeError("listLibrarySongs: maxPages must be a whole number above 0; got 0"));
+      });
+
+      test("the types: a function that walks takes a limit, and one that asks for one thing does not", () => {
+        expectTypeOf(listLibrarySongs).parameter(1).toExtend<{ readonly maxPages?: number | undefined } | undefined>();
+        const wrong = [
+          // @ts-expect-error -- one song is one request: there is no walk to hold
+          () => getSong(apple().music, "1", { maxPages: 2 }),
+        ];
+        expect(wrong).toHaveLength(1);
+      });
     });
 
     test("the signal aborts the walk between pages", async () => {
@@ -755,7 +966,7 @@ describe("the resource patterns: what each asks Apple for", () => {
   });
 
   test("an option is sent only by a function declared to take it", async () => {
-    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", { views: true });
+    const getArtist = resourceGetter<tSongsResponse, tNone, { readonly views?: readonly string[] | undefined }>("getArtist", () => "v1/catalog/us/artists", { views: "list" });
     const { music, sent } = apple();
     await getArtist(music, "1", { views: ["top-songs", "singles"] });
     await getSong(music, "1", { views: ["top-songs"] } as tReadOptions<tSongsResponse>);
@@ -766,9 +977,9 @@ describe("the resource patterns: what each asks Apple for", () => {
     interface tViews {
       readonly views?: readonly string[] | undefined;
     }
-    const one = resourceGetter<tSongsResponse, tNone, tViews>("getArtist", () => "v1/catalog/us/artists", { views: true });
-    const several = resourcesGetter<tSongsResponse, tNone, tViews>("getArtists", () => "v1/catalog/us/artists", { views: true });
-    const whole = resourceLister<tSongsResponse, tNone, tViews>("listArtists", () => "v1/catalog/us/artists", { views: true });
+    const one = resourceGetter<tSongsResponse, tNone, tViews>("getArtist", () => "v1/catalog/us/artists", { views: "list" });
+    const several = resourcesGetter<tSongsResponse, tNone, tViews>("getArtists", () => "v1/catalog/us/artists", { views: "list" });
+    const whole = resourceLister<tSongsResponse, tNone, tViews>("listArtists", () => "v1/catalog/us/artists", { views: "list" });
     const { music, sent } = apple();
     await one(music, "1", { views: ["top-songs"] });
     await several(music, ["1"], { views: ["top-songs"] });
@@ -795,6 +1006,94 @@ describe("the resource patterns: what each asks Apple for", () => {
     const { music, sent } = apple([{ body: { data: [song("1")], next: "/v1/catalog/us/albums/9/tracks?offset=1" } }, { body: { data: [song("2")] } }]);
     expect(await all(getAlbumRelationship.bound(music)("9", "tracks", { limit: 1 }))).toEqual([song("1"), song("2")]);
     expect(sent()).toEqual(["GET /v1/catalog/us/albums/9/tracks?limit=1", "GET /v1/catalog/us/albums/9/tracks?offset=1"]);
+  });
+});
+
+describe("resourcesFinder: the resources a filter picks out of a collection", () => {
+  interface tRestrict {
+    readonly restrict?: readonly "explicit"[] | undefined;
+  }
+  const getSongsByIsrc = resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", () => SONGS);
+
+  test("it asks the collection for the values under the filter's name, with the options beside them", async () => {
+    const { music, sent } = apple();
+    await getSongsByIsrc(music, ["USUM71900001", "GBUM71900002"], { include: ["albums"], language: "en-GB" });
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?l=en-GB&include=albums&filter[isrc]=USUM71900001,GBUM71900002"]);
+  });
+
+  test("called with a client it resolves to Apple's answer, and bound to the list the answer holds", async () => {
+    const answer = { data: [song("1"), song("2")] };
+    const { music } = apple([{ body: answer }, { body: answer }]);
+    expect(await getSongsByIsrc(music, ["USUM71900001"])).toEqual(answer);
+    expect(await getSongsByIsrc.bound(music)(["USUM71900001"])).toEqual(answer.data);
+    expectTypeOf(getSongsByIsrc).parameters.toEqualTypeOf<[client: tAppleMusicClient, values: readonly string[], options?: tEndpointOptions<tSongsResponse>]>();
+    expectTypeOf(getSongsByIsrc.bound(music)).returns.resolves.toEqualTypeOf<tSong[]>();
+  });
+
+  test("the values it is handed win over the same filter put among the caller's params", async () => {
+    const { music, sent } = apple();
+    await getSongsByIsrc(music, ["A"], { params: { "filter[isrc]": ["B"], "filter[upc]": ["C"] } });
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?filter[isrc]=A&filter[upc]=C"]);
+  });
+
+  test("a filter with a hyphen in its name is sent under that name, and an option the declaration adds beside it", async () => {
+    const equivalents = resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS, { restrict: "list" });
+    const chart = resourcesFinder<tSongsResponse>("getPlaylistsByStorefrontChart", "storefront-chart", () => "v1/catalog/us/playlists");
+    const { music, sent } = apple();
+    await equivalents(music, ["1"], { restrict: ["explicit"] });
+    await chart(music, ["us"]);
+    expect(sent()).toEqual(["GET /v1/catalog/us/songs?restrict=explicit&filter[equivalents]=1", "GET /v1/catalog/us/playlists?filter[storefront-chart]=us"]);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["one string, not a list", "USUM71900001", "12 characters"],
+    ["an empty list", [], "a list of 0"],
+    ["a list holding two in one", ["A,B"], "3 characters at index 0"],
+    ["missing", undefined, "undefined"],
+  ])("values that are %s are a TypeError naming the function and the argument as its signature names it, before the collection or Apple is asked", async (_name, values, what) => {
+    const { music, calls } = apple();
+    const collection = vi.fn<tCollection>(() => SONGS);
+    const error = await rejection(resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection)(music, values as string[]));
+    expect(error).toEqual(new TypeError(`getSongsByIsrc: values must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ${what}`));
+    expect([collection.mock.calls.length, calls.length]).toEqual([0, 0]);
+  });
+
+  test("the argument has one name: the signature's, which is the one a mistake in it is told by", () => {
+    expectTypeOf(getSongsByIsrc).parameters.toEqualTypeOf<[client: tAppleMusicClient, values: readonly string[], options?: tEndpointOptions<tSongsResponse>]>();
+  });
+
+  test.each<[string, unknown, string]>([
+    ["missing", undefined, "undefined"],
+    ["empty", "", "0 characters"],
+    ["written with its brackets", "filter[isrc]", "12 characters"],
+    ["one that would close the brackets and add a parameter", "isrc]&ids[", "10 characters"],
+    ["in capitals", "ISRC", "4 characters"],
+    ["a list", ["isrc"], "object"],
+    ["one that begins with a hyphen", "-isrc", "5 characters"],
+    ["one that ends with a hyphen", "isrc-", "5 characters"],
+    ["one with two hyphens together", "storefront--chart", "17 characters"],
+    ["one with a digit in it", "isrc2", "5 characters"],
+    ["one character longer than a name may be", "a".repeat(65), "65 characters"],
+  ])("a filter's name that is %s is a TypeError naming resourcesFinder, as the declaration is made", (_name, filter, what) => {
+    expect(() => resourcesFinder<tSongsResponse>("getSongsByIsrc", filter as string, () => SONGS)).toThrow(
+      new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between and at most 64 characters, such as "isrc"; got ${what}`),
+    );
+  });
+
+  test("a filter's name of 64 characters is taken, as a type's name of that length is", async () => {
+    const { music, sent } = apple();
+    await resourcesFinder<tSongsResponse>("find", "a".repeat(64), () => SONGS)(music, ["1"]);
+    expect(sent()).toEqual([`GET /v1/catalog/us/songs?filter[${"a".repeat(64)}]=1`]);
+  });
+
+  test("the types: it has to say what its answer is, and to name every option it adds", () => {
+    const declarations = [
+      // @ts-expect-error -- the answer's type is not said, so there is nothing a collection can be
+      () => resourcesFinder("getSongsByIsrc", "isrc", () => SONGS),
+      // @ts-expect-error -- an option is added and not named
+      () => resourcesFinder<tSongsResponse, tNone, tRestrict>("getSongsByEquivalents", "equivalents", () => SONGS),
+    ];
+    expect(declarations).toHaveLength(2);
   });
 });
 
@@ -843,6 +1142,138 @@ describe("the resource patterns: where the collection is", () => {
     });
     expect(await rejection(fn(music, "1"))).toBe(mistake);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("inStorefront: the storefront a call is for, as one segment of a path", () => {
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
+  const path = (storefront: string) => `v1/catalog/${storefront}/songs`;
+
+  test("named by the call, it is there at once, and the client is not asked", () => {
+    const { music } = apple([], { storefront: "us" });
+    const storefront = vi.spyOn(music, "storefront");
+    expect(inStorefront("getSong", music, "gb", path)).toBe("v1/catalog/gb/songs");
+    expect(storefront).not.toHaveBeenCalled();
+  });
+
+  test("not named, it is left for later: the client is asked when what it gives is called, and not before", async () => {
+    const { music } = apple([], { storefront: "us" });
+    const storefront = vi.spyOn(music, "storefront");
+    const later = inStorefront("getSong", music, undefined, path);
+    expect(later).toBeTypeOf("function");
+    expect(storefront).not.toHaveBeenCalled();
+    expect(await (later as () => Promise<string>)()).toBe("v1/catalog/us/songs");
+    expect(storefront).toHaveBeenCalledTimes(1);
+  });
+
+  test("it is encoded as a segment is, so one that is only odd stays where it was put", () => {
+    expect(inStorefront("getSong", apple().music, "u s?x", path)).toBe("v1/catalog/u%20s%3Fx/songs");
+  });
+
+  test.each<[string, unknown, string]>([
+    ["empty", "", "0 characters"],
+    ["two dots", "..", "2 characters"],
+    ["one that would leave the catalog", "../me/library", "13 characters"],
+    ["a number", 5, "5"],
+    ["null", null, "null"],
+  ])("a storefront the call names that is %s is a TypeError naming the function and the option, thrown there and then", (_name, storefront, what) => {
+    expect(() => inStorefront("getSong", apple().music, storefront, path)).toThrow(new TypeError(`getSong: storefront ${SEGMENT}${what}`));
+  });
+
+  test("the client's own storefront is held to the same, when it comes", async () => {
+    const later = inStorefront("getSong", apple([], { storefront: "../me/library" }).music, undefined, path) as () => Promise<string>;
+    expect(await rejection(later())).toEqual(new TypeError(`getSong: storefront ${SEGMENT}13 characters`));
+  });
+
+  test("a client that answers with its storefront itself, and not a promise of it, is asked the same", async () => {
+    const wrapped = { storefront: () => "gb" } as unknown as tAppleMusicClient;
+    expect(await (inStorefront("getSong", wrapped, undefined, path) as () => Promise<string>)()).toBe("v1/catalog/gb/songs");
+  });
+});
+
+describe("the resource patterns: a collection says whether what is asked of it carries the Music User Token", () => {
+  /** A collection at a path, with its say on the listener's token, or with none. */
+  const at = (path: string, user?: unknown): tCollection => Object.assign(() => path, user === undefined ? {} : { user }) as tCollection;
+  /** A call of every pattern over one collection, with a client and bound: seven requests when no page names a next. */
+  const every = (collection: tCollection) => {
+    const one = resourceGetter<tSongsResponse>("getSong", collection);
+    const several = resourcesGetter<tSongsResponse>("getSongs", collection);
+    const found = resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection);
+    const whole = resourceLister<tSongsResponse>("listSongs", collection);
+    const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
+    return async (music: tAppleMusicClient) => {
+      await one(music, "1");
+      await several(music, ["1"]);
+      await found(music, ["A"]);
+      await whole(music);
+      await related(music, "1", "tracks");
+      await all(whole.bound(music)());
+      await all(related.bound(music)("1", "tracks"));
+    };
+  };
+  const seven = (token: string | null) => Array.from({ length: 7 }, () => token);
+
+  test("false: nothing asked of it carries the token, though the client holds one and the path is the listener's", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/me/library/songs", false))(music);
+    expect(userTokens()).toEqual(seven(null));
+  });
+
+  test("false holds for every page of a walk, wherever a next link points", async () => {
+    const page = { body: { data: [song("1")], next: "/v1/me/library/songs?offset=1" } };
+    const { music, sent, userTokens } = apple([page, { body: { data: [song("2")] } }, page, { body: { data: [song("2")] } }], { userToken: "listener" });
+    const collection = at("v1/catalog/us/genres", false);
+    expect(await all(resourceLister<tSongsResponse>("listGenres", collection).bound(music)())).toEqual([song("1"), song("2")]);
+    expect(await all(relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection).bound(music)("1", "tracks"))).toEqual([song("1"), song("2")]);
+    expect(sent()).toEqual(["GET /v1/catalog/us/genres", "GET /v1/me/library/songs?offset=1", "GET /v1/catalog/us/genres/1/tracks", "GET /v1/me/library/songs?offset=1"]);
+    expect(userTokens()).toEqual([null, null, null, null]);
+  });
+
+  test("the check can tell: with no say from the collection, the same walk does carry the token to where that link points", async () => {
+    const { music, userTokens } = apple([{ body: { data: [song("1")], next: "/v1/me/library/songs?offset=1" } }, { body: { data: [] } }], { userToken: "listener" });
+    await all(resourceLister<tSongsResponse>("listGenres", at("v1/catalog/us/genres")).bound(music)());
+    expect(userTokens()).toEqual([null, "listener"]);
+  });
+
+  test("true: everything asked of it carries the token, though the path is the catalog's", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/catalog/us/stations", true))(music);
+    expect(userTokens()).toEqual(seven("listener"));
+  });
+
+  test("left out: the client goes by the path, and sends the token under /v1/me alone", async () => {
+    const { music, userTokens } = apple([], { userToken: "listener" });
+    await every(at("v1/catalog/us/songs"))(music);
+    await every(at("v1/me/library/songs"))(music);
+    expect(userTokens()).toEqual([...seven(null), ...seven("listener")]);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["a string", "no", "2 characters"],
+    ["a number", 0, "0"],
+    ["null", null, "null"],
+  ])("a say that is %s is a TypeError naming the builder, as the declaration is made", (_name, user, what) => {
+    const builders: [string, (collection: tCollection) => unknown][] = [
+      ["resourceGetter", (collection) => resourceGetter<tSongsResponse>("getSong", collection)],
+      ["resourcesGetter", (collection) => resourcesGetter<tSongsResponse>("getSongs", collection)],
+      ["resourcesFinder", (collection) => resourcesFinder<tSongsResponse>("getSongsByIsrc", "isrc", collection)],
+      ["resourceLister", (collection) => resourceLister<tSongsResponse>("listSongs", collection)],
+      ["relationshipGetter", (collection) => relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection)],
+    ];
+    for (const [builder, declare] of builders) {
+      expect(() => declare(at(SONGS, user))).toThrow(new TypeError(`${builder}: collection.user must be true or false where it is given; got ${what}`));
+    }
+  });
+
+  test("the say is the collection's own: a user put on Object.prototype by other code is not it", async () => {
+    Object.assign(Object.prototype, { user: true });
+    try {
+      const { music, userTokens } = apple([], { userToken: "listener" });
+      await every(at("v1/catalog/us/songs"))(music);
+      expect(userTokens()).toEqual(seven(null));
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "user");
+    }
   });
 });
 
@@ -955,7 +1386,7 @@ describe("the resource patterns: what a collection gives is checked, so that wha
 
   test("the check that says so can catch it: the same storefront put into a path with no check does reach the listener's library, token and all", async () => {
     const { music, sent, userTokens } = apple([], { userToken: "user" });
-    await music.request(await catalog("getSong", music, { storefront: "../me/library" }));
+    await music.request((await catalog("getSong", music, { storefront: "../me/library" })) as string);
     expect(sent()).toEqual(["GET /v1/me/library/songs"]);
     expect(userTokens()).toEqual(["user"]);
   });
@@ -975,7 +1406,7 @@ describe("the resource patterns: what a function is handed is checked before any
   const several = resourcesGetter<tSongsResponse>("getSongs", collection);
   const whole = resourceLister<tLibrarySongsResponse>("listLibrarySongs", collection);
   const related = relationshipGetter<tAlbumRelationships>("getAlbumRelationship", collection);
-  const SEGMENT = 'must be a string of 1 to 64 characters, and not "." or ".."; got ';
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
   const LIST = "must be a list of 1 to 300 strings, each of 1 to 64 characters with no comma in it; got ";
 
   test.each<[string, (music: tAppleMusicClient) => Promise<unknown>, string]>([
@@ -1049,7 +1480,21 @@ describe("the resource patterns: what a function is handed is checked before any
 });
 
 describe("the resource patterns: a value in a path cannot move the request to another endpoint", () => {
-  const hostile = ["../../../me/library/songs", "..\\..\\..\\me\\library\\songs", "%2e%2e/%2e%2e/%2e%2e/me/library/songs", "/v1/me/library/songs", "1/../../../../me/storefront", "1?include=library", "1#x"];
+  /** What a URL, or a server that decodes a path before it reads it, would take for a way out of the segment. */
+  const leaving = ["../../../me/library/songs", "..\\..\\..\\me\\library\\songs", "%2e%2e/%2e%2e/%2e%2e/me/library/songs", "..%2F..%2F..%2Fme", "/v1/me/library/songs", "1/../../../../me/storefront", "1\n2"];
+  /** What means something elsewhere in a URL, and nothing in a path once it is encoded. */
+  const hostile = ["1?include=library", "1#x", "1 2", "1&ids=2"];
+  const SEGMENT = 'must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got ';
+
+  test.each(leaving)("an id or a relationship name of %j is refused by every function, and Apple is not asked", async (value) => {
+    const { music, calls } = apple([], { userToken: "user" });
+    const what = `${String(value.length)} characters`;
+    expect(await rejection(getSong(music, value))).toEqual(new TypeError(`getSong: id ${SEGMENT}${what}`));
+    expect(await rejection(getAlbumRelationship(music, value, "tracks"))).toEqual(new TypeError(`getAlbumRelationship: id ${SEGMENT}${what}`));
+    expect(await rejection(getAlbumRelationship(music, "1", value as "tracks"))).toEqual(new TypeError(`getAlbumRelationship: name ${SEGMENT}${what}`));
+    expect(() => getAlbumRelationship.bound(music)("1", value as "tracks")).toThrow(TypeError);
+    expect(calls).toHaveLength(0);
+  });
 
   test.each(hostile)("an id of %j stays the one segment after the collection, and a listener's token is not sent with it", async (id) => {
     const { music, calls, userTokens } = apple([], { userToken: "user" });
@@ -1076,6 +1521,69 @@ describe("the resource patterns: a value in a path cannot move the request to an
     await music.request(`${SONGS}/../../../me/library/songs`);
     expect(sent()).toEqual(["GET /v1/me/library/songs"]);
     expect(userTokens()).toEqual(["user"]);
+  });
+});
+
+describe("what a plan gives is read as what it holds itself, never as what is found on Object.prototype", () => {
+  /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
+  async function polluted<T>(planted: Record<string, unknown>, run: () => Promise<T>): Promise<T> {
+    Object.assign(Object.prototype, planted);
+    try {
+      return await run();
+    } finally {
+      for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
+    }
+  }
+  const addToLibrary = endpoint("addToLibrary", "answer", (): tRequestPlan<unknown> => ["v1/me/library", { method: "POST", params: { "ids[songs]": ["1"] } }]);
+
+  test("an onResponse there that is no function does not turn a request that was answered into a failure", async () => {
+    const { music, sent } = apple([{ status: 202 }, { body: { data: [song("1")] } }, { body: { data: [song("1")] } }], { userToken: "user" });
+    const answers = await polluted({ onResponse: "planted" }, async () => [await addToLibrary(music), await getSong(music, "1"), await getSong.bound(music)("1")]);
+    expect(answers).toEqual([undefined, { data: [song("1")] }, song("1")]);
+    expect(sent()).toEqual(["POST /v1/me/library?ids[songs]=1", "GET /v1/catalog/us/songs/1", "GET /v1/catalog/us/songs/1"]);
+  });
+
+  test("an onResponse there that is a function is not the plan's hook, and is handed no request", async () => {
+    const planted = vi.fn();
+    const { music } = apple([{ status: 202 }, { body: { data: [song("1")] } }], { userToken: "user" });
+    await polluted({ onResponse: planted }, async () => [await addToLibrary(music), await getSong.bound(music)("1")]);
+    expect(planted).not.toHaveBeenCalled();
+  });
+
+  test("the check can tell: a hook the plan gives itself is called, once for each response", async () => {
+    const own = vi.fn();
+    const hooked = endpoint("getSong", "resource", (): tRequestPlan<tSongsResponse> => [`${SONGS}/1`, { onResponse: own }]);
+    const { music } = apple([{ body: { data: [song("1")] } }]);
+    await hooked.bound(music)();
+    expect(own).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("endpointNamespace: a name looked up in a namespace is one of its functions, or is not there", () => {
+  const namespace = () => endpointNamespace("catalog", apple().music, declared) as unknown as Record<string, unknown>;
+
+  test.each(["constructor", "toString", "hasOwnProperty", "valueOf", "__proto__", "isPrototypeOf"])("%s, which every ordinary object has, is not in it", (name) => {
+    expect(namespace()[name]).toBeUndefined();
+    expect(name in namespace()).toBe(false);
+  });
+
+  test("it inherits from nothing, so nothing put on Object.prototype by other code is found there either", () => {
+    Object.assign(Object.prototype, { getEverything: () => "planted" });
+    try {
+      expect(Object.getPrototypeOf(namespace())).toBeNull();
+      expect(namespace().getEverything).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "getEverything");
+    }
+  });
+
+  test("the check can tell: an ordinary object does answer to those names", () => {
+    expect(typeof ({} as Record<string, unknown>).constructor).toBe("function");
+  });
+
+  test("what it does hold is all there, and is still frozen", () => {
+    expect(Object.keys(namespace()).sort()).toEqual(Object.keys(declared).sort());
+    expect(Object.isFrozen(namespace())).toBe(true);
   });
 });
 
@@ -1146,7 +1654,9 @@ describe("endpointNamespace", () => {
     endpoints.__proto__ = getSong;
     const catalog = endpointNamespace("catalog", apple().music, endpoints);
     expect(Object.keys(catalog)).toEqual(["__proto__"]);
-    expect(Object.getPrototypeOf(catalog)).toBe(Object.prototype);
+    // One more name the namespace holds itself: it has not become what the namespace inherits from, which is nothing.
+    expect(Object.getPrototypeOf(catalog)).toBeNull();
+    expect(typeof Object.getOwnPropertyDescriptor(catalog, "__proto__")?.value).toBe("function");
   });
 
   test.each<[string, unknown, string]>([

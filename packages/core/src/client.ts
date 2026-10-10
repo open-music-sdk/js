@@ -126,6 +126,13 @@ export interface tAppleMusicClient {
 type tSettled<T> = tResponseOutcome & ({ readonly value: T; readonly error: undefined } | { readonly error: AppleMusicError; readonly value?: undefined });
 
 /**
+ * What an object holds under `data` and `next` itself. A page is read as its own properties and nothing it
+ * inherits, so a `next` that other code has put on Object.prototype is not a link every page has: it would
+ * otherwise send a walk somewhere no answer named, and keep it going without end.
+ */
+const held = (page: object): { readonly data?: unknown; readonly next?: unknown } => ownOf(page);
+
+/**
  * A page is an object whose `data`, if any, is an array and whose `next`, if any, is a string. An empty body is a
  * last, empty page. `status` is that of the answer the page came in, for the error that says it was no page.
  */
@@ -133,10 +140,16 @@ export function pageOf(page: unknown, path: string, status: number | undefined):
   if (page === undefined) return { data: [], next: undefined };
   const shape = (what: string) => new AppleMusicError("ApiError", `${path}: ${what}`, { status });
   if (typeof page !== "object" || page === null || Array.isArray(page)) throw shape("expected a page object");
-  const { data, next } = page as { data?: unknown; next?: unknown };
+  const { data, next } = held(page);
   if (data != null && !Array.isArray(data)) throw shape("data is not an array");
   if (next != null && typeof next !== "string") throw shape("next is not a string");
   return { data: (data as readonly unknown[] | null | undefined) ?? [], next: next ?? undefined };
+}
+
+/** The next link of a body as Apple sent it: its `next`, when that is a string, and nothing otherwise. */
+function linkOf(body: unknown): string | undefined {
+  const next: unknown = typeof body === "object" && body !== null ? held(body).next : undefined;
+  return typeof next === "string" ? next : undefined;
 }
 
 /**
@@ -146,9 +159,17 @@ export function pageOf(page: unknown, path: string, status: number | undefined):
  */
 function isPage(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const { data, next } = value as { data?: unknown; next?: unknown };
+  const { data, next } = held(value);
   return (data == null || Array.isArray(data)) && (next == null || typeof next === "string") && (data != null || next != null);
 }
+
+/**
+ * Whether an error says the request was not carried out: Apple turned it away for coming too fast, or there was no
+ * developer token to send it with. A POST makes something each time it is carried out, a playlist or a track added
+ * to one, and a failure of any other kind leaves open whether it was: the connection may have dropped after Apple
+ * acted. So a POST is sent again only after one of these, and never on the chance that the first did nothing.
+ */
+const unsent = (error: AppleMusicError): boolean => error._tag === "RateLimited" || error._tag === "DeveloperTokenUnavailable";
 
 const toProvider = (token: string | tTokenProvider): tTokenProvider => (typeof token === "string" ? () => token : token);
 const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
@@ -233,7 +254,7 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
         if (outcome.error) throw outcome.error;
         return outcome.value;
       },
-      policy,
+      init.method === "POST" ? { ...policy, retryOn: (error) => unsent(error) && policy.retryOn(error) } : policy,
       signal,
     );
   }
@@ -298,17 +319,30 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       if (typeof (from as { then?: unknown } | null | undefined)?.then === "function") throw new TypeError("paginate: expected a path or a page; got a promise of one, which has to be awaited first");
       // Nothing at all is what an empty answer comes to, and is a last, empty page. Anything else has to be a page,
       // and one that is not is the caller's mistake: nothing was asked for, so it is no answer of Apple's.
-      if ((from as unknown) !== undefined && !isPage(from)) throw new TypeError(`paginate: expected a path or a page, which is an object with a data list, a next link or both; got ${got(from)}`);
-      const first = ((from as unknown) ?? {}) as { readonly data?: readonly T[] | null; readonly next?: string | null };
+      const given: unknown = from;
+      if (given !== undefined && !isPage(given)) throw new TypeError(`paginate: expected a path or a page, which is an object with a data list, a next link or both; got ${got(given)}`);
+      const first = (given === undefined ? {} : held(from)) as { readonly data?: readonly T[] | null; readonly next?: string | null };
       // The walk's own copy, so that it goes over the page as it was handed, whatever is done to the page meanwhile.
       yield* (first.data ?? []).slice();
       next = first.next ?? undefined;
       params = undefined;
     }
     for (let asked = 0; next !== undefined && asked < (maxPages ?? Infinity); asked++) {
-      const page = pageOf(await request<unknown>(next, { ...each, params }), next, 200);
+      // What Apple sent is kept beside what a schema made of it. The items are the schema's to shape, and where the
+      // next page is, is Apple's to say: a schema that hands back only the fields it knows would otherwise end the
+      // walk at its first page, without a word.
+      let sent: unknown;
+      const answered = await request<unknown>(next, {
+        ...each,
+        params,
+        onResponse: (res, req, outcome) => {
+          sent = outcome.body;
+          each.onResponse?.(res, req, outcome);
+        },
+      });
+      const page = pageOf(answered, next, 200);
       yield* page.data as readonly T[];
-      next = page.next;
+      next = linkOf(sent);
       params = undefined; // a next link already carries the query
     }
   }

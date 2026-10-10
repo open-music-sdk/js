@@ -45,12 +45,20 @@ try {
 | `has(value, methods)`, `optionsOf(fn, options, what)`, `clientOf(fn, client, methods)` | The checks a package makes on what it is handed: an object with those methods, an options bag, a client. A mistake is a `TypeError` naming `fn` |
 | `segmentOf(fn, name, value)` | A caller's value as one segment of a path, percent-encoded, or a `TypeError` |
 | `listOf(fn, name, value)` | A caller's list of ids, types or codes as the call's own copy, or a `TypeError` |
+| `textOf(fn, name, value)` | A caller's text that is no name, such as a search term, or a `TypeError` |
+| `isName(value)`, `isPlain(value)`, `itemsOf(value, least, most)`, `ownOf(object)` | What the checks are made of, for a package that has one of its own to make: a string of 1 to 64 characters; a plain object; a caller's list as the call's own copy; what an object holds itself |
+| `inStorefront(fn, client, storefront, finish)`, `tStorefrontOption`, `tViewsOption` | The storefront a call is for, as one segment of a path, and the options both clients share |
+| `typedIdsOf(fn, name, value)` | A caller's ids by type, such as `{ songs: ["1"] }`, as the parameters they are sent as, or a `TypeError` |
 | `initOf(fn, options, set?, also?)`, `tReadOptions` | The options every function for an endpoint takes, turned into what `request` takes |
-| `endpoint`, `resourceGetter`, `resourcesGetter`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
+| `walkOf(fn, options, set?, also?)`, `tWalkOptions` | The same for a function that walks pages, with the most pages its walk may ask for |
+| `endpoint`, `resourceGetter`, `resourcesGetter`, `resourcesFinder`, `resourceLister`, `relationshipGetter` | Declare a function for one endpoint |
 | `endpointNamespace(fn, client, endpoints)` | Every such function bound to one client, its answers unwrapped |
 
-The rows from `segmentOf` down are for packages that put names to endpoints, as the client packages
-do; see [Declaring endpoints](#declaring-endpoints). An app has no need of them.
+The rows from `segmentOf` down are for packages that put names to endpoints; see
+[Declaring endpoints](#declaring-endpoints). An app has no need of them: the two that are made with
+them, [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
+[`@open-music-sdk/client-user`](../../clients/client-user), have a function for every endpoint, so
+that `request` is for the rare path neither names.
 
 `isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
 with a string `_tag`, not by constructor. An error is recognised whichever copy of this package made
@@ -80,8 +88,16 @@ it, so two versions installed side by side do not break your error handling.
 The default policy makes two attempts with a 250 ms base delay and a 4 s cap, and waits for a
 `Retry-After` of up to 60 s (`maxRetryAfterMs`); a longer one is not waited for, the `RateLimited`
 error reaches you at once with `retryAfterMs` attached. Pass `retry: false` to make one attempt, or
-a `tRetryPolicy` to tune it. Rate limiting is opt-in: Apple publishes no numbers, so
-create a limiter with yours and share one instance across every client on the same developer token.
+a `tRetryPolicy` to tune it.
+
+A `POST` is held back further, whatever the policy. It makes something each time it is carried out, a
+playlist or a track added to one, and a 5xx or a lost connection leaves open whether Apple carried it
+out. So a `POST` is sent again only after a 429, or when there was no developer token to send it with:
+the two failures that say it was not. After any other, the error reaches you, and whether to try again
+is yours to decide.
+
+Rate limiting is opt-in: Apple publishes no numbers, so create a limiter with yours and share one
+instance across every client on the same developer token.
 
 ## Pages
 
@@ -99,6 +115,10 @@ if (tracks) for await (const track of music.paginate(tracks)) { /* that page's t
 A page's own items come first, as they were when the walk reached the page, and Apple is not asked
 until they run out. With a page, `init.params` is not sent, since its `next` link already carries the
 query; `schema` and `signal` apply to the pages that are fetched.
+
+Each page's items are what a `schema` made of them, and its `next` link is the one Apple sent. So a
+schema that hands back only the fields it knows, as some libraries' do, does not end a walk at its
+first page.
 
 A page is an object with a `data` list, a `next` link or both. Anything else handed over is a
 `TypeError` and nothing is asked for: a `URL`, a `Response`, a resource, or a whole search answer, none
@@ -182,18 +202,22 @@ client and hands over what the answer holds:
 | --- | --- | --- |
 | `resourceGetter<R, C, E>(fn, collection, also?)` | `GET {collection}/{id}` | The resource. A success that holds none is an `ApiError` with the status it came with, not `undefined`. |
 | `resourcesGetter<R, C, E>(fn, collection, also?)` | `GET {collection}?ids=` | The list of them as Apple sent it, empty when Apple sent none |
+| `resourcesFinder<R, C, E>(fn, filter, collection, also?)` | `GET {collection}?filter[{filter}]=` | The list, likewise. `filter` is the filter's name, such as `isrc`: lowercase words with hyphens between, in at most 64 characters. The function takes the values to look for, as `values`. |
 | `resourceLister<R, C, E>(fn, collection, also?)` | `GET {collection}` | Every item of every page, as an `AsyncIterable` |
 | `relationshipGetter<Rels, C>(fn, collection)` | `GET {collection}/{id}/{name}` | Every item of every page. `name` is a key of `Rels`, and decides the type of what comes back, and of a `schema` for it. |
-| `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, or the `answer` as it is |
+| `endpoint(fn, unwrap, plan)` | What `plan` returns, as `[path, init]` | By `unwrap`: the `resource`, the `resources`, all `pages`, what a write has `written`, or the `answer` as it is |
 
-`endpoint` is what the other four are made with, for anything they do not cover.
+`endpoint` is what the others are made with, for anything they do not cover. Its `written` is for a
+function that makes or changes something: bound, it gives the resource the answer holds, and
+`undefined` where a success holds none. The write happened either way, and an error there would have a
+caller do it again.
 
 ### A declaration
 
 `R` is the type of Apple's answer, and has to be said: a declaration that leaves it out does not
 compile. `C` is the options the collection reads, such as a storefront. `E` is the options the
 function adds that are sent as parameters under their own names, such as `views`, and `also` names
-every one of them:
+every one of them and says what it is, a `"list"` of names or one `"name"`:
 
 ```ts
 import { resourceGetter, segmentOf, type tCollection } from "@open-music-sdk/core";
@@ -202,24 +226,29 @@ import type { tArtistViews, tArtistsResponse } from "@open-music-sdk/types";
 interface tStorefront { readonly storefront?: string }
 interface tViews { readonly views?: readonly (keyof tArtistViews)[] }
 
-const artists: tCollection<tStorefront> = async (fn, client, options) =>
-  `v1/catalog/${segmentOf(fn, "storefront", options.storefront ?? (await client.storefront()))}/artists`;
+const artists: tCollection<tStorefront> = (fn, client, { storefront }) => {
+  const path = (id: unknown) => `v1/catalog/${segmentOf(fn, "storefront", id)}/artists`;
+  // Named by the call, the path is there at once. Otherwise the client is asked, when a request is about to be made.
+  return storefront === undefined ? () => client.storefront().then(path) : path(storefront);
+};
 
-export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: true });
+export const getArtist = resourceGetter<tArtistsResponse, tStorefront, tViews>("getArtist", artists, { views: "list" });
 
 await getArtist(music, "178834", { storefront: "gb", views: ["top-songs"] });
 ```
 
-An option of `E` that `also` leaves out, or misspells, does not compile, so an option that is typed is
-an option that is sent. A declaration is checked as it is made: a name with something in it, a
-`collection` that is a function, an `also` that is an object, one of the four `unwrap`s, a `plan` that
-is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
+An option of `E` that `also` leaves out, misspells, or calls a name where its type is a list, does not
+compile. So an option that is typed is an option that is sent, and a call is held to the type: where a
+list was declared, one string is a `TypeError`, and not a list of one. A declaration is checked as it
+is made: a name with something in it, a `collection` that is a function, an `also` that says what each
+option is, one of the five `unwrap`s, a `plan` that is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
 called. What a declaration gives is frozen.
 
 ### The collection
 
-`collection` is `(fn, client, options) => string | Promise<string>`: where the collection is for one
-call, so that a catalog can put a storefront in its path. What it gives is checked before it is asked
+`collection` is `(fn, client, options) => string`: where the collection is for one call, so that a
+catalog can put a storefront in its path. It may also give a function for the path, to be called when
+a request is about to be made, or a promise of the path. What it gives is checked before it is asked
 for, and refused with the reason:
 
 | A path that | Is refused because |
@@ -238,6 +267,16 @@ So a storefront from outside cannot move a request under `/v1/me`, where the cli
 User Token. The path is described by what is wrong with it and never shown. A collection that checks
 its own parts with `segmentOf` gets to name the option that was wrong.
 
+A collection also has the say on the Music User Token, as a `user` property of its own:
+
+```ts
+const genres: tCollection = Object.assign(() => "v1/catalog/us/genres", { user: false });
+```
+
+Left out, the client goes by the path and sends the token under `/v1/me`. `false` means nothing asked
+of the collection carries it, and that holds for every page of a walk, wherever a next link points:
+it is how a catalog says that nothing in it is the listener's. `true` sends it outside `/v1/me`.
+
 ### When a function is called
 
 Everything a function is handed is checked before Apple or `collection` is asked, in the order it was
@@ -248,24 +287,37 @@ handed over, and a mistake is a `TypeError` naming the function and the argument
 - Bound and walking pages, a function checks and takes what it is handed as it is called, and a
   mistake is thrown there. What it gives asks Apple for nothing until a loop starts, and can be looped
   again, each loop asking afresh.
-- Where the collection has to be waited for, as for a storefront no option named, it is asked as the
-  function is called. If that fails before a loop starts, the loop is where it is heard.
+- Where the collection has to ask the client for part of its path, as for a storefront no option named,
+  it gives a function for the path in place of the path. That function is called when a request is
+  about to be made: at once for a function that asks for one thing, and as each loop starts for one
+  that walks pages. So a walk nobody loops over asks for nothing, and a lookup that fails in one loop
+  is tried again by the next.
 
 A function is known by its shape, a function with a `bound` method, so a namespace binds one made by
-another copy of this package. A namespace is frozen, and its type holds what it holds.
+another copy of this package. A namespace is frozen, its type holds what it holds, and it inherits
+from nothing: a name looked up in it is one of its functions or is not there, `constructor` and
+`toString` included.
 
 ### What a function is handed
 
 | Check | Takes |
 | --- | --- |
-| `segmentOf(fn, name, value)` | A string of 1 to 64 characters, and not `.` or `..`. It comes back percent-encoded, so a slash, a question mark or a hash stays inside the segment. |
+| `segmentOf(fn, name, value)` | A string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not `.` or `..`. It comes back percent-encoded, so a question mark, a hash or a space stays inside the segment. |
 | `listOf(fn, name, value)` | A list of 1 to 300 strings, each of 1 to 64 characters with no comma in it, since a list is sent joined by commas. It is asked its length once and read by index, and comes back as a copy. |
+| `textOf(fn, name, value)` | A string of 1 to 256 characters, whatever they are: it is sent as one parameter. |
+| `inStorefront(fn, client, storefront, finish)` | A storefront as `segmentOf` takes a segment, or `undefined` for the client's. Named by the call, what `finish` makes of it is there at once. Otherwise it gives a function for that, to be called when a request is about to be made, which is when the client is asked. |
+| `typedIdsOf(fn, name, value)` | A plain object of 1 to 32 names, each the name of a type of resource: lowercase words with hyphens between, such as `library-songs`, in at most 64 characters. Under each is a list as `listOf` takes one, and the lists hold at most 300 ids between them, since together they are one URL. It comes back as the parameters to send, `ids[library-songs]`. A type whose list is undefined is left out, and one at least has to be left in. Which types there are is Apple's to say. |
 | `optionsOf(fn, options, what)` | A plain object, or nothing. It comes back as the call's own copy of what the object holds itself, inheriting nothing. A list, a `Map` or a class's instance is a `TypeError`: read as a bag of options each would be an empty one. |
 | `clientOf(fn, client, methods)` | Anything with the client methods named |
 
 `segmentOf` is what keeps a caller's id from moving a request: put into a path as it is,
 `../../../me/library/songs` after `v1/catalog/us/songs/` is a request for the listener's library, and
 under `/v1/me` the client sends the Music User Token.
+
+A slash is refused, not encoded. Encoded, it would stay in its segment as far as a URL goes, which is
+as far as this package can see: a server that decodes a path before it reads it would find the slash
+there again. No id, name or code of Apple's holds a slash, a backslash, a percent sign or a control
+character, so a value that does is a mistake, and is not sent.
 
 Sixty-four characters is longer than any id, name or code Apple gives out, and well short of a token.
 A token put where an id belongs is therefore refused before it is sent, and is not repeated in the
@@ -286,9 +338,15 @@ option read once and copied.
 | `schema` | A Standard Schema the answer is held to: an object or a function with a `validate` under `~standard`. |
 | `signal` | An `AbortSignal`. Aborts the request. |
 
+A function that walks pages takes one more, `maxPages` (`tWalkOptions`): the most pages its walk may
+ask for, a whole number above zero, with no limit by default. `walkOf` is `initOf` for such a function,
+and what it gives holds the limit for `paginate`. It is the walk's alone: called with a client, the
+function asks for the one page it resolves to.
+
 Three things fill the query, and the later wins: the caller's `params`; then the options that are
 given; then `set`, which is what the function itself puts there, such as the ids it was handed.
-`also` names any further options a function takes, such as `views`, each sent under its own name; an
+`also` names any further options a function takes, such as `views`, with what each one is,
+`{ views: "list", chart: "name" }`. Each is checked as that and sent under its own name; an
 option a function does not name is not sent.
 
 `params` is held to what a query parameter can be, so that what is put there by mistake is refused

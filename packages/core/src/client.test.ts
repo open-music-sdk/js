@@ -536,6 +536,73 @@ describe("retrying", () => {
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
   });
 
+  describe("a POST makes something each time it is carried out, so it is sent again only when the first was not", () => {
+    const post = { method: "POST", body: { attributes: { name: "Road" } } } as const;
+
+    test.each([500, 502, 503])("after a %s, which leaves open whether Apple acted, it is not sent again: the error is the caller's to weigh", async (status) => {
+      const { music, calls } = client([{ status }, { status: 201, body: { data: [song] } }], { retry: quick });
+      expect((await failure(music.request("v1/me/library/playlists", { ...post, user: false }))).status).toBe(status);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("after a fetch that throws, or an answer whose body is lost on the way, it is not sent again", async () => {
+      const thrown = client([new TypeError("fetch failed"), { status: 201, body: {} }], { retry: quick });
+      expect((await failure(thrown.music.request("v1/x", post)))._tag).toBe("NetworkError");
+      expect(thrown.calls).toHaveLength(1);
+      let asked = 0;
+      const lost = (): Promise<Response> => {
+        asked += 1;
+        const body = new ReadableStream<Uint8Array>({
+          pull: (controller) => {
+            controller.error(new TypeError("terminated"));
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 201 }));
+      };
+      expect((await failure(createClient({ developerToken: "dev", fetch: lost, retry: quick }).request("v1/x", post)))._tag).toBe("NetworkError");
+      expect(asked).toBe(1);
+    });
+
+    test("with no retry policy given, the default one holds a POST to the same", async () => {
+      const { music, calls } = client([{ status: 500 }, { status: 201, body: {} }], { retry: undefined });
+      expect((await failure(music.request("v1/x", post))).status).toBe(500);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("after a 429, which says Apple turned it away, it is sent again", async () => {
+      const { music, calls } = client([{ status: 429 }, { status: 201, body: { data: [song] } }], { retry: quick });
+      expect(await music.request("v1/x", post)).toEqual({ data: [song] });
+      expect(calls).toHaveLength(2);
+    });
+
+    test("when there was no developer token to send it with, it was not sent, and is tried again", async () => {
+      let asked = 0;
+      const developerToken = () => {
+        asked += 1;
+        if (asked === 1) throw new AppleMusicError("DeveloperTokenUnavailable", "token source down");
+        return "dev";
+      };
+      const { music, calls } = client([{ status: 201, body: {} }], { developerToken, retry: quick });
+      expect(await music.request("v1/x", post)).toEqual({});
+      expect([asked, calls.length]).toEqual([2, 1]);
+    });
+
+    test.each(["GET", "PUT", "DELETE"] as const)("the check can tell: a %s, which comes to the same however often it is carried out, is sent again after a 500", async (method) => {
+      const { music, calls } = client([{ status: 500 }, { body: { ok: true } }], { retry: quick });
+      expect(await music.request("v1/x", { method })).toEqual({ ok: true });
+      expect(calls).toHaveLength(2);
+    });
+
+    test("a caller's retryOn can hold a POST back further, and cannot have it sent again where it would not be", async () => {
+      const eager = client([{ status: 500 }, { status: 201, body: {} }], { retry: { ...quick, retryOn: () => true } });
+      expect((await failure(eager.music.request("v1/x", post))).status).toBe(500);
+      expect(eager.calls).toHaveLength(1);
+      const never = client([{ status: 429 }, { status: 201, body: {} }], { retry: { ...quick, retryOn: () => false } });
+      expect((await failure(never.music.request("v1/x", post)))._tag).toBe("RateLimited");
+      expect(never.calls).toHaveLength(1);
+    });
+  });
+
   describe("a developer token provider that cannot get a token", () => {
     const unavailable = (status?: number) => new AppleMusicError("DeveloperTokenUnavailable", "token source down", { status });
     /** A provider that throws each error in turn, then answers "dev". */
@@ -820,6 +887,43 @@ describe("paginate", () => {
   test.each([{ data: [] }, {}, { next: undefined }])("yields nothing for %j", async (body) => {
     const { music } = client([{ body }]);
     expect(await items(music.paginate("v1/catalog/us/songs"))).toEqual([]);
+  });
+
+  describe("where the next page is, is Apple's to say, whatever a schema makes of the answer", () => {
+    const three = () => [{ body: { data: [1, 2], next: "/v1/x?offset=2" } }, { body: { data: [3, 4], next: "/v1/x?offset=4" } }, { body: { data: [5] } }];
+    /** A schema as a library that keeps only the fields it was told of makes one: what it hands back has `data` and no `next`. */
+    const strict: tSchemaLike<{ data: number[] }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data } }) } };
+
+    test("a schema that hands back only the fields it knows does not end the walk at its first page", async () => {
+      const { music, calls } = client(three());
+      expect(await items(music.paginate("v1/x", { schema: strict }))).toEqual([1, 2, 3, 4, 5]);
+      expect(calls.map((call) => new URL(call.url).search)).toEqual(["", "?offset=2", "?offset=4"]);
+    });
+
+    test("the check can tell: the first page such a schema gives has no next link, which a walk that went by it would stop at", async () => {
+      const { music } = client(three());
+      expect(await music.request("v1/x", { schema: strict })).toEqual({ data: [1, 2] });
+    });
+
+    test("the items are still the schema's: what it makes of each page is what is yielded", async () => {
+      const doubled: tSchemaLike<{ data: number[] }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data.map((n) => n * 2) } }) } };
+      const { music } = client(three());
+      expect(await items(music.paginate("v1/x", { schema: doubled }))).toEqual([2, 4, 6, 8, 10]);
+    });
+
+    test("a next link a schema put there, where Apple sent none, is not followed", async () => {
+      const inventive: tSchemaLike<{ data: number[]; next: string }> = { "~standard": { validate: (value) => ({ value: { data: (value as { data: number[] }).data, next: "/v1/me/library/songs" } }) } };
+      const { music, calls } = client([{ body: { data: [1] } }, { body: { data: [2] } }]);
+      expect(await items(music.paginate("v1/x", { schema: inventive }))).toEqual([1]);
+      expect(calls).toHaveLength(1);
+    });
+
+    test("an onResponse given for the walk is still told of every page", async () => {
+      const seen: unknown[] = [];
+      const { music } = client(three());
+      await items(music.paginate("v1/x", { schema: strict, onResponse: (_res, _req, outcome) => seen.push(outcome.body) }));
+      expect(seen).toEqual([{ data: [1, 2], next: "/v1/x?offset=2" }, { data: [3, 4], next: "/v1/x?offset=4" }, { data: [5] }]);
+    });
   });
 
   test("breaking out stops fetching", async () => {
@@ -1496,6 +1600,33 @@ describe("an option is one that was passed, never one found on Object.prototype"
     });
     expect(seen).toEqual([1, 2, 3]);
     expect(calls).toHaveLength(3);
+  });
+
+  test("paginate: a next link and items planted there are not every page's, so a walk ends where Apple's answers end and goes nowhere else", async () => {
+    const { music, calls, url, header } = client([{ body: { data: [1] } }, { body: { data: [9] } }], { userToken: "user" });
+    const seen = await polluted({ next: "/v1/me/library/songs", data: [7] }, async () => {
+      const out: number[] = [];
+      for await (const item of music.paginate<number>("v1/catalog/us/genres")) out.push(item);
+      for await (const item of music.paginate<number>({ data: [2] })) out.push(item);
+      return out;
+    });
+    expect(seen).toEqual([1, 2]);
+    expect([calls.length, url(), header("music-user-token")]).toEqual([1, "https://api.music.apple.com/v1/catalog/us/genres", null]);
+  });
+
+  test("paginate: an object that holds neither of its own is no page, though both are planted there", async () => {
+    const { music, calls } = client();
+    const error: unknown = await polluted({ next: "/v1/me/library/songs", data: [7] }, async () => {
+      const out: unknown[] = [];
+      for await (const item of music.paginate({})) out.push(item);
+      return out;
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the check that says so can tell: an ordinary object does appear to hold the planted link, which a walk that read it would follow", async () => {
+    expect(await polluted({ next: "/v1/me/library/songs" }, () => Promise.resolve(({} as { next?: string }).next))).toBe("/v1/me/library/songs");
   });
 
   test("createClient: a listener's token, a storefront, a hook and a fetch planted there are not the client's", async () => {
