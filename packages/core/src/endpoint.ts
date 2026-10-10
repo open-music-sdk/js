@@ -91,7 +91,10 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
 
   /** One call, planned and asked for: what Apple answered, and with what status, when the client says. */
   const ask = async (music: tAppleMusicClient, args: unknown[]): Promise<{ readonly body: unknown; readonly status: number | undefined }> => {
-    const [path, init = {}] = await settled(fn, begun(planFor(music, ...args)));
+    const [path, planned = {}] = await settled(fn, begun(planFor(music, ...args)));
+    // What the plan's init holds itself. A hook that other code has put on Object.prototype is not the plan's, and
+    // is neither called nor, where it is no function, the reason a request that was answered is said to have failed.
+    const init = ownOf(planned);
     let status: number | undefined;
     const body = await music.request(path, {
       ...init,

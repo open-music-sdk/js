@@ -1448,6 +1448,41 @@ describe("the resource patterns: a value in a path cannot move the request to an
   });
 });
 
+describe("what a plan gives is read as what it holds itself, never as what is found on Object.prototype", () => {
+  /** Runs `run` while `Object.prototype` carries `planted`, as it would after some other code had polluted it. */
+  async function polluted<T>(planted: Record<string, unknown>, run: () => Promise<T>): Promise<T> {
+    Object.assign(Object.prototype, planted);
+    try {
+      return await run();
+    } finally {
+      for (const key of Object.keys(planted)) Reflect.deleteProperty(Object.prototype, key);
+    }
+  }
+  const addToLibrary = endpoint("addToLibrary", "answer", (): tRequestPlan<undefined> => ["v1/me/library", { method: "POST", params: { "ids[songs]": ["1"] } }]);
+
+  test("an onResponse there that is no function does not turn a request that was answered into a failure", async () => {
+    const { music, sent } = apple([{ status: 202 }, { body: { data: [song("1")] } }, { body: { data: [song("1")] } }], { userToken: "user" });
+    const answers = await polluted({ onResponse: "planted" }, async () => [await addToLibrary(music), await getSong(music, "1"), await getSong.bound(music)("1")]);
+    expect(answers).toEqual([undefined, { data: [song("1")] }, song("1")]);
+    expect(sent()).toEqual(["POST /v1/me/library?ids[songs]=1", "GET /v1/catalog/us/songs/1", "GET /v1/catalog/us/songs/1"]);
+  });
+
+  test("an onResponse there that is a function is not the plan's hook, and is handed no request", async () => {
+    const planted = vi.fn();
+    const { music } = apple([{ status: 202 }, { body: { data: [song("1")] } }], { userToken: "user" });
+    await polluted({ onResponse: planted }, async () => [await addToLibrary(music), await getSong.bound(music)("1")]);
+    expect(planted).not.toHaveBeenCalled();
+  });
+
+  test("the check can tell: a hook the plan gives itself is called, once for each response", async () => {
+    const own = vi.fn();
+    const hooked = endpoint("getSong", "resource", (): tRequestPlan<tSongsResponse> => [`${SONGS}/1`, { onResponse: own }]);
+    const { music } = apple([{ body: { data: [song("1")] } }]);
+    await hooked.bound(music)();
+    expect(own).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("endpointNamespace", () => {
   test("every function for an endpoint is there under its own name, bound to the client", async () => {
     const { music, sent } = apple([{ body: { data: [song("1")] } }, { body: { data: [song("1"), song("2")] } }]);
