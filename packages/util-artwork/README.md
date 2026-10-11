@@ -195,8 +195,9 @@ work until they are filled in.
 
 ## Not here
 
-- **Getting the artwork.** It arrives on the resources `@open-music-sdk/core` fetches; this package
-  only reads it.
+- **Getting the artwork.** It arrives on the resources that
+  [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
+  [`@open-music-sdk/client-user`](../../clients/client-user) fetch; this package only reads it.
 - **Screen density detection.** `srcset` is how a browser picks; nothing here reads `devicePixelRatio`.
 - **Width descriptors** (`300w` with `sizes`), for images whose shown width depends on the layout.
 - **Colours.** `bgColor` and `textColor1` to `textColor4` are hex without the `#`; prefix one and it

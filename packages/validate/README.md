@@ -22,6 +22,18 @@ if (result.issues) {
 
 Validation is synchronous, so `result` never needs awaiting.
 
+Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core),
+or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
+[`@open-music-sdk/client-user`](../../clients/client-user). A failure there is a `ValidationError`
+with the issues attached.
+
+```ts
+import { getSong } from "@open-music-sdk/client-catalog";
+import { songsResponse } from "@open-music-sdk/validate";
+
+const { data } = await getSong(music, "1613600188", { schema: songsResponse });
+```
+
 ## What is in it
 
 | Export                                  | Validates                                     |
@@ -48,7 +60,7 @@ Issues carry a `path` from the root of the value, so a bad field deep in a respo
 
 ## Size
 
-The runtime is a handful of combinators under 100 lines. Validators are plain constants, so a bundler
+The runtime is a handful of combinators in about 100 lines. Validators are plain constants, so a bundler
 keeps only the ones you import plus what they reference.
 
 ## Regenerating

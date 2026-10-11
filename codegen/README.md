@@ -6,8 +6,8 @@ rendered from machine-readable DocC JSON. This directory turns that JSON into
 
 ```
 pnpm crawl      docc-crawl: Apple's docs  ->  .cache/ (ignored)  ->  docc-ir/ir.json (committed)
-pnpm codegen    emit:       docc-ir/ir.json  ->  packages/types/src/generated/index.ts
-                                             ->  packages/validate/src/generated/index.ts
+pnpm codegen    emit:       docc-ir/ir.json  ->  packages/types/src/index.ts, src/generated/*.ts
+                                             ->  packages/validate/src/index.ts, src/generated/*.ts
 ```
 
 `pnpm codegen` runs as a Turborepo task before every build. `pnpm crawl` is run by hand when Apple's
@@ -73,11 +73,14 @@ throws during the crawl so it is handled deliberately rather than emitted as `un
 ```
 
 Endpoints are recorded for reference. Client functions are written by hand against this table so
-their signatures can be shaped for use rather than mirroring the docs.
+their signatures can be shaped for use rather than mirroring the docs. The tests of
+[`client-catalog`](../clients/client-catalog) and [`client-user`](../clients/client-user) read the
+table too: every endpoint in it has to have exactly one function, or be listed as left out, and each
+function is held to the method, the path, the parameters and the answer its endpoint is recorded with.
 
 ## emit
 
-`src/emit.mjs` writes two files from the IR and nothing else.
+`src/emit.mjs` writes into those two packages from the IR and nothing else.
 
 **Names.** Apple titles each resource page by its plural `type` value, so one song object is
 documented as `Songs` and everything nested under it inherits the prefix. The emitter singularizes

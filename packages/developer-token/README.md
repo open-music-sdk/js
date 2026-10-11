@@ -173,3 +173,6 @@ minute:
 ## Not here
 
 Music User Tokens are a different thing entirely; see [`@open-music-sdk/user-token`](../user-token).
+So is asking Apple for anything: a client made with one of these providers is what the functions of
+[`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
+[`@open-music-sdk/client-user`](../../clients/client-user) take.

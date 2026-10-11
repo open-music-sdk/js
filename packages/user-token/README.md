@@ -15,7 +15,10 @@ Keep the two on the same version. If your app does end up with a different copy 
 one this package resolves, nothing breaks: an `AppleMusicError` is recognised whichever copy made it.
 
 The examples below take their developer token from
-[`@open-music-sdk/developer-token`](../developer-token), which is a separate install.
+[`@open-music-sdk/developer-token`](../developer-token), which is a separate install. They ask Apple
+by path, with `request` and `paginate`, to stay within these packages:
+[`@open-music-sdk/client-user`](../../clients/client-user) has a named function for each of a
+listener's endpoints, and takes the same client.
 
 ## Taking a token in
 
@@ -315,4 +318,5 @@ with the rest of the request, so a hook that prints requests prints the token.
 
 Developer tokens are a different thing entirely; see
 [`@open-music-sdk/developer-token`](../developer-token). So is issuing a Music User Token: only
-Apple's sign-in does that.
+Apple's sign-in does that. What a listener's client is then asked for, their library, ratings,
+recommendations and history, is [`@open-music-sdk/client-user`](../../clients/client-user).
