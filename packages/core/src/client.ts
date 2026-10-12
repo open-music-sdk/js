@@ -7,8 +7,10 @@ import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
 import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from "./retry";
 
+// Both written out, and the origin not worked out from the URL: a call at the top of a module is one a bundler
+// keeps whether or not the client is used, so an app that took one check from this package would carry this too.
+const BASE_ORIGIN = "https://api.music.apple.com";
 const BASE_URL = "https://api.music.apple.com/";
-const BASE_ORIGIN = new URL(BASE_URL).origin;
 
 export interface tTokenContext {
   readonly signal?: AbortSignal | undefined;
