@@ -5,7 +5,7 @@
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
 
 > **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core, developer
-> token, user token and artwork packages and the two clients exist and pass their tests, but none has been
+> token, user token and artwork packages, the two clients and the two libs exist and pass their tests, but none has been
 > run against the live API, and there is no integration to install.
 > The table below is the source of truth for what works; expect everything else to be missing or to change.
 
@@ -21,14 +21,14 @@ libs, and the integrations people actually install. Every package ships the same
 | [`codegen`](./codegen) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
 | [`@open-music-sdk/types`](./packages/types) | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
 | [`@open-music-sdk/validate`](./packages/validate) | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
-| [`@open-music-sdk/core`](./packages/core) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · the checks and builders the clients declare their endpoints with · untested against the live API |
+| [`@open-music-sdk/core`](./packages/core) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · the checks and builders the clients declare their endpoints with · the check on where a URL may point · untested against the live API |
 | [`@open-music-sdk/developer-token`](./packages/developer-token) | 🚧 In progress | 80% | JWT minting · minter and fetcher providers over one cache · a `/fetcher` entry with no signing code · untested against the live API |
 | [`@open-music-sdk/user-token`](./packages/user-token) | 🚧 In progress | 80% | Validation · intake handler, and the same step without HTTP · memory and KV stores · untested against the live API |
-| [`@open-music-sdk/util-artwork`](./packages/util-artwork) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check · zero dependencies · checked against Apple's image server, untested against the live API |
+| [`@open-music-sdk/util-artwork`](./packages/util-artwork) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check, which is all of `core` it carries · checked against Apple's image server, untested against the live API |
 | [`@open-music-sdk/client-catalog`](./clients/client-catalog) | 🚧 In progress | 80% | A function for each of the 58 catalog, storefront, search, and chart endpoints · `catalog(client)` with the answers unwrapped · developer token only · held to Apple's documentation by its tests, untested against the live API |
 | [`@open-music-sdk/client-user`](./clients/client-user) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
-| `@open-music-sdk/lib-playlists` | ⬜ Not started | 0% | Resolve tracks · read playlists · plan and apply changes · export |
-| `@open-music-sdk/lib-preview-player` | ⬜ Not started | 0% | Queue player for preview clips · framework-free · browser only |
+| [`@open-music-sdk/lib-playlists`](./lib/lib-playlists) | 🚧 In progress | 80% | `playlists(client)` · resolve tracks by ISRC, then by a search held to an exact match · read a playlist whole, which is also the export · plan what it is missing · apply it with each write sent once · progress, a delay between requests and an opt-in limit on pages · untested against the live API |
+| [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · untested in a browser against the live API |
 | `@open-music-sdk/server` | ⬜ Not started | 0% | Server client · token endpoint · user-token intake · Node, Workers, Bun, Deno |
 | `@open-music-sdk/browser` | ⬜ Not started | 0% | Browser client · fetches tokens from your server · no signing code |
 | `@open-music-sdk/react` | ⬜ Not started | 0% | Provider · hooks · query option factories |
@@ -40,7 +40,8 @@ Progress is a judgement of how much of the described scope exists and is tested.
 
 Until an integration exists, an app puts the pieces together itself: a client from `core`, a developer
 token from `developer-token`, and the functions of `client-catalog` and `client-user`, each of which
-takes that client. Each README linked above shows how.
+takes that client. `lib-playlists` takes the same client, and `lib-preview-player` the songs it
+fetched. Each README linked above shows how.
 
 ## What every package holds to
 
@@ -67,7 +68,8 @@ packages still to come.
   function of `client-user` does.
 - **A write is sent once, unless Apple says it was not carried out.** A `POST` is sent again only
   after a 429, or when there was no developer token to send it with, so a lost answer cannot make a
-  playlist twice.
+  playlist twice. `lib-playlists` sends none again either: it reads the playlist back, and what it
+  holds decides.
 - **One function for each endpoint, held to Apple's documentation.** The types and validators are
   generated from it, and each client's tests hold every function to the method, the path, the
   parameters and the answer its endpoint documents. Where a package differs from the documentation,
@@ -89,11 +91,12 @@ tooling/              private shared configs: eslint, tsdown, vitest
 codegen/              docc-crawl → docc-ir/ir.json → emit (see codegen/README.md)
 packages/             foundation packages: types, validate, core, developer-token, user-token, util-artwork
 clients/              one client per token boundary: client-catalog, client-user
+lib/                  conveniences over the clients: lib-playlists, lib-preview-player
 .github/workflows/    ci: build, typecheck, lint and test on what a change affects
 ```
 
-Planned workspaces: `lib/` (conveniences), `integrations/` (what people install: server, browser,
-react, next), `apps/` (private samples).
+Planned workspaces: `integrations/` (what people install: server, browser, react, next), `apps/`
+(private samples).
 
 ## Development
 

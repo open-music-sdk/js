@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import type { tArtwork, tLibraryPlaylist, tSong } from "@open-music-sdk/types";
+import { build } from "tsdown";
 import { describe, expect, test } from "vitest";
 import manifest from "../package.json" with { type: "json" };
 import * as api from "./index";
@@ -47,13 +50,52 @@ describe("the README's way of reaching an artwork, against the generated types",
   });
 });
 
+describe("what an app carries because of this package", () => {
+  /** What only the client holds: the header it sends, where it sends it, the error it throws and the walk it makes. */
+  const CLIENT = ["music-user-token", "api.music.apple.com", "AppleMusicError", "paginate"];
+
+  /** This package as an app's bundler leaves it: core bundled in with it, and what nothing uses dropped. */
+  async function carried(): Promise<string> {
+    const { bundles } = await build({
+      config: false,
+      entry: ["src/index.ts"],
+      format: ["esm"],
+      platform: "neutral",
+      deps: { alwaysBundle: [/^@open-music-sdk\//] },
+      treeshake: true,
+      dts: false,
+      write: false,
+      clean: false,
+      report: false,
+      logLevel: "silent",
+    });
+    return bundles.flatMap((bundle) => bundle.chunks.map((chunk) => ("code" in chunk ? chunk.code : ""))).join("\n");
+  }
+
+  test("of core, the check on where a URL points and nothing of the client", { timeout: 30_000 }, async () => {
+    const code = await carried();
+    expect(code).toContain("hosts must be an array of");
+    expect(code).not.toContain("@open-music-sdk/core");
+    expect(CLIENT.filter((mark) => code.includes(mark))).toEqual([]);
+  });
+
+  test("the check that says so can tell: all of core has every one of those in it", () => {
+    const core = readFileSync(createRequire(import.meta.url).resolve("@open-music-sdk/core"), "utf8");
+    expect(CLIENT.filter((mark) => core.includes(mark))).toEqual(CLIENT);
+  });
+});
+
 describe("the package manifest", () => {
   test("has one entry", () => {
     expect(Object.keys(manifest.exports)).toEqual(["."]);
   });
 
-  test("has no dependencies: it is strings in and strings out", () => {
-    expect(manifest).not.toHaveProperty("dependencies");
+  test("has one dependency, core, on a caret range as it is for the rest of the family: it is strings in and strings out", () => {
+    expect(manifest.dependencies).toEqual({ "@open-music-sdk/core": "workspace:^" });
     expect(manifest).not.toHaveProperty("peerDependencies");
+  });
+
+  test("it says it has no side effects, which is what lets a bundler drop what an app does not import", () => {
+    expect(manifest.sideEffects).toBe(false);
   });
 });

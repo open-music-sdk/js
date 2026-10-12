@@ -1313,6 +1313,8 @@ describe("hosts: where the artwork may come from, for a caller who says", () => 
     ["an allowed host in the path", "https://evil.example/is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
     ["an allowed host with a dot after it", "https://is1-ssl.mzstatic.com./{w}x{h}bb.jpg"],
     ["a space in front and a way up out of the path", " https://evil.example/../../api/logout?via={w}"],
+    ["an allowed host after one slash, which a page that is https reads as a path on its own host", "https:/is1-ssl.mzstatic.com/../account/delete?confirm=1&size={w}x{h}"],
+    ["an allowed host after no slash at all, which such a page reads the same way", "https:is1-ssl.mzstatic.com/../../uploads/{w}x{h}bb.jpg"],
     ["no scheme, so the page's own", "//is1-ssl.mzstatic.com/{w}x{h}bb.jpg"],
     ["no host, so the page's own", "/api/logout?via={w}"],
     ["a path of its own only", "covers/{w}x{h}bb.jpg"],
