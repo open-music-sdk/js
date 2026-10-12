@@ -78,7 +78,11 @@ export interface tLoadedPreviews<T> {
   readonly skipped: readonly tSkippedPreview<T>[];
 }
 
-/** A player from `previewPlayer`. Its functions need no `this`, so each can be handed on by itself. */
+/**
+ * A player from `previewPlayer`. Its functions need no `this`, so each can be handed on by itself. It is disposable
+ * with `await using` where the runtime has that: in one that has no `Symbol.asyncDispose`, a player has no such
+ * function, and `dispose()` is the way.
+ */
 export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends AsyncDisposable {
   /**
    * Replaces the queue with the tracks that have a clip, and answers with those and with the ones left out. What
@@ -391,11 +395,19 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     setVolume,
     subscribe,
     dispose,
-    [Symbol.asyncDispose]: (): Promise<void> => {
-      dispose();
-      return Promise.resolve();
-    },
   });
+  // Where the runtime has `await using`, a player can be taken by it. Where it has not, as in a browser that came
+  // before it, there is no such symbol: written as a key all the same, it would be the name "undefined".
+  const asyncDispose: unknown = Reflect.get(Symbol, "asyncDispose");
+  if (typeof asyncDispose === "symbol") {
+    Object.defineProperty(player, asyncDispose, {
+      value: (): Promise<void> => {
+        dispose();
+        return Promise.resolve();
+      },
+      enumerable: true,
+    });
+  }
   // A getter, so that the one object handed out always gives the state as it now is. Frozen with the rest, and with
   // nothing to inherit from, so a name looked up on a player is one of these or is not there.
   Object.defineProperty(player, "state", { get: () => state, enumerable: true });

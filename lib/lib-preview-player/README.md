@@ -149,7 +149,8 @@ volume set on the element is the volume in `state`.
 
 `dispose()` pauses, takes the player's listeners off the element, and forgets the queue and whoever
 subscribed. The element is left as it is, for you to reuse or drop. Afterwards every other function
-is a `TypeError`. `await using player = previewPlayer()` works where the runtime has it.
+is a `TypeError`. `await using player = previewPlayer()` works where the runtime has it; in a browser
+with no `Symbol.asyncDispose` yet a player has no such function, and `dispose()` is the way.
 
 ## Where a clip points
 

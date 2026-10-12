@@ -995,6 +995,28 @@ describe("dispose: the player lets go of its element, and of whoever listens", (
     expect(audio.heldBy()).toBe(0);
   });
 
+  test("in a runtime with no Symbol.asyncDispose, a player has no function under a name it would have by accident", () => {
+    // Symbol as a browser that came before `await using` has it: everything but that one symbol.
+    const left = ["asyncDispose", "length", "name", "prototype"];
+    const kept = Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(Symbol)).filter(([key]) => !left.includes(key)));
+    const older = Object.defineProperties((description?: string) => Symbol(description), kept);
+    vi.stubGlobal("Symbol", older);
+    const player = previewPlayer({ audio: new FakeAudio() });
+    vi.unstubAllGlobals();
+    expect(Object.keys(player).sort()).toEqual(["dispose", "load", "next", "pause", "play", "previous", "seek", "setVolume", "state", "subscribe"]);
+    expect(Object.getOwnPropertySymbols(player)).toEqual([]);
+    expect("undefined" in player).toBe(false);
+    expect(() => {
+      player.dispose();
+    }).not.toThrow();
+  });
+
+  test("in a runtime that has it, the function is there under the symbol and nowhere else", () => {
+    const { player } = loaded();
+    expect(Object.getOwnPropertySymbols(player)).toEqual([Symbol.asyncDispose]);
+    expect("undefined" in player).toBe(false);
+  });
+
   test("`await using` takes a player", async () => {
     const audio = new FakeAudio();
     {
