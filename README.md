@@ -27,8 +27,8 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/util-artwork`](./packages/util-artwork) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check · zero dependencies · checked against Apple's image server, untested against the live API |
 | [`@open-music-sdk/client-catalog`](./clients/client-catalog) | 🚧 In progress | 80% | A function for each of the 58 catalog, storefront, search, and chart endpoints · `catalog(client)` with the answers unwrapped · developer token only · held to Apple's documentation by its tests, untested against the live API |
 | [`@open-music-sdk/client-user`](./clients/client-user) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
-| `@open-music-sdk/lib-playlists` | ⬜ Not started | 0% | Resolve tracks · read playlists · plan and apply changes · export |
-| `@open-music-sdk/lib-preview-player` | ⬜ Not started | 0% | Queue player for preview clips · framework-free · browser only |
+| `@open-music-sdk/lib-playlists` | 🚧 In progress | 0% | Resolve tracks · read playlists · plan and apply changes · export |
+| `@open-music-sdk/lib-preview-player` | 🚧 In progress | 0% | Queue player for preview clips · framework-free · browser only |
 | `@open-music-sdk/server` | ⬜ Not started | 0% | Server client · token endpoint · user-token intake · Node, Workers, Bun, Deno |
 | `@open-music-sdk/browser` | ⬜ Not started | 0% | Browser client · fetches tokens from your server · no signing code |
 | `@open-music-sdk/react` | ⬜ Not started | 0% | Provider · hooks · query option factories |
