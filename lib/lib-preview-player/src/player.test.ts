@@ -562,14 +562,24 @@ describe("what the element refuses is passed on as it is, and the state says whe
     expect(player.state).toMatchObject({ status: "playing", index: 1 });
   });
 
-  test("a play still waiting when a new queue is loaded leaves the new queue idle, however it settles", async () => {
+  test.each<[string, (waiting: FakeAudio["waiting"][number]) => void]>([
+    ["resolves", (waiting) => {
+      waiting.resolve();
+    }],
+    ["rejects", (waiting) => {
+      waiting.reject(new DOMException("The play() request was interrupted by a new load request", "AbortError"));
+    }],
+  ])("a play still waiting when a new queue is loaded leaves the new queue idle when it %s", async (_name, settle) => {
     const { audio, player } = loaded();
     audio.hold = true;
     const begun = player.play();
     player.load([song("z")]);
-    audio.waiting[0]?.resolve();
-    await begun;
+    const [waiting] = audio.waiting;
+    if (waiting !== undefined) settle(waiting);
+    await begun.catch(() => undefined);
+    expect(audio.waiting).toHaveLength(1);
     expect(player.state).toMatchObject({ status: "idle", index: -1 });
+    expect(player.state.tracks.map((track) => track.id)).toEqual(["z"]);
   });
 
   test("a clip that stops to wait for more of itself is loading, and playing again when it has it", async () => {

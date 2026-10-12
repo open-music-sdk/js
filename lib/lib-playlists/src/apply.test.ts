@@ -145,8 +145,8 @@ function apple(start: readonly { id: string; name?: string; description?: string
     fail: (method: string, path: RegExp, answer: "lost" | "unreadable" | number, carried: boolean, times = 1) => {
       faults.push({ method, path, answer, carried, times });
     },
-    /** Someone else adds a track to a playlist. */
-    add: (id: string, catalogId: string) => library.find((each) => each.id === id)?.tracks.push(kept(catalogId)),
+    /** Someone else adds a track to a playlist: after whatever was written to it before, shown or not yet. */
+    add: (id: string, catalogId: string) => library.find((each) => each.id === id)?.pending.push({ tracks: [kept(catalogId)], reads: 0 }),
   };
 }
 
@@ -377,24 +377,54 @@ describe("apply: a write is sent once, whatever becomes of its answer", () => {
     expect(posted).toEqual([["a", "b"]]);
   });
 
-  test("a read back that fails does not stand in for the write's own error", async () => {
-    const { music, fail } = apple([{ id: "p.1", holds: ["0"] }]);
-    fail("POST", TRACKS, "lost", false);
-    fail("GET", /^\/v1\/me\/library\/playlists\/p\.1$/, 500, false, 9);
-    // The first read is made before anything can fail: the fault is for the reads that follow the write.
-    const error: unknown = await apply(music, plan({ name: "Untitled" }, want("a")), { settle: { tries: 2, waitMs: 0 } }).catch((e: unknown) => e);
-    expect(isAppleMusicError(error, "ApiError") && error.status).toBe(500);
-    expect(isAppleMusicError(error, "NetworkError")).toBe(false);
+  test("a read back that fails does not stand in for the write's own error: the run rejects with what the write got", async () => {
+    const { music, lines, posted, fail } = apple([{ id: "p.1", holds: ["0"] }]);
+    const error: unknown = await apply(music, forId("p.1", "0", "a", "b"), {
+      chunk: 1,
+      settle: { tries: 2, waitMs: 0 },
+      // Armed once the first track is in: the second write is lost, and every read of the playlist after it fails.
+      onProgress: ({ done }) => {
+        if (done !== 1) return;
+        fail("POST", TRACKS, "lost", false);
+        fail("GET", /^\/v1\/me\/library\/playlists\/p\.1$/, 500, false, 9);
+      },
+    }).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "NetworkError")).toBe(true);
+    expect(posted).toEqual([["a"]]);
+    expect(lines().filter((line) => line.startsWith("POST"))).toHaveLength(2);
+    expect(lines().slice(-2)).toEqual(["GET /v1/me/library/playlists/p.1", "GET /v1/me/library/playlists/p.1"]);
   });
 
-  test("tracks someone else added meanwhile are not taken for this run's: the run rejects, and does not carry on from a place it cannot be sure of", async () => {
-    const { music, posted, fail, add } = apple([{ id: "p.1" }]);
-    fail("POST", TRACKS, "lost", false);
-    add("p.1", "theirs");
-    add("p.1", "theirs too");
-    const error: unknown = await apply(music, plan({ id: "p.1", tracks: [] }, want("a", "b", "c")), { chunk: 2, ...QUICK }).catch((e: unknown) => e);
+  test("a track someone else added meanwhile, where this run's would be, is not taken for it: the run rejects, and does not carry on from a place it cannot be sure of", async () => {
+    const { music, posted, holds, fail, add } = apple([{ id: "p.1" }]);
+    const error: unknown = await apply(music, forId("p.1", "a", "b", "c"), {
+      chunk: 1,
+      ...QUICK,
+      // Once this run's first track is in, and so after the playlist was read: someone adds one of theirs, and the answer to this run's next write is lost.
+      onProgress: ({ done }) => {
+        if (done !== 1) return;
+        add("p.1", "theirs");
+        fail("POST", TRACKS, "lost", true);
+      },
+    }).catch((e: unknown) => e);
     expect(isAppleMusicError(error, "NetworkError")).toBe(true);
-    expect(posted).toEqual([]);
+    expect(holds("p.1")).toEqual(["a", "theirs", "b"]);
+    expect(posted).toEqual([["a"], ["b"]]);
+  });
+
+  test("the same track added by someone else at that very place is taken for this run's: nothing tells the two apart, and the playlist holds what was wanted", async () => {
+    const { music, holds, fail, add } = apple([{ id: "p.1" }]);
+    const applied = await apply(music, forId("p.1", "a", "b"), {
+      chunk: 1,
+      ...QUICK,
+      onProgress: ({ done }) => {
+        if (done !== 1) return;
+        add("p.1", "b");
+        fail("POST", TRACKS, "lost", false);
+      },
+    });
+    expect(applied).toMatchObject({ appended: 2, verified: true });
+    expect(holds("p.1")).toEqual(["a", "b"]);
   });
 
   test("a client that tries a failed request again still sends each write once", async () => {
@@ -732,7 +762,14 @@ describe("apply: progress, pace and stopping", () => {
     const { music, calls } = apple([{ id: "p.1" }]);
     const reason = new Error("gone");
     await expect(apply(music, forId("p.1", "a"), { signal: AbortSignal.abort(reason) })).rejects.toBe(reason);
-    expect(calls.every((c) => c.signal.aborted)).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  test("the same for a playlist named by what it is called: the listener's playlists are not asked for", async () => {
+    const { music, calls } = apple();
+    const reason = new Error("gone");
+    await expect(apply(music, plan({ name: "Road trip" }, want("a")), { signal: AbortSignal.abort(reason) })).rejects.toBe(reason);
+    expect(calls).toEqual([]);
   });
 
   test("an abort between two requests to add stops the run there: what was written stays, and nothing more is sent", async () => {
