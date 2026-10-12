@@ -49,10 +49,16 @@ const MAX_CHUNK = 300;
 const DEFAULTS = { chunk: 100, tries: 5, waitMs: 1000 } as const;
 
 /**
- * Whether an error leaves open if Apple carried the write out: the answer was lost, or Apple failed part way.
- * Anything else says it was not: a refusal, a limit the client already waited out, or the caller's own abort.
+ * Whether an error leaves open if Apple carried the write out: the answer was lost, Apple failed part way, or Apple
+ * answered that it was done with a body that could not be read, which the client makes an error of with the 2xx it
+ * came with. Anything else says it was not: a refusal, a limit the client already waited out, or the caller's own
+ * abort.
  */
-const unsure = (error: unknown): boolean => isAppleMusicError(error) && (error._tag === "NetworkError" || (error._tag === "ApiError" && error.status !== undefined && error.status >= 500 && error.status !== 501));
+const unsure = (error: unknown): boolean => {
+  if (!isAppleMusicError(error)) return false;
+  const status = error._tag === "ApiError" ? (error.status ?? 0) : 0;
+  return error._tag === "NetworkError" || (status >= 500 && status !== 501) || (status >= 200 && status < 300);
+};
 
 /** Whether a track the playlist holds is the one wanted: by its catalog id, or by its own. */
 const same = (held: tHeld | undefined, wanted: tPlaylistTrack): boolean => held !== undefined && (held.catalogId === wanted.id || held.id === wanted.id);

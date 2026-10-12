@@ -28,8 +28,8 @@ interface tKeptPlaylist {
 interface tFault {
   readonly method: string;
   readonly path: RegExp;
-  /** `lost`: no answer comes, as when a connection drops. A number: Apple answers with that status. */
-  readonly answer: "lost" | number;
+  /** `lost`: no answer comes, as when a connection drops. `unreadable`: Apple answers 200 with a body that is no JSON. A number: Apple answers with that status. */
+  readonly answer: "lost" | "unreadable" | number;
   /** Whether Apple carries the request out all the same. */
   readonly carried: boolean;
   times: number;
@@ -113,6 +113,11 @@ function apple(start: readonly { id: string; name?: string; description?: string
     if (fault !== undefined) fault.times--;
     const reply = fault === undefined || fault.carried ? await route(request, url) : missing;
     if (fault?.answer === "lost") throw new TypeError("fetch failed");
+    if (fault?.answer === "unreadable") {
+      const garbled = new Response("<html>OK</html>", { status: 200 });
+      responses.push(garbled);
+      return garbled;
+    }
     const answered = fault === undefined ? reply : { status: fault.answer, body: { errors: [] } };
     const res = new Response(answered.body === undefined ? null : JSON.stringify(answered.body), { status: answered.status ?? 200 });
     responses.push(res);
@@ -134,7 +139,7 @@ function apple(start: readonly { id: string; name?: string; description?: string
     holds: (id: string) => library.filter((each) => each.id === id).flatMap((each) => [...each.tracks, ...each.pending.flatMap((write) => write.tracks)].map((track) => track.catalogId)),
     playlists: () => library.map((each) => each.id),
     /** Has the next `times` matching requests go wrong. */
-    fail: (method: string, path: RegExp, answer: "lost" | number, carried: boolean, times = 1) => {
+    fail: (method: string, path: RegExp, answer: "lost" | "unreadable" | number, carried: boolean, times = 1) => {
       faults.push({ method, path, answer, carried, times });
     },
     /** Someone else adds a track to a playlist. */
@@ -312,6 +317,22 @@ describe("apply: a write is sent once, whatever becomes of its answer", () => {
     expect(posted).toEqual([["a", "b"], ["c"]]);
   });
 
+  test("a write Apple answers as done, with a body that cannot be read, is not taken for refused: the playlist is read back, and the run carries on", async () => {
+    const { music, posted, holds, fail } = apple([{ id: "p.1" }]);
+    fail("POST", TRACKS, "unreadable", true);
+    expect(await apply(music, forId("p.1", "a", "b", "c"), { chunk: 2, ...QUICK })).toEqual({ id: "p.1", created: false, appended: 3, verified: true });
+    expect(posted).toEqual([["a", "b"], ["c"]]);
+    expect(holds("p.1")).toEqual(["a", "b", "c"]);
+  });
+
+  test("such an answer for a write that does not show rejects with the error the client made of it, and nothing is sent again", async () => {
+    const { music, calls, fail } = apple([{ id: "p.1" }]);
+    fail("POST", TRACKS, "unreadable", false);
+    const error: unknown = await apply(music, forId("p.1", "a"), QUICK).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "ApiError") && error.status).toBe(200);
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
   test("a 500 for a write Apple did not carry out rejects with that 500", async () => {
     const { music, calls, fail } = apple([{ id: "p.1" }]);
     fail("POST", TRACKS, 503, false);
@@ -487,6 +508,13 @@ describe("apply: a playlist named by what it is called is found, or made once", 
     expect(isAppleMusicError(error, "NetworkError")).toBe(true);
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
     expect(playlists()).toEqual([]);
+  });
+
+  test("Apple makes it and answers with a body that cannot be read: it is found by looking, and is not made a second time", async () => {
+    const { music, playlists, fail } = apple();
+    fail("POST", PLAYLISTS, "unreadable", true);
+    expect(await apply(music, plan(mine, want("1")), QUICK)).toMatchObject({ id: "p.new1", created: true, appended: 1 });
+    expect(playlists()).toEqual(["p.new1"]);
   });
 
   test("Apple makes it and answers with no playlist: it is found by looking", async () => {
