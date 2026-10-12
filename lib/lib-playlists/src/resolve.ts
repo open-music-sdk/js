@@ -137,13 +137,17 @@ function said(song: tSong): { readonly isrc: string; readonly name: string; read
 }
 
 /**
- * The one of several songs that are all the track wanted: the one on the album named, where one is, and of those
- * the one nearest the length given, or Apple's first where no length was.
+ * The one of several songs that are all the track wanted. Songs that compare equal may still differ in what the
+ * comparing left out, as `Papa` and `Papá` do: the ones whose name and artist are written as the description's
+ * are, where there are any, are the ones meant. Of those it is the one on the album named, where one is, and of
+ * those the one nearest the length given, or Apple's first where no length was.
  */
 function pick<D>(wanted: tWanted<D>, songs: readonly tSong[]): tSong | undefined {
-  const album = wanted.albumName;
-  const onAlbum = album === undefined ? [] : songs.filter((song) => fold(said(song).albumName) === fold(album));
-  const pool = onAlbum.length > 0 ? onAlbum : songs;
+  const { name, artistName, albumName: album } = wanted;
+  const asWritten = songs.filter((song) => (name === undefined || said(song).name.trim() === name) && (artistName === undefined || said(song).artistName.trim() === artistName));
+  const written = asWritten.length > 0 ? asWritten : songs;
+  const onAlbum = album === undefined ? [] : written.filter((song) => fold(said(song).albumName) === fold(album));
+  const pool = onAlbum.length > 0 ? onAlbum : written;
   const length = wanted.durationInMillis;
   if (length === undefined) return pool[0];
   // A song that does not say how long it is, is as far off as a song can be.

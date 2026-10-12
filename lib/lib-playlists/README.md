@@ -83,7 +83,7 @@ was read.
 | --- | --- |
 | `isrc` | The recording's International Standard Recording Code. It names a recording whoever sells it. |
 | `name`, `artistName` | What the track is searched for by, where its ISRC finds nothing |
-| `albumName`, `durationInMillis` | Decide between several songs that fit: the one on that album, then the one nearest that length |
+| `albumName`, `durationInMillis` | Decide between several songs that fit: the one on that album, then the one nearest that length. Before either, a song whose name and artist are written exactly as the description's are is taken over one that only compares equal. |
 
 Tracks with an ISRC are looked up by it first, 25 to a request, which is the most Apple documents
 taking. Each track still not found that has a name is searched for, one request each. A song the

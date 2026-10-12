@@ -215,6 +215,26 @@ describe("resolve: then by a search, for what the ISRCs did not find", () => {
     expect(skipped).toEqual([{ index: 0, track: description, reason: "no-match", candidates: [HEY_JUDE, YESTERDAY] }]);
   });
 
+  test.each<[string, string, string]>([
+    ["an accent", "Papa", "Pap\u00e1"],
+    ["punctuation", "Why", "Why?"],
+    ["case", "hello", "Hello"],
+  ])("of two songs that differ only by %s, the one written as the description is written is the one taken, whichever Apple puts first", async (_name, plain, marked) => {
+    const [first, second] = [song("1", { name: plain, artistName: "Artist" }), song("2", { name: marked, artistName: "Artist" })];
+    expect((await resolve(apple([first, second]).music, [{ name: marked, artistName: "Artist" }])).tracks).toEqual([second]);
+    expect((await resolve(apple([second, first]).music, [{ name: plain, artistName: "Artist" }])).tracks).toEqual([first]);
+  });
+
+  test("where none is written as the description is, they are all the track still, and Apple's first is taken", async () => {
+    const [first, second] = [song("1", { name: "Papa", artistName: "Artist" }), song("2", { name: "Pap\u00e1", artistName: "Artist" })];
+    expect((await resolve(apple([first, second]).music, [{ name: "PAPA", artistName: "artist" }])).tracks).toEqual([first]);
+  });
+
+  test("being written the same comes before the album and the length: a song on the album named is not taken over one that is the title asked for", async () => {
+    const [other, asked] = [song("1", { name: "Papa", artistName: "Artist", albumName: "Greatest" }), song("2", { name: "Pap\u00e1", artistName: "Artist", albumName: "Single" })];
+    expect((await resolve(apple([other, asked]).music, [{ name: "Pap\u00e1", artistName: "Artist", albumName: "Greatest" }])).tracks).toEqual([asked]);
+  });
+
   test("a title that differs from a song's by a mark that is part of a letter is another title, and is not matched", async () => {
     const heart = song("5", { name: "\u30cf\u30fc\u30c8", artistName: "Artist" });
     const { music } = apple([heart]);
