@@ -43,5 +43,5 @@ export { initOf, walkOf } from "./options";
 export type { tAlsoKind, tAlsoKinds, tReadOptions, tWalkOptions } from "./options";
 export { createRateLimiter } from "./rate-limit";
 export type { tRateLimiter } from "./rate-limit";
-export { parseRetryAfter, retry, retryable } from "./retry";
+export { parseRetryAfter, retry, retryable, sleep } from "./retry";
 export type { tRetryPolicy } from "./retry";
