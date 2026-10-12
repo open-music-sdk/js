@@ -114,7 +114,8 @@ descriptions they were found for. Each of `skipped` is a description left over:
 | `candidates` | The songs its search came back with, best first as Apple ranks them: what to show a listener to choose from. None, when there was nothing to search for. |
 
 A description that finds nothing is never an error. A field that is a string and of no use, an empty
-name or an ISRC with a comma in it, is taken as not given. A request that fails rejects the call, and
+name or an ISRC with a comma in it, is taken as not given. An ISRC may be written as it is printed,
+with hyphens or spaces, and in small letters: `GB-AYE-06-01498` is `GBAYE0601498`. A request that fails rejects the call, and
 nothing found so far is handed over: resolve a long list a part at a time if that matters.
 
 | Option | |

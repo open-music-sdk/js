@@ -90,6 +90,17 @@ interface tWanted<D> {
 }
 
 /**
+ * An ISRC as it is sent and compared: in capitals, and without the hyphens and spaces it is printed with, so that
+ * `GB-AYE-06-01498` is `GBAYE0601498`. It is held to what can be sent as it will be sent, after it has been put in
+ * capitals: some letters become two there. One that cannot be sent is no ISRC, and the track is looked for by
+ * what else it has.
+ */
+function codeOf(isrc: string | undefined): string | undefined {
+  const code = isrc?.replace(/[\s-]+/g, "").toUpperCase();
+  return code !== undefined && code !== "" && code.length <= MAX_CODE && !code.includes(",") ? code : undefined;
+}
+
+/**
  * The descriptions as this call's own, each field read once. A field of the wrong kind is the caller's mistake. A
  * string that cannot be used, an empty name or an ISRC with a comma in it, is data that did not help: the track is
  * looked for by what else it has.
@@ -114,7 +125,7 @@ function wantedOf<D>(descriptions: unknown): tWanted<D>[] {
     if (durationInMillis !== undefined && typeof durationInMillis !== "number") throw new TypeError(`${where}.durationInMillis must be a number; got ${got(durationInMillis)}`);
     return {
       given: given as D,
-      code: isrc !== undefined && isrc.length <= MAX_CODE && !isrc.includes(",") ? isrc.toUpperCase() : undefined,
+      code: codeOf(isrc),
       name,
       artistName,
       albumName,

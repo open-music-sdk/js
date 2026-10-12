@@ -147,6 +147,18 @@ describe("resolve: by ISRC first, which names a recording whoever sells it", () 
     expect(lines()).toEqual(["GET /v1/catalog/us/songs?filter[isrc]=GBAYE0601498"]);
   });
 
+  test.each(["GB-AYE-06-01498", "GB AYE 06 01498", "gb-aye-06-01498", "GBAYE06 01498"])("an ISRC written as it is printed, %j, is read without its hyphens and spaces", async (isrc) => {
+    const { music, lines } = apple();
+    expect((await resolve(music, [{ isrc }])).tracks).toEqual([HEY_JUDE]);
+    expect(lines()).toEqual(["GET /v1/catalog/us/songs?filter[isrc]=GBAYE0601498"]);
+  });
+
+  test("an ISRC written two ways in two descriptions is one ISRC, asked for once", async () => {
+    const { music, lines } = apple();
+    expect((await resolve(music, [{ isrc: "GB-AYE-06-01498" }, { isrc: "gbaye0601498" }])).tracks).toEqual([HEY_JUDE, HEY_JUDE]);
+    expect(lines()).toHaveLength(1);
+  });
+
   test("of several songs with one ISRC, the one on the album named is taken", async () => {
     const [single, album] = [song("1", { isrc: "A", albumName: "Hey Jude - Single" }), song("2", { isrc: "A", albumName: "1 (2015 Version)" })];
     const { music } = apple([single, album]);
@@ -329,10 +341,22 @@ describe("resolve: a field that is a string and of no use is data that did not h
     ["an ISRC that is only space", { isrc: "   ", name: "Hey Jude", artistName: "The Beatles" }],
     ["an ISRC with a comma, which would be sent as two", { isrc: "GBAYE0601498,GBAYE0601477", name: "Hey Jude", artistName: "The Beatles" }],
     ["an ISRC longer than one can be sent", { isrc: "A".repeat(65), name: "Hey Jude", artistName: "The Beatles" }],
+    ["an ISRC that is short enough until it is put in capitals, where some letters become two", { isrc: "\u00df".repeat(40), name: "Hey Jude", artistName: "The Beatles" }],
+    ["an ISRC that is hyphens and nothing else", { isrc: "- - -", name: "Hey Jude", artistName: "The Beatles" }],
   ])("%s is no ISRC: the track is looked for by its name and artist alone", async (_name, description) => {
     const { music, lines } = apple();
     expect((await resolve(music, [description])).tracks).toEqual([HEY_JUDE]);
     expect(lines()).toEqual(["GET /v1/catalog/us/search?term=Hey Jude The Beatles&types=songs"]);
+  });
+
+  test("such an ISRC among good ones does not stop them being looked up, whichever request it would have been in", async () => {
+    const catalog = Array.from({ length: 30 }, (_, at) => song(String(at), { isrc: `CODE${String(at).padStart(8, "0")}` }));
+    const { music, calls } = apple(catalog);
+    const descriptions = [...catalog.map((each) => ({ isrc: each.attributes?.isrc })), { isrc: "\u00df".repeat(40) }];
+    const { tracks, skipped } = await resolve(music, descriptions);
+    expect(tracks).toEqual(catalog);
+    expect(skipped.map((each) => each.index)).toEqual([30]);
+    expect(calls).toHaveLength(2);
   });
 
   test("an empty name is no name, and an empty artist no artist", async () => {
