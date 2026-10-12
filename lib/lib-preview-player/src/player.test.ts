@@ -140,6 +140,16 @@ describe("which clip a track has: the URL of its first preview, read as the trac
     expect(answer).toEqual({ tracks: [], skipped: [{ index: 0, track, reason: "no-preview" }] });
   });
 
+  test("a song with no previews gets none from what is under 0 on Object.prototype", () => {
+    const polluted = Object.prototype as Record<string, unknown>;
+    polluted["0"] = { url: clip("planted") };
+    try {
+      expect(loaded([song("a", [])]).answer.tracks).toEqual([]);
+    } finally {
+      Reflect.deleteProperty(polluted, "0");
+    }
+  });
+
   test("a clip put on Object.prototype by other code is nobody's clip", () => {
     const polluted = Object.prototype as { attributes?: unknown };
     polluted.attributes = { previews: [{ url: clip("planted") }] };

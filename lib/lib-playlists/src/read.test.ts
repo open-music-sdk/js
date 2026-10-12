@@ -191,6 +191,34 @@ describe("read: which catalog song a track is", () => {
   });
 });
 
+describe("read: nothing on Object.prototype is read as Apple's", () => {
+  const polluted = Object.prototype as Record<string, unknown>;
+  const PLANTED = ["id", "type", "data", "catalogId", "isrc", "name", "artistName", "standard", "canEdit", "0"];
+
+  afterEach(() => {
+    for (const key of PLANTED) Reflect.deleteProperty(polluted, key);
+  });
+
+  test("a track with no catalog song and no playParams has no catalog id, whatever other code planted", async () => {
+    const bare = { id: "i.1", type: "library-songs", attributes: { name: "Mine" } };
+    const { music } = apple([], { override: (path) => (path.endsWith("/tracks") ? { body: { data: [bare] } } : undefined), attributes: { name: "Road trip" } });
+    for (const key of PLANTED) polluted[key] = key === "0" ? { id: "planted", attributes: { isrc: "PLANTED00001" } } : "planted";
+    const snapshot = await read(music, "p.1");
+    for (const key of PLANTED) Reflect.deleteProperty(polluted, key);
+    expect(snapshot).toEqual({ id: "p.1", name: "Road trip", tracks: [{ id: "i.1", type: "library-songs", name: "Mine" }] });
+    expect(Object.keys(snapshot.tracks[0] ?? {})).toEqual(["id", "type", "name"]);
+  });
+
+  test("a track whose catalog relationship holds no song gets none from what is under 0 on Object.prototype", async () => {
+    const empty = { id: "i.1", type: "library-songs", relationships: { catalog: { data: [] } } };
+    const { music } = apple([], { override: (path) => (path.endsWith("/tracks") ? { body: { data: [empty] } } : undefined) });
+    polluted["0"] = { id: "planted", attributes: { isrc: "PLANTED00001" } };
+    const snapshot = await read(music, "p.1");
+    Reflect.deleteProperty(polluted, "0");
+    expect(snapshot.tracks).toEqual([{ id: "i.1", type: "library-songs" }]);
+  });
+});
+
 describe("read: a playlist with nothing in it", () => {
   test("a 404 for the tracks of a playlist that is there is a playlist with no tracks", async () => {
     const { music } = apple([], { empty: "404" });

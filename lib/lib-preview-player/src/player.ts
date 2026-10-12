@@ -128,7 +128,8 @@ const own = (value: unknown, key: string): unknown => (isPlain(value) && Object.
  */
 function clipOf(track: unknown): string | undefined {
   const previews = own(own(track, "attributes"), "previews");
-  const url = own(Array.isArray(previews) ? (previews[0] as unknown) : undefined, "url");
+  // The first preview is one the list holds itself: an empty list has none, whatever is under 0 on Object.prototype.
+  const url = own(Array.isArray(previews) && Object.hasOwn(previews, 0) ? (previews[0] as unknown) : undefined, "url");
   return typeof url === "string" && url !== "" ? url : undefined;
 }
 

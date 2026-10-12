@@ -7,7 +7,8 @@
 import { addLibraryPlaylistTracks, createLibraryPlaylist, listLibraryPlaylists, type tPlaylistTrack } from "@open-music-sdk/client-user";
 import { AppleMusicError, got, isAppleMusicError, isName, isPlain, optionsOf, ownOf, sleep, type tAppleMusicClient } from "@open-music-sdk/core";
 import { countOf, pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
-import { diff, isThere, refsOf, targetOf, type tHeld, type tNewPlaylist, type tPlaylistPlan } from "./plan";
+import { held } from "./own";
+import { diff, isThere, refsOf, targetOf, type tHeld, type tNewPlaylist, type tPlaylistPlan, type tPlaylistSnapshotTrack } from "./plan";
 import { taken } from "./read";
 
 /** How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made at once may not show it. */
@@ -56,6 +57,16 @@ const unsure = (error: unknown): boolean => isAppleMusicError(error) && (error._
 /** Whether a track the playlist holds is the one wanted: by its catalog id, or by its own. */
 const same = (held: tHeld | undefined, wanted: tPlaylistTrack): boolean => held !== undefined && (held.catalogId === wanted.id || held.id === wanted.id);
 
+/**
+ * What the diff reads of each track a playlist holds, read as the track's own. A track that was read has no field
+ * for what Apple did not give, so a catalog id found on Object.prototype is not the track's.
+ */
+const idsOf = (tracks: readonly tPlaylistSnapshotTrack[]): tHeld[] =>
+  tracks.map((track) => {
+    const { id, catalogId } = held(track);
+    return { id: id as string, catalogId: isName(catalogId) ? catalogId : undefined };
+  });
+
 /** A plan as this call's own: the playlist it is for and the tracks wanted. What it says is missing is worked out again from what the playlist holds now. */
 function planOf(plan: unknown): { readonly target: { readonly id: string } | tNewPlaylist; readonly wanted: tPlaylistTrack[] } {
   if (!isPlain(plan)) throw new TypeError(`${FN}: plan must be a plan as plan gives one, with a playlist and the tracks it is to hold; got ${got(plan)}`);
@@ -66,9 +77,9 @@ function planOf(plan: unknown): { readonly target: { readonly id: string } | tNe
 /** The listener's playlist with exactly this name and description that they may add to, or nothing. */
 async function find(client: tAppleMusicClient, target: tNewPlaylist, signal: AbortSignal | undefined): Promise<string | undefined> {
   for await (const playlist of listLibraryPlaylists.bound(client)({ signal })) {
-    const { id, attributes } = isPlain(playlist) ? ownOf(playlist as { readonly id?: unknown; readonly attributes?: unknown }) : {};
-    const { name, description, canEdit } = isPlain(attributes) ? ownOf(attributes as { readonly name?: unknown; readonly description?: unknown; readonly canEdit?: unknown }) : {};
-    const standard: unknown = isPlain(description) ? ownOf(description as { readonly standard?: unknown }).standard : undefined;
+    const { id, attributes } = held(playlist);
+    const { name, description, canEdit } = held(attributes);
+    const { standard } = held(description);
     if (isName(id) && name === target.name && (standard ?? "") === (target.description ?? "") && canEdit !== false) return id;
   }
   return undefined;
@@ -103,7 +114,7 @@ async function make(client: tAppleMusicClient, target: tNewPlaylist, signal: Abo
   let failure: unknown;
   try {
     const made: unknown = await createLibraryPlaylist.bound(client)({ attributes }, { signal });
-    const id: unknown = isPlain(made) ? ownOf(made as { readonly id?: unknown }).id : undefined;
+    const { id } = held(made);
     if (isName(id)) return id;
     failure = new AppleMusicError("ApiError", `${FN}: Apple took the new playlist and answered with none, and it does not show in the library yet`, { status: 201 });
   } catch (error) {
@@ -141,7 +152,7 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
   // The playlist, and what it holds now. One made here holds nothing, and is not read: it may not show yet.
   const there = isThere(target) ? target.id : await find(client, target, signal);
   const id = there ?? (await make(client, target as tNewPlaylist, signal, settle));
-  const before: readonly tHeld[] = there === undefined ? [] : (await taken(client, id, signal)).tracks;
+  const before: readonly tHeld[] = there === undefined ? [] : idsOf((await taken(client, id, signal)).tracks);
   const { append } = diff(before, wanted);
 
   let done = 0;
@@ -155,7 +166,7 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
       // The tracks went to the playlist's end if they went at all: after what it held, and what this run has added.
       const landed = await settled(
         async () => {
-          const now = (await taken(client, id, signal)).tracks;
+          const now = idsOf((await taken(client, id, signal)).tracks);
           return part.every((track, at) => same(now[before.length + from + at], track)) ? true : undefined;
         },
         settle,
@@ -168,6 +179,6 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
   }
 
   // Read once more, unless nothing was added: then the read that the plan was worked out from is the proof.
-  const shown = append.length === 0 ? true : await settled(async () => (diff((await taken(client, id, signal)).tracks, wanted).append.length === 0 ? true : undefined), settle, signal);
+  const shown = append.length === 0 ? true : await settled(async () => (diff(idsOf((await taken(client, id, signal)).tracks), wanted).append.length === 0 ? true : undefined), settle, signal);
   return Object.freeze({ id, created: there === undefined, appended: done, verified: shown === true });
 }

@@ -7,6 +7,7 @@ import { getSongsByIsrc, searchCatalog } from "@open-music-sdk/client-catalog";
 import { got, isPlain, itemsOf, optionsOf, ownOf, segmentOf, type tAppleMusicClient, type tStorefrontOption } from "@open-music-sdk/core";
 import type { tSong } from "@open-music-sdk/types";
 import { pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
+import { held } from "./own";
 
 /**
  * What is known of a track from outside Apple's catalog. The names are the ones a song's attributes have, so a
@@ -116,9 +117,9 @@ function wantedOf<D>(descriptions: unknown): tWanted<D>[] {
   });
 }
 
-/** What a song says of itself, read as what Apple sent and not as what the types say it is: an answer is not checked here. */
+/** What a song says of itself, read as what Apple sent and not as what the types say it is: an answer is not checked here, and a field is the song's when the song holds it itself. */
 function said(song: tSong): { readonly isrc: string; readonly name: string; readonly artistName: string; readonly albumName: string; readonly durationInMillis: number } {
-  const attributes = (isPlain(song) && isPlain(song.attributes) ? song.attributes : {}) as { readonly [K in keyof tTrackDescription]?: unknown };
+  const attributes = held(held(song).attributes);
   const words = (value: unknown): string => (typeof value === "string" ? value : "");
   return {
     isrc: words(attributes.isrc).toUpperCase(),

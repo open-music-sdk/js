@@ -326,6 +326,34 @@ describe("resolve: an answer that is not what Apple documents is an answer that 
   });
 });
 
+describe("resolve: what a song says of itself is what it holds itself", () => {
+  const polluted = Object.prototype as Record<string, unknown>;
+
+  afterEach(() => {
+    for (const key of ["attributes", "isrc", "name", "artistName"]) Reflect.deleteProperty(polluted, key);
+  });
+
+  test("a song Apple sent with no attributes is not given a name and an artist by what other code planted", async () => {
+    const bare = { id: "666", type: "songs", href: "/666" } as unknown as tSong;
+    const { music } = apple([], { search: () => [bare] });
+    polluted.attributes = { name: "Hey Jude", artistName: "The Beatles" };
+    const answer = await resolve(music, [{ name: "Hey Jude", artistName: "The Beatles" }]);
+    Reflect.deleteProperty(polluted, "attributes");
+    expect(answer.tracks).toEqual([]);
+  });
+
+  test("a song with no ISRC, or no name, is not given one either", async () => {
+    const nameless = song("667", { albumName: "1" });
+    const { music } = apple([], { override: (url) => (url.pathname.endsWith("/songs") ? { body: { data: [nameless] } } : undefined), search: () => [nameless] });
+    polluted.isrc = "GBAYE0601498";
+    polluted.name = "Hey Jude";
+    polluted.artistName = "The Beatles";
+    const answer = await resolve(music, [Object.assign(Object.create(null) as object, { isrc: "GBAYE0601498", name: "Hey Jude", artistName: "The Beatles" })]);
+    for (const key of ["isrc", "name", "artistName"]) Reflect.deleteProperty(polluted, key);
+    expect(answer.tracks).toEqual([]);
+  });
+});
+
 describe("resolve: progress, pace and stopping", () => {
   test("it is told how many descriptions are done with, of how many, each time more are: several at once for an ISRC, one at a time for a search", async () => {
     const { music } = apple();

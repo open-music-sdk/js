@@ -1,8 +1,9 @@
 // A playlist of the listener's library, read whole: what it is called, and every track on every page, each with
 // the catalog's id for it and the recording's ISRC where the library knows them. What comes of it is plain JSON.
 import { getLibraryPlaylist, getLibraryPlaylistRelationship } from "@open-music-sdk/client-user";
-import { AppleMusicError, isAppleMusicError, isName, isPlain, optionsOf, ownOf, segmentOf, type tAppleMusicClient } from "@open-music-sdk/core";
+import { AppleMusicError, isAppleMusicError, isName, optionsOf, segmentOf, type tAppleMusicClient } from "@open-music-sdk/core";
 import { progressOf, signalOf, type tAskOptions } from "./options";
+import { first, held } from "./own";
 import type { tPlaylistSnapshot, tPlaylistSnapshotTrack } from "./plan";
 
 const FN = "playlists.read";
@@ -12,29 +13,6 @@ const PAGE = 100;
 
 /** The options of `read`. */
 export type tReadPlaylistOptions = tAskOptions;
-
-/** What is read of a track, and of what a track holds, none of it taken on trust: an answer is checked only where the caller passes a schema, and none is passed here. */
-interface tLoose {
-  readonly id?: unknown;
-  readonly type?: unknown;
-  readonly attributes?: unknown;
-  readonly relationships?: unknown;
-  readonly catalog?: unknown;
-  readonly data?: unknown;
-  readonly playParams?: unknown;
-  readonly catalogId?: unknown;
-  readonly isrc?: unknown;
-  readonly name?: unknown;
-  readonly artistName?: unknown;
-  readonly albumName?: unknown;
-  readonly durationInMillis?: unknown;
-  readonly description?: unknown;
-  readonly standard?: unknown;
-  readonly canEdit?: unknown;
-}
-
-/** What a value holds itself, where it is a plain object, and nothing where it is not. */
-const held = (value: unknown): tLoose => (isPlain(value) ? ownOf(value as tLoose) : {});
 
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined);
 
@@ -46,13 +24,16 @@ const filled = <T extends object>(bag: { readonly [K in keyof T]: T[K] | undefin
  * `catalog` relationship, which is asked for with the tracks. Where an answer has no such relationship, the id
  * Apple puts under `playParams.catalogId` is taken: Apple's documentation does not list that field, and its
  * answers carry it. Without either, the track is one the catalog does not know, such as an upload.
+ *
+ * None of what an answer holds is taken on trust: an answer is checked only where a caller passes a schema, and
+ * none is passed here. Each field is read as the answer's own, so nothing on Object.prototype is read as Apple's.
  */
 function trackOf(track: unknown): tPlaylistSnapshotTrack {
   const { id, type, attributes, relationships } = held(track);
   if (!isName(id) || !isName(type)) throw new AppleMusicError("ApiError", `${FN}: Apple answered with a track that has no id or no type`, { status: 200 });
   const { name, artistName, albumName, durationInMillis, playParams } = held(attributes);
   const { data } = held(held(relationships).catalog);
-  const song = held(Array.isArray(data) ? (data[0] as unknown) : undefined);
+  const song = held(first(data));
   const catalogId = isName(song.id) ? song.id : held(playParams).catalogId;
   return filled<tPlaylistSnapshotTrack>({
     id,

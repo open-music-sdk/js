@@ -233,6 +233,36 @@ describe("apply: the playlist a plan names by its id", () => {
   });
 });
 
+describe("apply: what a playlist holds is read as its own, whatever other code put on Object.prototype", () => {
+  const polluted = Object.prototype as Record<string, unknown>;
+
+  afterEach(() => {
+    for (const key of ["id", "catalogId", "data"]) Reflect.deleteProperty(polluted, key);
+  });
+
+  test("an id planted there is no track's catalog id: what the playlist holds is not added a second time", async () => {
+    const { music, posted, holds } = apple([{ id: "p.1", holds: ["1", "2"] }]);
+    const made = forId("p.1", "1", "2");
+    polluted.id = "zzz";
+    const applied = await apply(music, made, QUICK);
+    Reflect.deleteProperty(polluted, "id");
+    expect(applied).toMatchObject({ appended: 0, verified: true });
+    expect(posted).toEqual([]);
+    expect(holds("p.1")).toEqual(["1", "2"]);
+  });
+
+  test("a catalog id planted there is no track's either: a track the playlist does not hold is still added", async () => {
+    const { music, posted, add } = apple([{ id: "p.1" }]);
+    add("p.1", undefined as unknown as string);
+    const made = forId("p.1", "1");
+    polluted.catalogId = "1";
+    const applied = await apply(music, made, QUICK);
+    Reflect.deleteProperty(polluted, "catalogId");
+    expect(applied).toMatchObject({ appended: 1, verified: true });
+    expect(posted).toEqual([["1"]]);
+  });
+});
+
 describe("apply: tracks go in order, chunk to a request", () => {
   test("five tracks two at a time are three requests, and the playlist ends in the order wanted", async () => {
     const { music, posted, holds } = apple([{ id: "p.1" }]);

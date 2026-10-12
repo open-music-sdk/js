@@ -4,6 +4,7 @@
 // to look at before anything is written.
 import type { tPlaylistTrack } from "@open-music-sdk/client-user";
 import { got, isName, isPlain, itemsOf, ownOf, segmentOf } from "@open-music-sdk/core";
+import { held } from "./own";
 
 /**
  * A track of a playlist as `read` gives it. Plain JSON, and the same fields a track is described by to `resolve`,
@@ -108,7 +109,7 @@ export function diff(held: readonly tHeld[], wanted: readonly tPlaylistTrack[]):
 export function refsOf(fn: string, tracks: unknown): tPlaylistTrack[] {
   const given = itemsOf(tracks, 0, Number.MAX_SAFE_INTEGER);
   const own = (given ?? []).map((track) => {
-    const { id, type } = isPlain(track) ? ownOf(track as { readonly id?: unknown; readonly type?: unknown }) : {};
+    const { id, type } = held(track);
     return isName(id) && isName(type) ? ({ id, type } as tPlaylistTrack) : undefined;
   });
   const bad = own.indexOf(undefined);
@@ -146,7 +147,7 @@ function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapsh
   const { tracks } = ownOf(playlist as { readonly tracks?: unknown });
   const given = itemsOf(tracks, 0, Number.MAX_SAFE_INTEGER);
   const own = (given ?? []).map((track) => {
-    const { id, catalogId } = isPlain(track) ? ownOf(track as { readonly id?: unknown; readonly catalogId?: unknown }) : {};
+    const { id, catalogId } = held(track);
     return isName(id) && (catalogId === undefined || isName(catalogId)) ? { track: track as tPlaylistSnapshotTrack, ids: { id, catalogId } } : undefined;
   });
   const bad = own.indexOf(undefined);

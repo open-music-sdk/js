@@ -92,6 +92,33 @@ describe("refsOf", () => {
   });
 });
 
+describe("refsOf and the tracks of a playlist: nothing on Object.prototype makes a track of what is none", () => {
+  const polluted = Object.prototype as Record<string, unknown>;
+
+  test("with an id and a type planted there, what is no track is still refused", () => {
+    polluted.id = "999";
+    polluted.type = "songs";
+    try {
+      expect(() => refsOf("playlists.plan", [null])).toThrow(/; got null at index 0$/);
+      expect(() => refsOf("playlists.plan", [7])).toThrow(/; got 7 at index 0$/);
+      expect(() => refsOf("playlists.plan", [{}])).toThrow(/; got object at index 0$/);
+      expect(() => plan({ id: "p.1", tracks: [null] } as unknown as tPlaylistSnapshot, [])).toThrow(/^playlists\.plan: playlist\.tracks must be .*; got null at index 0$/);
+    } finally {
+      Reflect.deleteProperty(polluted, "id");
+      Reflect.deleteProperty(polluted, "type");
+    }
+  });
+
+  test("a catalog id planted there is not a held track's: the track it has not got is still missing", () => {
+    polluted.catalogId = "1";
+    try {
+      expect(plan({ id: "p.1", tracks: [{ id: "i.9", type: "library-songs" }] }, [want("1")]).append).toEqual([want("1")]);
+    } finally {
+      Reflect.deleteProperty(polluted, "catalogId");
+    }
+  });
+});
+
 describe("targetOf", () => {
   test("a playlist with an id is that playlist, whatever else it holds", () => {
     expect(targetOf("playlists.plan", snapshot("1"))).toEqual({ id: "p.1" });
