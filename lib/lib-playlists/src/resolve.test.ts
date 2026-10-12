@@ -82,6 +82,27 @@ describe("fold: text as it is compared", () => {
     expect(fold(text)).toBe(folded);
   });
 
+  test.each<[string, string, string]>([
+    ["the two dots that make a Japanese to a do", "\u30cf\u30fc\u30c9", "\u30cf\u30fc\u30c8"],
+    ["the same in hiragana", "\u304c\u3089\u3059", "\u304b\u3089\u3059"],
+    ["a Thai vowel", "\u0e1d\u0e31\u0e19", "\u0e1d\u0e19"],
+    ["a Devanagari vowel sign", "\u0926\u093f\u0932", "\u0926\u0932"],
+    ["the breve that tells one Russian letter from another", "\u043c\u043e\u0439", "\u043c\u043e\u0438"],
+    ["a Greek accent", "\u03b3\u03ad\u03c1\u03bf\u03c2", "\u03b3\u03b5\u03c1\u03bf\u03c2"],
+    ["a Hebrew point", "\u05e9\u05c1\u05dc\u05d5\u05dd", "\u05e9\u05c2\u05dc\u05d5\u05dd"],
+  ])("a mark that is part of a letter is kept: %s makes another word, and the two are not the same", (_name, one, other) => {
+    expect(fold(one)).not.toBe(fold(other));
+  });
+
+  test.each<[string, string, string]>([
+    ["a Japanese letter", "\u30c9", "\u30c8\u3099"],
+    ["a Russian letter", "\u0439", "\u0438\u0306"],
+    ["a Korean syllable", "\ud55c", "\u1112\u1161\u11ab"],
+  ])("%s written as one character and as a letter with its mark are the same text", (_name, one, two) => {
+    expect(one).not.toBe(two);
+    expect(fold(one)).toBe(fold(two));
+  });
+
   test("what a recording was later called is left in: it is not for a rule to say those are the same song", () => {
     expect(fold("Hey Jude (Remastered 2015)")).toBe("hey jude remastered 2015");
     expect(fold("Hey Jude - Live")).not.toBe(fold("Hey Jude"));
@@ -192,6 +213,14 @@ describe("resolve: then by a search, for what the ISRCs did not find", () => {
     const { tracks, skipped } = await resolve(music, [description]);
     expect(tracks).toEqual([]);
     expect(skipped).toEqual([{ index: 0, track: description, reason: "no-match", candidates: [HEY_JUDE, YESTERDAY] }]);
+  });
+
+  test("a title that differs from a song's by a mark that is part of a letter is another title, and is not matched", async () => {
+    const heart = song("5", { name: "\u30cf\u30fc\u30c8", artistName: "Artist" });
+    const { music } = apple([heart]);
+    const { tracks, skipped } = await resolve(music, [{ name: "\u30cf\u30fc\u30c9", artistName: "Artist" }]);
+    expect(tracks).toEqual([]);
+    expect(skipped[0]?.candidates).toEqual([heart]);
   });
 
   test("of several songs with the name and the artist, the album and then the length decide, as they do for an ISRC", async () => {

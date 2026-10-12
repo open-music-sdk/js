@@ -56,18 +56,24 @@ const MAX_TERM = 256;
 const MAX_CODE = 64;
 
 /**
- * Text as it is compared: without case, accents or apostrophes, with one space wherever there was punctuation or
- * more than one space. `Beyoncé` is `beyonce`, `Don't` is `dont`, and `AC/DC` is `ac dc`. What a recording was
+ * Text as it is compared: without case, apostrophes or the accents on Latin letters, with one space wherever there
+ * was punctuation or more than one space. `Beyoncé` is `beyonce`, `Don't` is `dont`, and `AC/DC` is `ac dc`. What a recording was
  * later called, `(Remastered 2011)` or `- Live`, is left in: whether those are the same song is not for a rule
  * to say. Text that is punctuation and nothing else is compared as it is, so that `!!!` is not `???`.
+ *
+ * An accent is a mark on a Latin letter, and only there is a mark dropped. In other scripts a mark is part of the
+ * letter, and makes another word of it: the two dots that tell a Japanese `do` from `to`, a Thai vowel, the breve
+ * that tells one Russian letter from another. Those are kept, and text is put back together around them, so that
+ * a letter written as one character and the same letter written as two compare equal.
  */
 export function fold(value: string): string {
   const folded = value
     .normalize("NFKD")
-    .replace(/\p{M}+/gu, "")
+    .replace(/(\p{Script=Latin})\p{M}+/gu, "$1")
+    .normalize("NFKC")
     .toLowerCase()
     .replace(/['`´‘’]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, " ")
     .trim();
   return folded === "" ? value.trim() : folded;
 }
@@ -157,8 +163,8 @@ const songsOf = (data: unknown): tSong[] => (Array.isArray(data) ? (data as unkn
 /**
  * Finds a song in the catalog for each description of a track. The ones with an ISRC are looked up by it first, 25
  * to a request. Each one still not found that has a name is searched for, one request each, and a song the search
- * found is taken only when its name and its artist are the description's, compared without case, accents or
- * punctuation. Where several songs fit, the description's album and length decide.
+ * found is taken only when its name and its artist are the description's, compared without case, punctuation or
+ * the accents on Latin letters. Where several songs fit, the description's album and length decide.
  *
  * It resolves to `{ tracks, skipped }`: the songs, in the order of the descriptions they were found for, and each
  * description left over, with where it was in the list and the songs its search came back with. A description that

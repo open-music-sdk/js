@@ -88,13 +88,16 @@ was read.
 Tracks with an ISRC are looked up by it first, 25 to a request, which is the most Apple documents
 taking. Each track still not found that has a name is searched for, one request each. A song the
 search found is taken only when its name and its artist are the description's, compared without case,
-accents, apostrophes or punctuation:
+apostrophes or punctuation, and without the accents on Latin letters:
 
 | These are the same | These are not |
 | --- | --- |
 | `Beyoncé` and `beyonce` | `Hey Jude` and `Hey Jude (Remastered 2015)` |
 | `Don't Stop Me Now` and `Dont stop me now` | `The Beatles` and `Beatles` |
 | `AC/DC` and `AC-DC` | `Simon & Garfunkel` and `Simon and Garfunkel` |
+
+A mark on a letter of another script is part of the letter and is kept, so a Japanese ハード is not
+ハート, and a Russian мой is not мои.
 
 The rule is strict on purpose. A wrong match cannot be taken back, since Apple's API cannot take a
 track out of a playlist, and whether a remaster or a live take is the same song is not for a rule to
