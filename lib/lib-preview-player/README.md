@@ -119,6 +119,14 @@ When a clip ends the next track of the queue starts. After the last one the play
 A listener is called once for each change, after the state has changed. While a clip plays the
 position changes several times a second, as often as the element says so.
 
+A listener may call the player back. The element is asked to play before anyone hears that a clip is
+loading, so a listener that pauses, loads another queue or disposes on hearing it has the last word,
+and no sound is left playing behind it.
+
+A listener that throws stops neither the player nor the other listeners. Each one is told, the
+player's own work is done first, and the first error is then thrown on: to whoever called the
+function, or out through the element's event when it was the element that spoke.
+
 ## Sound starts from a click
 
 Browsers do not let a page start sound by itself: the first sound has to follow something the

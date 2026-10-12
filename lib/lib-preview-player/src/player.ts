@@ -182,12 +182,25 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     });
   let state = snapshot();
 
-  /** Takes the state as it now is and tells whoever listens, when something a page would draw has changed. */
+  /**
+   * Takes the state as it now is and tells whoever listens, when something a page would draw has changed. Every
+   * listener is told, whatever another one throws, and the first such error is thrown on once they all have been.
+   * It is always the last thing done for a change, so what a listener throws cuts none of the player's own work
+   * short: it goes to whoever called the verb, or out through the element's event.
+   */
   function changed(): void {
     const now = snapshot();
     if (HELD.every((key) => Object.is(now[key], state[key]))) return;
     state = now;
-    for (const each of [...listeners]) each.heard();
+    let thrown: { readonly error: unknown } | undefined;
+    for (const each of [...listeners]) {
+      try {
+        each.heard();
+      } catch (error) {
+        thrown ??= { error };
+      }
+    }
+    if (thrown !== undefined) throw thrown.error;
   }
 
   /** A verb called on a player that was disposed is the caller's mistake: it has let go of its element. */
@@ -195,24 +208,42 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     if (disposed) throw new TypeError(`${NAME}.${verb}: the player was disposed, and plays nothing more`);
   }
 
-  /** Asks the element to play what it holds, and settles as the element does. */
-  async function sound(): Promise<void> {
+  /**
+   * Asks the element to play what it holds, and settles as the element does. The element is asked before anyone
+   * is told that a clip is loading. So whatever a listener does on hearing it, pause, load another queue or
+   * dispose, comes after the asking and is what stands: sound that a listener stopped stays stopped.
+   */
+  function sound(): Promise<void> {
     const turn = ++turns;
-    try {
-      await audio.play();
-    } catch (error) {
-      // The element did not start. Where it said why, with an error event, the state says so already.
-      if (turn === turns && status === "loading") {
-        status = "paused";
+    const asked = (async (): Promise<void> => {
+      try {
+        await audio.play();
+      } catch (error) {
+        // The element did not start. Where it said why, with an error event, the state says so already.
+        if (turn === turns && status === "loading") {
+          status = "paused";
+          try {
+            changed();
+          } catch {
+            // The element's own refusal is what this call rejects with. A listener that throws on hearing of it is not heard over it.
+          }
+        }
+        throw error;
+      }
+      // An element says it is playing with an event as well. Whichever comes first, the state is the same.
+      if (turn === turns && status === "loading" && !audio.paused) {
+        status = "playing";
         changed();
       }
+    })();
+    try {
+      changed();
+    } catch (error) {
+      // A listener threw, and that goes to whoever called. The element was asked all the same, and what it answers is nobody's to wait for now.
+      void asked.catch(() => undefined);
       throw error;
     }
-    // An element says it is playing with an event as well. Whichever comes first, the state is the same.
-    if (turn === turns && status === "loading" && !audio.paused) {
-      status = "playing";
-      changed();
-    }
+    return asked;
   }
 
   /** Makes the track at `at` the current one and plays it from its start. */
@@ -220,7 +251,6 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     index = at;
     status = "loading";
     audio.src = clips[at] ?? "";
-    changed();
     return sound();
   }
 
@@ -274,8 +304,10 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
         urls.push(clip);
       }
     });
-    reset(Object.freeze(kept), urls);
-    return Object.freeze({ tracks, skipped: Object.freeze(skipped) });
+    // Its own queue, and not whatever the player holds by the time it answers: a listener may have loaded another meanwhile.
+    const queue = Object.freeze(kept);
+    reset(queue, urls);
+    return Object.freeze({ tracks: queue, skipped: Object.freeze(skipped) });
   };
 
   const play = async (at?: number): Promise<void> => {
@@ -290,10 +322,7 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     if (index < 0 || status === "ended") return start(0);
     // The clip that failed is asked for again from its start: the element holds nothing of it to carry on with.
     if (status === "error") return start(index);
-    if (status === "paused") {
-      status = "loading";
-      changed();
-    }
+    if (status === "paused") status = "loading";
     return sound();
   };
 
@@ -342,8 +371,12 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
     if (disposed) return;
     disposed = true;
     for (const [type, handler] of handlers) audio.removeEventListener(type, handler);
-    reset(Object.freeze([]), []);
-    listeners.clear();
+    try {
+      reset(Object.freeze([]), []);
+    } finally {
+      // Whoever listened is let go of, whatever one of them threw on hearing the last of it.
+      listeners.clear();
+    }
   };
 
   const player = ownOf({

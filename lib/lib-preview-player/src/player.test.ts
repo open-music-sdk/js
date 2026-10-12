@@ -634,6 +634,151 @@ describe("state: one frozen snapshot, replaced only when something a page would 
   });
 });
 
+describe("what a listener does on hearing that a clip is loading is what stands: the element was asked first", () => {
+  /** A player whose listener does `once` the first time it hears that a clip is loading. */
+  function reacting(once: (player: tPreviewPlayer<tSong>) => void) {
+    const made = loaded();
+    let reacted = false;
+    made.player.subscribe(() => {
+      if (reacted || made.player.state.status !== "loading") return;
+      reacted = true;
+      once(made.player);
+    });
+    return made;
+  }
+
+  test("a listener that disposes the player leaves no sound behind: the element is paused, and nothing listens to it", async () => {
+    const { audio, player } = reacting((made) => {
+      made.dispose();
+    });
+    await player.play();
+    expect([audio.plays, audio.paused, audio.heldBy()]).toEqual([1, true, 0]);
+    expect(player.state).toMatchObject({ status: "idle", index: -1, tracks: [] });
+  });
+
+  test("a listener that loads another queue stops the clip that was starting, and the new queue is idle", async () => {
+    const { audio, player } = reacting((made) => {
+      made.load([song("z")]);
+    });
+    await player.play();
+    expect(audio.paused).toBe(true);
+    expect(player.state).toMatchObject({ status: "idle", index: -1 });
+    expect(player.state.tracks.map((track) => track.id)).toEqual(["z"]);
+  });
+
+  test("a listener that pauses is not overtaken: the clip is paused", async () => {
+    const { audio, player } = reacting((made) => {
+      made.pause();
+    });
+    await player.play();
+    expect(audio.paused).toBe(true);
+    expect(player.state).toMatchObject({ status: "paused", index: 0 });
+  });
+
+  test("a listener that plays another track has that track play, and not the one that was starting", async () => {
+    const { audio, player } = reacting((made) => {
+      void made.play(2);
+    });
+    await player.play(0);
+    await settled();
+    expect(audio.src).toBe(clip("c"));
+    expect(player.state).toMatchObject({ status: "playing", index: 2 });
+  });
+
+  test("load answers with its own queue, though a listener loaded another as it heard of the first", () => {
+    const { player } = loaded([]);
+    let nested = false;
+    player.subscribe(() => {
+      if (nested) return;
+      nested = true;
+      player.load([song("inner")]);
+    });
+    const none = song("none", []);
+    const outer = player.load([song("outer"), none]);
+    expect(outer.tracks.map((track) => track.id)).toEqual(["outer"]);
+    expect(outer.skipped.map((each) => each.track)).toEqual([none]);
+    expect(player.state.tracks.map((track) => track.id)).toEqual(["inner"]);
+  });
+});
+
+describe("a listener that throws stops neither the player nor the other listeners", () => {
+  const boom = new Error("the listener threw");
+  const thrower = () => {
+    throw boom;
+  };
+
+  test("every listener is told, and the first error is the one thrown on", () => {
+    const { player } = loaded();
+    const [before, after] = [vi.fn(), vi.fn()];
+    player.subscribe(before);
+    player.subscribe(thrower);
+    player.subscribe(() => {
+      throw new Error("a second one");
+    });
+    player.subscribe(after);
+    expect(() => {
+      player.setVolume(0.5);
+    }).toThrow(boom);
+    expect([before.mock.calls.length, after.mock.calls.length]).toEqual([1, 1]);
+    expect(player.state.volume).toBe(0.5);
+  });
+
+  test("play rejects with it, and the clip plays all the same: the element was asked, and the player is not left loading", async () => {
+    const { audio, player } = loaded();
+    player.subscribe(thrower);
+    await expect(player.play()).rejects.toBe(boom);
+    await settled();
+    expect([audio.plays, audio.paused]).toEqual([1, false]);
+    expect(player.state).toMatchObject({ status: "playing", index: 0 });
+  });
+
+  test("at the end of a clip it goes out through the element's event, and the next clip starts all the same", async () => {
+    const { audio, player } = loaded();
+    await player.play();
+    player.subscribe(thrower);
+    expect(() => {
+      audio.finish();
+    }).toThrow(boom);
+    await settled();
+    expect(audio.sources).toEqual([clip("a"), clip("b")]);
+    expect(audio.plays).toBe(2);
+    expect(player.state).toMatchObject({ status: "playing", index: 1 });
+  });
+
+  test("load throws it, with the new queue in place", () => {
+    const { player } = loaded();
+    player.subscribe(thrower);
+    expect(() => player.load([song("z")])).toThrow(boom);
+    expect(player.state.tracks.map((track) => track.id)).toEqual(["z"]);
+  });
+
+  test("dispose throws it, having let go of the element and of every listener", async () => {
+    const { audio, player } = loaded();
+    await player.play();
+    const heard = vi.fn(thrower);
+    player.subscribe(heard);
+    expect(() => {
+      player.dispose();
+    }).toThrow(boom);
+    expect([audio.paused, audio.heldBy()]).toEqual([true, 0]);
+    expect(() => {
+      player.dispose();
+    }).not.toThrow();
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  test("where the element refuses to play, its own error is what play rejects with, whatever a listener throws on hearing of it", async () => {
+    const { audio, player } = loaded();
+    const refusal = new DOMException("not allowed", "NotAllowedError");
+    audio.refusal = refusal;
+    player.subscribe(() => {
+      if (player.state.status === "paused") throw boom;
+    });
+    await expect(player.play()).rejects.toBe(refusal);
+    expect(player.state.status).toBe("paused");
+  });
+});
+
 describe("seek and volume are held to what an element takes", () => {
   test("seek moves the current clip, and the state follows", async () => {
     const { audio, player } = loaded();
