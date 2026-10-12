@@ -261,7 +261,9 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
       else if (type === "waiting" && status === "playing") status = "loading";
       else if (type === "pause" && audio.paused && !audio.ended && (status === "playing" || status === "loading")) status = "paused";
       else if (type === "error") status = "error";
-      else if (type === "ended" && audio.ended) {
+      // A clip that was playing has run out. One that was paused and then moved to its end has not: the next
+      // clip starts from the end of a clip that was playing, and from nothing else the element says.
+      else if (type === "ended" && audio.ended && (status === "playing" || status === "loading")) {
         if (index + 1 < tracks.length) {
           // Nobody is waiting on this one. If the next clip will not play, the state says so.
           void start(index + 1).catch(() => undefined);

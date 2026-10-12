@@ -431,6 +431,36 @@ describe("when a clip ends the next one starts, and after the last the player ha
     expect(player.state).toMatchObject({ status: "paused", index: 1 });
   });
 
+  test("a clip that is paused and then moved to its end has not run out: no clip starts, and the player stays paused on it", async () => {
+    const { audio, player } = loaded();
+    await player.play();
+    player.pause();
+    player.seek(30);
+    audio.ended = true;
+    audio.emit("ended");
+    await settled();
+    expect([audio.plays, audio.sources]).toEqual([1, [clip("a")]]);
+    expect(player.state).toMatchObject({ status: "paused", index: 0 });
+  });
+
+  test("the same on the last clip: paused at its end, the queue has not ended", async () => {
+    const { audio, player } = loaded([song("a")]);
+    await player.play();
+    player.pause();
+    audio.ended = true;
+    audio.emit("ended");
+    expect(player.state.status).toBe("paused");
+  });
+
+  test("a clip that stopped to wait for more of itself and then ran out is one that was playing: the next starts", async () => {
+    const { audio, player } = loaded();
+    await player.play();
+    audio.emit("waiting");
+    audio.finish();
+    await settled();
+    expect(player.state).toMatchObject({ status: "playing", index: 1 });
+  });
+
   test("an end heard late, for a clip that is no longer the current one, moves nothing", async () => {
     const { audio, player } = loaded();
     await player.play();
