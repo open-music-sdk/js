@@ -46,7 +46,7 @@ export interface tNewPlaylist {
   readonly description?: string | undefined;
 }
 
-/** What `plan` gives: the tracks a playlist is to hold, and what that takes. Plain and frozen. */
+/** What `plan` gives: the tracks a playlist is to hold, and what that takes. Plain, and frozen all the way down: it holds nothing of the caller's that could change under it. */
 export interface tPlaylistPlan {
   /** The playlist the plan is for: by its id, or by the name and description of one to find or make. */
   readonly playlist: { readonly id: string } | tNewPlaylist;
@@ -120,7 +120,7 @@ export function refsOf(fn: string, tracks: unknown): tPlaylistTrack[] {
   const given = itemsOf(tracks, 0, Number.MAX_SAFE_INTEGER);
   const own = (given ?? []).map((track) => {
     const { id, type } = held(track);
-    return isName(id) && isName(type) ? ({ id, type } as tPlaylistTrack) : undefined;
+    return isName(id) && isName(type) ? (Object.freeze({ id, type }) as tPlaylistTrack) : undefined;
   });
   const bad = own.indexOf(undefined);
   if (given !== undefined && bad === -1) return own as tPlaylistTrack[];
@@ -152,13 +152,13 @@ export function targetOf(fn: string, playlist: unknown): { readonly id: string }
  */
 export const isThere = (target: { readonly id: string } | tNewPlaylist): target is { readonly id: string } => Object.hasOwn(target, "id");
 
-/** The tracks of a playlist that was read, each as what the diff reads of it and as it was handed over. */
+/** The tracks of a playlist that was read, each as what the diff reads of it and as a frozen copy of what was handed over, for the plan to hold. */
 function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapshotTrack; readonly ids: tHeld }[] {
   const { tracks } = ownOf(playlist as { readonly tracks?: unknown });
   const given = itemsOf(tracks, 0, Number.MAX_SAFE_INTEGER);
   const own = (given ?? []).map((track) => {
     const { id, catalogId } = held(track);
-    return isName(id) && (catalogId === undefined || isName(catalogId)) ? { track: track as tPlaylistSnapshotTrack, ids: { id, catalogId } } : undefined;
+    return isName(id) && (catalogId === undefined || isName(catalogId)) ? { track: Object.freeze({ ...(track as tPlaylistSnapshotTrack) }), ids: { id, catalogId } } : undefined;
   });
   const bad = own.indexOf(undefined);
   if (given !== undefined && bad === -1) return own as { readonly track: tPlaylistSnapshotTrack; readonly ids: tHeld }[];

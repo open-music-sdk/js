@@ -174,13 +174,29 @@ describe("plan: what a playlist is missing, and what cannot be done, with no req
 
   test("a plan is frozen all the way down, and is plain JSON: it is the same after being written out and read back", () => {
     const made = plan(snapshot("9"), [want("1")]);
-    expect([made, made.playlist, made.tracks, made.append, made.extra].every((each) => Object.isFrozen(each))).toBe(true);
+    expect([made, made.playlist, made.tracks, made.append, made.extra, ...made.tracks, ...made.append, ...made.extra].every((each) => Object.isFrozen(each))).toBe(true);
+    expect([made.tracks.length, made.append.length, made.extra.length]).toEqual([1, 1, 1]);
     expect(JSON.parse(JSON.stringify(made))).toEqual(made);
   });
 
-  test("the extra tracks are the playlist's own, as they were read", () => {
-    const playlist = snapshot("9");
-    expect(plan(playlist, []).extra[0]).toBe(playlist.tracks[0]);
+  test("a plan holds nothing of the caller's: changing the playlist or the tracks afterwards changes nothing in it", () => {
+    const playlist = JSON.parse(JSON.stringify(snapshot("9"))) as { tracks: { id: string }[] };
+    const tracks = [{ id: "1", type: "songs" as const }];
+    const made = plan(playlist as unknown as tPlaylistSnapshot, tracks);
+    const before = JSON.stringify(made);
+    (tracks[0] as { id: string }).id = "changed";
+    (playlist.tracks[0] as { id: string }).id = "changed too";
+    expect(JSON.stringify(made)).toBe(before);
+    expect(() => {
+      (made.tracks[0] as { id: string }).id = "written to";
+    }).toThrow(TypeError);
+  });
+
+  test("the extra tracks are the playlist's, as they were read: copies of them, with everything each one held", () => {
+    const playlist: tPlaylistSnapshot = { id: "p.1", tracks: [{ id: "i.9", type: "library-songs", catalogId: "9", isrc: "A", name: "Nine" }] };
+    const { extra } = plan(playlist, []);
+    expect(extra).toEqual(playlist.tracks);
+    expect(extra[0]).not.toBe(playlist.tracks[0]);
   });
 
   test("a playlist that was read, written to a file and read back plans the same", () => {
