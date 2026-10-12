@@ -223,6 +223,14 @@ describe("hosts: where a clip may come from, for a caller who says", () => {
     ]);
   });
 
+  test.each(["https:/audio-ssl.itunes.apple.com/../api/logout?all=1", "https:audio-ssl.itunes.apple.com/../../uploads/theirs.m4a"])(
+    "a clip written as %s names an allowed host on its own, and is a path on the page's own host to a page that is https: it is skipped",
+    (url) => {
+      const moved = song("moved", [{ url }]);
+      expect(loaded([moved], { hosts: ["itunes.apple.com"] }).answer).toEqual({ tracks: [], skipped: [{ index: 0, track: moved, reason: "host" }] });
+    },
+  );
+
   test("with none named, where a clip points is not checked at all", () => {
     expect(loaded([elsewhere, plain]).answer.skipped).toEqual([]);
   });

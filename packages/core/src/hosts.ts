@@ -19,15 +19,23 @@ export function hostsOf(fn: string, value: unknown, example: string): readonly s
   throw new TypeError(`${fn}: hosts must be an array of 1 to ${String(MAX_HOSTS)} host names in small letters, such as ${example}`);
 }
 
+/** A page that is itself `https`, on a host nobody allows: what a URL is read against, to see that it stands on its own. */
+const ELSEWHERE = "https://elsewhere.invalid/";
+
 /**
  * Whether `url` is `https` on one of `hosts` or on a subdomain of one, with no port and no credentials. The URL is
  * read by the parser a browser reads it with, so what is checked is what will be requested. One that does not stand
  * on its own, such as a relative one, is on no host that could be allowed.
+ *
+ * It is read twice: on its own, and as a page that is `https` itself reads it. `https:host/a` and `https:/host/a`
+ * are whole URLs on their own and name `host`, but such a page reads them as paths on its own host, and asks
+ * there. A URL that the two readings take to different places is on no host that could be allowed.
  */
 export function isOnHost(url: string, hosts: readonly string[]): boolean {
   let parsed: URL | undefined;
   try {
-    parsed = new URL(url);
+    const alone = new URL(url);
+    if (new URL(url, ELSEWHERE).href === alone.href) parsed = alone;
   } catch {
     // Not a URL on its own: on no host.
   }

@@ -72,6 +72,26 @@ describe("isOnHost", () => {
     expect(isOnHost(url, APPLE)).toBe(false);
   });
 
+  test.each<[string, string, string]>([
+    ["no slash after the scheme", "https:mzstatic.com/a.jpg", "https://app.example/dir/mzstatic.com/a.jpg"],
+    ["one slash after the scheme", "https:/mzstatic.com/a.jpg", "https://app.example/mzstatic.com/a.jpg"],
+    ["one slash, and a path that climbs", "https:/mzstatic.com/../account/delete?confirm=1", "https://app.example/account/delete?confirm=1"],
+    ["no slash, and a path that climbs", "https:mzstatic.com/../../uploads/theirs.jpg", "https://app.example/uploads/theirs.jpg"],
+  ])("a URL with %s names the host on its own, and is a path on the page's own host to a page that is https: it is not on the host", (_name, url, asked) => {
+    // What the check is up against: read alone the URL names the host allowed, and a page reads it as somewhere else.
+    expect(new URL(url).hostname).toBe("mzstatic.com");
+    expect(new URL(url, "https://app.example/dir/page.html").href).toBe(asked);
+    expect(isOnHost(url, APPLE)).toBe(false);
+  });
+
+  test.each(["https:\\\\mzstatic.com/a.jpg", "https:/\\mzstatic.com/a.jpg", "  https://mzstatic.com/a.jpg  ", "ht\ttps://mzstatic.com/a.jpg"])(
+    "%j is read the same way alone and by a page, and is on the host",
+    (url) => {
+      expect(new URL(url, "https://app.example/dir/page.html").hostname).toBe("mzstatic.com");
+      expect(isOnHost(url, APPLE)).toBe(true);
+    },
+  );
+
   test("any one of the hosts will do", () => {
     expect(isOnHost("https://audio-ssl.itunes.apple.com/a.m4a", ["mzstatic.com", "itunes.apple.com"])).toBe(true);
     expect(isOnHost("https://audio-ssl.itunes.apple.com/a.m4a", ["mzstatic.com"])).toBe(false);
