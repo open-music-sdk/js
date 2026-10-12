@@ -44,6 +44,7 @@ try {
 | `readBounded(message, maxBytes)` | The body of a `Request` or `Response` as text, or `undefined` once it runs past the limit; the rest is cancelled, not read |
 | `got(value)` | What a value is, for an error that must not show it: a string by its length, anything else by its kind, a number as it is |
 | `has(value, methods)`, `optionsOf(fn, options, what)`, `clientOf(fn, client, methods)` | The checks a package makes on what it is handed: an object with those methods, an options bag, a client. A mistake is a `TypeError` naming `fn` |
+| `hostsOf(fn, value, example)`, `isOnHost(url, hosts)` | The hosts a caller says a URL may be on, as the call's own list or a `TypeError`; and whether a URL is `https` on one of them or on a subdomain, with no port and no credentials |
 | `segmentOf(fn, name, value)` | A caller's value as one segment of a path, percent-encoded, or a `TypeError` |
 | `listOf(fn, name, value)` | A caller's list of ids, types or codes as the call's own copy, or a `TypeError` |
 | `textOf(fn, name, value)` | A caller's text that is no name, such as a search term, or a `TypeError` |
