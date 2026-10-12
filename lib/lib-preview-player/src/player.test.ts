@@ -304,11 +304,12 @@ describe("hosts: where a clip may come from, for a caller who says", () => {
   });
 });
 
-describe("nothing is asked of the element, and nothing is played, until a verb says so", () => {
-  test("making a player gives the element no clip and does not play", () => {
+describe("the element is given no clip, and nothing is played, until a verb says so", () => {
+  test("making a player listens to the element, and does nothing else to it: no clip, no playing, no loading", () => {
     const audio = new FakeAudio();
     const player = previewPlayer({ audio });
-    expect([audio.sources, audio.plays]).toEqual([[], 0]);
+    expect(audio.heldBy()).toBe(8);
+    expect([audio.sources, audio.plays, audio.loads]).toEqual([[], 0, 0]);
     expect(player.state).toEqual({ status: "idle", tracks: [], index: -1, track: undefined, position: 0, duration: 0, volume: 1 });
   });
 

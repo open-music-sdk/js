@@ -157,8 +157,8 @@ function audioOf(given: unknown): tPreviewAudio {
 }
 
 /**
- * Makes a player of preview clips around one audio element. Nothing is asked of the element, and nothing is
- * played, until one of the player's functions is called. `T` is the kind of track it is fed, such as `tSong`, and
+ * Makes a player of preview clips around one audio element. The element is listened to from then on, and that is
+ * all: it is given no clip, and nothing is played, until one of the player's functions is called. `T` is the kind of track it is fed, such as `tSong`, and
  * is what `state.track` is typed as.
  *
  * Sound starts only from `play`, `next` and `previous`, and from the end of a clip that was playing, which starts

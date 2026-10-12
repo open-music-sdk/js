@@ -19,7 +19,7 @@ pnpm add @open-music-sdk/lib-preview-player
 import { previewPlayer } from "@open-music-sdk/lib-preview-player";
 import type { tSong } from "@open-music-sdk/types";
 
-const player = previewPlayer<tSong>(); // nothing is played, and nothing is asked of the element, yet
+const player = previewPlayer<tSong>(); // listens to the element; gives it no clip and plays nothing yet
 
 // Songs as a client handed them over: from a search, a chart, an album's tracks.
 const { tracks, skipped } = player.load(songs);
@@ -164,8 +164,9 @@ URL, and the element will request it.
 | `hosts` | Bare host names in small letters, 16 at most. With this, a track whose clip is not `https` on one of them or on a subdomain of one, with no port and no credentials, is skipped as `"host"`. |
 
 The check is the one [`@open-music-sdk/util-artwork`](../../packages/util-artwork) makes for an
-artwork, and both take it from [`@open-music-sdk/core`](../../packages/core). That check is all of
-`core` an app carries because of this package: none of the client comes with it.
+artwork, and both take it from [`@open-music-sdk/core`](../../packages/core). That check, and a
+handful of others the player makes on what it is handed, are all of `core` an app carries because of
+this package: none of the client comes with it.
 
 ## Mistakes and errors
 

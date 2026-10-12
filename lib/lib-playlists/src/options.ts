@@ -21,8 +21,9 @@ export interface tAskOptions {
 /** What a verb that makes several requests of its own takes beside: how long to leave between them. */
 export interface tPaceOptions {
   /**
-   * How long to wait after one request before the next, in milliseconds. Default 0: no wait. The client's own rate
-   * limiter and its wait after a 429 apply underneath, whatever this says.
+   * How long to wait between the requests a verb makes one after another for the same thing, in milliseconds:
+   * every request of `resolve`, and in `apply` the requests that add tracks, not the reads before and after them.
+   * Default 0: no wait. The client's own rate limiter and its wait after a 429 apply underneath, whatever this says.
    */
   readonly delayMs?: number | undefined;
 }

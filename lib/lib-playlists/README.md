@@ -185,10 +185,11 @@ later.
    listener's playlists for one they may add to with exactly that name and that description. If there
    is none, it makes one, and only then.
 2. **Reads it**, and works out afresh what it is missing. What the plan said was missing is not taken
-   at its word: the playlist may have changed since.
+   at its word: the playlist may have changed since. A playlist it has just made holds nothing, and
+   is not read.
 3. **Adds what is missing** to its end, in order, `chunk` tracks to a request.
-4. **Reads it once more**, to see whether what was added shows; and, for a playlist it made, looks
-   for it among the listener's playlists, where the next run will look.
+4. **Reads it once more**, where anything was added, to see whether it shows; and, for a playlist it
+   made, looks for it among the listener's playlists, where the next run will look.
 
 The description is the place for a mark of your own, such as `"from my-app, list 42"`: Apple keeps
 nothing else of yours with a playlist, and a listener may have another by the same name. Better still,
@@ -242,7 +243,7 @@ cannot find it, and makes a second one, which nothing in the API can take away. 
 | Option | On | |
 | --- | --- | --- |
 | `onProgress({ done, total })` | `resolve`, `read`, `apply` | Called each time more tracks are done with. What it throws stops the verb, and is what the verb rejects with. |
-| `delayMs` | `resolve`, `apply` | How long to wait after one request before the next. Default 0. |
+| `delayMs` | `resolve`, `apply` | How long to wait between the requests a verb makes one after another for the same thing: in `resolve`, every request it makes; in `apply`, the requests that add tracks, and not the reads before and after them. Default 0. |
 | `signal` | `resolve`, `read`, `apply` | Aborts the request in flight and any wait. An abort is rethrown as it is. |
 | `maxPages` | `read`, `apply` | The most pages one walk may ask for: of a playlist's tracks, or of the listener's playlists. Default: no limit. |
 
@@ -300,7 +301,11 @@ Nothing in this package has been run against the live API. These are what it tak
 - **How long a write takes to show**, which the defaults of `settle` are a guess at, and **how many
   tracks one request takes**, which `chunk` is held to 300 for because that is the most the client's
   function takes.
-- **That a playlist's description comes back as it was sent**, which finding a playlist by it needs.
+- **That a playlist's name and description come back as they were sent**, which finding a playlist by
+  them needs. If Apple changes either, a playlist a run made is never found again by its plan: the run
+  resolves with `verified: false`, and the `id` it resolved with is the way back to the playlist.
+- **That a playlist asked for with `include=tracks` carries its first tracks**, which is what a 404
+  for its tracks is checked against.
 
 ## Not here
 

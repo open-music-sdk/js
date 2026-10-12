@@ -90,6 +90,12 @@ describe("what an app carries because of this package", () => {
     expect(CLIENT.filter((mark) => code.includes(mark))).toEqual([]);
   });
 
+  test("what it does carry of core is the checks it makes on what it is handed, the host check among them", { timeout: 30_000 }, async () => {
+    const code = await carried();
+    expect(code).toContain("hosts must be an array of");
+    expect(code).toContain("expected ${");
+  });
+
   test("the check that says so can tell: all of core has every one of those in it", () => {
     const core = readFileSync(createRequire(import.meta.url).resolve("@open-music-sdk/core"), "utf8");
     expect(CLIENT.filter((mark) => core.includes(mark))).toEqual(CLIENT);
