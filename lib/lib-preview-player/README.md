@@ -141,8 +141,8 @@ rejects with the browser's `AbortError`, and the state is the later call's: catc
 ## The element
 
 Hand over your own `<audio>` to keep its controls, or let the player make one. The player uses
-`src`, `currentTime`, `volume`, `duration`, `paused`, `ended`, `play()`, `pause()` and eight of the
-element's events, and nothing else: it never adds the element to the page or takes it out.
+`src`, `currentTime`, `volume`, `duration`, `paused`, `ended`, `error`, `play()`, `pause()` and eight of
+the element's events, and nothing else: it never adds the element to the page or takes it out.
 
 An element that something else pauses, such as its own controls, is paused in `state` too, and a
 volume set on the element is the volume in `state`.

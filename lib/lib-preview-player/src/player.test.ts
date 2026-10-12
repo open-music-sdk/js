@@ -21,6 +21,7 @@ class FakeAudio implements tPreviewAudio {
   duration = Number.NaN;
   paused = true;
   ended = false;
+  error: unknown = null;
   #src = "";
   #volume = 1;
 
@@ -35,6 +36,7 @@ class FakeAudio implements tPreviewAudio {
     this.duration = Number.NaN;
     this.ended = false;
     this.paused = true;
+    this.error = null;
   }
   get volume(): number {
     return this.#volume;
@@ -84,6 +86,11 @@ class FakeAudio implements tPreviewAudio {
     this.paused = true;
     this.emit("pause");
     this.emit("ended");
+  }
+  /** The element cannot play the clip it holds, and says so. */
+  fail(): void {
+    this.error = { code: 4, message: "MEDIA_ELEMENT_ERROR: Format error" };
+    this.emit("error");
   }
   /** How many listeners the element still holds. */
   heldBy(): number {
@@ -484,7 +491,7 @@ describe("what the element refuses is passed on as it is, and the state says whe
   test("a clip the element cannot play is an error in the state, and the next track can still be played", async () => {
     const { audio, player } = loaded();
     await player.play();
-    audio.emit("error");
+    audio.fail();
     expect(player.state).toMatchObject({ status: "error", index: 0 });
     await player.next();
     expect(player.state).toMatchObject({ status: "playing", index: 1 });
@@ -493,10 +500,22 @@ describe("what the element refuses is passed on as it is, and the state says whe
   test("play after an error asks for the same clip again, from its start", async () => {
     const { audio, player } = loaded();
     await player.play();
-    audio.emit("error");
+    audio.fail();
     await player.play();
     expect(audio.sources).toEqual([clip("a"), clip("a")]);
     expect(player.state.status).toBe("playing");
+  });
+
+  test("an error heard late, for a clip the element no longer holds, does not make a failure of the clip it holds now", async () => {
+    const { audio, player } = loaded();
+    await player.play(0);
+    audio.hold = true;
+    const second = player.play(1);
+    audio.emit("error");
+    expect(player.state).toMatchObject({ status: "loading", index: 1 });
+    audio.waiting[0]?.resolve();
+    await second;
+    expect(player.state).toMatchObject({ status: "playing", index: 1 });
   });
 
   test("a play overtaken by another rejects as the element rejects it, and leaves the state to the later one", async () => {

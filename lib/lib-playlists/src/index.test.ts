@@ -270,7 +270,7 @@ describe("what a server is asked, from a verb to the wire", () => {
 
 describe("the two lib packages are used in the same way", () => {
   /** A stand-in for an audio element that plays nothing and says nothing. */
-  const audio = () => ({ src: "", currentTime: 0, volume: 1, duration: Number.NaN, paused: true, ended: false, play: vi.fn(() => Promise.resolve()), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const audio = () => ({ src: "", currentTime: 0, volume: 1, duration: Number.NaN, paused: true, ended: false, error: null, play: vi.fn(() => Promise.resolve()), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() });
 
   test("each exports one name: a noun, which is a function", () => {
     expect([Object.keys(api), Object.keys(player)]).toEqual([["playlists"], ["previewPlayer"]]);

@@ -31,6 +31,7 @@ describe("the package entry", () => {
       duration: Number.NaN,
       paused: true,
       ended: false,
+      error: null,
       play() {
         asked.push(this.src);
         this.paused = false;

@@ -22,6 +22,8 @@ export interface tPreviewAudio {
   readonly duration: number;
   readonly paused: boolean;
   readonly ended: boolean;
+  /** What stopped the element playing the clip it holds, or `null` when nothing has: an element forgets it when it is given another clip. */
+  readonly error: unknown;
   play(): Promise<void>;
   pause(): void;
   addEventListener(type: string, listener: () => void): void;
@@ -264,7 +266,8 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
       if (type === "playing" && !audio.paused) status = "playing";
       else if (type === "waiting" && status === "playing") status = "loading";
       else if (type === "pause" && audio.paused && !audio.ended && (status === "playing" || status === "loading")) status = "paused";
-      else if (type === "error") status = "error";
+      // An element with a new clip has no error: one heard then is the last clip's, come late.
+      else if (type === "error" && audio.error !== null && audio.error !== undefined) status = "error";
       // A clip that was playing has run out. One that was paused and then moved to its end has not: the next
       // clip starts from the end of a clip that was playing, and from nothing else the element says.
       else if (type === "ended" && audio.ended && (status === "playing" || status === "loading")) {
