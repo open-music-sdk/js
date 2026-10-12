@@ -239,6 +239,13 @@ describe("plan: what a playlist is missing, and what cannot be done, with no req
     );
   });
 
+  test("the tracks of a playlist that was read are tracks to plan with: a playlist can be copied into another", () => {
+    const playlist = snapshot("1", undefined, "2");
+    const copy = plan({ name: "A copy" }, playlist.tracks);
+    expect(copy.append).toEqual(playlist.tracks.map(({ id, type }) => ({ id, type })));
+    expectTypeOf(playlist.tracks).items.toExtend<Parameters<typeof plan>[1][number]>();
+  });
+
   test("the types: a song is a track, and so is anything else with an id and one of the four types a playlist takes", () => {
     expectTypeOf<tSong>().toExtend<Parameters<typeof plan>[1][number]>();
     expectTypeOf<{ id: string; type: "library-songs" }>().toExtend<Parameters<typeof plan>[1][number]>();

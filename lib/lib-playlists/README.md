@@ -156,7 +156,8 @@ so `resolve(playlist.tracks)` reads it back in.
 
 `plan(playlist, tracks)` asks nothing and changes nothing. `playlist` is what `read` gave, or
 `{ name, description }` for a playlist that `apply` is to find or make. `tracks` are the tracks it is
-to hold, in order: songs as `resolve` gave them, or anything else with an `id` and a `type`.
+to hold, in order: songs as `resolve` gave them, the tracks of another playlist that was read, or
+anything else with an `id` and a `type`.
 
 | A plan holds | |
 | --- | --- |

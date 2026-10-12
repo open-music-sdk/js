@@ -14,8 +14,8 @@ import { held } from "./own";
 export interface tPlaylistSnapshotTrack {
   /** The track's id in the listener's library. */
   readonly id: string;
-  /** `library-songs` or `library-music-videos`. */
-  readonly type: string;
+  /** What kind of track it is: the two kinds Apple documents a playlist of a library as holding. */
+  readonly type: "library-songs" | "library-music-videos";
   /** The id of the same track in the catalog, where the library knows of one. A track the listener uploaded has none. */
   readonly catalogId?: string;
   /** The recording's ISRC, from the catalog. */
@@ -169,7 +169,8 @@ function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapsh
 /**
  * Plans bringing a playlist to a list of tracks, and makes no request. `playlist` is what `read` gave, or
  * `{ name, description }` for one that `apply` is to find or make. `tracks` are the tracks it is to hold, in
- * order: songs as `resolve` gave them, or anything else with an `id` and a `type`.
+ * order: songs as `resolve` gave them, the tracks of another playlist that was read, or anything else with an
+ * `id` and a `type`.
  *
  * The plan says what will be added, and what cannot be done: the tracks that would have to come out, and whether
  * the playlist will be in another order than wanted, since a track can only be added at the end. Looking at it is

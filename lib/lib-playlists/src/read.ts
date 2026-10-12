@@ -35,7 +35,8 @@ function trackOf(fn: string, track: unknown): tPlaylistSnapshotTrack {
   const catalogId = isName(song.id) ? song.id : held(playParams).catalogId;
   return filled<tPlaylistSnapshotTrack>({
     id,
-    type,
+    // What Apple sent, whatever it is: the type says what Apple documents sending here.
+    type: type as tPlaylistSnapshotTrack["type"],
     catalogId: isName(catalogId) ? catalogId : undefined,
     isrc: text(held(song.attributes).isrc),
     name: text(name),
