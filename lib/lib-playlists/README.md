@@ -164,7 +164,7 @@ to hold, in order: songs as `resolve` gave them, or anything else with an `id` a
 | `tracks` | The tracks wanted, each as `{ id, type }` |
 | `append` | The ones the playlist does not hold yet, in order: what `apply` will add to its end |
 | `extra` | The tracks it holds that are not wanted. They stay: Apple's API cannot take a track out. |
-| `reordered` | Whether the wanted tracks it already holds are in another order than wanted. They stay as they are: Apple's API cannot move one. |
+| `reordered` | Whether the playlist, once what is missing is added, will hold the wanted tracks in another order than wanted: it holds some of them in another order already, or a track to add belongs before one it holds. Apple's API cannot move a track, or add one anywhere but at the end. |
 
 A wanted track is held when one of the playlist's tracks has its id, as its `catalogId` or as its own
 `id`. Each track of the playlist answers for one wanted track at most, so a song wanted twice and

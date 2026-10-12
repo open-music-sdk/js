@@ -56,7 +56,11 @@ export interface tPlaylistPlan {
   readonly append: readonly tPlaylistTrack[];
   /** The tracks it holds that are not wanted. Apple's API cannot take a track out, so they stay. */
   readonly extra: readonly tPlaylistSnapshotTrack[];
-  /** Whether the wanted tracks it already holds are in another order than wanted. Apple's API cannot move one, so they stay as they are. */
+  /**
+   * Whether the playlist, once what is missing is added, will hold the wanted tracks in another order than wanted:
+   * because it holds some of them in another order already, or because a track to add belongs before one it holds
+   * and can only go after it. Apple's API cannot move a track, or put one anywhere but at the end.
+   */
   readonly reordered: boolean;
 }
 
@@ -72,6 +76,9 @@ export interface tHeld {
  * Which of the `wanted` tracks a playlist that holds `held` is missing. A wanted track is held when one of the
  * playlist's tracks has its id, as its catalog id or as its own. Each held track answers for one wanted track at
  * most, so a song wanted twice and held once is missing once.
+ *
+ * `reordered` says whether the wanted tracks will be in another order than wanted once the missing ones are at the
+ * end: some are held in another order, or one that is missing is wanted before one that is held.
  */
 export function diff(held: readonly tHeld[], wanted: readonly tPlaylistTrack[]): { readonly append: tPlaylistTrack[]; readonly extra: number[]; readonly reordered: boolean } {
   // Where each id is held, in order, and how far along that list has been used up. A Map, so that an id is a key and nothing else.
@@ -87,6 +94,8 @@ export function diff(held: readonly tHeld[], wanted: readonly tPlaylistTrack[]):
   const used = held.map(() => false);
   const found: number[] = [];
   const append: tPlaylistTrack[] = [];
+  /** Whether a track that is held is wanted after one that has to be added, which will come after it all the same. */
+  let overtaken = false;
   for (const track of wanted) {
     const place = places.get(track.id);
     // A track listed under two ids may have been used under the other one.
@@ -96,12 +105,13 @@ export function diff(held: readonly tHeld[], wanted: readonly tPlaylistTrack[]):
     else {
       used[at] = true;
       found.push(at);
+      overtaken ||= append.length > 0;
     }
   }
   return {
     append,
     extra: used.flatMap((taken, at) => (taken ? [] : [at])),
-    reordered: found.some((at, i) => at < (found[i - 1] ?? -1)),
+    reordered: overtaken || found.some((at, i) => at < (found[i - 1] ?? -1)),
   };
 }
 
@@ -162,7 +172,8 @@ function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapsh
  * order: songs as `resolve` gave them, or anything else with an `id` and a `type`.
  *
  * The plan says what will be added, and what cannot be done: the tracks that would have to come out, and whether
- * any would have to move. Looking at it is the dry run.
+ * the playlist will be in another order than wanted, since a track can only be added at the end. Looking at it is
+ * the dry run.
  */
 export function plan(playlist: tPlaylistSnapshot | tNewPlaylist, tracks: readonly tPlaylistTrack[]): tPlaylistPlan {
   const target = targetOf(FN, playlist);
