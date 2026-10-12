@@ -314,4 +314,58 @@ describe("sleep", () => {
     await assertion;
     expect(vi.getTimerCount()).toBe(0);
   });
+  test("a wait of nothing is still a wait: it resolves on a timer, not at once", async () => {
+    const done = vi.fn();
+    void sleep(0).then(done);
+    await Promise.resolve();
+    expect(done).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).toHaveBeenCalled();
+  });
+  test("a wait longer than a timer keeps is waited in full, and is not over at once", async () => {
+    const done = vi.fn();
+    void sleep(2 ** 31 + 1000).then(done);
+    await vi.advanceTimersByTimeAsync(2 ** 31 - 1);
+    expect(done).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(done).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toHaveBeenCalled();
+  });
+  test("an abort part way through such a wait ends it", async () => {
+    const controller = new AbortController();
+    const assertion = expect(sleep(2 ** 33, controller.signal)).rejects.toThrow("stop");
+    await vi.advanceTimersByTimeAsync(2 ** 31);
+    controller.abort(new Error("stop"));
+    await assertion;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  test.each<[string, unknown]>([
+    ["not a number", Number.NaN],
+    ["below zero", -1],
+    ["without end", Number.POSITIVE_INFINITY],
+    ["a string", "100"],
+    ["nothing", undefined],
+  ])("a wait that is %s is no wait: a TypeError, and no timer is set", async (_name, ms) => {
+    await expect(sleep(ms as number)).rejects.toThrow(/^sleep: ms must be a number of milliseconds from 0, and not without end; got /);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  test.each<[string, unknown]>([
+    ["a controller", new AbortController()],
+    ["a string", "stop"],
+    ["null", null],
+  ])("a signal that is %s is refused, and no timer is set", async (_name, signal) => {
+    await expect(sleep(100, signal as AbortSignal)).rejects.toThrow(/^sleep: signal must be an AbortSignal; got /);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("retry: a wait is always one a timer can be set for", () => {
+  test("a base of nothing, tried more times than a number can double, still waits nothing and does not fail for it", async () => {
+    let attempts = 0;
+    const flaky = () => (++attempts < 1100 ? Promise.reject(new AppleMusicError("NetworkError", "down")) : Promise.resolve("up"));
+    const result = retry(flaky, { maxAttempts: 2000, baseDelayMs: 0 });
+    await vi.runAllTimersAsync();
+    expect(await result).toBe("up");
+  });
 });

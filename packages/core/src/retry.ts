@@ -1,4 +1,5 @@
 import { type AppleMusicError, isAppleMusicError } from "./errors";
+import { got } from "./got";
 
 /** Every field is optional and an explicit `undefined` means the default. Invalid values throw a TypeError. */
 export interface tRetryPolicy {
@@ -74,7 +75,8 @@ export async function retry<T>(fn: (attempt: number) => Promise<T>, policy?: tRe
     } catch (e) {
       if (attempt >= maxAttempts || !isAppleMusicError(e) || !retryOn(e)) throw e;
       if (e.retryAfterMs !== undefined && e.retryAfterMs > maxRetryAfterMs) throw e;
-      await sleep(e.retryAfterMs ?? Math.random() * Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1)), signal);
+      // The power is kept to one a number can hold: past it, a base of 0 would come to no number at all, which is no wait.
+      await sleep(e.retryAfterMs ?? Math.random() * Math.min(maxDelayMs, baseDelayMs * 2 ** Math.min(attempt - 1, 1023)), signal);
     }
   }
 }
@@ -89,8 +91,21 @@ export function parseRetryAfter(header: string | null, now = Date.now()): number
   return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 }
 
-/** Resolves after `ms`, or rejects with the abort reason. */
+/**
+ * Resolves after `ms`, or rejects with the abort reason. What it is handed is checked, since other packages call
+ * it too: a wait that is no number of milliseconds from 0, or has no end, is a TypeError, and so is a signal that
+ * is none. A wait longer than a timer keeps is kept as several, so that it is never over at once.
+ */
 export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (typeof ms !== "number" || !(ms >= 0) || ms === Number.POSITIVE_INFINITY) throw new TypeError(`sleep: ms must be a number of milliseconds from 0, and not without end; got ${got(ms)}`);
+  if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError(`sleep: signal must be an AbortSignal; got ${got(signal)}`);
+  let left = ms;
+  for (; left > MAX_TIMEOUT_MS; left -= MAX_TIMEOUT_MS) await timer(MAX_TIMEOUT_MS, signal);
+  await timer(left, signal);
+}
+
+/** One timer, for a wait it can keep. */
+async function timer(ms: number, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   await new Promise<void>((resolve) => {
     const onAbort = () => {

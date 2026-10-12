@@ -92,6 +92,25 @@ describe("isOnHost", () => {
     },
   );
 
+  test.each<[string, string, unknown]>([
+    ["an empty name, which every host with a dot at its end would end with", "https://evil.example./a.jpg", [""]],
+    ["a dot alone", "https://evil.example../a.jpg", ["."]],
+    ["a name in capitals, which no parsed host is", "https://mzstatic.com/a.jpg", ["MZSTATIC.COM"]],
+    ["a name that is no string", "https://mzstatic.com/a.jpg", [{ toString: () => "mzstatic.com" }]],
+    ["no list, but one name", "https://mzstatic.com/a.jpg", "mzstatic.com"],
+    ["nothing", "https://mzstatic.com/a.jpg", undefined],
+  ])("hosts that hold %s allow nothing, though hostsOf was not asked first", (_name, url, hosts) => {
+    expect(isOnHost(url, hosts as string[])).toBe(false);
+  });
+
+  test("a URL that is no string is on no host: not an object that says it is one, and says something else the next time", () => {
+    const said = ["https://mzstatic.com/a.jpg", "https://evil.example/a.jpg"];
+    const shifting = { toString: () => said.shift() ?? "" };
+    expect(isOnHost(shifting as unknown as string, APPLE)).toBe(false);
+    expect(said).toHaveLength(2);
+    for (const url of [new URL("https://mzstatic.com/a.jpg"), null, undefined, 7]) expect(isOnHost(url as unknown as string, APPLE)).toBe(false);
+  });
+
   test("any one of the hosts will do", () => {
     expect(isOnHost("https://audio-ssl.itunes.apple.com/a.m4a", ["mzstatic.com", "itunes.apple.com"])).toBe(true);
     expect(isOnHost("https://audio-ssl.itunes.apple.com/a.m4a", ["mzstatic.com"])).toBe(false);
