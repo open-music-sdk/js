@@ -574,6 +574,28 @@ describe("apply: a playlist named by what it is called is found, or made once", 
   });
 });
 
+describe("apply: how far its walks may go, for a caller who says", () => {
+  test("the listener's playlists run past maxPages: the run rejects before a playlist is made or a track written", async () => {
+    const { music, lines } = apple([{ id: "p.a" }, { id: "p.b" }, { id: "p.c" }, { id: "p.d" }, { id: "p.e" }]);
+    const error: unknown = await apply(music, plan({ name: "Road trip" }, want("1")), { maxPages: 2 }).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "ApiError")).toBe(true);
+    expect((error as Error).message).toBe("playlists.apply: Apple names another page after the 2 that maxPages allows, so what was read is not all there is");
+    expect(lines()).toEqual(["GET /v1/me/library/playlists", "GET /v1/me/library/playlists"]);
+  });
+
+  test("a playlist's tracks run past maxPages: the run rejects before a track is written, since what it holds is not known", async () => {
+    const { music, posted } = apple([{ id: "p.1", holds: ["1", "2", "3", "4", "5"] }], { page: 2 });
+    await expect(apply(music, forId("p.1", "5", "6"), { maxPages: 2 })).rejects.toThrow(/^playlists\.apply: Apple names another page after the 2 that maxPages allows/);
+    expect(posted).toEqual([]);
+  });
+
+  test("walks that end within maxPages are whole, and the run goes as it would with no limit", async () => {
+    const { music, holds } = apple([{ id: "p.1", holds: ["1", "2", "3"] }], { page: 2 });
+    expect(await apply(music, forId("p.1", "3", "4"), { maxPages: 3, ...QUICK })).toMatchObject({ appended: 1, verified: true });
+    expect(holds("p.1")).toEqual(["1", "2", "3", "4"]);
+  });
+});
+
 describe("apply: verified says whether what was written showed before the run resolved", () => {
   test("tracks that show on a later read are waited for as settle says", async () => {
     const { music, lines } = apple([{ id: "p.1", holds: ["0"] }], { lag: 2 });
@@ -729,6 +751,7 @@ describe("apply: what it is handed is checked before Apple is asked, and a mista
     ["a signal that is none", { signal: "stop" }, /^playlists\.apply: signal must be an AbortSignal; got 4 characters$/],
     ["an onProgress that is no function", { onProgress: {} }, /^playlists\.apply: onProgress must be a function; got object$/],
     ["a delayMs that is a string", { delayMs: "500" }, /^playlists\.apply: delayMs must be a number of milliseconds from 0 to 2147483647; got 3 characters$/],
+    ["a maxPages that is a fraction", { maxPages: 1.5 }, /^playlists\.apply: maxPages must be a whole number from 1; got 1.5$/],
     ["a chunk of none", { chunk: 0 }, /^playlists\.apply: chunk must be a whole number from 1 to 300; got 0$/],
     ["a chunk past what a request takes", { chunk: 301 }, /^playlists\.apply: chunk must be a whole number from 1 to 300; got 301$/],
     ["a chunk and a half", { chunk: 1.5 }, /^playlists\.apply: chunk must be a whole number from 1 to 300; got 1.5$/],

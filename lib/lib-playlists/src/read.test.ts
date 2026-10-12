@@ -271,12 +271,47 @@ describe("read: a playlist with nothing in it", () => {
   });
 });
 
+describe("read: how far a walk may go, for a caller who says", () => {
+  test("a playlist with more pages than maxPages allows is not read short: read rejects, and says why", async () => {
+    const { music, lines } = apple(songs(7), { page: 3 });
+    const error: unknown = await read(music, "p.1", { maxPages: 2 }).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "ApiError")).toBe(true);
+    expect((error as Error).message).toBe("playlists.read: Apple names another page after the 2 that maxPages allows, so what was read is not all there is");
+    expect(lines().filter((line) => line.includes("/tracks"))).toHaveLength(2);
+  });
+
+  test("a playlist that ends on the page maxPages allows, or before it, is read whole", async () => {
+    const { music } = apple(songs(7), { page: 3 });
+    expect((await read(music, "p.1", { maxPages: 3 })).tracks).toHaveLength(7);
+    expect((await read(music, "p.1", { maxPages: 50 })).tracks).toHaveLength(7);
+  });
+
+  test("a page whose next link names itself is followed no further than maxPages allows", async () => {
+    const again = { body: { data: [{ id: "i.1", type: "library-songs" }], next: "/v1/me/library/playlists/p.1/tracks?offset=0" } };
+    const { music, lines } = apple([], { override: (path) => (path.endsWith("/tracks") ? again : undefined) });
+    await expect(read(music, "p.1", { maxPages: 4 })).rejects.toThrow(/after the 4 that maxPages allows/);
+    expect(lines().filter((line) => line.includes("/tracks"))).toHaveLength(4);
+  });
+
+  test("with no maxPages, every page is read however many there are", async () => {
+    const { music } = apple(songs(60), { page: 1 });
+    expect((await read(music, "p.1")).tracks).toHaveLength(60);
+  });
+});
+
 describe("read: progress, and stopping", () => {
   test("it is told how many tracks have been read a page at a time, with no total, since Apple gives none until the end", async () => {
     const { music } = apple(songs(250));
     const heard = vi.fn();
     await read(music, "p.1", { onProgress: heard });
     expect(heard.mock.calls).toEqual([[{ done: 100, total: undefined }], [{ done: 200, total: undefined }], [{ done: 250, total: undefined }]]);
+  });
+
+  test("it is told after each page, whatever a page holds", async () => {
+    const { music } = apple(songs(70), { page: 25 });
+    const heard = vi.fn();
+    await read(music, "p.1", { onProgress: heard });
+    expect(heard.mock.calls).toEqual([[{ done: 25, total: undefined }], [{ done: 50, total: undefined }], [{ done: 70, total: undefined }]]);
   });
 
   test("a playlist that ends on a full page is not told of twice", async () => {
@@ -349,6 +384,7 @@ describe("read: what it is handed is checked before Apple is asked, and a mistak
     ["options that are a signal", new AbortController().signal, /^playlists\.read: expected an options object; got an object that is not a plain one$/],
     ["a signal that is none", { signal: true }, /^playlists\.read: signal must be an AbortSignal; got boolean$/],
     ["an onProgress that is no function", { onProgress: "tell me" }, /^playlists\.read: onProgress must be a function; got 7 characters$/],
+    ["a maxPages of none", { maxPages: 0 }, /^playlists\.read: maxPages must be a whole number from 1; got 0$/],
   ])("%s", async (_name, options, message) => {
     const { music, calls } = apple(songs(1));
     await expect(read(music, "p.1", options as object)).rejects.toThrow(message);

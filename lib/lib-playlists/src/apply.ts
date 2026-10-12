@@ -6,10 +6,11 @@
 // calling `apply` again with the same plan, which reads the playlist first and adds only what is still missing.
 import { addLibraryPlaylistTracks, createLibraryPlaylist, listLibraryPlaylists, type tPlaylistTrack } from "@open-music-sdk/client-user";
 import { AppleMusicError, got, isAppleMusicError, isName, isPlain, optionsOf, ownOf, sleep, type tAppleMusicClient } from "@open-music-sdk/core";
-import { countOf, pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
+import { countOf, maxPagesOf, pause, progressOf, signalOf, waitOf, type tAskOptions, type tLimitOptions, type tPaceOptions } from "./options";
 import { held } from "./own";
 import { diff, isThere, refsOf, targetOf, type tHeld, type tNewPlaylist, type tPlaylistPlan, type tPlaylistSnapshotTrack } from "./plan";
 import { taken } from "./read";
+import { pagesOf, type tWalk } from "./walk";
 
 /** How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made at once may not show it. */
 export interface tSettleOptions {
@@ -20,7 +21,7 @@ export interface tSettleOptions {
 }
 
 /** The options of `apply`. */
-export interface tApplyOptions extends tAskOptions, tPaceOptions {
+export interface tApplyOptions extends tAskOptions, tPaceOptions, tLimitOptions {
   /** How many tracks go in one request: a whole number from 1 to 300, the most the client's function takes. Default 100. */
   readonly chunk?: number | undefined;
   /** How long a write is given to show in a read. */
@@ -81,12 +82,14 @@ function planOf(plan: unknown): { readonly target: { readonly id: string } | tNe
 }
 
 /** The listener's playlist with exactly this name and description that they may add to, or nothing. */
-async function find(client: tAppleMusicClient, target: tNewPlaylist, signal: AbortSignal | undefined): Promise<string | undefined> {
-  for await (const playlist of listLibraryPlaylists.bound(client)({ signal })) {
-    const { id, attributes } = held(playlist);
-    const { name, description, canEdit } = held(attributes);
-    const { standard } = held(description);
-    if (isName(id) && name === target.name && (standard ?? "") === (target.description ?? "") && canEdit !== false) return id;
+async function find(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk): Promise<string | undefined> {
+  for await (const page of pagesOf(client, () => listLibraryPlaylists(client, { signal: walk.signal }), walk)) {
+    for (const playlist of page) {
+      const { id, attributes } = held(playlist);
+      const { name, description, canEdit } = held(attributes);
+      const { standard } = held(description);
+      if (isName(id) && name === target.name && (standard ?? "") === (target.description ?? "") && canEdit !== false) return id;
+    }
   }
   return undefined;
 }
@@ -115,7 +118,8 @@ async function settled<T>(look: () => Promise<T | undefined>, settle: tSettle, s
 }
 
 /** Makes the playlist, once. Where the answer is lost, or holds no playlist, the library is looked through for it, and it is not made again. */
-async function make(client: tAppleMusicClient, target: tNewPlaylist, signal: AbortSignal | undefined, settle: tSettle): Promise<string> {
+async function make(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk, settle: tSettle): Promise<string> {
+  const { signal } = walk;
   const attributes = target.description === undefined ? { name: target.name } : { name: target.name, description: target.description };
   let failure: unknown;
   try {
@@ -127,7 +131,7 @@ async function make(client: tAppleMusicClient, target: tNewPlaylist, signal: Abo
     if (!unsure(error)) throw error;
     failure = error;
   }
-  const there = await settled(() => find(client, target, signal), settle, signal);
+  const there = await settled(() => find(client, target, walk), settle, signal);
   if (there === undefined) throw failure;
   return there;
 }
@@ -151,14 +155,15 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
   const signal = signalOf(FN, bag.signal);
   const report = progressOf(FN, bag.onProgress);
   const delayMs = waitOf(FN, "delayMs", bag.delayMs, 0);
+  const walk = { fn: FN, signal, maxPages: maxPagesOf(FN, bag.maxPages) };
   const chunk = countOf(FN, "chunk", bag.chunk, 1, MAX_CHUNK, DEFAULTS.chunk);
   const given = optionsOf(FN, bag.settle, "settle to be an options object");
   const settle = { tries: countOf(FN, "settle.tries", given.tries, 1, Number.MAX_SAFE_INTEGER, DEFAULTS.tries), waitMs: waitOf(FN, "settle.waitMs", given.waitMs, DEFAULTS.waitMs) };
 
   // The playlist, and what it holds now. One made here holds nothing, and is not read: it may not show yet.
-  const there = isThere(target) ? target.id : await find(client, target, signal);
-  const id = there ?? (await make(client, target as tNewPlaylist, signal, settle));
-  const before: readonly tHeld[] = there === undefined ? [] : idsOf((await taken(client, id, signal)).tracks);
+  const there = isThere(target) ? target.id : await find(client, target, walk);
+  const id = there ?? (await make(client, target as tNewPlaylist, walk, settle));
+  const before: readonly tHeld[] = there === undefined ? [] : idsOf((await taken(client, id, walk)).tracks);
   const { append } = diff(before, wanted);
 
   let done = 0;
@@ -172,7 +177,7 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
       // The tracks went to the playlist's end if they went at all: after what it held, and what this run has added.
       const landed = await settled(
         async () => {
-          const now = idsOf((await taken(client, id, signal)).tracks);
+          const now = idsOf((await taken(client, id, walk)).tracks);
           return part.every((track, at) => same(now[before.length + from + at], track)) ? true : undefined;
         },
         settle,
@@ -185,6 +190,6 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
   }
 
   // Read once more, unless nothing was added: then the read that the plan was worked out from is the proof.
-  const shown = append.length === 0 ? true : await settled(async () => (diff(idsOf((await taken(client, id, signal)).tracks), wanted).append.length === 0 ? true : undefined), settle, signal);
+  const shown = append.length === 0 ? true : await settled(async () => (diff(idsOf((await taken(client, id, walk)).tracks), wanted).append.length === 0 ? true : undefined), settle, signal);
   return Object.freeze({ id, created: there === undefined, appended: done, verified: shown === true });
 }

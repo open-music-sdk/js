@@ -27,6 +27,16 @@ export interface tPaceOptions {
   readonly delayMs?: number | undefined;
 }
 
+/** What a verb that reads one of the listener's collections whole takes beside: how far it may walk. */
+export interface tLimitOptions {
+  /**
+   * The most pages one walk may ask Apple for: a whole number from 1. Default: no limit, so a walk goes on for as
+   * long as each page names a next one. A playlist, or a list of playlists, that runs past it is not read short:
+   * the verb rejects with an `ApiError`, since what was read is not all there is.
+   */
+  readonly maxPages?: number | undefined;
+}
+
 /** The longest a timer waits: past it, `setTimeout` fires at once. */
 const MAX_WAIT_MS = 2 ** 31 - 1;
 
@@ -59,6 +69,9 @@ export function countOf(fn: string, name: string, value: unknown, least: number,
   if (Number.isSafeInteger(value) && (value as number) >= least && (value as number) <= most) return value as number;
   throw new TypeError(`${fn}: ${name} must be a whole number from ${String(least)}${most === Number.MAX_SAFE_INTEGER ? "" : ` to ${String(most)}`}; got ${got(value)}`);
 }
+
+/** The most pages a walk may ask for, where the caller gave one. */
+export const maxPagesOf = (fn: string, value: unknown): number | undefined => (value === undefined ? undefined : countOf(fn, "maxPages", value, 1, Number.MAX_SAFE_INTEGER, 1));
 
 /** Waits `ms`, or not at all when it is 0, and stops waiting as soon as the signal aborts. */
 export async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {

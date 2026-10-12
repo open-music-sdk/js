@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { countOf, pause, progressOf, signalOf, waitOf } from "./options";
+import { countOf, maxPagesOf, pause, progressOf, signalOf, waitOf } from "./options";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -95,6 +95,24 @@ describe("countOf", () => {
   test("a count with no most says only where it starts", () => {
     expect(() => countOf("playlists.apply", "settle.tries", 0, 1, Number.MAX_SAFE_INTEGER, 5)).toThrow(new TypeError("playlists.apply: settle.tries must be a whole number from 1; got 0"));
     expect(countOf("playlists.apply", "settle.tries", 1_000_000, 1, Number.MAX_SAFE_INTEGER, 5)).toBe(1_000_000);
+  });
+});
+
+describe("maxPagesOf", () => {
+  test("not given, there is no limit; given, it is what was given", () => {
+    expect(maxPagesOf("playlists.read", undefined)).toBeUndefined();
+    expect([1, 2, 500].map((pages) => maxPagesOf("playlists.read", pages))).toEqual([1, 2, 500]);
+  });
+
+  test.each<[string, unknown]>([
+    ["none", 0],
+    ["below zero", -1],
+    ["a fraction", 2.5],
+    ["without end", Number.POSITIVE_INFINITY],
+    ["a string", "2"],
+    ["null", null],
+  ])("a limit that is %s is refused, under the verb's name", (_name, value) => {
+    expect(() => maxPagesOf("playlists.read", value)).toThrow(/^playlists\.read: maxPages must be a whole number from 1; got /);
   });
 });
 

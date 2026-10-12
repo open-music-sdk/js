@@ -94,6 +94,7 @@ describe("the package entry", () => {
       "tAppliedPlan",
       "tApplyOptions",
       "tAskOptions",
+      "tLimitOptions",
       "tNewPlaylist",
       "tPaceOptions",
       "tPlaylistPlan",

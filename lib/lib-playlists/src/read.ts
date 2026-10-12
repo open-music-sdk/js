@@ -2,17 +2,15 @@
 // the catalog's id for it and the recording's ISRC where the library knows them. What comes of it is plain JSON.
 import { getLibraryPlaylist, getLibraryPlaylistRelationship } from "@open-music-sdk/client-user";
 import { AppleMusicError, isAppleMusicError, isName, optionsOf, segmentOf, type tAppleMusicClient } from "@open-music-sdk/core";
-import { progressOf, signalOf, type tAskOptions } from "./options";
+import { maxPagesOf, progressOf, signalOf, type tAskOptions, type tLimitOptions } from "./options";
 import { first, held } from "./own";
 import type { tPlaylistSnapshot, tPlaylistSnapshotTrack } from "./plan";
+import { pagesOf, type tWalk } from "./walk";
 
 const FN = "playlists.read";
 const OPTIONS = "an options object";
-/** The most tracks Apple documents sending in one answer. Progress is told a page at a time. */
-const PAGE = 100;
-
 /** The options of `read`. */
-export type tReadPlaylistOptions = tAskOptions;
+export interface tReadPlaylistOptions extends tAskOptions, tLimitOptions {}
 
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined);
 
@@ -28,9 +26,9 @@ const filled = <T extends object>(bag: { readonly [K in keyof T]: T[K] | undefin
  * None of what an answer holds is taken on trust: an answer is checked only where a caller passes a schema, and
  * none is passed here. Each field is read as the answer's own, so nothing on Object.prototype is read as Apple's.
  */
-function trackOf(track: unknown): tPlaylistSnapshotTrack {
+function trackOf(fn: string, track: unknown): tPlaylistSnapshotTrack {
   const { id, type, attributes, relationships } = held(track);
-  if (!isName(id) || !isName(type)) throw new AppleMusicError("ApiError", `${FN}: Apple answered with a track that has no id or no type`, { status: 200 });
+  if (!isName(id) || !isName(type)) throw new AppleMusicError("ApiError", `${fn}: Apple answered with a track that has no id or no type`, { status: 200 });
   const { name, artistName, albumName, durationInMillis, playParams } = held(attributes);
   const { data } = held(held(relationships).catalog);
   const song = held(first(data));
@@ -49,16 +47,18 @@ function trackOf(track: unknown): tPlaylistSnapshotTrack {
 
 /**
  * The playlist with `id`, read whole. For a verb that has already checked what it was handed: `report` is told how
- * many tracks have been read, a page at a time, and the total is not known until the last page.
+ * many tracks have been read after each page of them, and the total is not known until the last page. The first
+ * page of tracks is asked for by the client's function, and the rest by the links Apple gives.
  */
-export async function taken(client: tAppleMusicClient, id: string, signal: AbortSignal | undefined, report: (done: number, total: undefined) => void = () => undefined): Promise<tPlaylistSnapshot> {
+export async function taken(client: tAppleMusicClient, id: string, walk: tWalk, report: (done: number, total: undefined) => void = () => undefined): Promise<tPlaylistSnapshot> {
+  const { fn, signal } = walk;
   const playlist = await getLibraryPlaylist.bound(client)(id, { signal });
   const { name, description, canEdit } = held(held(playlist).attributes);
   const tracks: tPlaylistSnapshotTrack[] = [];
   try {
-    for await (const track of getLibraryPlaylistRelationship.bound(client)(id, "tracks", { include: ["catalog"], signal })) {
-      tracks.push(trackOf(track));
-      if (tracks.length % PAGE === 0) report(tracks.length, undefined);
+    for await (const page of pagesOf(client, () => getLibraryPlaylistRelationship(client, id, "tracks", { include: ["catalog"], signal }), walk)) {
+      for (const track of page) tracks.push(trackOf(fn, track));
+      if (page.length > 0) report(tracks.length, undefined);
     }
   } catch (error) {
     if (!(tracks.length === 0 && isAppleMusicError(error, "ApiError") && error.status === 404)) throw error;
@@ -69,7 +69,6 @@ export async function taken(client: tAppleMusicClient, id: string, signal: Abort
     const again = await getLibraryPlaylist.bound(client)(id, { include: ["tracks"], signal });
     if (first(held(held(held(again).relationships).tracks).data) !== undefined) throw error;
   }
-  if (tracks.length % PAGE !== 0) report(tracks.length, undefined);
   return filled<tPlaylistSnapshot>({
     id,
     name: text(name),
@@ -89,6 +88,6 @@ export async function taken(client: tAppleMusicClient, id: string, signal: Abort
 export async function read(client: tAppleMusicClient, id: string, options?: tReadPlaylistOptions): Promise<tPlaylistSnapshot> {
   segmentOf(FN, "id", id);
   const bag = optionsOf(FN, options, OPTIONS);
-  const signal = signalOf(FN, bag.signal);
-  return taken(client, id, signal, progressOf(FN, bag.onProgress));
+  const walk = { fn: FN, signal: signalOf(FN, bag.signal), maxPages: maxPagesOf(FN, bag.maxPages) };
+  return taken(client, id, walk, progressOf(FN, bag.onProgress));
 }

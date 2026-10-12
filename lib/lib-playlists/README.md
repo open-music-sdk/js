@@ -137,6 +137,8 @@ JSON:
 }
 ```
 
+It takes `onProgress`, `signal` and `maxPages`: see [Progress, pace and stopping](#progress-pace-and-stopping).
+
 A track's `id` is its id in the listener's library. `catalogId` is the id of the same track in the
 catalog, and `isrc` the recording's, where the library knows them: a track the listener uploaded has
 neither. A field Apple did not give is left out.
@@ -192,7 +194,7 @@ keep the `id` that `apply` resolves with and plan for that.
 | --- | --- |
 | `chunk` | How many tracks go in one request: 1 to 300. Default 100. |
 | `settle` | `{ tries, waitMs }`: how many times the playlist is read to see a write, and how long is waited between one such read and the next. Default 5 and 1000. |
-| `delayMs`, `onProgress`, `signal` | See [Progress, pace and stopping](#progress-pace-and-stopping) |
+| `delayMs`, `onProgress`, `signal`, `maxPages` | See [Progress, pace and stopping](#progress-pace-and-stopping) |
 
 ### A write is sent once
 
@@ -225,6 +227,7 @@ a quick second run.
 | `onProgress({ done, total })` | `resolve`, `read`, `apply` | Called each time more tracks are done with. What it throws stops the verb, and is what the verb rejects with. |
 | `delayMs` | `resolve`, `apply` | How long to wait after one request before the next. Default 0. |
 | `signal` | `resolve`, `read`, `apply` | Aborts the request in flight and any wait. An abort is rethrown as it is. |
+| `maxPages` | `read`, `apply` | The most pages one walk may ask for: of a playlist's tracks, or of the listener's playlists. Default: no limit. |
 
 What `done` and `total` count:
 
@@ -233,6 +236,11 @@ What `done` and `total` count:
 | `resolve` | Descriptions settled, found or not. An answer by ISRC can settle 25 at once. | The descriptions handed over |
 | `read` | Tracks read, told a page at a time | `undefined`: Apple does not say how many there are until the last page |
 | `apply` | Tracks added, told after each request | The tracks there are to add |
+
+A walk that reaches `maxPages` with another page named does not stop short. The verb rejects with an
+`ApiError`, and `apply` writes nothing: a playlist read short would be taken to hold less than it
+does, and have the rest added again. Without `maxPages` a walk goes on for as long as Apple names a
+next page, and only `signal` ends it sooner.
 
 Each verb makes one request at a time. The client's own rate limiter, and its wait after a 429, apply
 underneath whatever `delayMs` says: these options say how hard one call pushes, and the client says
