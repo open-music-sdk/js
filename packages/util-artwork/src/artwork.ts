@@ -1,3 +1,5 @@
+import { hostsOf, isOnHost } from "@open-music-sdk/core";
+
 /** What is read from an artwork object. Any `tArtwork` from `@open-music-sdk/types` fits. */
 export interface tArtworkSource {
   /** The URL template. `{w}` and `{h}` stand for the pixel size. */
@@ -83,33 +85,12 @@ function cropOf(value: unknown): string | undefined {
 }
 
 /**
- * The hosts a caller allows, as a list of this call's own. Each is a bare host name in small letters, as a URL
- * parser gives a host: `https://mzstatic.com`, `*.mzstatic.com` and `MzStatic.com` would each match nothing, so
- * they are refused here and not left to refuse every artwork later.
- */
-function hostsOf(value: unknown): readonly string[] | undefined {
-  if (value === undefined) return undefined;
-  const hosts: unknown[] = Array.isArray(value) && value.length <= MAX_HOSTS ? [...(value as unknown[])] : [];
-  if (hosts.length > 0 && hosts.every((host): host is string => typeof host === "string" && host.length <= 253 && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(host))) return hosts;
-  throw new TypeError(`artwork: hosts must be an array of 1 to ${String(MAX_HOSTS)} host names in small letters, such as mzstatic.com`);
-}
-
-/**
  * The URL, if no hosts were named or it is `https` on one of them, and a `TypeError` if it is not. The error
- * does not show the URL: it is not ours, and may be as long or as strange as whoever wrote it liked.
- *
- * The URL is read by the parser a browser reads it with, so what is checked is what will be requested.
+ * does not show the URL: it is not ours, and may be as long or as strange as whoever wrote it liked. What a list
+ * of hosts is, and what being on one of them takes, is core's to say, as it is for a preview clip.
  */
 function allowed(url: string, hosts: readonly string[] | undefined): string {
-  if (hosts === undefined) return url;
-  let parsed: URL | undefined;
-  try {
-    parsed = new URL(url);
-  } catch {
-    // A URL that does not stand on its own, such as a relative one, is on no host that could be allowed.
-  }
-  const host = parsed?.hostname ?? "";
-  if (parsed?.protocol === "https:" && parsed.username === "" && parsed.password === "" && parsed.port === "" && hosts.some((name) => host === name || host.endsWith(`.${name}`))) return url;
+  if (hosts === undefined || isOnHost(url, hosts)) return url;
   throw new TypeError("artwork: the artwork's url is not https on one of the hosts allowed");
 }
 
@@ -119,8 +100,6 @@ const DEFAULT_CROP = "bb";
 const MAX_SIDE = 10_000;
 /** Three times the longest crop code seen from Apple. A code fills every `{c}` in a template, so its length is what a URL can grow by. */
 const MAX_CROP_LENGTH = 32;
-/** More hosts than artwork is served from. */
-const MAX_HOSTS = 16;
 /** More densities than screens come in. Each one is a candidate built and a URL written, so the list is not left open. */
 const MAX_DENSITIES = 16;
 /** What arithmetic on sizes this small can be off by, with room to spare: a height of 180.0000000001 is 180, not 181. */
@@ -242,7 +221,7 @@ function read(artwork: tArtworkSource, width: number, options: tArtworkOptions):
     format: format ?? "jpg",
     crop: crop ?? DEFAULT_CROP,
     placement: placementOf(named.cut),
-    hosts: hostsOf(options.hosts),
+    hosts: hostsOf("artwork", options.hosts, "mzstatic.com"),
   };
 }
 

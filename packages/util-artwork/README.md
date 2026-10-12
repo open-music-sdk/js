@@ -3,7 +3,8 @@
 Artwork in the Apple Music API is not an image URL but a template for one:
 `https://…/{w}x{h}bb.jpg`, with the pixel size left for you to fill in. This package fills it in, and
 builds the `srcset` that gives a dense screen a sharper image. Strings and numbers in, strings and
-numbers out, no dependencies.
+numbers out. Its one dependency is [`@open-music-sdk/core`](../core), for the check on where a URL
+points, and that check is all of `core` an app carries because of this package.
 
 You probably want one of the integrations instead (`browser`, `react`, `next`) once they exist. Use
 this package directly to assemble your own client or to build one of those.
