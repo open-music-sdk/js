@@ -37,8 +37,10 @@ export interface tAppliedPlan {
   /** How many tracks this run added. */
   readonly appended: number;
   /**
-   * Whether a read made afterwards shows every track wanted. `false` does not mean a write failed: Apple took
-   * every one, and what the playlist holds did not show them all within the reads `settle` allows.
+   * Whether what this run wrote showed before it resolved: every track wanted in a read of the playlist and, for
+   * a playlist this run made, the playlist itself among the listener's playlists, under the name and description
+   * it was made with. `false` does not mean a write failed: Apple took every one, and not all of it showed within
+   * the reads `settle` allows. It does mean the same plan carried out again now may not find what this run did.
    */
   readonly verified: boolean;
 }
@@ -117,15 +119,18 @@ async function settled<T>(look: () => Promise<T | undefined>, settle: tSettle, s
   return undefined;
 }
 
-/** Makes the playlist, once. Where the answer is lost, or holds no playlist, the library is looked through for it, and it is not made again. */
-async function make(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk, settle: tSettle): Promise<string> {
+/**
+ * Makes the playlist, once. Where the answer is lost, or holds no playlist, the library is looked through for it,
+ * and it is not made again. It gives the playlist's id, and whether it has been seen among the listener's playlists.
+ */
+async function make(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk, settle: tSettle): Promise<{ readonly id: string; readonly listed: boolean }> {
   const { signal } = walk;
   const attributes = target.description === undefined ? { name: target.name } : { name: target.name, description: target.description };
   let failure: unknown;
   try {
     const made: unknown = await createLibraryPlaylist.bound(client)({ attributes }, { signal });
     const { id } = held(made);
-    if (isName(id)) return id;
+    if (isName(id)) return { id, listed: false };
     failure = new AppleMusicError("ApiError", `${FN}: Apple took the new playlist and answered with none, and it does not show in the library yet`, { status: 201 });
   } catch (error) {
     if (!unsure(error)) throw error;
@@ -133,7 +138,7 @@ async function make(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk
   }
   const there = await settled(() => find(client, target, walk), settle, signal);
   if (there === undefined) throw failure;
-  return there;
+  return { id: there, listed: true };
 }
 
 /**
@@ -146,8 +151,8 @@ async function make(client: tAppleMusicClient, target: tNewPlaylist, walk: tWalk
  * stays written, and calling `apply` again with the same plan adds only what is still missing.
  *
  * Apple takes a write in and carries it out afterwards. So a run begun straight after another may read the
- * playlist before the first run's tracks show, and add them again: `verified` says whether this run's tracks
- * showed before it resolved.
+ * playlist before the first run's tracks show, and add them again, or look for a playlist the first run made
+ * before it is listed, and make another. `verified` says whether what this run wrote showed before it resolved.
  */
 export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, options?: tApplyOptions): Promise<tAppliedPlan> {
   const { target, wanted } = planOf(plan);
@@ -162,7 +167,8 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
 
   // The playlist, and what it holds now. One made here holds nothing, and is not read: it may not show yet.
   const there = isThere(target) ? target.id : await find(client, target, walk);
-  const id = there ?? (await make(client, target as tNewPlaylist, walk, settle));
+  const made = there === undefined ? await make(client, target as tNewPlaylist, walk, settle) : undefined;
+  const id = there ?? made?.id ?? "";
   const before: readonly tHeld[] = there === undefined ? [] : idsOf((await taken(client, id, walk)).tracks);
   const { append } = diff(before, wanted);
 
@@ -191,5 +197,8 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
 
   // Read once more, unless nothing was added: then the read that the plan was worked out from is the proof.
   const shown = append.length === 0 ? true : await settled(async () => (diff(idsOf((await taken(client, id, walk)).tracks), wanted).append.length === 0 ? true : undefined), settle, signal);
-  return Object.freeze({ id, created: there === undefined, appended: done, verified: shown === true });
+  // A playlist made here is found by the next run only once it is among the listener's playlists, as it was made.
+  // Until it is, the same plan carried out again would make a second one, which nothing can take away.
+  const listed = made === undefined || made.listed || (await settled(async () => ((await find(client, target as tNewPlaylist, walk)) === id ? true : undefined), settle, signal)) === true;
+  return Object.freeze({ id, created: made !== undefined, appended: done, verified: shown === true && listed });
 }

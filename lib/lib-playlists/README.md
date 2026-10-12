@@ -177,7 +177,8 @@ later.
 2. **Reads it**, and works out afresh what it is missing. What the plan said was missing is not taken
    at its word: the playlist may have changed since.
 3. **Adds what is missing** to its end, in order, `chunk` tracks to a request.
-4. **Reads it once more**, to see whether what was added shows.
+4. **Reads it once more**, to see whether what was added shows; and, for a playlist it made, looks
+   for it among the listener's playlists, where the next run will look.
 
 The description is the place for a mark of your own, such as `"from my-app, list 42"`: Apple keeps
 nothing else of yours with a playlist, and a listener may have another by the same name. Better still,
@@ -188,7 +189,7 @@ keep the `id` that `apply` resolves with and plan for that.
 | `id` | The playlist's id in the listener's library |
 | `created` | Whether this run made it |
 | `appended` | How many tracks this run added |
-| `verified` | Whether a read made afterwards showed every track wanted. `false` does not mean a write failed: Apple took every one, and the playlist did not show them all within the reads `settle` allows. |
+| `verified` | Whether what this run wrote showed before it resolved: every track wanted in a read of the playlist and, for a playlist this run made, the playlist itself among the listener's playlists. `false` does not mean a write failed: Apple took every one, and not all of it showed within the reads `settle` allows. |
 
 | Option | |
 | --- | --- |
@@ -217,8 +218,14 @@ on**: it reads the playlist first and adds only what is still missing.
 
 One thing to know: Apple takes a write in and carries it out afterwards, so a read made straight away
 may not show it. A run begun again before a lost write shows cannot see it, and adds those tracks a
-second time. After a run that rejected, wait before running it again, and prefer a larger `settle` to
-a quick second run.
+second time. A run begun again before a playlist the first run made is among the listener's playlists
+cannot find it, and makes a second one, which nothing in the API can take away. So:
+
+- After a run that rejected, wait before running it again, and prefer a larger `settle` to a quick
+  second run.
+- After a run that resolved with `verified: false`, do the same.
+- For a playlist a run made, plan for the `id` it resolved with from then on. Finding it again by its
+  name and description rests on Apple handing both back as they were sent.
 
 ## Progress, pace and stopping
 

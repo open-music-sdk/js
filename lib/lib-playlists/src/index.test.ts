@@ -208,6 +208,7 @@ describe("what a server is asked, from a verb to the wire", () => {
         } else if (path.endsWith("/tracks")) {
           res.end(JSON.stringify({ data: tracks.map((each, at) => ({ id: `i.${String(at)}`, type: "library-songs", attributes: { playParams: { catalogId: each.id } } })) }));
         } else if (path.endsWith("/p.1")) res.end(JSON.stringify({ data: [playlist] }));
+        else if (path.endsWith("/library/playlists")) res.end(JSON.stringify({ data: asked.some((each) => each.method === "POST") ? [{ ...playlist, attributes: { ...playlist.attributes, description: { standard: "made by my-app" } } }] : [] }));
         else res.end(JSON.stringify({ data: [] }));
       });
     });
@@ -236,12 +237,13 @@ describe("what a server is asked, from a verb to the wire", () => {
         "POST /v1/me/library/playlists/p.1/tracks",
         "GET /v1/me/library/playlists/p.1",
         "GET /v1/me/library/playlists/p.1/tracks?include=catalog",
+        "GET /v1/me/library/playlists",
       ]);
       expect(asked.map((each) => each.body).filter((body) => body !== "")).toEqual(['{"attributes":{"name":"Road trip","description":"made by my-app"}}', '{"data":[{"id":"900","type":"songs"}]}']);
       expect(asked.map((each) => [each.headers.authorization, each.headers["music-user-token"]])).toEqual([
         ["Bearer dev", undefined],
         ["Bearer dev", undefined],
-        ...Array.from({ length: 5 }, () => ["Bearer dev", "listener"]),
+        ...Array.from({ length: 6 }, () => ["Bearer dev", "listener"]),
       ]);
     } finally {
       await close();

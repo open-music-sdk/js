@@ -495,7 +495,7 @@ describe("apply: a playlist named by what it is called is found, or made once", 
   test("a playlist that is to hold nothing is made all the same", async () => {
     const { music, lines } = apple();
     expect(await apply(music, plan(mine, []))).toEqual({ id: "p.new1", created: true, appended: 0, verified: true });
-    expect(lines()).toEqual(["GET /v1/me/library/playlists", "POST /v1/me/library/playlists"]);
+    expect(lines()).toEqual(["GET /v1/me/library/playlists", "POST /v1/me/library/playlists", "GET /v1/me/library/playlists"]);
   });
 
   test("the answer to making it is lost, and Apple made it: it is found by looking, and is not made a second time", async () => {
@@ -562,6 +562,41 @@ describe("apply: a playlist named by what it is called is found, or made once", 
     }
     expect(lines().filter((line) => line.includes("p.theirs"))).toEqual([]);
     expect(holds("p.theirs")).toEqual(["9"]);
+  });
+
+  test("a playlist the run made is looked for among the listener's playlists before the run is called verified", async () => {
+    const { music, lines } = apple();
+    expect(await apply(music, plan(mine, want("1")))).toEqual({ id: "p.new1", created: true, appended: 1, verified: true });
+    expect(lines().at(-1)).toBe("GET /v1/me/library/playlists");
+  });
+
+  test("a playlist that shows there only after a while is waited for as settle says, and the same plan carried out again then makes no second one", async () => {
+    const { music, playlists, holds } = apple([], { hidden: 2 });
+    const made = plan(mine, want("1", "2"));
+    const first = await apply(music, made, QUICK);
+    const second = await apply(music, made, QUICK);
+    expect([first.verified, first.created, second.created, second.id]).toEqual([true, true, false, first.id]);
+    expect(playlists()).toEqual(["p.new1"]);
+    expect(holds("p.new1")).toEqual(["1", "2"]);
+  });
+
+  test("a playlist that does not show there within the reads settle allows leaves the run unverified: carried out again now, the plan would make another", async () => {
+    const { music, playlists } = apple([], { hidden: 9 });
+    expect(await apply(music, plan(mine, want("1")), { settle: { tries: 2, waitMs: 0 } })).toEqual({ id: "p.new1", created: true, appended: 1, verified: false });
+    expect(playlists()).toEqual(["p.new1"]);
+  });
+
+  test("a playlist found by looking, after the answer to making it was lost, has been seen there already and is not looked for again", async () => {
+    const { music, lines, fail } = apple();
+    fail("POST", PLAYLISTS, "lost", true);
+    await apply(music, plan(mine, []), QUICK);
+    expect(lines()).toEqual(["GET /v1/me/library/playlists", "POST /v1/me/library/playlists", "GET /v1/me/library/playlists"]);
+  });
+
+  test("a playlist named by its id is not looked for among the listener's playlists at all", async () => {
+    const { music, lines } = apple([{ id: "p.1" }]);
+    await apply(music, forId("p.1", "1"));
+    expect(lines().filter((line) => line === "GET /v1/me/library/playlists")).toEqual([]);
   });
 
   test("the plan carried out a second time finds the playlist the first time made", async () => {
