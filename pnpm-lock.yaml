@@ -278,6 +278,40 @@ importers:
 
   codegen/emit: {}
 
+  lib/lib-playlists:
+    dependencies:
+      '@open-music-sdk/client-catalog':
+        specifier: workspace:^
+        version: link:../../clients/client-catalog
+      '@open-music-sdk/client-user':
+        specifier: workspace:^
+        version: link:../../clients/client-user
+      '@open-music-sdk/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@open-music-sdk/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+    devDependencies:
+      '@open-music-sdk/lib-preview-player':
+        specifier: workspace:*
+        version: link:../lib-preview-player
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      tooling-tsdown-config:
+        specifier: workspace:*
+        version: link:../../tooling/tsdown-config
+      tooling-vitest-config:
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
+
   lib/lib-preview-player:
     dependencies:
       '@open-music-sdk/core':
