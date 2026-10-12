@@ -171,8 +171,8 @@ artwork, and both take it from [`@open-music-sdk/core`](../../packages/core). Th
 
 A mistake in how a function was called is a `TypeError` that names the function and the argument,
 such as `previewPlayer.seek: seconds must be …`. `load`, `seek`, `setVolume` and `subscribe` throw
-it, and `play`, `next` and `previous` reject with it. No error repeats a value: a string is described
-by its length and anything else by its kind.
+it, and `play`, `next` and `previous` reject with it. No such error repeats a value: a string is
+described by its length and anything else by its kind.
 
 What the element refuses is passed on as the browser made it, as above. Nothing here is an
 `AppleMusicError`: the player asks Apple for nothing.

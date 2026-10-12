@@ -391,6 +391,17 @@ describe("read: what it is handed is checked before Apple is asked, and a mistak
     expect(calls).toEqual([]);
   });
 
+  test("an id short enough to be one is asked for, and comes back in the path Apple's error names; one as long as a token never gets that far", async () => {
+    const { music } = apple(songs(1), { override: () => ({ status: 404, body: { errors: [{ status: "404", title: "Resource Not Found" }] } }) });
+    const asked = (await read(music, "p.not-there").catch((e: unknown) => e)) as Error;
+    expect(isAppleMusicError(asked, "ApiError")).toBe(true);
+    expect(asked.message).toContain("/v1/me/library/playlists/p.not-there");
+    const token = `eyJhbGciOiJFUzI1NiJ9.${"x".repeat(120)}`;
+    const refused = (await read(music, token).catch((e: unknown) => e)) as Error;
+    expect(refused).toBeInstanceOf(TypeError);
+    expect(refused.message).not.toContain("eyJ");
+  });
+
   test("the id is checked before the options, in the order they were handed over", async () => {
     const { music } = apple(songs(1));
     await expect(read(music, "", [] as object)).rejects.toThrow(/^playlists\.read: id must be /);

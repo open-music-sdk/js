@@ -267,12 +267,15 @@ how hard your app does.
 
 A mistake in how a verb was called is a `TypeError` that names the verb and the argument, such as
 `playlists.read: id must be …`, raised before Apple is asked. The verbs that wait on Apple reject with
-it; `plan` and `playlists` throw it. No error repeats a value: a string is described by its length and
-anything else by its kind.
+it; `plan` and `playlists` throw it. No such error repeats a value: a string is described by its
+length and anything else by its kind.
 
 What happens at runtime with Apple is an `AppleMusicError` from the client, with a `_tag` to switch
 on: `UserTokenInvalid` when the listener has to reconnect, `ApiError` with a `status` of 404 for a
-playlist that is not there, `NetworkError` for an answer that never came.
+playlist that is not there, `NetworkError` for an answer that never came. Its message names the path
+that was asked for, as every error of the client does, and so holds the playlist's id or the
+storefront as it was handed over. What can get that far is short: an id or a storefront of more than
+64 characters, which is what a token put in the wrong place would be, is refused as a mistake first.
 
 ## What Apple documents, and what it does not
 
