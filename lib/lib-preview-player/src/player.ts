@@ -26,6 +26,9 @@ export interface tPreviewAudio {
   readonly error: unknown;
   play(): Promise<void>;
   pause(): void;
+  /** With `removeAttribute("src")`, how a clip is taken off the element, so that it holds nothing of a queue that is gone. */
+  load(): void;
+  removeAttribute(name: string): void;
   addEventListener(type: string, listener: () => void): void;
   removeEventListener(type: string, listener: () => void): void;
 }
@@ -88,7 +91,7 @@ export interface tLoadedPreviews<T> {
 export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends AsyncDisposable {
   /**
    * Replaces the queue with the tracks that have a clip, and answers with those and with the ones left out. What
-   * was playing stops, no track is current afterwards, and nothing is played.
+   * was playing stops and its clip is taken off the element, no track is current afterwards, and nothing is played.
    */
   readonly load: (tracks: readonly T[]) => tLoadedPreviews<T>;
   /**
@@ -112,14 +115,14 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
   readonly state: tPreviewPlayerState<T>;
   /** Calls `listener` after each change of `state`, and gives the function that stops it. */
   readonly subscribe: (listener: () => void) => () => void;
-  /** Pauses, lets go of the element, forgets the queue and whoever listens. Afterwards every other function refuses. */
+  /** Pauses, takes its clip off the element and lets go of it, forgets the queue and whoever listens. Afterwards every other function refuses. */
   readonly dispose: () => void;
 }
 
 const NAME = "previewPlayer";
 const OPTIONS = "an options object";
 /** What makes a value an audio element here: the functions the player calls on one. */
-const AUDIO = ["play", "pause", "addEventListener", "removeEventListener"];
+const AUDIO = ["play", "pause", "load", "removeAttribute", "addEventListener", "removeEventListener"];
 /** The element's events the player hears. */
 const EVENTS = ["playing", "pause", "waiting", "timeupdate", "durationchange", "volumechange", "ended", "error"] as const;
 /** What a state holds, for telling whether the next one differs. */
@@ -146,7 +149,7 @@ const seconds = (value: unknown): number => (typeof value === "number" && Number
 function audioOf(given: unknown): tPreviewAudio {
   if (given !== undefined) {
     if (has(given, AUDIO)) return given as tPreviewAudio;
-    throw new TypeError(`${NAME}: audio must be an audio element, with play, pause, addEventListener and removeEventListener; got ${got(given)}`);
+    throw new TypeError(`${NAME}: audio must be an audio element, with play, pause, load, removeAttribute, addEventListener and removeEventListener; got ${got(given)}`);
   }
   const make: unknown = Reflect.get(globalThis, "Audio");
   if (typeof make !== "function") throw new TypeError(`${NAME}: there is no Audio here to make an element with, as there is in a browser; pass one as audio`);
@@ -181,7 +184,7 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
       tracks,
       index,
       track: tracks[index],
-      // With no track current, the element may still hold the last clip. That is not the page's to draw.
+      // With no track current, what the element says of itself is not the page's to draw.
       position: index < 0 ? 0 : seconds(audio.currentTime),
       duration: index < 0 ? 0 : seconds(audio.duration),
       volume: audio.volume,
@@ -284,15 +287,23 @@ export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: t
   const handlers = EVENTS.map((type) => [type, () => { heard(type); }] as const);
   for (const [type, handler] of handlers) audio.addEventListener(type, handler);
 
-  /** Stops what is playing and forgets which track was current, so that what the element says of the old clip afterwards is nobody's. */
+  /**
+   * Stops what is playing and forgets which track was current, so that what the element says of the old clip
+   * afterwards is nobody's. The clip is taken off the element as well: left there, the element's own controls could
+   * play a clip that is in no queue, with the state saying that nothing is current.
+   */
   function reset(queue: readonly T[], urls: readonly string[]): void {
-    const playing = index >= 0;
+    const current = index >= 0;
     tracks = queue;
     clips = urls;
     index = -1;
     status = "idle";
     turns++;
-    if (playing) audio.pause();
+    if (current) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
     changed();
   }
 

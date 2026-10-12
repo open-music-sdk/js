@@ -270,7 +270,7 @@ describe("what a server is asked, from a verb to the wire", () => {
 
 describe("the two lib packages are used in the same way", () => {
   /** A stand-in for an audio element that plays nothing and says nothing. */
-  const audio = () => ({ src: "", currentTime: 0, volume: 1, duration: Number.NaN, paused: true, ended: false, error: null, play: vi.fn(() => Promise.resolve()), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const audio = () => ({ src: "", currentTime: 0, volume: 1, duration: Number.NaN, paused: true, ended: false, error: null, play: vi.fn(() => Promise.resolve()), pause: vi.fn(), load: vi.fn(), removeAttribute: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() });
 
   test("each exports one name: a noun, which is a function", () => {
     expect([Object.keys(api), Object.keys(player)]).toEqual([["playlists"], ["previewPlayer"]]);
@@ -331,7 +331,7 @@ describe("the two lib packages are used in the same way", () => {
     expect(await message(lists.resolve("songs" as unknown as []))).toMatch(/^playlists\.resolve: descriptions must be a list of .*; got 5 characters$/);
     expect(() => made.load("songs" as unknown as [])).toThrow(/^previewPlayer\.load: tracks must be a list of .*; got 5 characters$/);
     expect(() => api.playlists("a-token" as unknown as tAppleMusicClient)).toThrow(/^playlists: client must be .*; got 7 characters$/);
-    expect(() => player.previewPlayer({ audio: "a-token" as never })).toThrow(/^previewPlayer: audio must be .*; got 7 characters$/);
+    expect(() => player.previewPlayer({ audio: "a-token" as never })).toThrow(/^previewPlayer: audio must be an audio element, .*; got 7 characters$/);
   });
 });
 

@@ -40,6 +40,8 @@ describe("the package entry", () => {
       pause() {
         this.paused = true;
       },
+      load: () => undefined,
+      removeAttribute: () => undefined,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
     };

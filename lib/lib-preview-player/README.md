@@ -92,7 +92,8 @@ they were handed over. Each of `skipped` is a track left out of it:
 | `reason` | `"no-preview"`: it has no clip. `"host"`: its clip is not on one of the hosts allowed. |
 
 A track that cannot be played is never an error, so a page can draw it with its play button off.
-Loading a new queue stops what was playing and leaves no track current.
+Loading a new queue stops what was playing, takes its clip off the element, and leaves no track
+current: the element's own controls then have nothing of the old queue to play.
 
 When a clip ends the next track of the queue starts. After the last one the player's status is
 `ended`, and `play()` starts again from the first.
@@ -141,14 +142,14 @@ rejects with the browser's `AbortError`, and the state is the later call's: catc
 ## The element
 
 Hand over your own `<audio>` to keep its controls, or let the player make one. The player uses
-`src`, `currentTime`, `volume`, `duration`, `paused`, `ended`, `error`, `play()`, `pause()` and eight of
-the element's events, and nothing else: it never adds the element to the page or takes it out.
+`src`, `currentTime`, `volume`, `duration`, `paused`, `ended`, `error`, `play()`, `pause()`, `load()`,
+`removeAttribute("src")` and eight of the element's events, and nothing else: it never adds the element to the page or takes it out.
 
 An element that something else pauses, such as its own controls, is paused in `state` too, and a
 volume set on the element is the volume in `state`.
 
-`dispose()` pauses, takes the player's listeners off the element, and forgets the queue and whoever
-subscribed. The element is left as it is, for you to reuse or drop. Afterwards every other function
+`dispose()` pauses, takes the clip and the player's listeners off the element, and forgets the queue
+and whoever subscribed. The element is yours again, for you to reuse or drop. Afterwards every other function
 is a `TypeError`. `await using player = previewPlayer()` works where the runtime has it; in a browser
 with no `Symbol.asyncDispose` yet a player has no such function, and `dispose()` is the way.
 

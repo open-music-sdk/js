@@ -12,6 +12,8 @@ class FakeAudio implements tPreviewAudio {
   readonly sources: string[] = [];
   /** How many times it was asked to play. */
   plays = 0;
+  /** How many times it was told to load afresh, as it is when a clip is taken off it. */
+  loads = 0;
   /** What the next play() rejects with. Left alone, it resolves. */
   refusal: Error | undefined;
   /** Set, each play() waits in `waiting` for the test to settle it. */
@@ -61,6 +63,19 @@ class FakeAudio implements tPreviewAudio {
     if (this.paused) return;
     this.paused = true;
     this.emit("pause");
+  }
+  load(): void {
+    this.loads++;
+  }
+  /** Without its src, an element holds no clip, and forgets where it was in the last one. */
+  removeAttribute(name: string): void {
+    if (name !== "src") return;
+    this.#src = "";
+    this.currentTime = 0;
+    this.duration = Number.NaN;
+    this.ended = false;
+    this.paused = true;
+    this.error = null;
   }
   addEventListener(type: string, listener: () => void): void {
     this.listeners.set(type, (this.listeners.get(type) ?? new Set()).add(listener));
@@ -210,8 +225,24 @@ describe("load: a track that cannot be played is left out and said so, never an 
     await player.play(1);
     player.load([song("z")]);
     expect(audio.paused).toBe(true);
+    expect([audio.src, audio.loads]).toEqual(["", 1]);
     expect(player.state).toMatchObject({ status: "idle", index: -1, track: undefined, position: 0, duration: 0 });
     expect(player.state.tracks.map((track) => track.id)).toEqual(["z"]);
+  });
+
+  test("the old clip is taken off the element, so its own controls have nothing of a queue that is gone to play", async () => {
+    const { audio, player } = loaded();
+    await player.play(1);
+    player.pause();
+    player.load([song("z")]);
+    expect(audio.src).toBe("");
+    expect(audio.sources).toEqual([clip("b")]);
+  });
+
+  test("an element that was given no clip is left as it is by a new queue", () => {
+    const { audio, player } = loaded();
+    player.load([song("z")]);
+    expect([audio.loads, audio.sources]).toEqual([0, []]);
   });
 
   test.each<[string, unknown]>([
@@ -625,7 +656,8 @@ describe("state: one frozen snapshot, replaced only when something a page would 
     await player.play();
     audio.reach(12, 30);
     player.load([song("z")]);
-    expect([audio.currentTime, audio.duration]).toEqual([12, 30]);
+    audio.reach(5, 9);
+    expect([audio.currentTime, audio.duration]).toEqual([5, 9]);
     expect(player.state).toMatchObject({ position: 0, duration: 0 });
   });
 
@@ -896,8 +928,9 @@ describe("what a player is handed is checked when it is made, not when it first 
     ["a URL", clip("a")],
     ["null", null],
     ["something that plays and pauses but cannot be listened to", { play: () => Promise.resolve(), pause: () => undefined }],
+    ["something that can be played and listened to but not emptied", { play: () => Promise.resolve(), pause: () => undefined, addEventListener: () => undefined, removeEventListener: () => undefined }],
   ])("audio that is %s is refused", (_name, audio) => {
-    expect(() => previewPlayer({ audio: audio as tPreviewAudio })).toThrow(/^previewPlayer: audio must be an audio element, with play, pause, addEventListener and removeEventListener; got /);
+    expect(() => previewPlayer({ audio: audio as tPreviewAudio })).toThrow(/^previewPlayer: audio must be an audio element, with play, pause, load, removeAttribute, addEventListener and removeEventListener; got /);
   });
 
   test("with no element handed over and no Audio to make one with, as on a server, it says so", () => {
@@ -956,6 +989,13 @@ describe("dispose: the player lets go of its element, and of whoever listens", (
     player.dispose();
     expect(audio.paused).toBe(true);
     expect(audio.heldBy()).toBe(0);
+    expect([audio.src, audio.loads]).toEqual(["", 1]);
+  });
+
+  test("an element that was given no clip is not touched by it, beyond the listeners coming off", () => {
+    const { audio, player } = loaded();
+    player.dispose();
+    expect([audio.loads, audio.heldBy()]).toEqual([0, 0]);
   });
 
   test("the state is empty and idle afterwards, and listeners hear of it once and then no more", async () => {
