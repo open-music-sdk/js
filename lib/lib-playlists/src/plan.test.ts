@@ -165,6 +165,17 @@ describe("plan: what a playlist is missing, and what cannot be done, with no req
     expect(JSON.stringify([playlist, tracks])).toBe(before);
   });
 
+  test("an id put on Object.prototype by other code is not the playlist's: one named by what it is called stays one to find or make", () => {
+    const polluted = Object.prototype as { id?: unknown };
+    polluted.id = "p.theirs";
+    try {
+      expect(Object.keys(plan({ name: "Road trip" }, [want("1")]).playlist)).toEqual(["name"]);
+      expect(plan({ name: "Road trip" }, [want("1")]).append).toEqual([want("1")]);
+    } finally {
+      delete polluted.id;
+    }
+  });
+
   test("the playlist is checked before the tracks, in the order they were handed over", () => {
     expect(() => plan(undefined as unknown as tPlaylistSnapshot, undefined as unknown as tPlaylistTrack[])).toThrow(/^playlists\.plan: playlist must be /);
     expect(() => plan({ name: "Road trip" }, undefined as unknown as tPlaylistTrack[])).toThrow(/^playlists\.plan: tracks must be /);

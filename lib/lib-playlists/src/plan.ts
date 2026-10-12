@@ -135,6 +135,12 @@ export function targetOf(fn: string, playlist: unknown): { readonly id: string }
   return description === undefined ? { name } : { name, description };
 }
 
+/**
+ * Whether the playlist a plan is for is one that is there, by an id of its own. An `id` found on Object.prototype,
+ * where other code may have put one, is not the playlist's: a playlist named by what it is called has none.
+ */
+export const isThere = (target: { readonly id: string } | tNewPlaylist): target is { readonly id: string } => Object.hasOwn(target, "id");
+
 /** The tracks of a playlist that was read, each as what the diff reads of it and as it was handed over. */
 function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapshotTrack; readonly ids: tHeld }[] {
   const { tracks } = ownOf(playlist as { readonly tracks?: unknown });
@@ -159,7 +165,7 @@ function heldOf(fn: string, playlist: object): { readonly track: tPlaylistSnapsh
  */
 export function plan(playlist: tPlaylistSnapshot | tNewPlaylist, tracks: readonly tPlaylistTrack[]): tPlaylistPlan {
   const target = targetOf(FN, playlist);
-  const held = "id" in target ? heldOf(FN, playlist) : [];
+  const held = isThere(target) ? heldOf(FN, playlist) : [];
   const wanted = refsOf(FN, tracks);
   const { append, extra, reordered } = diff(
     held.map((each) => each.ids),

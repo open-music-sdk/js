@@ -480,6 +480,20 @@ describe("apply: a playlist named by what it is called is found, or made once", 
     expect(lines()).toEqual(["GET /v1/me/library/playlists", "POST /v1/me/library/playlists"]);
   });
 
+  test("an id put on Object.prototype by other code is not the plan's playlist: nothing is read there or written there", async () => {
+    const { music, lines, holds } = apple([{ id: "p.theirs", holds: ["9"] }]);
+    const stored = JSON.parse(JSON.stringify(plan(mine, want("1")))) as tPlaylistPlan;
+    const polluted = Object.prototype as { id?: unknown };
+    polluted.id = "p.theirs";
+    try {
+      expect(await apply(music, stored)).toMatchObject({ id: "p.new1", created: true, appended: 1 });
+    } finally {
+      delete polluted.id;
+    }
+    expect(lines().filter((line) => line.includes("p.theirs"))).toEqual([]);
+    expect(holds("p.theirs")).toEqual(["9"]);
+  });
+
   test("the plan carried out a second time finds the playlist the first time made", async () => {
     const { music, playlists, holds } = apple();
     const first = await apply(music, plan(mine, want("1", "2")));

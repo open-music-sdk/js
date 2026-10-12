@@ -7,7 +7,7 @@
 import { addLibraryPlaylistTracks, createLibraryPlaylist, listLibraryPlaylists, type tPlaylistTrack } from "@open-music-sdk/client-user";
 import { AppleMusicError, got, isAppleMusicError, isName, isPlain, optionsOf, ownOf, sleep, type tAppleMusicClient } from "@open-music-sdk/core";
 import { countOf, pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
-import { diff, refsOf, targetOf, type tHeld, type tNewPlaylist, type tPlaylistPlan } from "./plan";
+import { diff, isThere, refsOf, targetOf, type tHeld, type tNewPlaylist, type tPlaylistPlan } from "./plan";
 import { taken } from "./read";
 
 /** How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made at once may not show it. */
@@ -139,7 +139,7 @@ export async function apply(client: tAppleMusicClient, plan: tPlaylistPlan, opti
   const settle = { tries: countOf(FN, "settle.tries", given.tries, 1, Number.MAX_SAFE_INTEGER, DEFAULTS.tries), waitMs: waitOf(FN, "settle.waitMs", given.waitMs, DEFAULTS.waitMs) };
 
   // The playlist, and what it holds now. One made here holds nothing, and is not read: it may not show yet.
-  const there = "id" in target ? target.id : await find(client, target, signal);
+  const there = isThere(target) ? target.id : await find(client, target, signal);
   const id = there ?? (await make(client, target as tNewPlaylist, signal, settle));
   const before: readonly tHeld[] = there === undefined ? [] : (await taken(client, id, signal)).tracks;
   const { append } = diff(before, wanted);
