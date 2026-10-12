@@ -101,7 +101,10 @@ function apple(start: readonly { id: string; name?: string; description?: string
       const data = playlist.tracks.slice(offset, offset + page).map((each) => ({ id: each.id, type: "library-songs", attributes: { playParams: { id: each.id, catalogId: each.catalogId } } }));
       return { body: { data, ...(offset + page < playlist.tracks.length ? { next: `${url.pathname}?offset=${String(offset + page)}` } : {}) } };
     }
-    return { body: { data: [resource(playlist)] } };
+    // Asked for with its tracks, the playlist carries the ones that show.
+    const withTracks = (url.searchParams.get("include") ?? "").split(",").includes("tracks");
+    const relationships = withTracks ? { relationships: { tracks: { data: playlist.tracks.map((each) => ({ id: each.id, type: "library-songs" })) } } } : {};
+    return { body: { data: [{ ...resource(playlist), ...relationships }] } };
   }
 
   const fetch = async (input: RequestInfo | URL): Promise<Response> => {
@@ -217,6 +220,15 @@ describe("apply: the playlist a plan names by its id", () => {
     const { music, posted } = apple([{ id: "p.1", holds: ["1"] }]);
     await apply(music, forId("p.1", "1", "1", "1"));
     expect(posted).toEqual([["1", "1"]]);
+  });
+
+  test("one 404 for the tracks of a playlist that holds some does not have them all added again: the run rejects with it, and nothing is written", async () => {
+    const { music, posted, holds, fail } = apple([{ id: "p.1", holds: ["1", "2"] }]);
+    fail("GET", TRACKS, 404, false);
+    const error: unknown = await apply(music, forId("p.1", "1", "2"), QUICK).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "ApiError") && error.status).toBe(404);
+    expect(posted).toEqual([]);
+    expect(holds("p.1")).toEqual(["1", "2"]);
   });
 
   test("a playlist that is not there is Apple's 404, and nothing is written", async () => {

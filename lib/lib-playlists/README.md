@@ -263,7 +263,10 @@ Nothing in this package has been run against the live API. These are what it tak
   and its answers carry it.
 - **That a `next` link keeps what the first page was asked with.** If it drops `include`, tracks after
   the first hundred are read with their catalog id and without their ISRC.
-- **That a 404 for the tracks of a playlist that is there means it has none.**
+- **That a 404 for the tracks of a playlist that is there means it has none.** Before that is believed
+  the playlist is asked once more, with `include=tracks`, and a playlist that then shows a track is
+  not empty: the 404 is what the verb rejects with. A playlist wrongly taken for empty would have
+  everything it holds added again.
 - **That a track added by its catalog id is then held under that id.** `plan` goes by it. If the
   library answers with another id for the same recording, the track will look missing.
 - **How long a write takes to show**, which the defaults of `settle` are a guess at, and **how many

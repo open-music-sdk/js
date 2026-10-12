@@ -28,7 +28,10 @@ const responses: Response[] = [];
  * A fetch that answers as Apple does for one playlist of the listener's library: the playlist itself, and its tracks
  * a page at a time. `override` answers in its place where it gives anything.
  */
-function apple(tracks: readonly tKept[], options: { page?: number; empty?: "404" | "list"; nextKeeps?: boolean; override?: (path: string, offset: number) => tReply | undefined; attributes?: object } = {}) {
+function apple(
+  tracks: readonly tKept[],
+  options: { page?: number; empty?: "404" | "list"; nextKeeps?: boolean; override?: (path: string, offset: number) => tReply | undefined; attributes?: object; /** The tracks the playlist carries when it is asked for with them, where that differs from the tracks its relationship gives. */ says?: readonly tKept[] } = {},
+) {
   const { page = 100, empty = "404", nextKeeps = true, attributes = { name: "Road trip", description: { standard: "made by my-app" }, canEdit: true } } = options;
   const calls: Request[] = [];
   const track = (kept: tKept, include: boolean) => {
@@ -51,7 +54,12 @@ function apple(tracks: readonly tKept[], options: { page?: number; empty?: "404"
     const offset = Number(url.searchParams.get("offset") ?? 0);
     const given = options.override?.(url.pathname, offset);
     if (given !== undefined) return given;
-    if (url.pathname === "/v1/me/library/playlists/p.1") return { body: { data: [{ id: "p.1", type: "library-playlists", href: url.pathname, attributes }] } };
+    if (url.pathname === "/v1/me/library/playlists/p.1") {
+      // Asked for with its tracks, the playlist carries the first of them, as Apple documents.
+      const withTracks = (url.searchParams.get("include") ?? "").split(",").includes("tracks");
+      const relationships = withTracks ? { relationships: { tracks: { data: (options.says ?? tracks).slice(0, page).map((each) => track(each, false)) } } } : {};
+      return { body: { data: [{ id: "p.1", type: "library-playlists", href: url.pathname, attributes, ...relationships }] } };
+    }
     if (url.pathname === "/v1/me/library/playlists/p.1/tracks") {
       if (tracks.length === 0) return empty === "404" ? { status: 404, body: { errors: [{ status: "404", title: "Resource Not Found" }] } } : { body: { data: [] } };
       const include = (url.searchParams.get("include") ?? "").split(",").includes("catalog");
@@ -220,8 +228,21 @@ describe("read: nothing on Object.prototype is read as Apple's", () => {
 });
 
 describe("read: a playlist with nothing in it", () => {
-  test("a 404 for the tracks of a playlist that is there is a playlist with no tracks", async () => {
-    const { music } = apple([], { empty: "404" });
+  test("a 404 for the tracks of a playlist that is there is a playlist with no tracks, once the playlist asked for with its tracks bears that out", async () => {
+    const { music, lines } = apple([], { empty: "404" });
+    expect((await read(music, "p.1")).tracks).toEqual([]);
+    expect(lines()).toEqual(["GET /v1/me/library/playlists/p.1", "GET /v1/me/library/playlists/p.1/tracks?include=catalog", "GET /v1/me/library/playlists/p.1?include=tracks"]);
+  });
+
+  test("a 404 for the tracks of a playlist that then shows it holds some is not an empty playlist: the 404 is what read rejects with", async () => {
+    const { music } = apple([], { empty: "404", says: songs(2) });
+    const error: unknown = await read(music, "p.1").catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "ApiError") && error.status).toBe(404);
+    expect((error as Error).message).toContain("/tracks");
+  });
+
+  test("a playlist that carries no word of its tracks when asked for with them is taken at the 404's word", async () => {
+    const { music } = apple([], { override: (path) => (path.endsWith("/p.1") ? { body: { data: [{ id: "p.1", type: "library-playlists", attributes: { name: "Road trip" } }] } } : undefined) });
     expect((await read(music, "p.1")).tracks).toEqual([]);
   });
 

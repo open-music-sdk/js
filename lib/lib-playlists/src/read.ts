@@ -61,9 +61,13 @@ export async function taken(client: tAppleMusicClient, id: string, signal: Abort
       if (tracks.length % PAGE === 0) report(tracks.length, undefined);
     }
   } catch (error) {
-    // The playlist is there: it was just read. A 404 for its tracks before any of them came is taken to mean it
-    // has none. Apple's documentation does not say what an empty playlist's tracks answer with.
     if (!(tracks.length === 0 && isAppleMusicError(error, "ApiError") && error.status === 404)) throw error;
+    // The playlist is there: it was just read. A 404 for its tracks before any of them came is taken to mean it
+    // has none, which Apple's documentation does not say. So the playlist is asked once more, with its tracks,
+    // and has to bear that out: a playlist that then shows a track is not empty, and the 404 stands. What is read
+    // here decides what `apply` adds, and a playlist wrongly taken for empty would have all of it added again.
+    const again = await getLibraryPlaylist.bound(client)(id, { include: ["tracks"], signal });
+    if (first(held(held(held(again).relationships).tracks).data) !== undefined) throw error;
   }
   if (tracks.length % PAGE !== 0) report(tracks.length, undefined);
   return filled<tPlaylistSnapshot>({
