@@ -186,7 +186,9 @@ const songsOf = (data: unknown): tSong[] => (Array.isArray(data) ? (data as unkn
  * finds nothing is never an error. A request that fails is: it rejects the call, and nothing found so far is handed
  * over.
  *
- * Only the catalog is asked, so a client with no Music User Token will do, and none is sent.
+ * Only the catalog is asked, and no request made of it carries the Music User Token, so a client that has none
+ * will do. The one thing that may be asked beside is the client's own: where neither the call nor the client names
+ * a storefront, the client looks up the listener's, with their token, as it does for any catalog function.
  */
 export async function resolve<D extends tTrackDescription>(client: tAppleMusicClient, descriptions: readonly D[], options?: tResolveOptions): Promise<tResolvedTracks<D>> {
   const wanted = wantedOf<D>(descriptions);

@@ -32,6 +32,7 @@ function apple(catalog: readonly tSong[] = [HEY_JUDE, YESTERDAY], options: { sea
       const codes = (url.searchParams.get("filter[isrc]") ?? "").split(",");
       return { body: { data: catalog.filter((each) => codes.includes(each.attributes?.isrc ?? "")) } };
     }
+    if (url.pathname === "/v1/me/storefront") return { body: { data: [{ id: "gb", type: "storefronts" }] } };
     if (url.pathname.endsWith("/search")) return { body: { results: { songs: { data: (options.search ?? (() => catalog))(url.searchParams.get("term") ?? "") } } } };
     return { status: 404, body: { errors: [] } };
   };
@@ -45,6 +46,7 @@ function apple(catalog: readonly tSong[] = [HEY_JUDE, YESTERDAY], options: { sea
     return Promise.resolve(res);
   };
   return {
+    fetch,
     music: createClient({ developerToken: "dev", userToken: "listener", storefront: "us", fetch, retry: false }),
     calls,
     /** Each request as its method, path and query. */
@@ -286,6 +288,29 @@ describe("resolve: only the catalog is asked", () => {
       ["Bearer dev", null],
       ["Bearer dev", null],
     ]);
+  });
+
+  test("a client that names no storefront looks the listener's up first, which is the one request that carries their token: the catalog's still carry none", async () => {
+    const { fetch, calls } = apple();
+    const listener = createClient({ developerToken: "dev", userToken: "listener", fetch, retry: false });
+    await resolve(listener, [{ isrc: "GBAYE0601498" }, { name: "Yesterday", artistName: "The Beatles" }]);
+    expect(calls.map((c) => `${new URL(c.url).pathname} ${c.headers.get("music-user-token") ?? "-"}`)).toEqual(["/v1/me/storefront listener", "/v1/catalog/gb/songs -", "/v1/catalog/gb/search -"]);
+  });
+
+  test("with a storefront named in the call, that client is asked for nothing of the listener's at all", async () => {
+    const { fetch, calls } = apple();
+    const listener = createClient({ developerToken: "dev", userToken: "listener", fetch, retry: false });
+    await resolve(listener, [{ isrc: "GBAYE0601498" }], { storefront: "us" });
+    expect(calls.map((c) => `${new URL(c.url).pathname} ${c.headers.get("music-user-token") ?? "-"}`)).toEqual(["/v1/catalog/us/songs -"]);
+  });
+
+  test("a client with no Music User Token will do, so long as a storefront is named; with neither, the call rejects before the catalog is asked", async () => {
+    const { fetch, calls } = apple();
+    const anyone = createClient({ developerToken: "dev", fetch, retry: false });
+    expect((await resolve(anyone, [{ isrc: "GBAYE0601498" }], { storefront: "us" })).tracks).toEqual([HEY_JUDE]);
+    const error: unknown = await resolve(anyone, [{ isrc: "GBAYE0601498" }]).catch((e: unknown) => e);
+    expect(isAppleMusicError(error, "UserTokenInvalid")).toBe(true);
+    expect(calls).toHaveLength(1);
   });
 
   test("it is the client's storefront that is asked, unless the call names another", async () => {

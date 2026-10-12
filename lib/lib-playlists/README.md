@@ -61,8 +61,13 @@ itself: none of them needs `this`.
 | `apply(plan, options?)` | Finds or makes the playlist and adds what it is missing | The library, with both tokens |
 
 `read` and `apply` are the listener's, so the client has to hold a Music User Token: one created with
-a `userToken`, or given by `music.as(token)` or `music.forUser(id)`. `resolve` asks the catalog, sends
-no Music User Token whichever client it is given, and works with a client that has none.
+a `userToken`, or given by `music.as(token)` or `music.forUser(id)`.
+
+`resolve` asks the catalog, and no request it makes there carries the Music User Token, whichever
+client it is given. It works with a client that has none, so long as a storefront is named, on the
+client or in the call. Where neither names one, the client looks up the listener's own, and that one
+request, to `/v1/me/storefront`, does carry their token; a client with no token and no storefront has
+nowhere to look, and the call rejects before the catalog is asked.
 
 | Type | Is |
 | --- | --- |

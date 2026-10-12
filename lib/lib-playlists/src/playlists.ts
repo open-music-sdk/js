@@ -11,7 +11,8 @@ export interface tPlaylists {
   /**
    * Finds a song in the catalog for each description of a track: by ISRC first, then by a search kept only when
    * name and artist are the same. Resolves to the songs found and the descriptions left over, each with the songs
-   * its search came back with. Asks the catalog alone, so it needs no Music User Token and sends none.
+   * its search came back with. Asks the catalog alone, with no Music User Token: a client that has none will do,
+   * so long as it or the call names a storefront.
    */
   readonly resolve: <D extends tTrackDescription>(descriptions: readonly D[], options?: tResolveOptions) => Promise<tResolvedTracks<D>>;
   /**
