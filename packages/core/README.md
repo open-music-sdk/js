@@ -33,7 +33,7 @@ try {
 
 | Export | Does |
 | --- | --- |
-| `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser`. The options are checked when the client is made, so a mistake in one fails there and not on the first request |
+| `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser`. The options are checked when the client is made, so a mistake in one fails there and not on the first request: `null` where an option belongs is a mistake like any other value, and a store needs its three functions, though `forUser` reads only one. `as()` checks the token it is handed under its own name |
 | `withNamespaces(client, namespaces)` | The client with namespaces on it, such as `{ catalog, user, playlists }`, each made for it by its factory, under its name; `as()` and `forUser()` give the same again. What an integration's client is |
 | `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
 | `retry(fn, policy?, signal?)`, `retryable` | Exponential backoff with full jitter; honours `Retry-After` |
