@@ -62,8 +62,8 @@ minter provides:
 | `userToken`, `userTokenStore` | One listener's token, or the store `forUser(userId)` reads. |
 | `storefront`, `fetch`, `retry`, `rateLimit`, `onRequest`, `onResponse` | As `createClient` takes them. |
 
-Not among them: `origin`. The server's own token never meets a browser, and the one that does is the
-endpoint's.
+Not among them: `origin`, which is refused rather than dropped. The server's own token never meets a
+browser, and the one that does is the endpoint's.
 
 What it gives is core's client, `request`, `paginate`, `storefront`, `as` and `forUser`, with three
 namespaces on it: `catalog` is [`catalog(client)`](../../clients/client-catalog), `user` is
@@ -101,21 +101,25 @@ from it.
 | --- | --- |
 | `pem`, `teamId`, `keyId` | As for the client. Required. |
 | `origin` | The web origins the token is for, one at least, each exactly as a browser sends it: `https://app.example`, with no path or trailing slash. Required. |
-| `ttlSeconds` | The token's lifetime in whole seconds, from 60. Default 900, fifteen minutes. |
+| `ttlSeconds` | The token's lifetime in whole seconds, from 60 to 86 400, one day. Default 900, fifteen minutes. |
 | `refreshAheadSeconds` | How long before `exp` to mint a replacement. Default, and at most, half the lifetime. |
 
 It keeps a minter of its own, so page loads within a token's life share one signature.
 
 | Request | Answer |
 | --- | --- |
-| `GET` | `200`, `{ "token": "<jwt>" }` as JSON, `cache-control: no-store` |
+| `GET` | `200`, `{ "token": "<jwt>" }` as JSON |
 | `OPTIONS` | `204`, `allow: GET`, `access-control-allow-methods: GET` |
-| Anything else | `405`, `{ "error": "MethodNotAllowed" }`, `allow: GET`, `cache-control: no-store` |
+| Anything else | `405`, `{ "error": "MethodNotAllowed" }`, `allow: GET` |
 
-A request whose `Origin` header is one of the origins given is answered with
-`access-control-allow-origin` for that origin and `vary: origin`, so a page on another origin, a
-static site in front of a Worker, needs no wrapper. No other request gets a CORS header, and no answer
-carries credentials. Mount it behind your own session if tokens should go only to your users.
+Every answer says `vary: origin` and `cache-control: no-store`. A request whose `Origin` header is
+one of the origins given is answered with `access-control-allow-origin` for that origin, so a page on
+another origin, a static site in front of a Worker, reads the token with no wrapper. No other request
+gets a CORS header, and no answer carries a credentials header or allows a header of the page's own:
+a page on another origin can fetch the token and nothing more. Mount it behind your own session if
+tokens should go only to your users; that holds on your own origin alone, since a page on another
+cannot send a cookie or a header of its own to it. A request that is gone, aborted by the page, is
+answered all the same: the mint is one flight shared by every request, and no request's to cancel.
 
 It catches nothing. A `pem` that is a string but no key fails at the first mint, inside the request,
 with the `TypeError` the minter throws; your framework logs it, and that is where you find it. Nothing
@@ -129,7 +133,14 @@ an endpoint that hands one out is a public dispenser:
   long as it lives. That is why the default life is fifteen minutes, and why a longer one buys nothing:
   the page's fetcher replaces its token in the background.
 - Rate-limit the route, as you would a login.
-- `cache-control: no-store` is on every answer, so no proxy or CDN keeps a copy.
+- `cache-control: no-store` and `vary: origin` are on every answer, so no proxy or CDN keeps a copy,
+  and none hands one page's answer to another. A CDN rule that caches regardless would hand one token
+  to everyone, past its end.
+- Every token names every origin in the list, and anyone who fetches one can decode it: one endpoint
+  per deployment, listing that deployment's origins alone, so that a staging or a localhost origin is
+  not published by the production one.
+- `ttlSeconds` stops at a day here, whatever the minter takes elsewhere: a token anyone can fetch, and
+  nothing can take back, is not for keeping.
 
 ## What is re-exported
 
