@@ -130,6 +130,19 @@ describe("withNamespaces", () => {
     expect(() => withNamespaces(apple().music, namespaces as Record<string, never>)).toThrow(new TypeError(message));
   });
 
+  test("a namespace named __proto__ is one more namespace, and nothing inherits from it", () => {
+    const made = withNamespaces(apple().music, { ["__proto__"]: catalog });
+    expect(Object.getPrototypeOf(made)).toBeNull();
+    expect(Object.hasOwn(made, "__proto__")).toBe(true);
+    expect(typeof (made as unknown as Record<string, { getSong?: unknown }>).__proto__?.getSong).toBe("function");
+    expect(Object.hasOwn(Object.prototype, "getSong")).toBe(false);
+  });
+
+  test("a factory that gives no object is a TypeError naming the namespace", () => {
+    expect(() => withNamespaces(apple().music, { catalog: () => 42 as unknown as object })).toThrow(new TypeError("withNamespaces: namespaces.catalog must give an object for the client; got 42"));
+    expect(() => withNamespaces(apple().music, { catalog: () => null as unknown as object })).toThrow(/^withNamespaces: namespaces\.catalog must give an object for the client; got /);
+  });
+
   test("a factory on Object.prototype is nobody's namespace", () => {
     Object.assign(Object.prototype, { planted: catalog });
     try {

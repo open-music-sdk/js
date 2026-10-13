@@ -2,6 +2,7 @@
 // made for that client by a factory. What `as()` and `forUser()` give is composed the same way over the client
 // they derive, so the namespaces are there for a listener's client too.
 import { clientOf, gotFor, isPlain, ownOf } from "./check";
+// `ownOf` reads the namespaces handed over; what is made is built with no prototype from the start.
 import type { tAppleMusicClient, tTokenProvider } from "./client";
 import { got } from "./got";
 
@@ -36,16 +37,21 @@ export function withNamespaces<N extends tNamespaces>(client: tAppleMusicClient,
     return [name, factory as (client: tAppleMusicClient) => object] as const;
   });
   const compose = (base: tAppleMusicClient): tWithNamespaces<N> => {
-    const made: Record<string, unknown> = {
+    // With nothing to inherit from, so that a namespace named `__proto__` is one more namespace and nothing else.
+    const made = Object.assign(Object.create(null) as Record<string, unknown>, {
       // Bound, so that a client whose functions do need `this`, such as a test's own class, still works through here.
       request: base.request.bind(base),
       paginate: base.paginate.bind(base),
       storefront: base.storefront.bind(base),
       as: (userToken: string | tTokenProvider) => compose(base.as(userToken)),
       forUser: (userId: string) => compose(base.forUser(userId)),
-    };
-    for (const [name, factory] of factories) made[name] = factory(base);
-    return Object.freeze(ownOf(made)) as unknown as tWithNamespaces<N>;
+    });
+    for (const [name, factory] of factories) {
+      const namespace: unknown = factory(base);
+      if (typeof namespace !== "object" || namespace === null) throw new TypeError(`withNamespaces: namespaces.${name} must give an object for the client; got ${got(namespace)}`);
+      made[name] = namespace;
+    }
+    return Object.freeze(made) as unknown as tWithNamespaces<N>;
   };
   return compose(music);
 }
