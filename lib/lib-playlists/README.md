@@ -5,8 +5,7 @@ take a track out, move one, or delete a playlist. This package is the work every
 that: finding tracks known from somewhere else in Apple's catalog, reading a playlist whole, working
 out what it is missing, and adding that without adding anything twice.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use this package directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/lib-playlists @open-music-sdk/core

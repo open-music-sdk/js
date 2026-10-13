@@ -4,8 +4,7 @@ Everything around a Music User Token except issuing one: taking it in, asking Ap
 and keeping it where [`@open-music-sdk/core`](../core)'s `forUser(userId)` can find it. Only Apple can
 issue the token, through its own sign-in flow; this package starts once you hold the string.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use this package directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/user-token @open-music-sdk/core

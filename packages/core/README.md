@@ -4,8 +4,7 @@ The HTTP layer every other package in the family is built on: a client factory o
 attaches the two tokens, encodes parameters, follows `next` links, turns status codes into tagged
 errors, and retries what is worth retrying. Zero runtime dependencies; runs anywhere `fetch` does.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use `core` directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use `core` directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/core

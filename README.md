@@ -5,8 +5,8 @@
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
 
 > **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core, developer
-> token, user token and artwork packages, the two clients and the two libs exist and pass their tests, but none has been
-> run against the live API, and there is no integration to install.
+> token, user token and artwork packages, the two clients, the two libs and the three integrations exist and pass
+> their tests, but none has been run against the live API, in a browser, or in a React app outside its tests.
 > The table below is the source of truth for what works; expect everything else to be missing or to change.
 
 ## Project status
@@ -29,19 +29,22 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/client-user`](./clients/client-user) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
 | [`@open-music-sdk/lib-playlists`](./lib/lib-playlists) | 🚧 In progress | 80% | `playlists(client)` · resolve tracks by ISRC, then by a search held to an exact match · read a playlist whole, which is also the export · plan what it is missing · apply it with each write sent once · progress, a delay between requests and an opt-in limit on pages · untested against the live API |
 | [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · untested in a browser against the live API |
-| `@open-music-sdk/server` | 🚧 In progress | 0% | Server client · token endpoint · user-token intake · Node, Workers, Bun, Deno |
-| `@open-music-sdk/browser` | 🚧 In progress | 0% | Browser client · fetches tokens from your server · no signing code |
-| `@open-music-sdk/react` | 🚧 In progress | 0% | Provider · hooks · query option factories |
-| `@open-music-sdk/next` | ⬜ Not started | 0% | Server and client halves · route handlers · cookie-backed token store |
+| [`@open-music-sdk/server`](./integrations/server) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
+| [`@open-music-sdk/browser`](./integrations/browser) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
+| [`@open-music-sdk/react`](./integrations/react) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
+| `@open-music-sdk/next` | ⬜ Deferred | 0% | A Next.js app installs `server` and `react`; the recipe is in react's README · returns when it has Next-specific code worth a package |
 | Sample apps | ⬜ Not started | 0% | CLI · Worker · vanilla web · React · Next.js · Electron |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
 Progress is a judgement of how much of the described scope exists and is tested.
 
-Until an integration exists, an app puts the pieces together itself: a client from `core`, a developer
-token from `developer-token`, and the functions of `client-catalog` and `client-user`, each of which
-takes that client. `lib-playlists` takes the same client, and `lib-preview-player` the songs it
-fetched. Each README linked above shows how.
+An app installs one integration: `server` for anything server-side, `browser` for a page, `react` for
+a React app, and `server` with `react` for a Next.js app. Each gives a preconfigured client with the
+catalog, the listener's library and the playlist verbs on it, and re-exports what an app uses of the
+feature tier from one path. An app can also put the pieces together itself: a client from `core`, a
+developer token from `developer-token`, and the functions of `client-catalog` and `client-user`, each
+of which takes that client; `lib-playlists` takes the same client, and `lib-preview-player` the songs
+it fetched. Each README linked above shows how.
 
 ## What every package holds to
 
@@ -92,11 +95,11 @@ codegen/              docc-crawl → docc-ir/ir.json → emit (see codegen/READM
 packages/             foundation packages: types, validate, core, developer-token, user-token, util-artwork
 clients/              one client per token boundary: client-catalog, client-user
 lib/                  conveniences over the clients: lib-playlists, lib-preview-player
+integrations/         what people install: server, browser, react
 .github/workflows/    ci: build, typecheck, lint and test on what a change affects
 ```
 
-Planned workspaces: `integrations/` (what people install: server, browser, react, next), `apps/`
-(private samples).
+Planned workspaces: `apps/` (private samples).
 
 ## Development
 
