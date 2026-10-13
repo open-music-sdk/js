@@ -90,6 +90,16 @@ describe("musicQueries: a walk", () => {
     expectTypeOf(query.initialPageParam).toEqualTypeOf<string | undefined>();
   });
 
+  test("a schema that is a function, as some libraries' are, is a schema here too: every page is validated by it, and it is a marker in the key", async () => {
+    const { music } = apple();
+    const checked: unknown[] = [];
+    const schema = Object.assign(() => undefined, { "~standard": { validate: (value: unknown) => (checked.push(value), { value: value as { data: tGenre[] } }) } }) as unknown as tSchemaLike<{ data: tGenre[] }>;
+    const query = musicQueries(music).catalog.listGenres({ schema });
+    expect(query.queryKey).toEqual(["open-music-sdk", 0, "catalog", "listGenres", { schema: "schema" }]);
+    expect(await walk(query)).toHaveLength(3);
+    expect(checked).toHaveLength(3);
+  });
+
   test("next comes from Apple's body as it came, not from a schema's copy that kept only what it knows", async () => {
     const { music } = apple();
     const checked: unknown[] = [];
@@ -137,6 +147,17 @@ describe("musicQueries: what is in it, and what is kept out of a key", () => {
     expect(Object.isFrozen(queries) && Object.isFrozen(queries.catalog) && Object.getPrototypeOf(queries.user) === null).toBe(true);
     expectTypeOf(queries.user).not.toHaveProperty("addToLibrary");
     expectTypeOf(queries.catalog.getAlbumRelationship).toBeFunction();
+  });
+
+  test("the types say what the runtime has: a rating set or taken away is no query, and a view is a walk, in both", () => {
+    const { music } = apple();
+    const queries = musicQueries(music);
+    for (const write of ["setSongRating", "deleteSongRating", "setLibraryPlaylistRating", "deleteLibraryAlbumRating"]) expect(Object.keys(queries.user), write).not.toContain(write);
+    expectTypeOf(queries.user).not.toHaveProperty("setSongRating");
+    expectTypeOf(queries.user).not.toHaveProperty("deleteSongRating");
+    for (const view of ["getAlbumView", "getArtistView", "getPlaylistView", "getMusicVideoView", "getRecordLabelView"]) expect(Object.keys(queries.catalog), view).toContain(view);
+    expectTypeOf(queries.catalog).toHaveProperty("getAlbumView");
+    expectTypeOf(queries.catalog.getAlbumView("1", "other-versions").initialPageParam).toEqualTypeOf<string | undefined>();
   });
 
   test("a schema in the arguments is a marker in the key, and a signal or a function is nothing: the key is plain data", () => {

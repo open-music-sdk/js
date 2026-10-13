@@ -52,7 +52,8 @@ const isEndpoint = (value: unknown): value is tAnyEndpoint =>
 const PREFIX = "open-music-sdk";
 const METHODS = ["request", "paginate", "storefront", "as", "forUser"] as const;
 
-const isSchema = (value: unknown): boolean => typeof value === "object" && value !== null && Object.hasOwn(value, "~standard");
+/** Whether `value` is a Standard Schema, known as core knows one: by what is under `~standard`, whatever holds it, an object or a function, and wherever it is held. */
+const isSchema = (value: unknown): boolean => ((typeof value === "object" && value !== null) || typeof value === "function") && "~standard" in value;
 
 /** The options bag of a call, when its last argument is one: what `schema` and `maxPages` are read from. */
 const bagOf = (args: readonly unknown[]): Record<string, unknown> | undefined => {
