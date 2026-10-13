@@ -33,7 +33,10 @@ const WHAT = "an options object with pem, teamId and keyId";
  */
 export function createServerClient(options: tServerClientOptions): tMusic {
   if ((options as unknown) === undefined) throw new TypeError(`createServerClient: expected ${WHAT}; got undefined`);
-  const { pem, teamId, keyId, ttlSeconds, refreshAheadSeconds, ...client } = optionsOf("createServerClient", options, WHAT);
+  const bag = optionsOf("createServerClient", options, WHAT);
+  // Refused rather than dropped: a caller who set it meant a token for a browser, and this client's never meets one.
+  if ("origin" in bag) throw new TypeError("createServerClient: origin is not an option of the server's client, whose token never meets a browser; a token for a page is tokenEndpoint's, which takes origin");
+  const { pem, teamId, keyId, ttlSeconds, refreshAheadSeconds, ...client } = bag;
   const developerToken = developerTokenMinter({ pem, teamId, keyId, ttlSeconds, refreshAheadSeconds });
   return withNamespaces(createClient({ ...client, developerToken }), NAMESPACES);
 }

@@ -177,6 +177,7 @@ describe("createServerClient", () => {
       ["a lifetime below a minute", { pem: "x", ...IDS, ttlSeconds: 10 }, /^developer token: ttlSeconds must be an integer from 60/],
       ["a fetch that is no function", { pem: "x", ...IDS, fetch: 42 }, "createClient: fetch must be a function; got 42"],
       ["a store without delete", { pem: "x", ...IDS, userTokenStore: { get: () => undefined, set: () => undefined } }, "createClient: userTokenStore must be a store with get, set and delete; got object"],
+      ["an origin, which is the endpoint's and would otherwise be dropped", { pem: "x", ...IDS, origin: ["https://app.example"] }, "createServerClient: origin is not an option of the server's client, whose token never meets a browser; a token for a page is tokenEndpoint's, which takes origin"],
     ])("%s", (_name, options, message) => {
       expect(() => createServerClient(options as tServerClientOptions)).toThrow(typeof message === "string" ? new TypeError(message) : message);
     });
