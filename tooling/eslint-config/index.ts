@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -35,6 +36,8 @@ export function config({ tsconfigRootDir }: { tsconfigRootDir: string }) {
     },
     // Tools and sample apps print by design.
     { files: ["codegen/**", "apps/**"], rules: { "no-console": "off" } },
+    // A package of hooks is held to the two rules of hooks: where one may be called, and what an effect depends on.
+    { files: ["integrations/react/**"], plugins: { "react-hooks": reactHooks }, rules: { "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": "error" } },
     { files: ["**/*.{js,mjs,cjs}"], ...tseslint.configs.disableTypeChecked },
   );
 }

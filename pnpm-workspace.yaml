@@ -12,9 +12,14 @@ catalog:
   # runtime / peers
   jose: ^6
   react: ^19
+  react-dom: ^19
   next: ^16
   "@tanstack/react-query": ^5
+  "@types/react": ^19
+  "@types/react-dom": ^19
   # toolchain
+  happy-dom: ^21
+  eslint-plugin-react-hooks: ^7
   typescript: ~6.0.3
   turbo: ^2.11.7
   eslint: ^10.12.0
