@@ -30,21 +30,25 @@ export function App() {
 }
 
 function Connect() {
-  const { isReady, connect } = useConnect({ app: { name: "Crate Digger" } }); // Apple's script, loaded on mount; the token goes to the provider
-  return <button disabled={!isReady} onClick={() => void connect()}>Connect Apple Music</button>;
+  const { isReady, connect, disconnect } = useConnect({ app: { name: "Crate Digger" } }); // Apple's script, loaded on mount; the token goes to the provider
+  const [token] = useMusicUserToken();
+  return token ?
+      <button onClick={() => void disconnect().catch(showWhyNot)}>Sign out</button>
+    : <button disabled={!isReady} onClick={() => void connect().catch(showWhyNot)}>Connect Apple Music</button>;
 }
 
 function Album({ id }: { id: string }) {
   const queries = useMusicQueries();
-  const { data: album } = useQuery(queries.catalog.getAlbum(id)); // the developer token alone
+  const { data: album } = useQuery(queries.catalog.getAlbum(id, { include: ["tracks"] })); // the developer token alone
   const { state, load, play } = usePreviewPlayer();
-  return album ? <button onClick={() => { load(tracksOf(album)); void play(); }}>{state.status === "playing" ? "Playing" : "Play previews"}</button> : null;
+  const tracks = album?.relationships?.tracks?.data ?? [];
+  return album ? <button onClick={() => { load(tracks); void play().catch(showWhyNot); }}>{state.status === "playing" ? "Playing" : "Play previews"}</button> : null;
 }
 
 function Library() {
-  const music = useMusic(); // bound to the listener once a token is held
+  const [token] = useMusicUserToken(); // held once the listener signed in
   const queries = useMusicQueries();
-  const { data } = useInfiniteQuery(queries.user.listLibraryPlaylists()); // every page, as the listener scrolls
+  const { data } = useInfiniteQuery({ ...queries.user.listLibraryPlaylists(), enabled: token !== undefined }); // every page, as the listener scrolls
   return <ul>{data?.pages.flatMap((page) => page.data).map((p) => <li key={p.id}>{p.attributes?.name}</li>)}</ul>;
 }
 ```
@@ -56,14 +60,15 @@ function Library() {
 | `<MusicProvider music>` | Holds the client and the listener's token, in state and nowhere else |
 | `useMusic()` | The provider's client, bound to the listener while a token is held: one object for every component |
 | `useMusicUserToken()` | `[token, setToken]`: the token the provider holds, and how to set or forget it |
-| `useConnect(options)` | Apple's sign-in, as [`createConnect`](../browser#sign-in) runs it: `{ isReady, error, connect }` |
+| `useConnect(options)` | Apple's sign-in, as [`createConnect`](../browser#sign-in) runs it: `{ isReady, error, connect, disconnect }` |
 | `usePreviewPlayer(options?)` | A [preview player](../../lib/lib-preview-player) for the component: its `state`, and its verbs |
 | `musicQueries(music, scope?)`, `useMusicQueries()` | Every read function of the catalog and the library as its query for TanStack Query |
 | Everything in `browser` | `createBrowserClient`, `createConnect`, the feature tier: see [its README](../browser) |
 
 The `"use client"` directive is at the top of the one built file that holds the provider and the
-hooks, and on nothing else: `artworkImage`, `isAppleMusicError` or `musicQueries` imported from this
-package still run in a route handler, a server component or a prefetch.
+hooks, and on nothing else, so `artworkImage`, `isAppleMusicError` or `musicQueries` imported from
+this package carry no directive and can be imported into a route handler, a server component or a
+prefetch. That this is how Next's bundler reads it has not met a Next build yet.
 
 ## The provider
 
@@ -71,14 +76,19 @@ package still run in a route handler, a server component or a prefetch.
 tree. It holds the listener's token in React state: in memory, gone with the page, never in storage.
 No token arrives as a prop, since a prop handed down from a server component is written into the page;
 it arrives through `useConnect`, or through `setToken` after an authenticated `no-store` fetch of one
-your server stored.
+your server stored. It is in the provider's state and in its context value, where React DevTools, and
+an extension that uses its hook, can show it.
 
 `useMusic()` gives the client bound to that token, `music.as(token)`, derived once in the provider, so
 every component shares one client and one storefront lookup. It is the page's client until a token is
 held. A hook called with no provider above it is a `TypeError` naming the hook.
 
-The provider does not forget the token on a `UserTokenInvalid`: the component that made the call sees
-the error, and `setToken(undefined)` is the one line. A value that is no token is a `TypeError`.
+Signing out is `disconnect()` from `useConnect`: Apple's own sign-out, so a later page load restores
+nothing, and the provider forgets the token. `setToken(undefined)` alone forgets it in the provider,
+after a `UserTokenInvalid` say, and the provider then takes no token Apple's script restores until the
+next `connect()`; the script would restore it on the next page load, which is why sign-out is
+`disconnect()`. The provider does not forget the token on a `UserTokenInvalid` by itself: the component
+that made the call sees the error. A value that is no token is a `TypeError`.
 
 ## Sign-in
 
@@ -91,7 +101,8 @@ provider, so `useMusic()` is bound from then on.
 | --- | --- |
 | `isReady` | Whether Apple's script is loaded and configured: when the button can be enabled |
 | `error` | Why it is not, when it cannot be |
-| `connect()` | Opens Apple's sign-in window, to be called inside the click; resolves to the token, or to `undefined` when the listener declined |
+| `connect()` | Opens Apple's sign-in window, to be called inside the click; resolves to the token, or to `undefined` when the script answers with nothing, which is taken for a decline. After a `ready` that failed, it loads and configures the script afresh first. |
+| `disconnect()` | Apple's own sign-out, and the provider forgets the token |
 
 Everything a page has to know about the script, the headers it needs, and the copy of the token it
 keeps, is in [the browser package's README](../browser#sign-in).
@@ -129,10 +140,18 @@ schema's copy. `maxPages` is refused: how many pages are kept is TanStack's `max
 `useInfiniteQuery`. A relationship or a view is generic over its name, which a mapped type collapses,
 so its query is typed as the union of what any of them holds.
 
-`useMusicQueries()` is `musicQueries` over the provider's client, scoped by the provider's generation:
-a number raised by every change of token, so that one listener's cached library is never shown to
-another. A token is never part of a key. On a server, `musicQueries(createServerClient(…))` prefetches
-for a `HydrationBoundary` the same way.
+`useMusicQueries()` is `musicQueries` over the provider's client, in the provider's scope: 0 for the
+page's client before any sign-in, so a server render and a hydration agree, and a scope of its own for
+each sign-in and for each other client handed to the provider, unique across pages, reloads and
+providers, so that what one listener cached, persisted or not, is never under another's keys. A token
+is never part of a key.
+
+A server prefetch, `musicQueries(createServerClient(…))` for a `HydrationBoundary`, is in scope 0,
+which the page is in until a token is held: it matches the catalog queries of a page before sign-in,
+and no query of a listener's, whose scope is the page's own. Prefetch the catalog; the listener's
+library is fetched by the page. `useSuspenseQuery` runs during Next's server render of a client
+component too, where a relative `tokenUrl` has no page to resolve against: prefetch on the server, or
+use `useQuery`.
 
 ## Next.js
 
