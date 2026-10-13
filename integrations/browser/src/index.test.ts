@@ -101,7 +101,7 @@ describe("what an app carries because of this package", () => {
     const code = await carried();
     expect(code).toContain("createBrowserClient");
     expect(code).not.toContain("@open-music-sdk/");
-    expect(code).not.toMatch(/jose|SignJWT|importPKCS8|mintDeveloperToken|BEGIN PRIVATE KEY/);
+    expect(code).not.toMatch(/jose|SignJWT|importPKCS8|mintDeveloperToken|BEGIN PRIVATE KEY|\bprocess\b/);
     expect(code).not.toMatch(/localStorage|sessionStorage|document\.cookie|indexedDB/);
   });
 
