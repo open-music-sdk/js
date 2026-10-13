@@ -278,6 +278,61 @@ importers:
 
   codegen/emit: {}
 
+  integrations/browser:
+    dependencies:
+      '@open-music-sdk/client-catalog':
+        specifier: workspace:^
+        version: link:../../clients/client-catalog
+      '@open-music-sdk/client-user':
+        specifier: workspace:^
+        version: link:../../clients/client-user
+      '@open-music-sdk/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@open-music-sdk/developer-token':
+        specifier: workspace:^
+        version: link:../../packages/developer-token
+      '@open-music-sdk/lib-playlists':
+        specifier: workspace:^
+        version: link:../../lib/lib-playlists
+      '@open-music-sdk/lib-preview-player':
+        specifier: workspace:^
+        version: link:../../lib/lib-preview-player
+      '@open-music-sdk/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@open-music-sdk/user-token':
+        specifier: workspace:^
+        version: link:../../packages/user-token
+      '@open-music-sdk/util-artwork':
+        specifier: workspace:^
+        version: link:../../packages/util-artwork
+      '@open-music-sdk/validate':
+        specifier: workspace:^
+        version: link:../../packages/validate
+    devDependencies:
+      '@open-music-sdk/server':
+        specifier: workspace:*
+        version: link:../server
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
+      tooling-tsdown-config:
+        specifier: workspace:*
+        version: link:../../tooling/tsdown-config
+      tooling-vitest-config:
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1))
+
   integrations/server:
     dependencies:
       '@open-music-sdk/client-catalog':
