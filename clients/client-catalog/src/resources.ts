@@ -85,6 +85,7 @@ export type tViewOptions<Views, K extends keyof Views> = tEndpointOptions<tViewP
 export interface tViewEndpoint<Views> {
   <K extends keyof Views & string>(client: tAppleMusicClient, id: string, name: K, options?: tViewOptions<Views, K>): Promise<tViewPage<Views, K>>;
   readonly bound: (client: tAppleMusicClient) => <K extends keyof Views & string>(id: string, name: K, options?: tViewOptions<Views, K>) => AsyncIterable<tRelated<Views, K>>;
+  readonly unwrap: "pages";
 }
 
 /** The names are held to `Views` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a view. */

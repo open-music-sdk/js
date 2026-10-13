@@ -19,7 +19,7 @@ export type tDeleteRatingOptions = tReadOptions<void>;
  * A function that sets the listener's rating of the resource with an id: `PUT {collection}/{id}`. Bound, it gives
  * the rating, or `undefined` if Apple's answer holds none: the rating was set either way.
  */
-function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: string, value: tRatingValue, options?: tSetRatingOptions], tRatingsResponse, Promise<tItem<tRatingsResponse> | undefined>> {
+function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: string, value: tRatingValue, options?: tSetRatingOptions], tRatingsResponse, Promise<tItem<tRatingsResponse> | undefined>, "written"> {
   return endpoint(fn, "written", (_client, id: string, value: tRatingValue, options?: tSetRatingOptions): tRequestPlan<tRatingsResponse> => {
     const segment = segmentOf(fn, "id", id);
     if ((value as unknown) !== 1 && (value as unknown) !== -1) throw new TypeError(`${fn}: value must be 1, for a like, or -1, for a dislike; got ${got(value)}`);
@@ -30,7 +30,7 @@ function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: stri
 }
 
 /** A function that takes away the listener's rating of the resource with an id: `DELETE {collection}/{id}`. It resolves to nothing. */
-function ratingDeleter(fn: string, collection: () => string): tEndpoint<[id: string, options?: tDeleteRatingOptions], void, Promise<void>> {
+function ratingDeleter(fn: string, collection: () => string): tEndpoint<[id: string, options?: tDeleteRatingOptions], void, Promise<undefined>, "written"> {
   return endpoint(fn, "written", (_client, id: string, options?: tDeleteRatingOptions): tRequestPlan<void> => {
     const segment = segmentOf(fn, "id", id);
     const init = initOf(fn, optionsOf(fn, options, OPTIONS));
