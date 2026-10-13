@@ -200,6 +200,7 @@ const formatIssues = (issues: readonly tValidationIssue[]) =>
 
 /** Whether `value` is a token, or a function that gives one. A function's answer is checked where it is sent. */
 const isTokenSource = (value: unknown): boolean => typeof value === "function" || parseToken(value) !== undefined;
+const TOKEN = "a token or a function that gives one";
 
 /**
  * The options checked, so a mistake fails here and not on the first request. A provider's answer, and whatever a
@@ -213,7 +214,6 @@ function checked(given: unknown): tClientOptions {
   const refuse = (name: string, what: string, value: unknown): never => {
     throw new TypeError(`createClient: ${name} must be ${what}; got ${got(value)}`);
   };
-  const TOKEN = "a token or a function that gives one";
   if (!isTokenSource(options.developerToken)) refuse("developerToken", TOKEN, options.developerToken);
   if (options.userToken !== undefined && !isTokenSource(options.userToken)) refuse("userToken", TOKEN, options.userToken);
   if (options.userTokenStore !== undefined && !has(options.userTokenStore, ["get", "set", "delete"])) refuse("userTokenStore", "a store with get, set and delete", options.userTokenStore);
@@ -388,7 +388,11 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
     return storefrontPromise;
   }
 
-  const as = (token: string | tTokenProvider): tAppleMusicClient => createClient({ ...options, userToken: token });
+  const as = (token: string | tTokenProvider): tAppleMusicClient => {
+    // Checked here under its own name: a mistake in as() is as()'s, not one in the options the client was made with.
+    if (!isTokenSource(token)) throw new TypeError(`as: userToken must be ${TOKEN}; got ${got(token)}`);
+    return createClient({ ...options, userToken: token });
+  };
 
   const forUser = (userId: string): tAppleMusicClient => {
     const store = options.userTokenStore;

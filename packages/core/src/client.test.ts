@@ -94,6 +94,15 @@ describe("createClient: what it is handed is checked when the client is made, no
     expect(calls).toHaveLength(0);
   });
 
+  test.each<[string, unknown, string]>([
+    ["a header that was not there", null, "null"],
+    ["a token with a space in it", "to ken", "6 characters"],
+    ["nothing", undefined, "undefined"],
+  ])("as() handed %s is a TypeError naming as, not createClient", (_name, token, what) => {
+    const { music } = client();
+    expect(() => music.as(token as string)).toThrow(new TypeError(`as: userToken must be a token or a function that gives one; got ${what}`));
+  });
+
   test("an option on Object.prototype is not one the client was given", () => {
     Object.assign(Object.prototype, { fetch: 42 });
     try {
