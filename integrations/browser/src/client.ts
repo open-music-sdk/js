@@ -34,6 +34,21 @@ export interface tBrowserMusic extends Omit<tMusic, "as" | "forUser"> {
 
 const WHAT = "an options object with tokenUrl";
 
+/**
+ * Where the endpoint is, settled when the client is made: against the page's base as it is now, so that a route the
+ * page moves to later, a `<base>` put into it later, or a `URL` changed later, moves nothing. Where there is no page
+ * yet, as on a server loading a module that makes the client, a relative URL is left to resolve at the first fetch.
+ * What cannot be read as a URL is left for the fetcher to refuse under its own name.
+ */
+function settled(tokenUrl: string | URL): string {
+  const base = (globalThis as { document?: { baseURI?: string } }).document?.baseURI;
+  try {
+    return base === undefined ? (tokenUrl instanceof URL ? tokenUrl.href : tokenUrl) : new URL(tokenUrl, base).href;
+  } catch {
+    return String(tokenUrl);
+  }
+}
+
 /** `music` with the provider on it, and `as()` and `forUser()` that keep it there. */
 function attached(music: tMusic, developerToken: tDeveloperTokenProvider): tBrowserMusic {
   const made: Record<string, unknown> = { ...music, developerToken };
@@ -53,6 +68,6 @@ export function createBrowserClient(options: tBrowserClientOptions): tBrowserMus
   const { tokenUrl, endpoint, ...client } = optionsOf("createBrowserClient", options, WHAT);
   if (typeof tokenUrl !== "string" && !(tokenUrl instanceof URL)) throw new TypeError(`createBrowserClient: tokenUrl must be where your token endpoint is, as a string or a URL; got ${got(tokenUrl)}`);
   if (endpoint !== undefined && !isPlain(endpoint)) throw new TypeError(`createBrowserClient: endpoint must be an options object for the token endpoint, with fetch, timeoutMs or refreshAheadSeconds; got ${got(endpoint)}`);
-  const developerToken = developerTokenFetcher(tokenUrl, endpoint);
+  const developerToken = developerTokenFetcher(settled(tokenUrl), endpoint);
   return attached(withNamespaces(createClient({ ...client, developerToken }), NAMESPACES), developerToken);
 }

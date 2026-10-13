@@ -150,6 +150,23 @@ describe("createBrowserClient", () => {
     expect(appleCalls).toEqual([]);
   });
 
+  test("tokenUrl is settled when the client is made, against the page as it is then: a base put in later, a route moved to later, or a URL changed later moves nothing", async () => {
+    vi.stubGlobal("document", { baseURI: "https://app.example/artists/" });
+    try {
+      const { options, endpointCalls } = world();
+      const url = new URL("https://app.example/api/music/token");
+      const relative = createBrowserClient({ ...options, tokenUrl: "api/music/token" });
+      const absolute = createBrowserClient({ ...options, tokenUrl: url });
+      (globalThis as { document: { baseURI: string } }).document.baseURI = "https://evil.example/";
+      url.pathname = "/evil";
+      await relative.catalog.getSong("1");
+      await absolute.catalog.getSong("1");
+      expect(endpointCalls.map((c) => c.url)).toEqual(["https://app.example/artists/api/music/token", "https://app.example/api/music/token"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("the options are read once: a change to the object afterwards reaches nothing", async () => {
     const { options, sent } = world();
     const mine = { ...options };
