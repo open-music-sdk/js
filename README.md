@@ -29,9 +29,9 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/client-user`](./clients/client-user) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
 | [`@open-music-sdk/lib-playlists`](./lib/lib-playlists) | 🚧 In progress | 80% | `playlists(client)` · resolve tracks by ISRC, then by a search held to an exact match · read a playlist whole, which is also the export · plan what it is missing · apply it with each write sent once · progress, a delay between requests and an opt-in limit on pages · untested against the live API |
 | [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · untested in a browser against the live API |
-| `@open-music-sdk/server` | ⬜ Not started | 0% | Server client · token endpoint · user-token intake · Node, Workers, Bun, Deno |
-| `@open-music-sdk/browser` | ⬜ Not started | 0% | Browser client · fetches tokens from your server · no signing code |
-| `@open-music-sdk/react` | ⬜ Not started | 0% | Provider · hooks · query option factories |
+| `@open-music-sdk/server` | 🚧 In progress | 0% | Server client · token endpoint · user-token intake · Node, Workers, Bun, Deno |
+| `@open-music-sdk/browser` | 🚧 In progress | 0% | Browser client · fetches tokens from your server · no signing code |
+| `@open-music-sdk/react` | 🚧 In progress | 0% | Provider · hooks · query option factories |
 | `@open-music-sdk/next` | ⬜ Not started | 0% | Server and client halves · route handlers · cookie-backed token store |
 | Sample apps | ⬜ Not started | 0% | CLI · Worker · vanilla web · React · Next.js · Electron |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
