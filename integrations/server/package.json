@@ -1,0 +1,62 @@
+{
+  "name": "@open-music-sdk/server",
+  "version": "0.0.0",
+  "description": "The Apple Music API for a server, a worker, a CLI or an Electron main process: a client that mints its own developer token with the catalog, the library and the playlist verbs on it, a token endpoint for your pages, the user-token intake, and the rest of the family from one import.",
+  "license": "MIT",
+  "keywords": [
+    "apple-music-api",
+    "apple-music",
+    "musickit",
+    "typescript",
+    "sdk",
+    "server",
+    "node",
+    "cloudflare-workers",
+    "bun",
+    "deno"
+  ],
+  "homepage": "https://github.com/open-music-sdk/js/tree/main/integrations/server#readme",
+  "bugs": "https://github.com/open-music-sdk/js/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-music-sdk/js.git",
+    "directory": "integrations/server"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown --sourcemap",
+    "prepack": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@open-music-sdk/client-catalog": "workspace:^",
+    "@open-music-sdk/client-user": "workspace:^",
+    "@open-music-sdk/core": "workspace:^",
+    "@open-music-sdk/developer-token": "workspace:^",
+    "@open-music-sdk/lib-playlists": "workspace:^",
+    "@open-music-sdk/types": "workspace:*",
+    "@open-music-sdk/user-token": "workspace:^",
+    "@open-music-sdk/util-artwork": "workspace:^",
+    "@open-music-sdk/validate": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "jose": "catalog:",
+    "tooling-tsdown-config": "workspace:*",
+    "tooling-vitest-config": "workspace:*",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  }
+}
