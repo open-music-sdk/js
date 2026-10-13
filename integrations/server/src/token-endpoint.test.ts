@@ -63,10 +63,21 @@ describe("tokenEndpoint: what it answers", () => {
     await res.body?.cancel();
   });
 
-  test("a request already aborted mints nothing: it rejects with the abort's reason", async () => {
+  test("a request already aborted is answered all the same: the mint is one flight shared by every request, and no request's to cancel or to fail", async () => {
     const { handler } = await endpoint();
-    const reason = new Error("gone");
-    await expect(handler(new Request(ENDPOINT, { signal: AbortSignal.abort(reason) }))).rejects.toBe(reason);
+    const res = await handler(new Request(ENDPOINT, { signal: AbortSignal.abort(new Error("gone")) }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty("token");
+  });
+
+  test.each<[string, number]>([
+    ["a day", 86_400],
+    ["a minute", 60],
+  ])("a lifetime of %s is taken", async (_name, ttlSeconds) => {
+    const { handler, publicKey } = await endpoint({ ttlSeconds });
+    const { token } = (await (await handler(get())).json()) as { token: string };
+    const { payload } = await jwtVerify(token, publicKey);
+    expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(ttlSeconds);
   });
 });
 
@@ -87,8 +98,37 @@ describe("tokenEndpoint: CORS, for the origins it was handed and no other", () =
   ])("a GET with %s is answered without a CORS header, and with the token all the same", async (_name, headers) => {
     const { handler } = await endpoint();
     const res = await handler(get(headers));
-    expect([res.status, res.headers.get("access-control-allow-origin"), res.headers.get("vary")]).toEqual([200, null, null]);
+    expect([res.status, res.headers.get("access-control-allow-origin"), res.headers.get("vary")]).toEqual([200, null, "origin"]);
     expect(await res.json()).toHaveProperty("token");
+  });
+
+  test("every answer says vary: origin and cache-control: no-store, whatever the match and the method: no cache keyed on the URL alone hands one page's answer to another", async () => {
+    const { handler } = await endpoint();
+    for (const req of [get(), get({ origin: PAGE }), get({ origin: "https://evil.example" }), new Request(ENDPOINT, { method: "OPTIONS", headers: { origin: "https://evil.example" } }), new Request(ENDPOINT, { method: "POST" })]) {
+      const res = await handler(req);
+      expect([res.headers.get("vary"), res.headers.get("cache-control")], `${req.method} ${req.headers.get("origin") ?? ""}`).toEqual(["origin", "no-store"]);
+      await res.body?.cancel();
+    }
+  });
+
+  test("the origins are read by index, as the family reads a list: an iterator that says otherwise reaches neither the claim nor the CORS check", async () => {
+    class Lying extends Array<string> {
+      override *[Symbol.iterator](): ArrayIterator<string> {
+        yield "https://evil.example";
+      }
+    }
+    const origin = new Lying();
+    origin.push(PAGE);
+    expect([...origin]).toEqual(["https://evil.example"]);
+    const { pem, publicKey } = await key();
+    const handler = tokenEndpoint({ pem, ...IDS, origin });
+    const refused = await handler(get({ origin: "https://evil.example" }));
+    expect(refused.headers.get("access-control-allow-origin")).toBeNull();
+    await refused.body?.cancel();
+    const res = await handler(get({ origin: PAGE }));
+    expect(res.headers.get("access-control-allow-origin")).toBe(PAGE);
+    const { token } = (await res.json()) as { token: string };
+    expect((await jwtVerify(token, publicKey)).payload.origin).toEqual([PAGE]);
   });
 
   test("OPTIONS from one of the origins is 204 with the CORS headers and allow-methods: GET", async () => {
@@ -133,6 +173,9 @@ describe("tokenEndpoint: a mistake is a TypeError when it is made, named by what
     ["no pem", { ...IDS, origin: [PAGE] }, /^developer token: pem must be the contents of the \.p8 file, as a string; got undefined$/],
     ["a key id that is no id", { pem: "x", teamId: IDS.teamId, keyId: "key", origin: [PAGE] }, /^developer token: keyId must be ten capital letters and digits/],
     ["a lifetime below a minute", { pem: "x", ...IDS, origin: [PAGE], ttlSeconds: 30 }, /^developer token: ttlSeconds must be an integer from 60/],
+    ["a lifetime past a day, for a token anyone can fetch", { pem: "x", ...IDS, origin: [PAGE], ttlSeconds: 86_401 }, "tokenEndpoint: ttlSeconds must be a whole number of seconds up to 86400, one day, for a token a page holds; got 86401"],
+    ["a lifetime that is null, which is no default", { pem: "x", ...IDS, origin: [PAGE], ttlSeconds: null }, /^tokenEndpoint: ttlSeconds must be a whole number of seconds up to 86400/],
+    ["a lifetime that is a fraction", { pem: "x", ...IDS, origin: [PAGE], ttlSeconds: 900.5 }, "tokenEndpoint: ttlSeconds must be a whole number of seconds up to 86400, one day, for a token a page holds; got 900.5"],
   ])("%s", (_name, options, message) => {
     expect(() => tokenEndpoint(options as tTokenEndpointOptions)).toThrow(typeof message === "string" ? new TypeError(message) : message);
   });
