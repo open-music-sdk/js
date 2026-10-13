@@ -1,5 +1,7 @@
 # open-music-sdk
 
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
 > Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
