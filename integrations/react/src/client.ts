@@ -14,13 +14,22 @@ interface tHeld {
   /** The client the hooks give: `base.as(token)` while a token is held, else `base`. */
   readonly music: tBrowserMusic;
   readonly token: string | undefined;
-  /** Raised by every change of token: the scope of every query key, so that one listener's cache is never another's. */
-  readonly generation: number;
+  /**
+   * The scope of every query key: 0 for the page's client before any sign-in, so a server render and a hydration
+   * agree, and a scope of its own for each sign-in and each other client, unique across pages, reloads and
+   * providers, so that one listener's cache, persisted or not, is never another's.
+   */
+  readonly scope: string | number;
+  /** Whether a token Apple's script restored may be taken: not while one is held, and not once the app forgot one. */
+  readonly restorable: boolean;
   readonly setToken: (token: string | undefined) => void;
 }
 
 const MusicContext = createContext<tHeld | undefined>(undefined);
 const CLIENT = ["request", "paginate", "storefront", "as", "forUser", "developerToken"] as const;
+
+/** A scope of its own, unique across pages and reloads: a UUID where the page has one, which a page that is not secure has not. */
+const scopeOf = (): string => (typeof crypto === "object" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
 export interface tMusicProviderProps {
   /** The client from `createBrowserClient`, made once, outside the tree. */
@@ -37,15 +46,26 @@ export interface tMusicProviderProps {
 export function MusicProvider(props: tMusicProviderProps): ReactElement {
   const { music, children } = props;
   if (!has(music, CLIENT)) throw new TypeError(`MusicProvider: music must be a client from createBrowserClient; got ${got(music)}`);
-  const [held, setHeld] = useState<{ readonly token: string | undefined; readonly generation: number }>({ token: undefined, generation: 0 });
+  const [held, setHeld] = useState<{ readonly token: string | undefined; readonly scope: string; readonly forgotten: boolean }>({ token: undefined, scope: "", forgotten: false });
   const setToken = useCallback((token: string | undefined) => {
     const value = token === undefined ? undefined : parseToken(token);
     if (token !== undefined && value === undefined) throw new TypeError(`useMusicUserToken: token must be a token, printable characters with no spaces or line breaks inside, or undefined to forget it; got ${got(token)}`);
-    setHeld((was) => (was.token === value ? was : { token: value, generation: was.generation + 1 }));
+    // The same token again changes nothing, and keeps its scope. Another is another sign-in, with a scope of its own; none is a sign-out, remembered so that nothing restores it.
+    setHeld((was) => (was.token === value ? was : { token: value, scope: value === undefined ? "" : scopeOf(), forgotten: value === undefined }));
   }, []);
+  // The client first handed over is scope 0, as on a server; another client handed over later is another scope, so its cache is its own.
+  const first = useRef(music);
+  const clientScope = useMemo(() => (first.current === music ? 0 : scopeOf()), [music]);
   const value = useMemo<tHeld>(
-    () => ({ base: music, music: held.token === undefined ? music : music.as(held.token), token: held.token, generation: held.generation, setToken }),
-    [music, held, setToken],
+    () => ({
+      base: music,
+      music: held.token === undefined ? music : music.as(held.token),
+      token: held.token,
+      scope: held.token === undefined ? clientScope : held.scope,
+      restorable: held.token === undefined && !held.forgotten,
+      setToken,
+    }),
+    [music, held, clientScope, setToken],
   );
   return createElement(MusicContext.Provider, { value }, children);
 }
@@ -71,33 +91,45 @@ export function useMusicUserToken(): readonly [token: string | undefined, setTok
   return useMemo(() => [token, setToken] as const, [token, setToken]);
 }
 
-/** `musicQueries` over the provider's client, scoped by its generation, made once per client and per token. */
+/** `musicQueries` over the provider's client, in the provider's scope, made once per client and per sign-in. */
 export function useMusicQueries(): tMusicQueries {
-  const { music, generation } = useHeld("useMusicQueries");
-  return useMemo(() => musicQueries(music, generation), [music, generation]);
+  const { music, scope } = useHeld("useMusicQueries");
+  return useMemo(() => musicQueries(music, scope), [music, scope]);
 }
 
 export interface tUseConnect {
   /** Whether Apple's script is loaded and configured: when the button can be enabled. */
   readonly isReady: boolean;
-  /** Why it is not, when it cannot be: what the helper's `ready` rejected with. */
+  /** Why it is not, when it cannot be: what the helper's `ready` rejected with, or what the last `connect()` failed with. */
   readonly error: unknown;
   /**
    * Opens Apple's sign-in window, to be called inside the click, and resolves to the Music User Token, which the
-   * provider now holds too, or to `undefined` when the listener declined.
+   * provider now holds too, or to `undefined` when the script answered with nothing. After a `ready` that failed it
+   * loads and configures the script afresh.
    */
   readonly connect: () => Promise<string | undefined>;
+  /**
+   * Signs out: Apple's own sign-out through the script, so a later page load restores nothing, and the provider
+   * forgets the token. Whether the script's sign-out also ends the token at Apple is a live check.
+   */
+  readonly disconnect: () => Promise<void>;
 }
 
 /**
- * Apple's sign-in, as `createConnect` runs it: the helper is made when the component mounts, once, from the
- * provider's client, and disposed when it unmounts. The token a returning listener's script restored, and the one
- * `connect()` gives, go to the provider. The options are read on the first mount only, as the helper reads them once.
+ * Apple's sign-in, as `createConnect` runs it: the helper is made when the component mounts, from the provider's
+ * client, and disposed when it unmounts. The token a returning listener's script restored goes to the provider,
+ * unless the provider holds one already or the app has forgotten one; the token `connect()` gives always does. The
+ * options are read on the first mount only, as the helper reads them once.
  */
 export function useConnect(options: tConnectOptions): tUseConnect {
-  const { base, setToken } = useHeld("useConnect");
+  const { base, restorable, setToken } = useHeld("useConnect");
   const first = useRef(options);
   const helper = useRef<tConnect | undefined>(undefined);
+  // Read when `ready` settles, which is after this render: what the provider holds then is what counts.
+  const mayRestore = useRef(restorable);
+  useEffect(() => {
+    mayRestore.current = restorable;
+  }, [restorable]);
   const [state, setState] = useState<{ readonly isReady: boolean; readonly error: unknown }>({ isReady: false, error: undefined });
   useEffect(() => {
     const made = createConnect(base, first.current);
@@ -106,7 +138,7 @@ export function useConnect(options: tConnectOptions): tUseConnect {
     made.ready.then(
       (restored) => {
         if (!live) return;
-        if (restored !== undefined) setToken(restored);
+        if (restored !== undefined && mayRestore.current) setToken(restored);
         setState({ isReady: true, error: undefined });
       },
       (error: unknown) => {
@@ -122,11 +154,23 @@ export function useConnect(options: tConnectOptions): tUseConnect {
   const connect = useCallback(async (): Promise<string | undefined> => {
     const made = helper.current;
     if (made === undefined) throw new TypeError("useConnect: connect() was called before the component mounted, or after it unmounted");
-    const token = await made.connect();
-    if (token !== undefined) setToken(token);
-    return token;
+    try {
+      const token = await made.connect();
+      if (token !== undefined) setToken(token);
+      setState({ isReady: true, error: undefined });
+      return token;
+    } catch (error) {
+      setState({ isReady: false, error });
+      throw error;
+    }
   }, [setToken]);
-  return useMemo(() => ({ isReady: state.isReady, error: state.error, connect }), [state, connect]);
+  const disconnect = useCallback(async (): Promise<void> => {
+    const made = helper.current;
+    if (made === undefined) throw new TypeError("useConnect: disconnect() was called before the component mounted, or after it unmounted");
+    await made.disconnect();
+    setToken(undefined);
+  }, [setToken]);
+  return useMemo(() => ({ isReady: state.isReady, error: state.error, connect, disconnect }), [state, connect, disconnect]);
 }
 
 export interface tUsePreviewPlayerOptions extends Omit<tPreviewPlayerOptions, "audio"> {
@@ -161,6 +205,8 @@ export function usePreviewPlayer<T extends tPreviewable = tPreviewable>(options?
   const [player, setPlayer] = useState<tPreviewPlayer<T> | undefined>(undefined);
   useEffect(() => {
     const given = first.current;
+    // A ref with nothing in it is a mistake, not a reason to play through an element of the player's own while the page's stays silent.
+    if (isRef(given?.audio) && given.audio.current === null) throw new TypeError("usePreviewPlayer: audio is a ref with nothing in it when the component mounted; render the element before this component, or hand over the element itself");
     const audio = isRef(given?.audio) ? (given.audio.current ?? undefined) : given?.audio;
     const made = previewPlayer<T>({ ...given, audio });
     current.current = made;

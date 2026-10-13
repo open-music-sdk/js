@@ -1,4 +1,5 @@
 import { createBrowserClient, type tBrowserMusic, type tMusicKitInstance } from "@open-music-sdk/browser";
+import { QueryClient } from "@tanstack/react-query";
 import { Window } from "happy-dom";
 import { StrictMode, act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -96,7 +97,7 @@ describe("MusicProvider and useMusic", () => {
 });
 
 describe("useMusicUserToken", () => {
-  test("setToken binds every component's client to the listener and raises the generation; the same token again changes nothing; undefined forgets it", async () => {
+  test("setToken binds every component's client to the listener and gives the sign-in a scope of its own; the same token again changes nothing; undefined forgets it, and the scope is the page's again", async () => {
     const { music, userTokens } = page();
     const { Probe, seen } = probe(() => ({ token: useMusicUserToken(), music: useMusic(), key: useMusicQueries().catalog.getSong("1").queryKey }));
     mount(createElement(MusicProvider, { music }, createElement(Probe)));
@@ -106,18 +107,61 @@ describe("useMusicUserToken", () => {
     });
     expect(seen.current?.token[0]).toBe("listener");
     expect(seen.current?.music).not.toBe(music);
-    expect(seen.current?.key[1]).toBe(1);
+    const scope = seen.current?.key[1];
+    expect(typeof scope).toBe("string");
     await seen.current?.music.request("v1/me/storefront");
     expect(userTokens()).toEqual(["listener"]);
     const bound = seen.current?.music;
     act(() => {
       seen.current?.token[1](" listener ");
     });
-    expect([seen.current?.music, seen.current?.key[1]]).toEqual([bound, 1]);
+    expect([seen.current?.music, seen.current?.key[1]]).toEqual([bound, scope]);
     act(() => {
       seen.current?.token[1](undefined);
     });
-    expect([seen.current?.token[0], seen.current?.music, seen.current?.key[1]]).toEqual([undefined, music, 2]);
+    expect([seen.current?.token[0], seen.current?.music, seen.current?.key[1]]).toEqual([undefined, music, 0]);
+  });
+
+  test("each sign-in has a scope of its own, across providers and reloads: what one listener cached is never under another's keys", () => {
+    const { music } = page();
+    const cache = new QueryClient();
+    const { Probe, seen } = probe(() => ({ setToken: useMusicUserToken()[1], key: useMusicQueries().user.getLibrarySong("l.1").queryKey }));
+    const { unmount } = mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    act(() => {
+      seen.current?.setToken("a");
+    });
+    const first = seen.current?.key ?? [];
+    cache.setQueryData(first, "what A has");
+    act(() => {
+      seen.current?.setToken(undefined);
+    });
+    act(() => {
+      seen.current?.setToken("b");
+    });
+    expect(seen.current?.key).not.toEqual(first);
+    expect(cache.getQueryData(seen.current?.key ?? [])).toBeUndefined();
+    unmount();
+    mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    act(() => {
+      seen.current?.setToken("a");
+    });
+    expect(seen.current?.key).not.toEqual(first);
+    expect(cache.getQueryData(seen.current?.key ?? [])).toBeUndefined();
+    expect(cache.getQueryData(first)).toBe("what A has");
+    expect(JSON.stringify(seen.current?.key)).not.toContain('"a"');
+    cache.clear();
+  });
+
+  test("a client handed over later is another scope; the first is the page's, 0, as on a server", () => {
+    const { music } = page();
+    const other = page().music;
+    const { Probe, seen } = probe(() => useMusicQueries().catalog.getSong("1").queryKey);
+    const { rerender } = mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    expect(seen.current?.[1]).toBe(0);
+    rerender(createElement(MusicProvider, { music: other }, createElement(Probe)));
+    expect(typeof seen.current?.[1]).toBe("string");
+    rerender(createElement(MusicProvider, { music }, createElement(Probe)));
+    expect(seen.current?.[1]).toBe(0);
   });
 
   test("what is no token is a TypeError naming useMusicUserToken, and nothing changes", () => {
@@ -157,7 +201,7 @@ describe("useConnect", () => {
     vi.stubGlobal("document", window.document);
   });
 
-  test("makes the helper when the component mounts, once under StrictMode; is ready once Apple's script is configured; and hands a restored token to the provider", async () => {
+  test("makes the helper when the component mounts, and again after StrictMode's simulated remount; Apple's script is configured once for the page; a restored token goes to the provider", async () => {
     const { music, userTokens } = page();
     const musicKit = kit({ musicUserToken: "restored" });
     const { Probe, seen } = probe(() => ({ connect: useConnect({ app: APP, musicKit }), music: useMusic() }));
@@ -190,14 +234,57 @@ describe("useConnect", () => {
     expect([token, seen.current?.token, seen.current?.music]).toEqual([undefined, "signed", bound]);
   });
 
-  test("a script that cannot be configured: isReady stays false, and error says why", async () => {
+  test("a script that cannot be configured: isReady stays false, and error says why; connect() tries again, and isReady and error follow", async () => {
     const { music } = page();
-    const musicKit = { configure: () => Promise.reject(new Error("configure failed")) };
-    const { Probe, seen } = probe(() => useConnect({ app: APP, musicKit }));
+    const instance: tMusicKitInstance = { authorize: () => Promise.resolve("signed") };
+    const configure = vi.fn<(options: { developerToken: string }) => Promise<tMusicKitInstance>>().mockRejectedValueOnce(new Error("configure failed")).mockResolvedValue(instance);
+    const { Probe, seen } = probe(() => ({ connect: useConnect({ app: APP, musicKit: { configure } }), token: useMusicUserToken()[0] }));
     mount(createElement(MusicProvider, { music }, createElement(Probe)));
     await settle();
-    expect(seen.current?.isReady).toBe(false);
-    expect(seen.current?.error).toEqual(new Error("configure failed"));
+    expect(seen.current?.connect.isReady).toBe(false);
+    expect(seen.current?.connect.error).toEqual(new Error("configure failed"));
+    let token: string | undefined;
+    await act(async () => {
+      token = await seen.current?.connect.connect();
+    });
+    expect([token, seen.current?.token, seen.current?.connect.isReady, seen.current?.connect.error]).toEqual(["signed", "signed", true, undefined]);
+  });
+
+  test("a restored token is not taken while the provider holds one, nor after the app forgot one: signing out stays signed out", async () => {
+    const { music } = page();
+    const musicKit = kit({ musicUserToken: "restored" });
+    const holder = probe(() => useMusicUserToken());
+    const connect = probe(() => useConnect({ app: APP, musicKit }));
+    const tree = (show: boolean) => createElement(MusicProvider, { music }, createElement(holder.Probe), show ? createElement(connect.Probe) : null);
+    const { rerender } = mount(tree(false));
+    act(() => {
+      holder.seen.current?.[1]("mine");
+    });
+    rerender(tree(true));
+    await settle();
+    expect([connect.seen.current?.isReady, holder.seen.current?.[0]]).toEqual([true, "mine"]);
+    act(() => {
+      holder.seen.current?.[1](undefined);
+    });
+    rerender(tree(false));
+    rerender(tree(true));
+    await settle();
+    expect([connect.seen.current?.isReady, holder.seen.current?.[0]]).toEqual([true, undefined]);
+  });
+
+  test("disconnect() is Apple's own sign-out, and the provider forgets the token", async () => {
+    const { music } = page();
+    const instance: tMusicKitInstance = { musicUserToken: "restored", authorize: () => Promise.resolve("signed"), unauthorize: vi.fn() };
+    const musicKit = { configure: () => Promise.resolve(instance) };
+    const { Probe, seen } = probe(() => ({ connect: useConnect({ app: APP, musicKit }), token: useMusicUserToken()[0], music: useMusic() }));
+    mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    await settle();
+    expect(seen.current?.token).toBe("restored");
+    await act(async () => {
+      await seen.current?.connect.disconnect();
+    });
+    expect(instance.unauthorize).toHaveBeenCalledTimes(1);
+    expect([seen.current?.token, seen.current?.music]).toEqual([undefined, music]);
   });
 
   test("the options are read on the first mount: a render with another app makes no second helper, and connect keeps its identity", async () => {
@@ -278,6 +365,11 @@ describe("usePreviewPlayer", () => {
     });
     await act(() => seen.current?.play());
     expect(element.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("a ref with nothing in it when the component mounts is a TypeError naming the hook, not a silent element of the player's own", () => {
+    const { Probe } = probe(() => usePreviewPlayer({ audio: { current: null } }));
+    expect(() => mount(createElement(Probe))).toThrow(new TypeError("usePreviewPlayer: audio is a ref with nothing in it when the component mounted; render the element before this component, or hand over the element itself"));
   });
 
   test("a verb before the player exists is a TypeError naming it: on a server render, where no effect runs", () => {
