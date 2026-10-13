@@ -40,6 +40,8 @@ export { AppleMusicError, isAppleMusicError } from "./errors";
 export type { tErrorDetails, tErrorTag, tValidationIssue } from "./errors";
 export { got } from "./got";
 export { hostsOf, isOnHost } from "./hosts";
+export { withNamespaces } from "./namespaces";
+export type { tNamespaces, tWithNamespaces } from "./namespaces";
 export { initOf, walkOf } from "./options";
 export type { tAlsoKind, tAlsoKinds, tReadOptions, tWalkOptions } from "./options";
 export { createRateLimiter } from "./rate-limit";

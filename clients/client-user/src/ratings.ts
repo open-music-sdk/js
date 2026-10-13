@@ -31,7 +31,7 @@ function ratingSetter(fn: string, collection: () => string): tEndpoint<[id: stri
 
 /** A function that takes away the listener's rating of the resource with an id: `DELETE {collection}/{id}`. It resolves to nothing. */
 function ratingDeleter(fn: string, collection: () => string): tEndpoint<[id: string, options?: tDeleteRatingOptions], void, Promise<void>> {
-  return endpoint(fn, "answer", (_client, id: string, options?: tDeleteRatingOptions): tRequestPlan<void> => {
+  return endpoint(fn, "written", (_client, id: string, options?: tDeleteRatingOptions): tRequestPlan<void> => {
     const segment = segmentOf(fn, "id", id);
     const init = initOf(fn, optionsOf(fn, options, OPTIONS));
     return [`${collection()}/${segment}`, { ...init, method: "DELETE" }];

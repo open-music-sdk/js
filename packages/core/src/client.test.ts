@@ -53,6 +53,57 @@ afterEach(() => {
   responses.length = 0;
 });
 
+describe("createClient: what it is handed is checked when the client is made, not on the first request", () => {
+  const noop = () => undefined;
+  const made = (options: unknown) => () => createClient(options as tClientOptions);
+
+  test.each<[string, unknown, string]>([
+    ["no options at all", undefined, "createClient: expected an options object with developerToken; got undefined"],
+    ["a token where the options belong", "dev", "createClient: expected an options object with developerToken; got 3 characters"],
+    ["no developer token", {}, "createClient: developerToken must be a token or a function that gives one; got undefined"],
+    ["a developer token with a space in it", { developerToken: "de v" }, "createClient: developerToken must be a token or a function that gives one; got 4 characters"],
+    ["a user token that is no token", { developerToken: "dev", userToken: "" }, "createClient: userToken must be a token or a function that gives one; got 0 characters"],
+    ["a store without delete", { developerToken: "dev", userTokenStore: { get: noop, set: noop } }, "createClient: userTokenStore must be a store with get, set and delete; got object"],
+    ["a storefront that is no id", { developerToken: "dev", storefront: 3 }, "createClient: storefront must be a storefront id, a string of 1 to 64 characters; got 3"],
+    ["a fetch that is no function", { developerToken: "dev", fetch: 42 }, "createClient: fetch must be a function; got 42"],
+    ["a rate limiter without acquire", { developerToken: "dev", rateLimit: {} }, "createClient: rateLimit must be a rate limiter with acquire; got object"],
+    ["an onRequest that is no function", { developerToken: "dev", onRequest: true }, "createClient: onRequest must be a function; got boolean"],
+    ["an onResponse that is no function", { developerToken: "dev", onResponse: "log" }, "createClient: onResponse must be a function; got 3 characters"],
+  ])("%s is a TypeError naming createClient and the option", (_name, options, message) => {
+    expect(made(options)).toThrow(new TypeError(message));
+  });
+
+  test("what is accepted: a token or a provider for each token, a store with its three functions, a storefront, a fetch, a limiter and the hooks", () => {
+    const store = { get: () => Promise.resolve(undefined), set: () => Promise.resolve(), delete: () => Promise.resolve() };
+    const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
+    expect(made({ developerToken: () => "dev", userToken: () => Promise.resolve("user"), userTokenStore: store, storefront: "gb", fetch: noop, rateLimit: limiter, onRequest: noop, onResponse: noop })).not.toThrow();
+    expect(made({ developerToken: " dev\n", userToken: "user" })).not.toThrow();
+  });
+
+  test("a mistake fails before a provider is asked or a fetch is made", () => {
+    const developerToken = vi.fn(() => "dev");
+    const fetch = vi.fn();
+    expect(made({ developerToken, fetch, storefront: "" })).toThrow(TypeError);
+    expect(developerToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test("a provider's answer is not known until it is asked, so it is checked where it is sent", async () => {
+    const { music, calls } = client([], { developerToken: () => "de v" });
+    await expect(music.request("v1/test")).rejects.toThrow(/^developerToken is not a token/);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("an option on Object.prototype is not one the client was given", () => {
+    Object.assign(Object.prototype, { fetch: 42 });
+    try {
+      expect(made({ developerToken: "dev" })).not.toThrow();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "fetch");
+    }
+  });
+});
+
 describe("request: paths", () => {
   test.each([
     ["v1/catalog/us/songs/1", "https://api.music.apple.com/v1/catalog/us/songs/1"],
@@ -342,8 +393,19 @@ describe("request: a token that cannot be a header is refused before it is sent,
   }
 
   describe.each(["developerToken", "userToken"] as const)("%s", (name) => {
-    test.each(unfit)("a string with %s is a TypeError that names the option, not the token", async (_name, token) => {
-      await refused(name, { [name]: token });
+    test.each(unfit)("a string with %s is a TypeError when the client is made, naming the option and not the token", (_name, token) => {
+      const made: unknown = (() => {
+        try {
+          createClient({ developerToken: "dev", userToken: "user", [name]: token });
+        } catch (e) {
+          return e;
+        }
+        return undefined;
+      })();
+      expect(made).toBeInstanceOf(TypeError);
+      expect(isAppleMusicError(made)).toBe(false);
+      expect((made as Error).message).toMatch(new RegExp(`^createClient: ${name} must be a token or a function that gives one; got `));
+      expect(shown(made as Error)).not.toContain(SECRET);
     });
     test.each(unfit)("a provider answering with %s is a TypeError that names the option, not the token", async (_name, token) => {
       await refused(name, { [name]: () => Promise.resolve(token) });
@@ -371,7 +433,7 @@ describe("request: a token that cannot be a header is refused before it is sent,
 
   test("a refused token takes no turn in the rate limiter", async () => {
     const acquire = vi.fn(() => Promise.resolve());
-    const { music } = client([], { developerToken: "bad token", rateLimit: { acquire } });
+    const { music } = client([], { developerToken: () => "bad token", rateLimit: { acquire } });
     await refusal(music.request("v1/test"));
     expect(acquire).not.toHaveBeenCalled();
   });

@@ -1,7 +1,7 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
-import { ownOf } from "./check";
+import { gotFor, has, isName, ownOf } from "./check";
 import { AppleMusicError, type tValidationIssue } from "./errors";
 import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
@@ -198,10 +198,33 @@ function credential(name: string, token: unknown): string {
 const formatIssues = (issues: readonly tValidationIssue[]) =>
   issues.map((i) => `${(i.path ?? []).map((s) => String(typeof s === "object" ? s.key : s)).join(".") || "<root>"}: ${i.message}`).join("; ");
 
-export function createClient(given: tClientOptions): tAppleMusicClient {
+/** Whether `value` is a token, or a function that gives one. A function's answer is checked where it is sent. */
+const isTokenSource = (value: unknown): boolean => typeof value === "function" || parseToken(value) !== undefined;
+
+/**
+ * The options checked, so a mistake fails here and not on the first request. A provider's answer, and whatever a
+ * store holds, are not known yet and are checked when they are used.
+ */
+function checked(given: unknown): tClientOptions {
+  if (typeof given !== "object" || given === null) throw new TypeError(`createClient: expected an options object with developerToken; got ${gotFor(given)}`);
   // What the options hold themselves, and nothing they inherit: a `fetch` or a `userToken` that some other code has
   // put on Object.prototype is not one this client was given. The same goes for what `request` and `paginate` take.
-  const options = ownOf(given);
+  const options = ownOf(given as tClientOptions);
+  const refuse = (name: string, what: string, value: unknown): never => {
+    throw new TypeError(`createClient: ${name} must be ${what}; got ${got(value)}`);
+  };
+  const TOKEN = "a token or a function that gives one";
+  if (!isTokenSource(options.developerToken)) refuse("developerToken", TOKEN, options.developerToken);
+  if (options.userToken !== undefined && !isTokenSource(options.userToken)) refuse("userToken", TOKEN, options.userToken);
+  if (options.userTokenStore !== undefined && !has(options.userTokenStore, ["get", "set", "delete"])) refuse("userTokenStore", "a store with get, set and delete", options.userTokenStore);
+  if (options.storefront !== undefined && !isName(options.storefront)) refuse("storefront", "a storefront id, a string of 1 to 64 characters", options.storefront);
+  for (const name of ["fetch", "onRequest", "onResponse"] as const) if (options[name] !== undefined && typeof options[name] !== "function") refuse(name, "a function", options[name]);
+  if (options.rateLimit !== undefined && !has(options.rateLimit, ["acquire"])) refuse("rateLimit", "a rate limiter with acquire", options.rateLimit);
+  return options;
+}
+
+export function createClient(given: tClientOptions): tAppleMusicClient {
+  const options = checked(given);
   const developerToken = toProvider(options.developerToken);
   const userToken = options.userToken === undefined ? undefined : toProvider(options.userToken);
   const fetchImpl = options.fetch ?? globalThis.fetch;
