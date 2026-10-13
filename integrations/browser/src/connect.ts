@@ -17,6 +17,8 @@ export interface tMusicKitInstance {
   developerToken?: string | undefined;
   /** Opens Apple's sign-in window and resolves to the Music User Token, or to nothing when the listener declined. */
   authorize(): Promise<string | null | undefined>;
+  /** Apple's own sign-out, where the instance has one: ends the sign-in in the script, and the copy of the token it kept. */
+  unauthorize?: (() => unknown) | undefined;
 }
 
 /** What Apple's sign-in window shows of the app. */
@@ -45,10 +47,18 @@ export interface tConnect {
   readonly ready: Promise<string | undefined>;
   /**
    * Opens Apple's sign-in window, to be called inside the listener's click, and resolves to the Music User Token,
-   * or to `undefined` when the listener declined or closed the window. Waits on nothing but `ready`, which is
-   * settled by the time there is a button to click. What the script throws is handed on as it came.
+   * or to `undefined` when the script answers with nothing, which is taken for a decline. Waits on nothing but
+   * `ready`, which is settled by the time there is a button to click. What the script throws is handed on as it
+   * came. After a `ready` that failed, the script is loaded and configured afresh, so a page whose endpoint was down
+   * when it loaded can still sign in.
    */
   readonly connect: () => Promise<string | undefined>;
+  /**
+   * Apple's own sign-out, through the script's `unauthorize()`: ends the sign-in in the script and the copy of the
+   * token it kept, so that a later page load does not restore it. Whether it also ends the token at Apple, and with
+   * it a copy your server stored, is a live check. Does nothing where the script has no such function.
+   */
+  readonly disconnect: () => Promise<void>;
   /** Stops keeping the developer token fresh. The script stays: it is the page's. */
   readonly dispose: () => void;
 }
@@ -87,6 +97,9 @@ const WHAT = "an options object with app";
 
 const pages = new WeakMap<object, tPageState>();
 
+/** The state of a page, with nothing to inherit from: a `configured` put on Object.prototype by other code is not the page's. */
+const pageState = (): tPageState => Object.create(null) as tPageState;
+
 /** `exp` of a JWT in epoch milliseconds, or undefined when `token` is no JWT that carries one. */
 function expiryOf(token: string): number | undefined {
   const payload = /^[\w-]+\.([\w-]+)\.[\w-]+$/.exec(token)?.[1];
@@ -109,8 +122,10 @@ const musicKitOf = (): tMusicKit | undefined => Reflect.get(globalThis, "MusicKi
  */
 function loaded(page: tPage, state: tPageState): Promise<tMusicKit> {
   state.loading ??= new Promise<tMusicKit>((resolve, reject) => {
+    // The page's own, when it is Apple's script and not an element that happens to carry the name: an `<a id="MusicKit">`
+    // in content the page shows is found under that name too, and is not asked to configure anything.
     const found = musicKitOf();
-    if (found !== undefined) {
+    if (found !== undefined && has(found, ["configure"])) {
       resolve(found);
       return;
     }
@@ -165,10 +180,16 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   if (page === undefined) throw new TypeError("createConnect: needs a page, and there is no document here; make it where the connect button is shown, not on a server");
 
   let state = pages.get(page);
-  if (state === undefined) pages.set(page, (state = {}));
+  if (state === undefined) pages.set(page, (state = pageState()));
   const key = JSON.stringify(app);
   if (state.configured !== undefined && state.configured.app !== key) throw new TypeError("createConnect: Apple's script is one per page, and this page's is configured for another app; make one helper per page, or make each for the same app");
-  if (state.configured === undefined) {
+
+  /**
+   * The page's configuration: the one it has, or one made now, shared by every helper on the page. One that fails is
+   * let go of, so the next asking makes one afresh.
+   */
+  const configure = (): NonNullable<tPageState["configured"]> => {
+    if (state.configured !== undefined) return state.configured;
     /** The developer token the instance was last given, for the refresh to compare with. */
     const token = { current: "" };
     const record: NonNullable<tPageState["configured"]> = {
@@ -184,30 +205,37 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
     record.instance.catch(() => {
       if (state.configured === record) state.configured = undefined;
     });
-  }
-  const record = state.configured;
+    return record;
+  };
+  const first = configure();
 
   let disposed = false;
   /** Asked after an await, where the helper may have been disposed meanwhile. */
   const isDisposed = (): boolean => disposed;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  /** Asks the provider again, sets a token that changed on the instance, and waits for the next asking. */
+  /** Asks the provider again, sets a token that changed on the instance, and waits for the next asking, whatever came of this one. */
   const refresh = async (): Promise<void> => {
     if (disposed) return;
-    const instance = await record.instance;
-    const token = await provider({});
-    if (isDisposed()) return;
-    if (token !== record.token.current) {
-      record.token.current = token;
-      if ("developerToken" in instance) instance.developerToken = token;
+    try {
+      const record = state.configured;
+      if (record === undefined) return;
+      const instance = await record.instance;
+      const token = await provider({});
+      if (isDisposed()) return;
+      if (token !== record.token.current) {
+        record.token.current = token;
+        // Set where the instance has the property, and left as it is where the property cannot be set: whether a configured instance takes a new token is a live check.
+        if ("developerToken" in instance) Reflect.set(instance, "developerToken", token);
+      }
+    } finally {
+      if (!isDisposed()) schedule();
     }
-    schedule();
   };
-  /** The next asking: halfway to the token's end, a minute at the least, and never past what one timer keeps. */
+  /** The next asking: halfway to the token's end, a minute at the least, and never past what one timer keeps. An asking that failed is made again in a minute. */
   const schedule = (): void => {
     clearTimeout(timer);
-    const expiresAt = expiryOf(record.token.current);
+    const expiresAt = expiryOf(state.configured?.token.current ?? "");
     const wait = expiresAt === undefined ? FALLBACK_WAIT_MS : Math.max(MIN_WAIT_MS, (expiresAt - Date.now()) / 2);
     timer = setTimeout(() => void refresh().catch(() => undefined), Math.min(wait, MAX_TIMER_MS));
   };
@@ -216,7 +244,7 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   };
   page.addEventListener("visibilitychange", visibility);
 
-  const ready: Promise<string | undefined> = record.instance.then((instance) => {
+  const ready: Promise<string | undefined> = first.instance.then((instance) => {
     if (!disposed) schedule();
     return parseToken(instance.musicUserToken);
   });
@@ -226,13 +254,23 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   const connect = async (): Promise<string | undefined> => {
     if (disposed) throw new TypeError("createConnect: connect() was called after dispose()");
     // Settled by the time there is a button to click: no network, and no wait but a microtask, before the window.
+    // After a configuration that failed, this is where the next one is made, and the one wait before the window.
+    const record = configure();
     const instance = await record.instance;
+    if (record !== first && !isDisposed()) schedule();
     return parseToken(await instance.authorize());
+  };
+  const disconnect = async (): Promise<void> => {
+    if (disposed) throw new TypeError("createConnect: disconnect() was called after dispose()");
+    const record = state.configured;
+    if (record === undefined) return;
+    const instance = await record.instance;
+    if (typeof instance.unauthorize === "function") await instance.unauthorize();
   };
   const dispose = (): void => {
     disposed = true;
     clearTimeout(timer);
     page.removeEventListener("visibilitychange", visibility);
   };
-  return Object.freeze(ownOf({ ready, connect, dispose }));
+  return Object.freeze(ownOf({ ready, connect, disconnect, dispose }));
 }

@@ -138,7 +138,7 @@ describe("createConnect: Apple's script", () => {
     expect(musicKit.configure).toHaveBeenCalledWith(expect.objectContaining({ app: { name: "Crate Digger", build: "1.2.0" } }));
   });
 
-  test("a load that fails rejects ready and connect() with a NetworkError, takes the element out of the page, and is tried again by the next helper", async () => {
+  test("a load that fails rejects ready with a NetworkError and takes the element out of the page; connect() tries again, and rejects the same way when that fails too", async () => {
     const doc = page();
     vi.stubGlobal("document", doc);
     const helper = createConnect({ developerToken: provider() }, { app: APP });
@@ -148,11 +148,16 @@ describe("createConnect: Apple's script", () => {
     expect((error as Error).message).toContain("js-cdn.music.apple.com");
     expect(doc.scripts[0]?.remove).toHaveBeenCalledTimes(1);
     expect(doc.listening("musickitloaded")).toBe(0);
-    await expect(helper.connect()).rejects.toBe(error);
-    const again = createConnect({ developerToken: provider() }, { app: APP });
+    const retried = helper.connect();
     expect(doc.scripts).toHaveLength(2);
+    doc.scripts[1]?.listeners.get("error")?.();
+    expect(isAppleMusicError(await retried.catch((e: unknown) => e), "NetworkError")).toBe(true);
+    const signedIn = helper.connect();
+    expect(doc.scripts).toHaveLength(3);
     scriptLoads(doc, kit({ musicUserToken: "back" }));
-    expect(await again.ready).toBe("back");
+    expect(await signedIn).toBe("listener");
+    expect(await createConnect({ developerToken: provider() }, { app: APP }).ready).toBe("back");
+    expect(doc.scripts).toHaveLength(3);
   });
 
   test("a script that runs but defines no MusicKit is a NetworkError too", async () => {
@@ -246,16 +251,48 @@ describe("createConnect: ready and connect()", () => {
     await expect(helper.connect()).rejects.toBe(boom);
   });
 
-  test("connect() waits on nothing but ready, which is settled: the provider is not asked, and authorize runs before any timer could", async () => {
+  test("connect() waits on nothing but ready, which is settled: the provider is not asked, and authorize runs within a few microtasks, before any timer or task could", async () => {
     const authorize = vi.fn(() => Promise.resolve("listener"));
     const { helper, developerToken } = made({ authorize });
     await helper.ready;
     const asked = developerToken.mock.calls.length;
     const pending = helper.connect();
-    await vi.advanceTimersByTimeAsync(0);
+    for (let tick = 0; tick < 3; tick++) await Promise.resolve();
     expect(authorize).toHaveBeenCalledTimes(1);
     expect(developerToken).toHaveBeenCalledTimes(asked);
     expect(await pending).toBe("listener");
+  });
+
+  test("after a ready that failed, connect() loads and configures afresh, so a page whose endpoint was down when it loaded can still sign in", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const instance: tMusicKitInstance = { authorize: () => Promise.resolve("listener") };
+    const configure = vi.fn<(options: { developerToken: string }) => Promise<tMusicKitInstance>>().mockRejectedValueOnce(new Error("configure failed")).mockResolvedValue(instance);
+    const helper = createConnect({ developerToken: provider() }, { app: APP, musicKit: { configure } });
+    await expect(helper.ready).rejects.toThrow("configure failed");
+    expect(await helper.connect()).toBe("listener");
+    expect(await helper.connect()).toBe("listener");
+    expect(configure).toHaveBeenCalledTimes(2);
+  });
+
+  test("disconnect() is Apple's own sign-out, where the script has one: a later helper on the page restores nothing", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const instance: tMusicKitInstance = { musicUserToken: "restored", authorize: () => Promise.resolve("listener"), unauthorize: vi.fn(() => ((instance as { musicUserToken?: string | undefined }).musicUserToken = undefined)) };
+    const musicKit = { configure: () => Promise.resolve(instance) };
+    const helper = createConnect({ developerToken: provider() }, { app: APP, musicKit });
+    expect(await helper.ready).toBe("restored");
+    await helper.disconnect();
+    expect(instance.unauthorize).toHaveBeenCalledTimes(1);
+    expect(await createConnect({ developerToken: provider() }, { app: APP, musicKit }).ready).toBeUndefined();
+  });
+
+  test("disconnect() where the script has no sign-out does nothing, and after dispose() it is a TypeError", async () => {
+    const { helper } = made({ musicUserToken: "restored" });
+    await helper.ready;
+    await expect(helper.disconnect()).resolves.toBeUndefined();
+    helper.dispose();
+    await expect(helper.disconnect()).rejects.toThrow(new TypeError("createConnect: disconnect() was called after dispose()"));
   });
 
   test("connect() before ready waits for it, and then goes on", async () => {
@@ -267,7 +304,7 @@ describe("createConnect: ready and connect()", () => {
     const { helper } = made();
     expect(Object.isFrozen(helper)).toBe(true);
     expect(Object.getPrototypeOf(helper)).toBeNull();
-    expect(Object.keys(helper).sort()).toEqual(["connect", "dispose", "ready"]);
+    expect(Object.keys(helper).sort()).toEqual(["connect", "disconnect", "dispose", "ready"]);
     const { connect, ready } = helper;
     await ready;
     expect(await connect()).toBe("listener");
@@ -354,10 +391,11 @@ describe("createConnect: the developer token is kept fresh off the click path", 
     await expect(helper.connect()).rejects.toThrow(new TypeError("createConnect: connect() was called after dispose()"));
   });
 
-  test("a provider that fails on a later asking is tried again later, and ready is not undone", async () => {
+  test("a provider that fails on a later asking is asked again by the timer, with no tab change: a laptop that woke offline gets a fresh token once it is back", async () => {
     const doc = page();
     vi.stubGlobal("document", doc);
-    const answers = [Promise.resolve(jwt(900)), Promise.reject(new Error("endpoint down")), Promise.resolve(jwt(900, "b"))];
+    const first = jwt(900);
+    const answers = [Promise.resolve(first), Promise.reject(new Error("endpoint down")), Promise.resolve(jwt(900, "b"))];
     for (const answer of answers) answer.catch(() => undefined);
     const developerToken = vi.fn(() => answers.shift() ?? Promise.resolve(jwt(900, "c")));
     const musicKit = kit();
@@ -365,10 +403,48 @@ describe("createConnect: the developer token is kept fresh off the click path", 
     expect(await helper.ready).toBeUndefined();
     await vi.advanceTimersByTimeAsync(451_000);
     expect(developerToken).toHaveBeenCalledTimes(2);
-    doc.fire("visibilitychange");
-    await vi.advanceTimersByTimeAsync(0);
+    expect(musicKit.instance.developerToken).toBe(first);
+    await vi.advanceTimersByTimeAsync(226_000);
     expect(developerToken).toHaveBeenCalledTimes(3);
+    expect(musicKit.instance.developerToken).not.toBe(first);
     expect(await helper.connect()).toBe("listener");
+  });
+
+  test("an instance whose developerToken cannot be set keeps its own, and the asking goes on: whether a configured instance takes a new token is a live check", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const tokens = [jwt(900, "a"), jwt(900, "b"), jwt(900, "c")];
+    const developerToken = vi.fn(() => Promise.resolve(tokens.shift() ?? jwt(900, "d")));
+    const instance: tMusicKitInstance = Object.defineProperty({ authorize: () => Promise.resolve("listener") }, "developerToken", { get: () => "fixed", enumerable: true });
+    const helper = createConnect({ developerToken }, { app: APP, musicKit: { configure: () => Promise.resolve(instance) } });
+    await helper.ready;
+    await vi.advanceTimersByTimeAsync(451_000);
+    expect(developerToken).toHaveBeenCalledTimes(2);
+    expect(instance.developerToken).toBe("fixed");
+    await vi.advanceTimersByTimeAsync(451_000);
+    expect(developerToken.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("a global under Apple's name that is no script, such as an element the page shows with that id, is passed over and the script loaded", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    vi.stubGlobal("MusicKit", { id: "MusicKit", tagName: "A" });
+    const helper = createConnect({ developerToken: provider() }, { app: APP });
+    expect(doc.scripts).toHaveLength(1);
+    scriptLoads(doc, kit({ musicUserToken: "restored" }));
+    expect(await helper.ready).toBe("restored");
+  });
+
+  test("a configured put on Object.prototype is not the page's: the page is configured as if it had none", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    Object.assign(Object.prototype, { configured: { app: "other" } });
+    try {
+      const helper = createConnect({ developerToken: provider() }, { app: APP, musicKit: kit({ musicUserToken: "restored" }) });
+      expect(await helper.ready).toBe("restored");
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "configured");
+    }
   });
 });
 
