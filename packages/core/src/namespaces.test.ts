@@ -93,7 +93,10 @@ describe("withNamespaces", () => {
         return Promise.resolve(this.#storefront);
       }
       paginate(): AsyncIterable<unknown> {
-        return (async function* () {})();
+        const storefront = this.#storefront;
+        return (async function* () {
+          yield await Promise.resolve(storefront);
+        })();
       }
       storefront(): Promise<string> {
         return Promise.resolve(this.#storefront);

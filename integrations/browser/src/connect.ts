@@ -16,7 +16,7 @@ export interface tMusicKitInstance {
   /** The developer token the instance was configured with. Whether a configured instance takes a new one is a live check; the helper sets it where it can. */
   developerToken?: string | undefined;
   /** Opens Apple's sign-in window and resolves to the Music User Token, or to nothing when the listener declined. */
-  authorize(): Promise<string | null | undefined | void>;
+  authorize(): Promise<string | null | undefined>;
 }
 
 /** What Apple's sign-in window shows of the app. */
@@ -72,7 +72,7 @@ interface tScript {
 /** What one page holds of Apple's script: one load, and one configuration, shared by every helper made on it. */
 interface tPageState {
   loading?: Promise<tMusicKit> | undefined;
-  configured?: { readonly app: string; developerToken: string; readonly instance: Promise<tMusicKitInstance> } | undefined;
+  configured?: { readonly app: string; readonly token: { current: string }; readonly instance: Promise<tMusicKitInstance> } | undefined;
 }
 
 /** Apple's one unversioned URL for the script. It cannot be pinned, bundled or re-hosted: see the README. */
@@ -101,7 +101,7 @@ function expiryOf(token: string): number | undefined {
 }
 
 /** The global Apple's script defines once it has run. */
-const musicKitOf = (): tMusicKit | undefined => (globalThis as { MusicKit?: tMusicKit }).MusicKit;
+const musicKitOf = (): tMusicKit | undefined => Reflect.get(globalThis, "MusicKit") as tMusicKit | undefined;
 
 /**
  * Apple's script, loaded once for this page: the one `<script>` goes in on the first helper, and every helper after
@@ -169,14 +169,15 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   const key = JSON.stringify(app);
   if (state.configured !== undefined && state.configured.app !== key) throw new TypeError("createConnect: Apple's script is one per page, and this page's is configured for another app; make one helper per page, or make each for the same app");
   if (state.configured === undefined) {
+    /** The developer token the instance was last given, for the refresh to compare with. */
+    const token = { current: "" };
     const record: NonNullable<tPageState["configured"]> = {
       app: key,
-      developerToken: "",
+      token,
       instance: (async () => {
         const musicKit = kit ?? (await loaded(page, state));
-        const token = await provider({});
-        record.developerToken = token;
-        return musicKit.configure({ developerToken: token, app });
+        token.current = await provider({});
+        return musicKit.configure({ developerToken: token.current, app });
       })(),
     };
     state.configured = record;
@@ -187,6 +188,8 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   const record = state.configured;
 
   let disposed = false;
+  /** Asked after an await, where the helper may have been disposed meanwhile. */
+  const isDisposed = (): boolean => disposed;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   /** Asks the provider again, sets a token that changed on the instance, and waits for the next asking. */
@@ -194,9 +197,9 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
     if (disposed) return;
     const instance = await record.instance;
     const token = await provider({});
-    if (disposed) return;
-    if (token !== record.developerToken) {
-      record.developerToken = token;
+    if (isDisposed()) return;
+    if (token !== record.token.current) {
+      record.token.current = token;
       if ("developerToken" in instance) instance.developerToken = token;
     }
     schedule();
@@ -204,7 +207,7 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
   /** The next asking: halfway to the token's end, a minute at the least, and never past what one timer keeps. */
   const schedule = (): void => {
     clearTimeout(timer);
-    const expiresAt = expiryOf(record.developerToken);
+    const expiresAt = expiryOf(record.token.current);
     const wait = expiresAt === undefined ? FALLBACK_WAIT_MS : Math.max(MIN_WAIT_MS, (expiresAt - Date.now()) / 2);
     timer = setTimeout(() => void refresh().catch(() => undefined), Math.min(wait, MAX_TIMER_MS));
   };

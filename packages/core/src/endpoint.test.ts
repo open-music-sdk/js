@@ -587,7 +587,7 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
 
     test("a write whose answer is nothing is declared written: bound, it resolves to undefined, and the write happened", async () => {
       const { music, sent } = apple([{ status: 204 }], { userToken: "user" });
-      expect(await forget.bound(music)("1")).toBeUndefined();
+      await expect(forget.bound(music)("1")).resolves.toBeUndefined();
       expect(sent()).toEqual(["DELETE /v1/me/ratings/songs/1"]);
       expectTypeOf(forget.bound(music)("1")).toEqualTypeOf<Promise<undefined>>();
     });

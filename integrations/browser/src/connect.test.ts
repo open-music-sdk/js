@@ -227,7 +227,7 @@ describe("createConnect: ready and connect()", () => {
     expect(await helper.ready).toBe(expected);
   });
 
-  test.each<[string, Promise<string | null | undefined | void>, string | undefined]>([
+  test.each<[string, Promise<string | null | undefined>, string | undefined]>([
     ["the Music User Token the listener's sign-in gave", Promise.resolve("listener"), "listener"],
     ["undefined when the listener declined and the script answered with nothing", Promise.resolve(undefined), undefined],
     ["undefined when the script answered with null", Promise.resolve(null), undefined],
@@ -240,6 +240,7 @@ describe("createConnect: ready and connect()", () => {
 
   test("what the script throws is handed on as it came: its shape is Apple's, and undocumented", async () => {
     const boom = { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" };
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script rejects with an object of its own, not an Error
     const { helper } = made({ authorize: () => Promise.reject(boom) });
     await helper.ready;
     await expect(helper.connect()).rejects.toBe(boom);

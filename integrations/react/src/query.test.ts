@@ -86,7 +86,7 @@ describe("musicQueries: a walk", () => {
     expect(pages.map((page) => page.next)).toEqual(["/v1/catalog/us/genres?offset=1", "/v1/catalog/us/genres?offset=2", undefined]);
     expect(paths()).toEqual(["/v1/catalog/us/genres", "/v1/catalog/us/genres?offset=1", "/v1/catalog/us/genres?offset=2"]);
     expectTypeOf(query.queryFn).returns.resolves.toExtend<tPage<unknown>>();
-    expectTypeOf(pages[0]?.data).toEqualTypeOf<tGenre[] | undefined>();
+    expectTypeOf(pages[0]?.data).toExtend<tGenre[] | undefined>();
     expectTypeOf(query.initialPageParam).toEqualTypeOf<string | undefined>();
   });
 

@@ -124,11 +124,11 @@ describe("useMusicUserToken", () => {
     const { music } = page();
     const { Probe, seen } = probe(() => ({ token: useMusicUserToken(), music: useMusic() }));
     mount(createElement(MusicProvider, { music }, createElement(Probe)));
-    expect(() =>
+    expect(() => {
       act(() => {
         seen.current?.token[1]("a b");
-      }),
-    ).toThrow(new TypeError("useMusicUserToken: token must be a token, printable characters with no spaces or line breaks inside, or undefined to forget it; got 3 characters"));
+      });
+    }).toThrow(new TypeError("useMusicUserToken: token must be a token, printable characters with no spaces or line breaks inside, or undefined to forget it; got 3 characters"));
     expect(seen.current?.music).toBe(music);
   });
 
