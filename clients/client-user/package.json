@@ -48,6 +48,7 @@
     "@open-music-sdk/client-catalog": "workspace:*",
     "@open-music-sdk/validate": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "tooling-tsdown-config": "workspace:*",
     "tooling-vitest-config": "workspace:*",
     "tsdown": "catalog:",

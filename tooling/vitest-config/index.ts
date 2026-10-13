@@ -6,6 +6,12 @@ export const libraryConfig = (overrides: ViteUserConfig["test"] = {}) =>
     test: {
       include: ["src/**/*.test.ts"],
       environment: "node",
+      coverage: {
+        include: ["src/**/*.ts"],
+        exclude: ["src/generated/**"],
+        // Paths in lcov.info are written from the repo root, two levels above each package, so no two packages report the same path.
+        reporter: ["text", ["lcov", { projectRoot: "../.." }]],
+      },
       ...overrides,
     },
   });
