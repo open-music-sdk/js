@@ -24,7 +24,8 @@ export interface tPlaylists {
    * @throws TypeError if a description, an option or the storefront is not what it should be, before Apple is asked.
    * @throws AppleMusicError if a request fails: Apple refused or answered wrongly, the network failed, or a token
    * provider did; `_tag` says which. Nothing found before it is handed over.
-   * @throws The signal's reason when `signal` aborts, and what `onProgress` threw when it did, each as it is.
+   * @throws The reason `options.signal` aborted with, when it does.
+   * @throws What `options.onProgress` threw, when it did, as it is.
    */
   readonly resolve: <D extends tTrackDescription>(descriptions: readonly D[], options?: tResolveOptions) => Promise<tResolvedTracks<D>>;
   /**
@@ -40,7 +41,8 @@ export interface tPlaylists {
    * @throws AppleMusicError if a request fails, if the answer holds no playlist or a track with no id or no type,
    * or if Apple names another page after the `maxPages` allowed: what was read is not all there is, and none of it
    * is handed over. `_tag` says which.
-   * @throws The signal's reason when `signal` aborts, and what `onProgress` threw when it did, each as it is.
+   * @throws The reason `options.signal` aborted with, when it does.
+   * @throws What `options.onProgress` threw, when it did, as it is.
    */
   readonly read: (id: string, options?: tReadPlaylistOptions) => Promise<tPlaylistSnapshot>;
   /**
@@ -73,7 +75,8 @@ export interface tPlaylists {
    * new playlist and neither answered with it nor lists it within what `settle` allows, if a playlist that was
    * read holds a track with no id or no type, or if Apple names another page after the `maxPages` allowed. What
    * was written before it stays written. `_tag` says which.
-   * @throws The signal's reason when `signal` aborts, and what `onProgress` threw when it did, each as it is.
+   * @throws The reason `options.signal` aborted with, when it does.
+   * @throws What `options.onProgress` threw, when it did, as it is.
    */
   readonly apply: (plan: tPlaylistPlan, options?: tApplyOptions) => Promise<tAppliedPlan>;
 }
