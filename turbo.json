@@ -41,6 +41,11 @@
         "codegen-emit#codegen"
       ]
     },
+    "check": {
+      "dependsOn": [
+        "codegen-emit#codegen"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true

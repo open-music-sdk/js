@@ -40,7 +40,7 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/server`](./integrations/server) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
 | [`@open-music-sdk/browser`](./integrations/browser) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
 | [`@open-music-sdk/react`](./integrations/react) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
-| Reference site, `apps/docs` | 🚧 In progress | 0% | TypeDoc over every package's doc comments · arguments, returns and throws on every function · published to GitHub Pages from `main` |
+| [Reference site, `apps/docs`](./apps/docs) | 🚧 In progress | 90% | TypeDoc over every package's doc comments · a comment on every export, and arguments, returns and throws on every function, method and namespace member, which CI checks · published to GitHub Pages from `main` once Pages is turned on |
 | `@open-music-sdk/cli`, `apps/cli` | ⬜ Not started | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
@@ -55,7 +55,8 @@ catalog, the listener's library and the playlist verbs on it, and re-exports wha
 feature tier from one path. An app can also put the pieces together itself: a client from `core`, a
 developer token from `developer-token`, and the functions of `client-catalog` and `client-user`, each
 of which takes that client; `lib-playlists` takes the same client, and `lib-preview-player` the songs
-it fetched. Each README linked above shows how.
+it fetched. Each README linked above shows how, and [the reference](https://open-music-sdk.github.io/js/)
+has every function of every package with its arguments, what it returns and what it throws.
 
 ## What every package holds to
 
@@ -98,7 +99,7 @@ packages still to come.
 
 ```
 pnpm-workspace.yaml   workspace globs and the dependency catalog
-turbo.json            codegen → build → typecheck → lint → test
+turbo.json            codegen → build → typecheck → lint → test → check
 tsconfig.base.json    strict TypeScript base every package extends
 eslint.config.ts      root ESLint config (tooling/eslint-config)
 tooling/              private shared configs: eslint, tsdown, vitest
@@ -107,10 +108,11 @@ packages/             foundation packages: types, validate, core, developer-toke
 clients/              one client per token boundary: client-catalog, client-user
 lib/                  conveniences over the clients: lib-playlists, lib-preview-player
 integrations/         what people install: server, browser, react
-.github/workflows/    ci: build, typecheck, lint and test on what a change affects
+apps/                 private apps of the repository: docs, the TypeDoc reference (see apps/docs/README.md)
+.github/workflows/    ci: build, typecheck, lint, test and check on what a change affects · pages: the reference, from main
 ```
 
-Planned workspaces: `apps/` (the CLI and the reference site) and `samples/` (private sample apps).
+Planned workspaces: `apps/cli` (the CLI) and `samples/` (private sample apps).
 
 ## Development
 

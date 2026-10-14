@@ -1,7 +1,7 @@
 # @open-music-sdk/user-token
 
 Everything around a Music User Token except issuing one: taking it in, asking Apple whether it works,
-and keeping it where [`@open-music-sdk/core`](../core)'s `forUser(userId)` can find it. Only Apple can
+and keeping it where [`@open-music-sdk/core`](../core/README.md)'s `forUser(userId)` can find it. Only Apple can
 issue the token, through its own sign-in flow; this package starts once you hold the string.
 
 You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
@@ -14,9 +14,9 @@ Keep the two on the same version. If your app does end up with a different copy 
 one this package resolves, nothing breaks: an `AppleMusicError` is recognised whichever copy made it.
 
 The examples below take their developer token from
-[`@open-music-sdk/developer-token`](../developer-token), which is a separate install. They ask Apple
+[`@open-music-sdk/developer-token`](../developer-token/README.md), which is a separate install. They ask Apple
 by path, with `request` and `paginate`, to stay within these packages:
-[`@open-music-sdk/client-user`](../../clients/client-user) has a named function for each of a
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md) has a named function for each of a
 listener's endpoints, and takes the same client.
 
 ## Taking a token in
@@ -316,6 +316,6 @@ with the rest of the request, so a hook that prints requests prints the token.
 ## Not here
 
 Developer tokens are a different thing entirely; see
-[`@open-music-sdk/developer-token`](../developer-token). So is issuing a Music User Token: only
+[`@open-music-sdk/developer-token`](../developer-token/README.md). So is issuing a Music User Token: only
 Apple's sign-in does that. What a listener's client is then asked for, their library, ratings,
-recommendations and history, is [`@open-music-sdk/client-user`](../../clients/client-user).
+recommendations and history, is [`@open-music-sdk/client-user`](../../clients/client-user/README.md).

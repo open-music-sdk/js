@@ -41,9 +41,9 @@ const playlist = await lists.read(id);
 const next = lists.plan(playlist, moreTracks);
 ```
 
-Where the developer token comes from is [`@open-music-sdk/developer-token`](../../packages/developer-token),
-and the Music User Token [`@open-music-sdk/user-token`](../../packages/user-token). Playing the songs
-`resolve` found is [`@open-music-sdk/lib-preview-player`](../lib-preview-player), which is used in the
+Where the developer token comes from is [`@open-music-sdk/developer-token`](../../packages/developer-token/README.md),
+and the Music User Token [`@open-music-sdk/user-token`](../../packages/user-token/README.md). Playing the songs
+`resolve` found is [`@open-music-sdk/lib-preview-player`](../lib-preview-player/README.md), which is used in the
 same way: one noun, an object of short verbs, and a list of tracks answered with `{ tracks, skipped }`.
 
 ## What is in it
@@ -309,8 +309,8 @@ Nothing in this package has been run against the live API. These are what it tak
 ## Not here
 
 The endpoints themselves, one function each, are
-[`@open-music-sdk/client-user`](../../clients/client-user) and
-[`@open-music-sdk/client-catalog`](../../clients/client-catalog); this package is made of seven of
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md) and
+[`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md); this package is made of seven of
 them. Playing a preview of what was found is
-[`@open-music-sdk/lib-preview-player`](../lib-preview-player). Taking tracks out of a playlist, or
+[`@open-music-sdk/lib-preview-player`](../lib-preview-player/README.md). Taking tracks out of a playlist, or
 putting them in another order, is not here because Apple's API has no way to do either.

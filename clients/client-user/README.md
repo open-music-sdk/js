@@ -2,9 +2,9 @@
 
 A listener's side of the Apple Music API, with a function for each of its endpoints: their library and
 its playlists, their ratings, the recommendations made for them, what they have played, their replay,
-and their own station. Every function takes a client from [`@open-music-sdk/core`](../../packages/core)
+and their own station. Every function takes a client from [`@open-music-sdk/core`](../../packages/core/README.md)
 that holds the listener's Music User Token, and resolves to what Apple answered, typed by
-[`@open-music-sdk/types`](../../packages/types).
+[`@open-music-sdk/types`](../../packages/types/README.md).
 
 You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
@@ -37,8 +37,8 @@ for await (const song of mine.listLibrarySongs()) {
 ```
 
 Where the Music User Token comes from, and how to check and keep one, is
-[`@open-music-sdk/user-token`](../../packages/user-token). The catalog, which needs no listener, is
-[`@open-music-sdk/client-catalog`](../client-catalog). The two client packages are used in the same
+[`@open-music-sdk/user-token`](../../packages/user-token/README.md). The catalog, which needs no listener, is
+[`@open-music-sdk/client-catalog`](../client-catalog/README.md). The two client packages are used in the same
 way: what the catalog has as `getSong`, the library has as `getLibrarySong`.
 
 ## What is in it
@@ -141,7 +141,7 @@ Some functions take one more:
 | `storefront` | `getPersonalStation` | The storefront whose catalog the station is in |
 
 Nothing is validated unless a `schema` is passed, and this package does not depend on a validator. The
-ones in [`@open-music-sdk/validate`](../../packages/validate) fit:
+ones in [`@open-music-sdk/validate`](../../packages/validate/README.md) fit:
 
 ```ts
 import { librarySongsResponse } from "@open-music-sdk/validate";
@@ -263,9 +263,9 @@ in these:
 
 ## Not here
 
-- The catalog: [`@open-music-sdk/client-catalog`](../client-catalog). The `library` relationship of a
+- The catalog: [`@open-music-sdk/client-catalog`](../client-catalog/README.md). The `library` relationship of a
   catalog song, album, playlist or music video, which is the listener's copy of it, is in neither
   package yet; `listener.request(path, { user: true })` reaches it.
-- Taking in, checking and keeping a Music User Token: [`@open-music-sdk/user-token`](../../packages/user-token).
-- Validators: [`@open-music-sdk/validate`](../../packages/validate), through the `schema` option.
+- Taking in, checking and keeping a Music User Token: [`@open-music-sdk/user-token`](../../packages/user-token/README.md).
+- Validators: [`@open-music-sdk/validate`](../../packages/validate/README.md), through the `schema` option.
 - Changing or deleting a playlist or its tracks, which Apple's documentation has no endpoint for.

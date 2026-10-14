@@ -2,7 +2,7 @@
 
 Where a developer token comes from: signed with your MusicKit private key on a machine that holds it, or
 fetched from an endpoint you host by code that must not. Both are `developerToken` providers for
-[`@open-music-sdk/core`](../core), cached and replaced when Apple rejects them.
+[`@open-music-sdk/core`](../core/README.md), cached and replaced when Apple rejects them.
 
 You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
@@ -171,7 +171,7 @@ minute:
 
 ## Not here
 
-Music User Tokens are a different thing entirely; see [`@open-music-sdk/user-token`](../user-token).
+Music User Tokens are a different thing entirely; see [`@open-music-sdk/user-token`](../user-token/README.md).
 So is asking Apple for anything: a client made with one of these providers is what the functions of
-[`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
-[`@open-music-sdk/client-user`](../../clients/client-user) take.
+[`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md) take.

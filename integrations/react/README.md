@@ -1,6 +1,6 @@
 # @open-music-sdk/react
 
-The Apple Music API for a React app: everything in [`@open-music-sdk/browser`](../browser), a
+The Apple Music API for a React app: everything in [`@open-music-sdk/browser`](../browser/README.md), a
 provider that holds the client and the listener's token, hooks for the client, Apple's sign-in and the
 preview player, and one query factory for TanStack Query.
 
@@ -9,7 +9,7 @@ pnpm add @open-music-sdk/react react
 ```
 
 **Runs in a page.** The developer token comes from an endpoint your server hosts, `tokenEndpoint` of
-[`@open-music-sdk/server`](../server). React 19 is a peer. TanStack Query is neither: the factory gives
+[`@open-music-sdk/server`](../server/README.md). React 19 is a peer. TanStack Query is neither: the factory gives
 what `useQuery` and `useInfiniteQuery` take, and imports nothing of it.
 
 ```tsx
@@ -60,10 +60,10 @@ function Library() {
 | `<MusicProvider music>` | Holds the client and the listener's token, in state and nowhere else |
 | `useMusic()` | The provider's client, bound to the listener while a token is held: one object for every component |
 | `useMusicUserToken()` | `[token, setToken]`: the token the provider holds, and how to set or forget it |
-| `useConnect(options)` | Apple's sign-in, as [`createConnect`](../browser#sign-in) runs it: `{ isReady, error, connect, disconnect }` |
-| `usePreviewPlayer(options?)` | A [preview player](../../lib/lib-preview-player) for the component: its `state`, and its verbs |
+| `useConnect(options)` | Apple's sign-in, as [`createConnect`](../browser/README.md#sign-in) runs it: `{ isReady, error, connect, disconnect }` |
+| `usePreviewPlayer(options?)` | A [preview player](../../lib/lib-preview-player/README.md) for the component: its `state`, and its verbs |
 | `musicQueries(music, scope?)`, `useMusicQueries()` | Every read function of the catalog and the library as its query for TanStack Query |
-| Everything in `browser` | `createBrowserClient`, `createConnect`, the feature tier: see [its README](../browser) |
+| Everything in `browser` | `createBrowserClient`, `createConnect`, the feature tier: see [its README](../browser/README.md) |
 
 The `"use client"` directive is at the top of the one built file that holds the provider and the
 hooks, and on nothing else, so `artworkImage`, `isAppleMusicError` or `musicQueries` imported from
@@ -105,7 +105,7 @@ provider, so `useMusic()` is bound from then on.
 | `disconnect()` | Apple's own sign-out, and the provider forgets the token |
 
 Everything a page has to know about the script, the headers it needs, and the copy of the token it
-keeps, is in [the browser package's README](../browser#sign-in).
+keeps, is in [the browser package's README](../browser/README.md#sign-in).
 
 ## The player
 
@@ -120,8 +120,8 @@ dependencies; one called before the player exists, which only a child's effect c
 
 ## Queries
 
-`musicQueries(music, scope?)` maps every read function of [`client-catalog`](../../clients/client-catalog)
-and [`client-user`](../../clients/client-user) to a function of the same arguments giving its query:
+`musicQueries(music, scope?)` maps every read function of [`client-catalog`](../../clients/client-catalog/README.md)
+and [`client-user`](../../clients/client-user/README.md) to a function of the same arguments giving its query:
 
 | The function | The query |
 | --- | --- |
@@ -155,7 +155,7 @@ use `useQuery`.
 
 ## Next.js
 
-A Next.js app installs [`@open-music-sdk/server`](../server) for its route handlers, server
+A Next.js app installs [`@open-music-sdk/server`](../server/README.md) for its route handlers, server
 components and actions, and this package for its client components:
 
 ```ts
@@ -187,5 +187,5 @@ yet; the Next sample app is where it is proven.
 
 ## Not here
 
-The key, the token endpoint and the intake: [`@open-music-sdk/server`](../server). A page without
-React: [`@open-music-sdk/browser`](../browser).
+The key, the token endpoint and the intake: [`@open-music-sdk/server`](../server/README.md). A page without
+React: [`@open-music-sdk/browser`](../browser/README.md).

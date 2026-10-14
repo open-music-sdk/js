@@ -10,8 +10,8 @@ pnpm add @open-music-sdk/server
 ```
 
 **Runs where the private key may live.** One build runs on Node 24, workerd, Bun and Deno: each has
-the same `fetch` and WebCrypto. For a page, use [`@open-music-sdk/browser`](../browser); for a React
-app, [`@open-music-sdk/react`](../react). A Next.js app uses this package in its route handlers,
+the same `fetch` and WebCrypto. For a page, use [`@open-music-sdk/browser`](../browser/README.md); for a React
+app, [`@open-music-sdk/react`](../react/README.md). A Next.js app uses this package in its route handlers,
 server components and actions, and `react` in its client components.
 
 ```ts
@@ -51,8 +51,8 @@ try {
 
 ## The client
 
-`createServerClient` takes the key and its two ids as [`developerTokenMinter`](../../packages/developer-token)
-does, and every option of [`createClient`](../../packages/core) but the developer token, which the
+`createServerClient` takes the key and its two ids as [`developerTokenMinter`](../../packages/developer-token/README.md)
+does, and every option of [`createClient`](../../packages/core/README.md) but the developer token, which the
 minter provides:
 
 | Option | |
@@ -66,9 +66,9 @@ Not among them: `origin`, which is refused rather than dropped. The server's own
 browser, and the one that does is the endpoint's.
 
 What it gives is core's client, `request`, `paginate`, `storefront`, `as` and `forUser`, with three
-namespaces on it: `catalog` is [`catalog(client)`](../../clients/client-catalog), `user` is
-[`user(client)`](../../clients/client-user), and `playlists` is
-[`playlists(client)`](../../lib/lib-playlists), each made for this client. `as(token)` and
+namespaces on it: `catalog` is [`catalog(client)`](../../clients/client-catalog/README.md), `user` is
+[`user(client)`](../../clients/client-user/README.md), and `playlists` is
+[`playlists(client)`](../../lib/lib-playlists/README.md), each made for this client. `as(token)` and
 `forUser(userId)` give a listener's client with the three made for it. The object is frozen, inherits
 nothing, and each of its functions can be handed on by itself.
 
@@ -94,7 +94,7 @@ export default {
 ## The token endpoint
 
 A page cannot mint a developer token, so your server hands it one. `tokenEndpoint` is that handler,
-and `createBrowserClient({ tokenUrl })` in [`@open-music-sdk/browser`](../browser) is what fetches
+and `createBrowserClient({ tokenUrl })` in [`@open-music-sdk/browser`](../browser/README.md) is what fetches
 from it.
 
 | Option | |
@@ -149,16 +149,16 @@ import is enough:
 
 | From | Names |
 | --- | --- |
-| [`core`](../../packages/core) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with: an assembly of your own is the feature tier directly. |
-| [`developer-token`](../../packages/developer-token) | `mintDeveloperToken`, `developerTokenMinter`, `developerTokenFetcher` |
-| [`user-token`](../../packages/user-token) | `validateUserToken`, `acceptUserToken`, `userTokenIntake`, `MemoryUserTokenStore`, `KvUserTokenStore` |
-| [`util-artwork`](../../packages/util-artwork) | `artworkImage`, `artworkUrl`, `artworkSrcSet` |
-| [`client-catalog`](../../clients/client-catalog), [`client-user`](../../clients/client-user) | Every function, and `catalog` and `user` |
-| [`lib-playlists`](../../lib/lib-playlists) | `playlists` |
-| [`validate`](../../packages/validate) | Every validator, under `schemas`: `schemas.song`, `schemas.libraryPlaylist`, to pass as `schema` |
-| [`types`](../../packages/types) | Every generated type: `tSong`, `tAlbum`, `tLibraryPlaylist` |
+| [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with: an assembly of your own is the feature tier directly. |
+| [`developer-token`](../../packages/developer-token/README.md) | `mintDeveloperToken`, `developerTokenMinter`, `developerTokenFetcher` |
+| [`user-token`](../../packages/user-token/README.md) | `validateUserToken`, `acceptUserToken`, `userTokenIntake`, `MemoryUserTokenStore`, `KvUserTokenStore` |
+| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet` |
+| [`client-catalog`](../../clients/client-catalog/README.md), [`client-user`](../../clients/client-user/README.md) | Every function, and `catalog` and `user` |
+| [`lib-playlists`](../../lib/lib-playlists/README.md) | `playlists` |
+| [`validate`](../../packages/validate/README.md) | Every validator, under `schemas`: `schemas.song`, `schemas.libraryPlaylist`, to pass as `schema` |
+| [`types`](../../packages/types/README.md) | Every generated type: `tSong`, `tAlbum`, `tLibraryPlaylist` |
 
 ## Not here
 
-A page, which cannot hold the key: [`@open-music-sdk/browser`](../browser), whose client fetches its
-token from `tokenEndpoint`. A React app: [`@open-music-sdk/react`](../react).
+A page, which cannot hold the key: [`@open-music-sdk/browser`](../browser/README.md), whose client fetches its
+token from `tokenEndpoint`. A React app: [`@open-music-sdk/react`](../react/README.md).

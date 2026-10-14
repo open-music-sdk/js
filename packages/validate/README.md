@@ -22,9 +22,9 @@ if (result.issues) {
 
 Validation is synchronous, so `result` never needs awaiting.
 
-Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core),
-or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
-[`@open-music-sdk/client-user`](../../clients/client-user). A failure there is a `ValidationError`
+Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core/README.md),
+or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md). A failure there is a `ValidationError`
 with the issues attached.
 
 ```ts
@@ -46,7 +46,7 @@ const { data } = await getSong(music, "1613600188", { schema: songsResponse });
 
 Names are the dictionary names from Apple's docs with dots removed, the first letter lowercased, and
 the prefix singularized where the object is a single thing: `Songs.Attributes` is `songAttributes`,
-and its output type is `tSongAttributes` from [`@open-music-sdk/types`](../types). Collections keep
+and its output type is `tSongAttributes` from [`@open-music-sdk/types`](../types/README.md). Collections keep
 their plural (`songsResponse`).
 
 ## What a validator checks
