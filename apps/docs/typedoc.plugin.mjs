@@ -12,7 +12,11 @@ export function load(app) {
     // tEndpoint call signature, and TypeDoc would take the comment written there, the same for all 137, over the one
     // written on the const. The const's own comment is the function's.
     const declared = signature.parent.kindOf(ReflectionKind.Function) && signature.parent.comment && context.getSymbolFromReflection(signature.parent)?.declarations?.some((node) => ts.isVariableDeclaration(node));
-    if (declared) signature.comment = signature.parent.comment.clone();
+    if (declared) {
+      signature.comment = signature.parent.comment.clone();
+      signature.comment.removeModifier("@function"); // its work is done, and it would be shown as a chip
+      signature.parent.comment = undefined; // or the page shows the comment twice
+    }
 
     // A function made by a builder takes its arguments as one rest tuple: ...args: [id: string, options?: X].
     // TypeScript shows them one by one, and so does this, which gives @param id an argument to belong to.

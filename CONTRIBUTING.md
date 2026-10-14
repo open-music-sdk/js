@@ -26,5 +26,6 @@ the change or have the right to submit it under the MIT license.
 - Never commit raw pages from Apple's documentation; codegen commits only the intermediate representation.
 - Every export has a doc comment, and every function, method and namespace member says what each argument is
   (`@param`), what it returns (`@returns`) and what it throws (`@throws`, one per kind of error). A function with no
-  `@throws` throws nothing. `pnpm --filter docs check` holds the first two; the third is read for in review. See
+  `@throws` throws nothing. `pnpm --filter docs check` holds the first two on every function and method; each
+  client's tests hold them on its namespace's members; the rest, and every `@throws`, is read for in review. See
   [apps/docs](./apps/docs/README.md).

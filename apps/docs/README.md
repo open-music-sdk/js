@@ -16,9 +16,12 @@ resolves and the reference needs no build first.
 | `pnpm --filter docs check` | `typedoc --emit none`: everything but writing the site. CI runs it for every pull request, through `turbo run check` |
 
 The check fails on a comment that links to something that is not there, a name the reference refers to that is not
-exported, an export with no comment, and a function that leaves out an argument or what it returns. The first three
-are TypeDoc's own validation; the last is [the plugin](./typedoc.plugin.mjs), which also shows a function built by
-one of core's builders with its arguments one by one instead of as one rest tuple.
+exported, an export with no comment, and a function or method that leaves out an argument or what it returns. The
+first three are TypeDoc's own validation; the last is [the plugin](./typedoc.plugin.mjs), which also shows a function
+built by one of core's builders with its arguments one by one instead of as one rest tuple, and with the comment
+written on it rather than the one on core's call signature. The plugin reads functions and methods only: a member of
+a namespace interface, such as `music.catalog.getSong`, is a property, and each client's tests hold its tags to its
+function's instead.
 
 ## What every function says
 

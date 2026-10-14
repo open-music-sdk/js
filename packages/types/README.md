@@ -56,6 +56,6 @@ reads the same whether your `moduleResolution` is `bundler`, `node16`, or `noden
 ## Regenerating
 
 Everything under `src/generated/` and `src/index.ts` is written by
-[`codegen`](../../codegen/README.md), one file per resource family (`song.ts`, `library-playlist.ts`,
+[`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme), one file per resource family (`song.ts`, `library-playlist.ts`,
 `search-response.ts`, `common.ts` for shared dictionaries). Do not edit them; re-run the crawl and the
 emitter instead.

@@ -66,6 +66,6 @@ keeps only the ones you import plus what they reference.
 ## Regenerating
 
 Everything under `src/generated/` and `src/index.ts` is written by
-[`codegen`](../../codegen/README.md), one file per resource family mirroring `@open-music-sdk/types`;
+[`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme), one file per resource family mirroring `@open-music-sdk/types`;
 `src/runtime.ts` is the hand-written part. Do not edit the generated files; re-run the crawl and the
 emitter instead.
