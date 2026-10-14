@@ -205,9 +205,12 @@ export function usePreviewPlayer<T extends tPreviewable = tPreviewable>(options?
   const [player, setPlayer] = useState<tPreviewPlayer<T> | undefined>(undefined);
   useEffect(() => {
     const given = first.current;
-    // A ref with nothing in it is a mistake, not a reason to play through an element of the player's own while the page's stays silent.
-    if (isRef(given?.audio) && given.audio.current === null) throw new TypeError("usePreviewPlayer: audio is a ref with nothing in it when the component mounted; render the element before this component, or hand over the element itself");
-    const audio = isRef(given?.audio) ? (given.audio.current ?? undefined) : given?.audio;
+    let audio = given?.audio;
+    if (isRef(audio)) {
+      // A ref with nothing in it is a mistake, not a reason to play through an element of the player's own while the page's stays silent.
+      if (audio.current === null) throw new TypeError("usePreviewPlayer: audio is a ref with nothing in it when the component mounted; render the element before this component, or hand over the element itself");
+      audio = audio.current;
+    }
     const made = previewPlayer<T>({ ...given, audio });
     current.current = made;
     setPlayer(made);

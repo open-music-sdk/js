@@ -309,12 +309,30 @@ describe("useConnect", () => {
     await expect(connect?.()).rejects.toThrow(new TypeError("useConnect: connect() was called before the component mounted, or after it unmounted"));
   });
 
-  test("on a server render there is no helper: isReady is false and connect() is a TypeError", async () => {
+  test("on a server render there is no helper: isReady is false, and connect() and disconnect() are TypeErrors naming the hook", async () => {
     const { music } = page();
     const { Probe, seen } = probe(() => useConnect({ app: APP }));
     renderToString(createElement(MusicProvider, { music }, createElement(Probe)));
     expect(seen.current?.isReady).toBe(false);
-    await expect(seen.current?.connect()).rejects.toThrow(TypeError);
+    await expect(seen.current?.connect()).rejects.toThrow(new TypeError("useConnect: connect() was called before the component mounted, or after it unmounted"));
+    await expect(seen.current?.disconnect()).rejects.toThrow(new TypeError("useConnect: disconnect() was called before the component mounted, or after it unmounted"));
+  });
+
+  test("what Apple's script throws from connect() is handed on as it came, and is the hook's error too", async () => {
+    const { music } = page();
+    const boom = { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" };
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script rejects with an object of its own, not an Error
+    const musicKit = kit({ authorize: () => Promise.reject(boom) });
+    const { Probe, seen } = probe(() => ({ connect: useConnect({ app: APP, musicKit }), token: useMusicUserToken()[0] }));
+    mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    await settle();
+    expect(seen.current?.connect.isReady).toBe(true);
+    let thrown: unknown;
+    await act(async () => {
+      thrown = await seen.current?.connect.connect().catch((e: unknown) => e);
+    });
+    expect(thrown).toBe(boom);
+    expect([seen.current?.connect.isReady, seen.current?.connect.error, seen.current?.token]).toEqual([false, boom, undefined]);
   });
 });
 
