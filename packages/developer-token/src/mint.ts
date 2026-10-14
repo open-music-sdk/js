@@ -20,6 +20,7 @@ export interface tMintOptions {
   readonly origin?: readonly string[] | undefined;
 }
 
+/** What `developerTokenMinter` takes: what a mint takes, and how far ahead the next one happens. Invalid values throw a TypeError. */
 export interface tMinterOptions extends tMintOptions {
   /** Mint a replacement this long before `exp`. Default, and at most, half the lifetime. */
   readonly refreshAheadSeconds?: number | undefined;
@@ -114,7 +115,14 @@ async function sign(key: CryptoKey, { teamId, keyId, ttlSeconds, origin }: tClai
   return { token, expiresAt: exp * 1000 };
 }
 
-/** Signs a developer token: an ES256 JWT with `iss`, `iat`, `exp`, and optionally `origin`. */
+/**
+ * Signs a developer token: an ES256 JWT with `iss`, `iat`, `exp`, and optionally `origin`.
+ *
+ * @param options - The key, whose it is, and what the token says about itself.
+ * @returns The token in its compact form, as Apple takes it after `Bearer`.
+ * @throws TypeError if an option is not what it should be, or `pem` is not a PKCS8 P-256 private key. The function
+ *   is async, so this is a rejection: nothing is thrown before the promise is made.
+ */
 export async function mintDeveloperToken(options: tMintOptions): Promise<string> {
   const { pem, ...claims } = check(options);
   return (await sign(await importKey(pem), claims)).token;
@@ -127,6 +135,11 @@ export async function mintDeveloperToken(options: tMintOptions): Promise<string>
  * The options are read once, here, and the PEM held wrapped so that nothing prints it. The key is imported on
  * first use and the PEM let go of: from then on the minter holds a key that can sign and cannot be exported, and
  * no copy of the text it came from.
+ *
+ * @param options - The key, whose it is, what each token says about itself, and how far ahead of `exp` the next is minted.
+ * @returns A provider to pass as `developerToken`. Minting is local, so it rejects only with a `TypeError` on first
+ *   use when `pem` is not a PKCS8 P-256 private key, and with the reason of a `signal` that aborts before a token is had.
+ * @throws TypeError if an option is not what it should be, when the minter is created and before anything is signed.
  */
 export function developerTokenMinter(options: tMinterOptions): tDeveloperTokenProvider {
   const { pem, ...claims } = check(options);

@@ -28,7 +28,7 @@ import { station } from "./station";
 import { stationGenre } from "./station-genre";
 import { storefront } from "./storefront";
 
-/** Any resource object. */
+/** Validates a `tAnyResource`: any resource object, told apart by its `type`. */
 export const anyResource: r.tSchema<t.tAnyResource> = r.schema<t.tAnyResource>(
   r.union(r.lazy(() => activity), r.lazy(() => albumPeriodSummary), r.lazy(() => album), r.lazy(() => appleCurator), r.lazy(() => artistPeriodSummary), r.lazy(() => artist), r.lazy(() => curator), r.lazy(() => genre), r.lazy(() => libraryAlbum), r.lazy(() => libraryArtist), r.lazy(() => libraryMusicVideo), r.lazy(() => libraryPlaylistFolder), r.lazy(() => libraryPlaylist), r.lazy(() => librarySong), r.lazy(() => musicSummary), r.lazy(() => musicVideo), r.lazy(() => personalRecommendation), r.lazy(() => playlist), r.lazy(() => rating), r.lazy(() => recordLabel), r.lazy(() => songPeriodSummary), r.lazy(() => song), r.lazy(() => stationGenre), r.lazy(() => station), r.lazy(() => storefront)),
 );

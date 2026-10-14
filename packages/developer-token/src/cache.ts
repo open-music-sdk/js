@@ -1,6 +1,17 @@
 import { got, type tTokenContext } from "@open-music-sdk/core";
 
-/** A core `tTokenProvider` that always answers with a promise and needs no context, so it is easy to call directly. */
+/**
+ * A core `tTokenProvider` that always answers with a promise and needs no context, so it is easy to call directly.
+ *
+ * @param ctx - What core's client passes: a `signal` to stop waiting on, and under `rejected` the token Apple just
+ *   answered 401 to, which asks for a replacement.
+ * @returns The token held, or the first one, once it has been issued.
+ * @throws TypeError if the source cannot issue at all while no usable token is held: the minter's `pem` is not a
+ *   PKCS8 P-256 private key, or the fetcher's URL is relative and there is no document to resolve it against.
+ * @throws AppleMusicError `DeveloperTokenUnavailable` when the fetcher's endpoint cannot be reached or does not
+ *   answer with a token, while no usable token is held.
+ * @throws The reason `ctx.signal` aborted with, when it aborts before a token is had.
+ */
 export type tDeveloperTokenProvider = (ctx?: tTokenContext) => Promise<string>;
 
 /** A token and the moment it stops working, in epoch milliseconds. */

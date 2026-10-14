@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tError`: Information about an error that occurred while processing a request. */
 export const error: r.tSchema<t.tError> = r.object<t.tError>(
   {
     code: r.string,
@@ -15,6 +16,7 @@ export const error: r.tSchema<t.tError> = r.object<t.tError>(
   ["code", "id", "status", "title"],
 );
 
+/** Validates a `tErrorSource`: the Source object represents the source of an error. */
 export const errorSource: r.tSchema<t.tErrorSource> = r.object<t.tErrorSource>(
   {
     parameter: r.string,

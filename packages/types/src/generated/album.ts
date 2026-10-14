@@ -43,6 +43,7 @@ export interface tAlbumAttributes {
   editorialNotes?: tEditorialNotes;
   /** The names of the genres associated with the album. */
   genreNames: string[];
+  /** Whether the album is among the listener's favorites. */
   inFavorites?: boolean;
   /** Indicates whether the album is marked as a compilation. If true, the album is a compilation; otherwise, it’s not. */
   isCompilation: boolean;

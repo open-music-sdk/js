@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { album } from "./album";
 import { artwork, descriptionAttribute } from "./common";
 
+/** Validates a `tRecordLabel`: a resource object that represents a record label. */
 export const recordLabel: r.tSchema<t.tRecordLabel> = r.object<t.tRecordLabel>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const recordLabel: r.tSchema<t.tRecordLabel> = r.object<t.tRecordLabel>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tRecordLabelAttributes`: the attributes for a record label resource. */
 export const recordLabelAttributes: r.tSchema<t.tRecordLabelAttributes> = r.object<t.tRecordLabelAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -26,6 +28,7 @@ export const recordLabelAttributes: r.tSchema<t.tRecordLabelAttributes> = r.obje
   ["artwork", "name", "url"],
 );
 
+/** Validates a `tRecordLabelViews`: the relationship views for a record label resource. */
 export const recordLabelViews: r.tSchema<t.tRecordLabelViews> = r.object<t.tRecordLabelViews>(
   {
     "latest-releases": r.lazy(() => recordLabelViewsRecordLabelLatestReleasesView),
@@ -34,6 +37,7 @@ export const recordLabelViews: r.tSchema<t.tRecordLabelViews> = r.object<t.tReco
   [],
 );
 
+/** Validates a `tRecordLabelViewsRecordLabelLatestReleasesView`: a relationship view from this record label to a selection of its latest releases. */
 export const recordLabelViewsRecordLabelLatestReleasesView: r.tSchema<t.tRecordLabelViewsRecordLabelLatestReleasesView> = r.object<t.tRecordLabelViewsRecordLabelLatestReleasesView>(
   {
     href: r.string,
@@ -44,6 +48,7 @@ export const recordLabelViewsRecordLabelLatestReleasesView: r.tSchema<t.tRecordL
   ["attributes", "data"],
 );
 
+/** Validates a `tRecordLabelViewsRecordLabelLatestReleasesViewAttributes`: the attributes for the record label latest releases view. */
 export const recordLabelViewsRecordLabelLatestReleasesViewAttributes: r.tSchema<t.tRecordLabelViewsRecordLabelLatestReleasesViewAttributes> = r.object<t.tRecordLabelViewsRecordLabelLatestReleasesViewAttributes>(
   {
     title: r.string,
@@ -51,6 +56,7 @@ export const recordLabelViewsRecordLabelLatestReleasesViewAttributes: r.tSchema<
   ["title"],
 );
 
+/** Validates a `tRecordLabelViewsRecordLabelTopReleasesView`: a relationship view from this record label to a selection of its top releases. */
 export const recordLabelViewsRecordLabelTopReleasesView: r.tSchema<t.tRecordLabelViewsRecordLabelTopReleasesView> = r.object<t.tRecordLabelViewsRecordLabelTopReleasesView>(
   {
     href: r.string,
@@ -61,6 +67,7 @@ export const recordLabelViewsRecordLabelTopReleasesView: r.tSchema<t.tRecordLabe
   ["attributes", "data"],
 );
 
+/** Validates a `tRecordLabelViewsRecordLabelTopReleasesViewAttributes`: the attributes for the record label top releases view. */
 export const recordLabelViewsRecordLabelTopReleasesViewAttributes: r.tSchema<t.tRecordLabelViewsRecordLabelTopReleasesViewAttributes> = r.object<t.tRecordLabelViewsRecordLabelTopReleasesViewAttributes>(
   {
     title: r.string,
@@ -68,6 +75,7 @@ export const recordLabelViewsRecordLabelTopReleasesViewAttributes: r.tSchema<t.t
   ["title"],
 );
 
+/** Validates a `tRecordLabelsResponse`: the response to a request for record labels. */
 export const recordLabelsResponse: r.tSchema<t.tRecordLabelsResponse> = r.object<t.tRecordLabelsResponse>(
   {
     data: r.array(r.lazy(() => recordLabel)),

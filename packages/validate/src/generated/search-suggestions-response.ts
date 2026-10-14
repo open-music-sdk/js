@@ -13,6 +13,7 @@ import { recordLabel } from "./record-label";
 import { song } from "./song";
 import { station } from "./station";
 
+/** Validates a `tSearchSuggestionsResponse`: the response to a request for search suggestions. */
 export const searchSuggestionsResponse: r.tSchema<t.tSearchSuggestionsResponse> = r.object<t.tSearchSuggestionsResponse>(
   {
     results: r.lazy(() => searchSuggestionsResponseResults),
@@ -20,6 +21,7 @@ export const searchSuggestionsResponse: r.tSchema<t.tSearchSuggestionsResponse> 
   ["results"],
 );
 
+/** Validates a `tSearchSuggestionsResponseResults`: an object that represents the results of a search suggestions query. */
 export const searchSuggestionsResponseResults: r.tSchema<t.tSearchSuggestionsResponseResults> = r.object<t.tSearchSuggestionsResponseResults>(
   {
     suggestions: r.array(r.union(r.lazy(() => searchSuggestionsResponseResultsTermSuggestion), r.lazy(() => searchSuggestionsResponseResultsTopResultSuggestion))),
@@ -27,6 +29,7 @@ export const searchSuggestionsResponseResults: r.tSchema<t.tSearchSuggestionsRes
   ["suggestions"],
 );
 
+/** Validates a `tSearchSuggestionsResponseResultsTermSuggestion`: a suggested search term from a search suggestion response. */
 export const searchSuggestionsResponseResultsTermSuggestion: r.tSchema<t.tSearchSuggestionsResponseResultsTermSuggestion> = r.object<t.tSearchSuggestionsResponseResultsTermSuggestion>(
   {
     displayTerm: r.string,
@@ -36,6 +39,7 @@ export const searchSuggestionsResponseResultsTermSuggestion: r.tSchema<t.tSearch
   ["displayTerm", "kind", "searchTerm"],
 );
 
+/** Validates a `tSearchSuggestionsResponseResultsTopResultSuggestion`: a suggested popular result for similar search prefix terms. */
 export const searchSuggestionsResponseResultsTopResultSuggestion: r.tSchema<t.tSearchSuggestionsResponseResultsTopResultSuggestion> = r.object<t.tSearchSuggestionsResponseResultsTopResultSuggestion>(
   {
     content: r.union(r.lazy(() => activity), r.lazy(() => album), r.lazy(() => appleCurator), r.lazy(() => artist), r.lazy(() => curator), r.lazy(() => musicVideo), r.lazy(() => playlist), r.lazy(() => recordLabel), r.lazy(() => song), r.lazy(() => station)),

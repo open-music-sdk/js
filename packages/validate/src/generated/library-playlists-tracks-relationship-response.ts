@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { libraryMusicVideo } from "./library-music-video";
 import { librarySong } from "./library-song";
 
+/** Validates a `tLibraryPlaylistsTracksRelationshipResponse`: the response to a library playlists tracks relationship request. */
 export const libraryPlaylistsTracksRelationshipResponse: r.tSchema<t.tLibraryPlaylistsTracksRelationshipResponse> = r.object<t.tLibraryPlaylistsTracksRelationshipResponse>(
   {
     data: r.array(r.union(r.lazy(() => libraryMusicVideo), r.lazy(() => librarySong))),
@@ -14,4 +15,5 @@ export const libraryPlaylistsTracksRelationshipResponse: r.tSchema<t.tLibraryPla
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistsTracksRelationshipResponseMeta`: an object that represents the meta information for response to a library playlists tracks relationship request. */
 export const libraryPlaylistsTracksRelationshipResponseMeta: r.tSchema<t.tLibraryPlaylistsTracksRelationshipResponseMeta> = r.schema<t.tLibraryPlaylistsTracksRelationshipResponseMeta>(r.record);

@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { artwork, editorialNotes } from "./common";
 import { playlist } from "./playlist";
 
+/** Validates a `tAppleCurator`: a resource object that represents an Apple curator. */
 export const appleCurator: r.tSchema<t.tAppleCurator> = r.object<t.tAppleCurator>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const appleCurator: r.tSchema<t.tAppleCurator> = r.object<t.tAppleCurator
   ["id", "type", "href"],
 );
 
+/** Validates a `tAppleCuratorAttributes`: the attributes for an Apple curator resource. */
 export const appleCuratorAttributes: r.tSchema<t.tAppleCuratorAttributes> = r.object<t.tAppleCuratorAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -29,6 +31,7 @@ export const appleCuratorAttributes: r.tSchema<t.tAppleCuratorAttributes> = r.ob
   ["artwork", "kind", "name", "url"],
 );
 
+/** Validates a `tAppleCuratorRelationships`: the relationships for an Apple curator resource. */
 export const appleCuratorRelationships: r.tSchema<t.tAppleCuratorRelationships> = r.object<t.tAppleCuratorRelationships>(
   {
     playlists: r.lazy(() => appleCuratorRelationshipsAppleCuratorPlaylistsRelationship),
@@ -36,6 +39,7 @@ export const appleCuratorRelationships: r.tSchema<t.tAppleCuratorRelationships> 
   [],
 );
 
+/** Validates a `tAppleCuratorRelationshipsAppleCuratorPlaylistsRelationship`: a relationship from the Apple curator to its playlists. */
 export const appleCuratorRelationshipsAppleCuratorPlaylistsRelationship: r.tSchema<t.tAppleCuratorRelationshipsAppleCuratorPlaylistsRelationship> = r.object<t.tAppleCuratorRelationshipsAppleCuratorPlaylistsRelationship>(
   {
     href: r.string,
@@ -45,6 +49,7 @@ export const appleCuratorRelationshipsAppleCuratorPlaylistsRelationship: r.tSche
   ["data"],
 );
 
+/** Validates a `tAppleCuratorsResponse`: the response to a request for Apple curators. */
 export const appleCuratorsResponse: r.tSchema<t.tAppleCuratorsResponse> = r.object<t.tAppleCuratorsResponse>(
   {
     data: r.array(r.lazy(() => appleCurator)),

@@ -19,6 +19,16 @@ export interface tValidateOptions {
  * `UserTokenInvalid` is Apple's verdict and nothing else: Apple answered 403, or answered 401 for the listener
  * while accepting the developer token. Any other failure (developer token, rate limit, network, a reply with no
  * storefront) is the client's usual error and says nothing about the token.
+ *
+ * @param client - The client to ask with. Its developer token is sent; `token` stands in for any listener it is bound to.
+ * @param token - The Music User Token to ask about.
+ * @param options - A `signal` to abort with.
+ * @returns The listener's storefront id, such as `us`.
+ * @throws TypeError if `client` is not a client, `token` is not a token, or `options` is not a plain object, before Apple is asked.
+ * @throws AppleMusicError `UserTokenInvalid` when Apple will not take the token; otherwise what asking failed with:
+ *   `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `RateLimited`, `NetworkError`, or `ApiError`, which a 2xx
+ *   that names no storefront is too. `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
  */
 export async function validateUserToken(client: tAppleMusicClient, token: string, options: tValidateOptions = {}): Promise<string> {
   const music = clientOf("validateUserToken", client);

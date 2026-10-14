@@ -11,6 +11,7 @@ import { libraryPlaylist } from "./library-playlist";
 import { musicVideo } from "./music-video";
 import { song } from "./song";
 
+/** Validates a `tPlaylist`: a resource object that represents a playlist. */
 export const playlist: r.tSchema<t.tPlaylist> = r.object<t.tPlaylist>(
   {
     id: r.string,
@@ -23,6 +24,7 @@ export const playlist: r.tSchema<t.tPlaylist> = r.object<t.tPlaylist>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tPlaylistAttributes`: the attributes for a playlist resource. */
 export const playlistAttributes: r.tSchema<t.tPlaylistAttributes> = r.object<t.tPlaylistAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -40,6 +42,7 @@ export const playlistAttributes: r.tSchema<t.tPlaylistAttributes> = r.object<t.t
   ["curatorName", "isChart", "name", "playlistType", "url"],
 );
 
+/** Validates a `tPlaylistRelationships`: the relationships for a playlist resource. */
 export const playlistRelationships: r.tSchema<t.tPlaylistRelationships> = r.object<t.tPlaylistRelationships>(
   {
     curator: r.lazy(() => playlistRelationshipsPlaylistCuratorRelationship),
@@ -49,6 +52,7 @@ export const playlistRelationships: r.tSchema<t.tPlaylistRelationships> = r.obje
   [],
 );
 
+/** Validates a `tPlaylistRelationshipsPlaylistCuratorRelationship`: a relationship from the playlist to its curator. */
 export const playlistRelationshipsPlaylistCuratorRelationship: r.tSchema<t.tPlaylistRelationshipsPlaylistCuratorRelationship> = r.object<t.tPlaylistRelationshipsPlaylistCuratorRelationship>(
   {
     href: r.string,
@@ -58,6 +62,7 @@ export const playlistRelationshipsPlaylistCuratorRelationship: r.tSchema<t.tPlay
   ["data"],
 );
 
+/** Validates a `tPlaylistRelationshipsPlaylistLibraryRelationship`: a relationship from the playlist to its library. */
 export const playlistRelationshipsPlaylistLibraryRelationship: r.tSchema<t.tPlaylistRelationshipsPlaylistLibraryRelationship> = r.object<t.tPlaylistRelationshipsPlaylistLibraryRelationship>(
   {
     href: r.string,
@@ -67,6 +72,7 @@ export const playlistRelationshipsPlaylistLibraryRelationship: r.tSchema<t.tPlay
   ["data"],
 );
 
+/** Validates a `tPlaylistRelationshipsPlaylistTracksRelationship`: a relationship from the playlist to its tracks. */
 export const playlistRelationshipsPlaylistTracksRelationship: r.tSchema<t.tPlaylistRelationshipsPlaylistTracksRelationship> = r.object<t.tPlaylistRelationshipsPlaylistTracksRelationship>(
   {
     href: r.string,
@@ -76,6 +82,7 @@ export const playlistRelationshipsPlaylistTracksRelationship: r.tSchema<t.tPlayl
   ["data"],
 );
 
+/** Validates a `tPlaylistViews`: the views for a music video resource. */
 export const playlistViews: r.tSchema<t.tPlaylistViews> = r.object<t.tPlaylistViews>(
   {
     "featured-artists": r.lazy(() => playlistViewsPlaylistFeaturedArtistsView),
@@ -84,6 +91,7 @@ export const playlistViews: r.tSchema<t.tPlaylistViews> = r.object<t.tPlaylistVi
   [],
 );
 
+/** Validates a `tPlaylistViewsPlaylistFeaturedArtistsView`: Artists that are featured on this playlist. */
 export const playlistViewsPlaylistFeaturedArtistsView: r.tSchema<t.tPlaylistViewsPlaylistFeaturedArtistsView> = r.object<t.tPlaylistViewsPlaylistFeaturedArtistsView>(
   {
     href: r.string,
@@ -94,6 +102,7 @@ export const playlistViewsPlaylistFeaturedArtistsView: r.tSchema<t.tPlaylistView
   ["attributes", "data"],
 );
 
+/** Validates a `tPlaylistViewsPlaylistFeaturedArtistsViewAttributes`: Attribute metadata for the playlist featured artists view. */
 export const playlistViewsPlaylistFeaturedArtistsViewAttributes: r.tSchema<t.tPlaylistViewsPlaylistFeaturedArtistsViewAttributes> = r.object<t.tPlaylistViewsPlaylistFeaturedArtistsViewAttributes>(
   {
     title: r.string,
@@ -101,6 +110,7 @@ export const playlistViewsPlaylistFeaturedArtistsViewAttributes: r.tSchema<t.tPl
   ["title"],
 );
 
+/** Validates a `tPlaylistViewsPlaylistMoreByCuratorView`: Additional content by the same curator for this playlist. */
 export const playlistViewsPlaylistMoreByCuratorView: r.tSchema<t.tPlaylistViewsPlaylistMoreByCuratorView> = r.object<t.tPlaylistViewsPlaylistMoreByCuratorView>(
   {
     href: r.string,
@@ -111,6 +121,7 @@ export const playlistViewsPlaylistMoreByCuratorView: r.tSchema<t.tPlaylistViewsP
   ["attributes", "data"],
 );
 
+/** Validates a `tPlaylistViewsPlaylistMoreByCuratorViewAttributes`: Attribute metadata for the view containing additional content by the same curator for this playlist. */
 export const playlistViewsPlaylistMoreByCuratorViewAttributes: r.tSchema<t.tPlaylistViewsPlaylistMoreByCuratorViewAttributes> = r.object<t.tPlaylistViewsPlaylistMoreByCuratorViewAttributes>(
   {
     title: r.string,
@@ -118,6 +129,7 @@ export const playlistViewsPlaylistMoreByCuratorViewAttributes: r.tSchema<t.tPlay
   ["title"],
 );
 
+/** Validates a `tPlaylistsResponse`: the response to a playlists request. */
 export const playlistsResponse: r.tSchema<t.tPlaylistsResponse> = r.object<t.tPlaylistsResponse>(
   {
     data: r.array(r.lazy(() => playlist)),

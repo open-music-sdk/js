@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { artwork, editorialNotes } from "./common";
 import { playlist } from "./playlist";
 
+/** Validates a `tActivity`: a resource object that represents an activity curator. */
 export const activity: r.tSchema<t.tActivity> = r.object<t.tActivity>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const activity: r.tSchema<t.tActivity> = r.object<t.tActivity>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tActivityAttributes`: the attributes for an activities resource. */
 export const activityAttributes: r.tSchema<t.tActivityAttributes> = r.object<t.tActivityAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -26,6 +28,7 @@ export const activityAttributes: r.tSchema<t.tActivityAttributes> = r.object<t.t
   ["artwork", "name", "url"],
 );
 
+/** Validates a `tActivityRelationships`: the relationships for an activity resource. */
 export const activityRelationships: r.tSchema<t.tActivityRelationships> = r.object<t.tActivityRelationships>(
   {
     playlists: r.lazy(() => activityRelationshipsActivityPlaylistsRelationship),
@@ -33,6 +36,7 @@ export const activityRelationships: r.tSchema<t.tActivityRelationships> = r.obje
   [],
 );
 
+/** Validates a `tActivityRelationshipsActivityPlaylistsRelationship`: a relationship between the activity and its playlists. */
 export const activityRelationshipsActivityPlaylistsRelationship: r.tSchema<t.tActivityRelationshipsActivityPlaylistsRelationship> = r.object<t.tActivityRelationshipsActivityPlaylistsRelationship>(
   {
     href: r.string,
@@ -42,6 +46,7 @@ export const activityRelationshipsActivityPlaylistsRelationship: r.tSchema<t.tAc
   ["data"],
 );
 
+/** Validates a `tActivitiesResponse`: the response to a request for activities. */
 export const activitiesResponse: r.tSchema<t.tActivitiesResponse> = r.object<t.tActivitiesResponse>(
   {
     data: r.array(r.lazy(() => activity)),

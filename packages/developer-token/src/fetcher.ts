@@ -51,6 +51,15 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * The token is reused and replaced in the background halfway through the life it had left, concurrent requests
  * share one fetch, and a token Apple answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
  * the endpoint's status when it answered, so it is never mistaken for an answer from Apple.
+ *
+ * @param url - The endpoint: `http` or `https`, with no username or password in it. Absolute, or relative to the
+ *   page in a browser.
+ * @param options - The fetch to use, how far ahead of `exp` the next token is fetched, and how long to wait for one.
+ * @returns A provider to pass as `developerToken`. While it holds no usable token it rejects with what went wrong
+ *   at the endpoint, as `DeveloperTokenUnavailable`; with a `TypeError` when `url` is relative and there is no
+ *   document to resolve it against; and with the reason of a `signal` that aborts first.
+ * @throws TypeError if `url` is not `http` or `https` or carries credentials, or an option is not what it should
+ *   be, when the provider is created. A relative URL with no document yet is left for the first call.
  */
 export function developerTokenFetcher(url: string | URL, options: tFetcherOptions = {}): tDeveloperTokenProvider {
   const fetchImpl = options.fetch ?? globalThis.fetch;

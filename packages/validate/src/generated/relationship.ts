@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { resource } from "./resource";
 
+/** Validates a `tRelationship`: a to-one or to-many relationship from one resource object to others. */
 export const relationship: r.tSchema<t.tRelationship> = r.object<t.tRelationship>(
   {
     href: r.string,
@@ -14,4 +15,5 @@ export const relationship: r.tSchema<t.tRelationship> = r.object<t.tRelationship
   ["data"],
 );
 
+/** Validates a `tRelationshipMeta`: Information about the request or response. */
 export const relationshipMeta: r.tSchema<t.tRelationshipMeta> = r.schema<t.tRelationshipMeta>(r.record);

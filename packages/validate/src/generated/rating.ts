@@ -11,6 +11,7 @@ import { playlist } from "./playlist";
 import { song } from "./song";
 import { station } from "./station";
 
+/** Validates a `tRating`: an object that represents a rating for a resource. */
 export const rating: r.tSchema<t.tRating> = r.object<t.tRating>(
   {
     id: r.string,
@@ -22,6 +23,7 @@ export const rating: r.tSchema<t.tRating> = r.object<t.tRating>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tRatingAttributes`: the attributes for a rating resource. */
 export const ratingAttributes: r.tSchema<t.tRatingAttributes> = r.object<t.tRatingAttributes>(
   {
     value: r.literal(-1, 1),
@@ -29,6 +31,7 @@ export const ratingAttributes: r.tSchema<t.tRatingAttributes> = r.object<t.tRati
   [],
 );
 
+/** Validates a `tRatingRelationships`: the relationships for a rating resource. */
 export const ratingRelationships: r.tSchema<t.tRatingRelationships> = r.object<t.tRatingRelationships>(
   {
     content: r.lazy(() => ratingRelationshipsRatingContentRelationship),
@@ -36,6 +39,7 @@ export const ratingRelationships: r.tSchema<t.tRatingRelationships> = r.object<t
   [],
 );
 
+/** Validates a `tRatingRelationshipsRatingContentRelationship`: a relationship between the rating and the assocaited content. */
 export const ratingRelationshipsRatingContentRelationship: r.tSchema<t.tRatingRelationshipsRatingContentRelationship> = r.object<t.tRatingRelationshipsRatingContentRelationship>(
   {
     data: r.array(r.union(r.lazy(() => album), r.lazy(() => libraryMusicVideo), r.lazy(() => libraryPlaylist), r.lazy(() => librarySong), r.lazy(() => musicVideo), r.lazy(() => playlist), r.lazy(() => song), r.lazy(() => station))),
@@ -45,6 +49,7 @@ export const ratingRelationshipsRatingContentRelationship: r.tSchema<t.tRatingRe
   ["data"],
 );
 
+/** Validates a `tRatingsResponse`: the response to a request for a rating. */
 export const ratingsResponse: r.tSchema<t.tRatingsResponse> = r.object<t.tRatingsResponse>(
   {
     data: r.array(r.lazy(() => rating)),

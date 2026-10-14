@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { artist } from "./artist";
 import { libraryAlbum } from "./library-album";
 
+/** Validates a `tLibraryArtist`: a resource object that represents an artist present in a user’s library. */
 export const libraryArtist: r.tSchema<t.tLibraryArtist> = r.object<t.tLibraryArtist>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const libraryArtist: r.tSchema<t.tLibraryArtist> = r.object<t.tLibraryArt
   ["id", "type", "href"],
 );
 
+/** Validates a `tLibraryArtistAttributes`: the attributes for a library artist resource. */
 export const libraryArtistAttributes: r.tSchema<t.tLibraryArtistAttributes> = r.object<t.tLibraryArtistAttributes>(
   {
     inFavorites: r.boolean,
@@ -24,6 +26,7 @@ export const libraryArtistAttributes: r.tSchema<t.tLibraryArtistAttributes> = r.
   ["name"],
 );
 
+/** Validates a `tLibraryArtistRelationships`: the relationships for a library artist resource. */
 export const libraryArtistRelationships: r.tSchema<t.tLibraryArtistRelationships> = r.object<t.tLibraryArtistRelationships>(
   {
     albums: r.lazy(() => libraryArtistRelationshipsLibraryArtistAlbumsRelationship),
@@ -32,6 +35,7 @@ export const libraryArtistRelationships: r.tSchema<t.tLibraryArtistRelationships
   [],
 );
 
+/** Validates a `tLibraryArtistRelationshipsLibraryArtistAlbumsRelationship`: a relationship from the library artist to thier albums. */
 export const libraryArtistRelationshipsLibraryArtistAlbumsRelationship: r.tSchema<t.tLibraryArtistRelationshipsLibraryArtistAlbumsRelationship> = r.object<t.tLibraryArtistRelationshipsLibraryArtistAlbumsRelationship>(
   {
     href: r.string,
@@ -41,6 +45,7 @@ export const libraryArtistRelationshipsLibraryArtistAlbumsRelationship: r.tSchem
   ["data"],
 );
 
+/** Validates a `tLibraryArtistRelationshipsLibraryArtistCatalogRelationship`: a relationship from the library artist to their associated catalog content. */
 export const libraryArtistRelationshipsLibraryArtistCatalogRelationship: r.tSchema<t.tLibraryArtistRelationshipsLibraryArtistCatalogRelationship> = r.object<t.tLibraryArtistRelationshipsLibraryArtistCatalogRelationship>(
   {
     href: r.string,
@@ -50,6 +55,7 @@ export const libraryArtistRelationshipsLibraryArtistCatalogRelationship: r.tSche
   ["data"],
 );
 
+/** Validates a `tLibraryArtistsResponse`: the response to a library artists request. */
 export const libraryArtistsResponse: r.tSchema<t.tLibraryArtistsResponse> = r.object<t.tLibraryArtistsResponse>(
   {
     data: r.array(r.lazy(() => libraryArtist)),

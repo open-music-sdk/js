@@ -8,7 +8,7 @@ import * as api from "./index";
 
 describe("the package entry", () => {
   test("exports the documented functions and nothing else", () => {
-    expect(Object.keys(api).sort()).toEqual(["artworkImage", "artworkSrcSet", "artworkUrl"]);
+    expect(Object.keys(api).sort()).toEqual(["FORMATS", "artworkImage", "artworkSrcSet", "artworkUrl"]);
   });
 
   test("from an artwork object as the API gives it to an image, using nothing but the entry", () => {

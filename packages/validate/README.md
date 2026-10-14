@@ -42,7 +42,7 @@ const { data } = await getSong(music, "1613600188", { schema: songsResponse });
 | `songAttributes`, `artwork`, ...        | Any dictionary from the docs, by its camelCase name |
 | `songsResponse`, `errorsResponse`, ...  | Response envelopes                            |
 | `anyResource`                           | Any resource, discriminated by `type`         |
-| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult` | Types for writing code against validators |
+| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult`, `tCheck` | Types for writing code against validators, and the raw check a validator is composed from |
 
 Names are the dictionary names from Apple's docs with dots removed, the first letter lowercased, and
 the prefix singularized where the object is a single thing: `Songs.Attributes` is `songAttributes`,

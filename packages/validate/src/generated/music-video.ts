@@ -9,6 +9,7 @@ import { genre } from "./genre";
 import { libraryMusicVideo } from "./library-music-video";
 import { song } from "./song";
 
+/** Validates a `tMusicVideo`: a resource object that represents a music video. */
 export const musicVideo: r.tSchema<t.tMusicVideo> = r.object<t.tMusicVideo>(
   {
     id: r.string,
@@ -21,6 +22,7 @@ export const musicVideo: r.tSchema<t.tMusicVideo> = r.object<t.tMusicVideo>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tMusicVideoAttributes`: the attributes for a music video resource. */
 export const musicVideoAttributes: r.tSchema<t.tMusicVideoAttributes> = r.object<t.tMusicVideoAttributes>(
   {
     albumName: r.string,
@@ -48,6 +50,7 @@ export const musicVideoAttributes: r.tSchema<t.tMusicVideoAttributes> = r.object
   ["artistName", "artwork", "durationInMillis", "genreNames", "has4K", "hasHDR", "name", "previews", "url"],
 );
 
+/** Validates a `tMusicVideoRelationships`: the relationships for a music video resource. */
 export const musicVideoRelationships: r.tSchema<t.tMusicVideoRelationships> = r.object<t.tMusicVideoRelationships>(
   {
     albums: r.lazy(() => musicVideoRelationshipsMusicVideoAlbumsRelationship),
@@ -59,6 +62,7 @@ export const musicVideoRelationships: r.tSchema<t.tMusicVideoRelationships> = r.
   [],
 );
 
+/** Validates a `tMusicVideoRelationshipsMusicVideoAlbumsRelationship`: a relationship from the music video to its albums. */
 export const musicVideoRelationshipsMusicVideoAlbumsRelationship: r.tSchema<t.tMusicVideoRelationshipsMusicVideoAlbumsRelationship> = r.object<t.tMusicVideoRelationshipsMusicVideoAlbumsRelationship>(
   {
     href: r.string,
@@ -68,6 +72,7 @@ export const musicVideoRelationshipsMusicVideoAlbumsRelationship: r.tSchema<t.tM
   ["data"],
 );
 
+/** Validates a `tMusicVideoRelationshipsMusicVideoArtistsRelationship`: a relationship from the music video to its artists. */
 export const musicVideoRelationshipsMusicVideoArtistsRelationship: r.tSchema<t.tMusicVideoRelationshipsMusicVideoArtistsRelationship> = r.object<t.tMusicVideoRelationshipsMusicVideoArtistsRelationship>(
   {
     href: r.string,
@@ -77,6 +82,7 @@ export const musicVideoRelationshipsMusicVideoArtistsRelationship: r.tSchema<t.t
   ["data"],
 );
 
+/** Validates a `tMusicVideoRelationshipsMusicVideoGenresRelationship`: a relationship from the music video to its genres. */
 export const musicVideoRelationshipsMusicVideoGenresRelationship: r.tSchema<t.tMusicVideoRelationshipsMusicVideoGenresRelationship> = r.object<t.tMusicVideoRelationshipsMusicVideoGenresRelationship>(
   {
     href: r.string,
@@ -86,6 +92,7 @@ export const musicVideoRelationshipsMusicVideoGenresRelationship: r.tSchema<t.tM
   ["data"],
 );
 
+/** Validates a `tMusicVideoRelationshipsMusicVideoLibraryRelationship`: a relationship from the music video to its library. */
 export const musicVideoRelationshipsMusicVideoLibraryRelationship: r.tSchema<t.tMusicVideoRelationshipsMusicVideoLibraryRelationship> = r.object<t.tMusicVideoRelationshipsMusicVideoLibraryRelationship>(
   {
     href: r.string,
@@ -95,6 +102,7 @@ export const musicVideoRelationshipsMusicVideoLibraryRelationship: r.tSchema<t.t
   ["data"],
 );
 
+/** Validates a `tMusicVideoRelationshipsMusicVideoSongsRelationship`: a relationship from the music video to its songs. */
 export const musicVideoRelationshipsMusicVideoSongsRelationship: r.tSchema<t.tMusicVideoRelationshipsMusicVideoSongsRelationship> = r.object<t.tMusicVideoRelationshipsMusicVideoSongsRelationship>(
   {
     href: r.string,
@@ -104,6 +112,7 @@ export const musicVideoRelationshipsMusicVideoSongsRelationship: r.tSchema<t.tMu
   ["data"],
 );
 
+/** Validates a `tMusicVideoViews`: the views for a music video resource. */
 export const musicVideoViews: r.tSchema<t.tMusicVideoViews> = r.object<t.tMusicVideoViews>(
   {
     "more-by-artist": r.lazy(() => musicVideoViewsMusicVideoMoreByArtistView),
@@ -112,6 +121,7 @@ export const musicVideoViews: r.tSchema<t.tMusicVideoViews> = r.object<t.tMusicV
   [],
 );
 
+/** Validates a `tMusicVideoViewsMusicVideoMoreByArtistView`: a relationship view from this music video to more music videos of various types by the artist. */
 export const musicVideoViewsMusicVideoMoreByArtistView: r.tSchema<t.tMusicVideoViewsMusicVideoMoreByArtistView> = r.object<t.tMusicVideoViewsMusicVideoMoreByArtistView>(
   {
     href: r.string,
@@ -122,6 +132,7 @@ export const musicVideoViewsMusicVideoMoreByArtistView: r.tSchema<t.tMusicVideoV
   ["attributes", "data"],
 );
 
+/** Validates a `tMusicVideoViewsMusicVideoMoreByArtistViewAttributes`: More content of some other type by the artist. */
 export const musicVideoViewsMusicVideoMoreByArtistViewAttributes: r.tSchema<t.tMusicVideoViewsMusicVideoMoreByArtistViewAttributes> = r.object<t.tMusicVideoViewsMusicVideoMoreByArtistViewAttributes>(
   {
     title: r.string,
@@ -129,6 +140,7 @@ export const musicVideoViewsMusicVideoMoreByArtistViewAttributes: r.tSchema<t.tM
   ["title"],
 );
 
+/** Validates a `tMusicVideoViewsMusicVideoMoreInGenreView`: a relationship view from this music video to more music videos in a specific music video genre. */
 export const musicVideoViewsMusicVideoMoreInGenreView: r.tSchema<t.tMusicVideoViewsMusicVideoMoreInGenreView> = r.object<t.tMusicVideoViewsMusicVideoMoreInGenreView>(
   {
     href: r.string,
@@ -139,6 +151,7 @@ export const musicVideoViewsMusicVideoMoreInGenreView: r.tSchema<t.tMusicVideoVi
   ["attributes", "data"],
 );
 
+/** Validates a `tMusicVideoViewsMusicVideoMoreInGenreViewAttributes`: More music videos in a specific music video genre. */
 export const musicVideoViewsMusicVideoMoreInGenreViewAttributes: r.tSchema<t.tMusicVideoViewsMusicVideoMoreInGenreViewAttributes> = r.object<t.tMusicVideoViewsMusicVideoMoreInGenreViewAttributes>(
   {
     title: r.string,
@@ -146,6 +159,7 @@ export const musicVideoViewsMusicVideoMoreInGenreViewAttributes: r.tSchema<t.tMu
   ["title"],
 );
 
+/** Validates a `tMusicVideosResponse`: the response to a music videos request. */
 export const musicVideosResponse: r.tSchema<t.tMusicVideosResponse> = r.object<t.tMusicVideosResponse>(
   {
     data: r.array(r.lazy(() => musicVideo)),

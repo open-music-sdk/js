@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { resource } from "./resource";
 
+/** Validates a `tRelationshipViewResponse`: the response for a direct resource view fetch. */
 export const relationshipViewResponse: r.tSchema<t.tRelationshipViewResponse> = r.object<t.tRelationshipViewResponse>(
   {
     attributes: r.lazy(() => relationshipViewResponseAttributes),
@@ -14,6 +15,8 @@ export const relationshipViewResponse: r.tSchema<t.tRelationshipViewResponse> = 
   ["data"],
 );
 
+/** Validates a `tRelationshipViewResponseAttributes`: the attribute metadata for the view. */
 export const relationshipViewResponseAttributes: r.tSchema<t.tRelationshipViewResponseAttributes> = r.schema<t.tRelationshipViewResponseAttributes>(r.record);
 
+/** Validates a `tRelationshipViewResponseMeta`: Contextual data about the view. */
 export const relationshipViewResponseMeta: r.tSchema<t.tRelationshipViewResponseMeta> = r.schema<t.tRelationshipViewResponseMeta>(r.record);

@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { error } from "./error";
 import { resource } from "./resource";
 
+/** Validates a `tArtwork`: an object that represents artwork. */
 export const artwork: r.tSchema<t.tArtwork> = r.object<t.tArtwork>(
   {
     bgColor: r.string,
@@ -19,6 +20,7 @@ export const artwork: r.tSchema<t.tArtwork> = r.object<t.tArtwork>(
   ["height", "width", "url"],
 );
 
+/** Validates a `tDescriptionAttribute`: an object that represents a description attribute. */
 export const descriptionAttribute: r.tSchema<t.tDescriptionAttribute> = r.object<t.tDescriptionAttribute>(
   {
     short: r.string,
@@ -27,6 +29,7 @@ export const descriptionAttribute: r.tSchema<t.tDescriptionAttribute> = r.object
   ["standard"],
 );
 
+/** Validates a `tEditorialNotes`: an object that represents a notes attribute. */
 export const editorialNotes: r.tSchema<t.tEditorialNotes> = r.object<t.tEditorialNotes>(
   {
     short: r.string,
@@ -37,8 +40,10 @@ export const editorialNotes: r.tSchema<t.tEditorialNotes> = r.object<t.tEditoria
   [],
 );
 
+/** Validates a `tEmptyBodyResponse`: a response object that contains no content. */
 export const emptyBodyResponse: r.tSchema<t.tEmptyBodyResponse> = r.schema<t.tEmptyBodyResponse>(r.record);
 
+/** Validates a `tErrorsResponse`: a response object indicating that an error occurred while processing the request. */
 export const errorsResponse: r.tSchema<t.tErrorsResponse> = r.object<t.tErrorsResponse>(
   {
     errors: r.array(r.lazy(() => error)),
@@ -46,6 +51,7 @@ export const errorsResponse: r.tSchema<t.tErrorsResponse> = r.object<t.tErrorsRe
   ["errors"],
 );
 
+/** Validates a `tForbiddenResponse`: a response object indicating that the request wasn’t accepted due to an issue with the authentication. */
 export const forbiddenResponse: r.tSchema<t.tForbiddenResponse> = r.object<t.tForbiddenResponse>(
   {
     errors: r.array(r.lazy(() => error)),
@@ -53,6 +59,7 @@ export const forbiddenResponse: r.tSchema<t.tForbiddenResponse> = r.object<t.tFo
   ["errors"],
 );
 
+/** Validates a `tPaginatedResourceCollectionResponse`: a response object composed of paginated resource objects for the request. */
 export const paginatedResourceCollectionResponse: r.tSchema<t.tPaginatedResourceCollectionResponse> = r.object<t.tPaginatedResourceCollectionResponse>(
   {
     next: r.string,
@@ -61,6 +68,7 @@ export const paginatedResourceCollectionResponse: r.tSchema<t.tPaginatedResource
   ["data"],
 );
 
+/** Validates a `tPlayParameters`: an object that represents play parameters for resources. */
 export const playParameters: r.tSchema<t.tPlayParameters> = r.object<t.tPlayParameters>(
   {
     id: r.string,
@@ -69,6 +77,7 @@ export const playParameters: r.tSchema<t.tPlayParameters> = r.object<t.tPlayPara
   ["id", "kind"],
 );
 
+/** Validates a `tPreview`: an object that represents a preview for resources. */
 export const preview: r.tSchema<t.tPreview> = r.object<t.tPreview>(
   {
     artwork: r.lazy(() => artwork),
@@ -78,6 +87,7 @@ export const preview: r.tSchema<t.tPreview> = r.object<t.tPreview>(
   ["url"],
 );
 
+/** Validates a `tResourceCollectionResponse`: a response object composed of resource objects for the request. */
 export const resourceCollectionResponse: r.tSchema<t.tResourceCollectionResponse> = r.object<t.tResourceCollectionResponse>(
   {
     data: r.array(r.lazy(() => resource)),
@@ -85,4 +95,5 @@ export const resourceCollectionResponse: r.tSchema<t.tResourceCollectionResponse
   ["data"],
 );
 
+/** Validates a `tUnauthorizedResponse`: a response object indicating that the request’s authorization is missing or invalid. */
 export const unauthorizedResponse: r.tSchema<t.tUnauthorizedResponse> = r.schema<t.tUnauthorizedResponse>(r.record);

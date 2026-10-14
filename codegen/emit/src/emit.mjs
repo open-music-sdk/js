@@ -44,6 +44,16 @@ const typeName = (name) => "t" + displayName(name).replace(/[^A-Za-z0-9]/g, "");
 const valueName = (name) => typeName(name).slice(1).replace(/^[A-Z]/, (c) => c.toLowerCase());
 const key = (name) => (/^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name));
 const doc = (text, indent = "") => (text ? `${indent}/** ${text.replaceAll("*/", "* /")} */\n` : "");
+// What Apple's reference lists without describing, by "Dictionary" or "Dictionary.property", so that nothing
+// generated goes undocumented. Apple's own text wins the moment a crawl brings one.
+const DOCS = {
+  MusicSummariesResponse: "The response to a music summaries request.",
+  "Albums.Attributes.inFavorites": "Whether the album is among the listener's favorites.",
+  "Playlists.Attributes.inFavorites": "Whether the playlist is among the listener's favorites.",
+};
+const docOf = (name, text) => text || DOCS[name] || "Listed in Apple's reference without a description.";
+/** Apple's description made the second half of a sentence: its leading article in small letters. */
+const lead = (text) => (/^(A|An|The|This) /.test(text) ? text[0].toLowerCase() + text.slice(1) : text);
 // Apple writes every allowed value as a string, even for integer properties (Ratings.Attributes.value
 // lists "-1" and "1"); the wire value is a number, so coerce when the scalar is numeric.
 const literals = (values, scalar) =>
@@ -123,13 +133,13 @@ function typesFile(dicts, file) {
   for (const [f, names] of imports(dicts, file)) out += `import type { ${names.map(typeName).join(", ")} } from "./${f}";\n`;
   if (out !== HEADER) out += "\n";
   for (const d of dicts) {
-    out += doc(d.doc);
+    out += doc(docOf(d.name, d.doc));
     if (d.properties.length === 0) {
       out += `export type ${typeName(d.name)} = Record<string, unknown>;\n\n`;
       continue;
     }
     out += `export interface ${typeName(d.name)} {\n`;
-    for (const p of d.properties) out += doc(p.doc, "  ") + `  ${key(p.name)}${p.required ? "" : "?"}: ${ts(p.type, p.allowed)};\n`;
+    for (const p of d.properties) out += doc(docOf(`${d.name}.${p.name}`, p.doc), "  ") + `  ${key(p.name)}${p.required ? "" : "?"}: ${ts(p.type, p.allowed)};\n`;
     out += "}\n\n";
   }
   return out.trimEnd() + "\n";
@@ -141,7 +151,7 @@ function typesUnion() {
     out += `import type { ${names.map(typeName).join(", ")} } from "./${f}";\n`;
   out += "\n/** Every resource object, discriminated by `type`. */\nexport type tAnyResource =\n";
   out += resources.map((d) => `  | ${typeName(d.name)}`).join("\n") + ";\n\n";
-  out += 'export type tResourceType = tAnyResource["type"];\n';
+  out += '/** The `type` a resource object carries: what tells one kind of `tAnyResource` from another. */\nexport type tResourceType = tAnyResource["type"];\n';
   return out;
 }
 
@@ -172,6 +182,7 @@ function validateFile(dicts, file) {
   out += "\n";
   for (const d of dicts) {
     const tn = `t.${typeName(d.name)}`;
+    out += doc(`Validates a \`${typeName(d.name)}\`: ${lead(docOf(d.name, d.doc))}`);
     if (d.properties.length === 0) {
       out += `export const ${valueName(d.name)}: r.tSchema<${tn}> = r.schema<${tn}>(r.record);\n\n`;
       continue;
@@ -188,7 +199,7 @@ function validateUnion() {
   let out = HEADER + VALIDATE_PRELUDE;
   for (const [f, names] of imports([{ properties: resources.map((d) => ({ type: { kind: "ref", name: d.name } })) }], UNION_FILE))
     out += `import { ${names.map(valueName).join(", ")} } from "./${f}";\n`;
-  out += `\n/** Any resource object. */\nexport const anyResource: r.tSchema<t.tAnyResource> = r.schema<t.tAnyResource>(\n`;
+  out += `\n/** Validates a \`tAnyResource\`: any resource object, told apart by its \`type\`. */\nexport const anyResource: r.tSchema<t.tAnyResource> = r.schema<t.tAnyResource>(\n`;
   out += `  r.union(${resources.map((d) => `r.lazy(() => ${valueName(d.name)})`).join(", ")}),\n);\n`;
   return out;
 }
@@ -200,7 +211,7 @@ const barrel = (extra = "") => HEADER + fileNames.map((f) => `export * from "./g
 
 for (const [pkg, perFile, union, extra] of [
   ["types", typesFile, typesUnion, ""],
-  ["validate", validateFile, validateUnion, 'export type { tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime";\n'],
+  ["validate", validateFile, validateUnion, 'export type { tCheck, tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime";\n'],
 ]) {
   const src = path.join(root, "packages", pkg, "src");
   const dir = path.join(src, "generated");

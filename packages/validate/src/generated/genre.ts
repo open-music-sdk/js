@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tGenre`: a resource object that represents a music genre. */
 export const genre: r.tSchema<t.tGenre> = r.object<t.tGenre>(
   {
     id: r.string,
@@ -13,6 +14,7 @@ export const genre: r.tSchema<t.tGenre> = r.object<t.tGenre>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tGenreAttributes`: the attributes for a genre resource. */
 export const genreAttributes: r.tSchema<t.tGenreAttributes> = r.object<t.tGenreAttributes>(
   {
     name: r.string,
@@ -23,6 +25,7 @@ export const genreAttributes: r.tSchema<t.tGenreAttributes> = r.object<t.tGenreA
   ["name"],
 );
 
+/** Validates a `tGenresResponse`: the response to a genres request. */
 export const genresResponse: r.tSchema<t.tGenresResponse> = r.object<t.tGenresResponse>(
   {
     data: r.array(r.lazy(() => genre)),

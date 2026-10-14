@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tLibraryPlaylistTracksRequest`: a request to add tracks to a library playlist. */
 export const libraryPlaylistTracksRequest: r.tSchema<t.tLibraryPlaylistTracksRequest> = r.object<t.tLibraryPlaylistTracksRequest>(
   {
     data: r.array(r.lazy(() => libraryPlaylistTracksRequestData)),
@@ -10,6 +11,7 @@ export const libraryPlaylistTracksRequest: r.tSchema<t.tLibraryPlaylistTracksReq
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistTracksRequestData`: an object that represents a single track when added to a library playlist in a request. */
 export const libraryPlaylistTracksRequestData: r.tSchema<t.tLibraryPlaylistTracksRequestData> = r.object<t.tLibraryPlaylistTracksRequestData>(
   {
     id: r.string,
