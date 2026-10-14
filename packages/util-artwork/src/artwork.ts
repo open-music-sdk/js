@@ -14,7 +14,7 @@ export interface tArtworkSource {
  * The formats Apple's image server converts to. It answers 400 to `avif`, `bmp` and others, and to `gif` and
  * `tiff` it sends a JPEG under that name, so those are not here.
  */
-export const FORMATS = ["jpg", "jpeg", "png", "webp", "heic", "heif"] as const;
+export const FORMATS = Object.freeze(["jpg", "jpeg", "png", "webp", "heic", "heif"] as const);
 
 /** A file format the image server converts artwork to. */
 export type tArtworkFormat = (typeof FORMATS)[number];
@@ -277,9 +277,9 @@ export function normalise(url: string): string {
  * @param width - How wide the image is shown, in CSS pixels.
  * @param options - The height, the format, the crop, and where the URL may point.
  * @returns The URL of the image, ready for `src`.
- * @throws TypeError if `artwork` is not an object with a `url`, `width` or `height` is not a number above 0,
- *   `format` or `crop` is not one the image server takes, `hosts` is not a list of host names, or, with `hosts`,
- *   the URL is not `https` on one of them.
+ * @throws TypeError if `artwork` is not an object with a `url`, `options` is not an object, `width` or `height` is
+ *   not a number above 0 and at most 2^53 - 1 (so `Infinity` is refused), `format` or `crop` is not one the image
+ *   server takes, `hosts` is not a list of host names, or, with `hosts`, the URL is not `https` on one of them.
  */
 export function artworkUrl(artwork: tArtworkSource, width: number, options: tArtworkOptions = {}): string {
   return image(read(artwork, width, options), 1).url;
@@ -299,9 +299,10 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
  * @param options - The densities to offer, and what `artworkUrl` takes.
  * @returns The `srcset` value: one `url Nx` candidate per density, joined by commas; or the one URL alone, with no
  *   density, where the template has no size to fill in.
- * @throws TypeError if `artwork` is not an object with a `url`, `width`, `height` or a density is not a number
- *   above 0, `densities` is not a list of 1 to 16, `format` or `crop` is not one the image server takes, `hosts` is
- *   not a list of host names, or, with `hosts`, a URL is not `https` on one of them.
+ * @throws TypeError if `artwork` is not an object with a `url`, `options` is not an object, `width`, `height` or a
+ *   density is not a number above 0 and at most 2^53 - 1 (so `Infinity` is refused), `densities` is not a list of
+ *   1 to 16, `format` or `crop` is not one the image server takes, `hosts` is not a list of host names, or, with
+ *   `hosts`, a URL is not `https` on one of them.
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
   return srcset(read(artwork, width, options), options);

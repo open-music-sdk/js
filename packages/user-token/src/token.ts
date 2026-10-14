@@ -1,7 +1,7 @@
 // A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
 // file. What this does is ask Apple about it before anything depends on it.
 import { AppleMusicError, isAppleMusicError, optionsOf, type tAppleMusicClient } from "@open-music-sdk/core";
-import { clientOf, tokenOf } from "./check";
+import { clientOf, signalOf, tokenOf } from "./check";
 
 /** Invalid values throw a TypeError. No error quotes a token. */
 export interface tValidateOptions {
@@ -24,16 +24,18 @@ export interface tValidateOptions {
  * @param token - The Music User Token to ask about.
  * @param options - A `signal` to abort with.
  * @returns The listener's storefront id, such as `us`.
- * @throws TypeError if `client` is not a client, `token` is not a token, or `options` is not a plain object, before Apple is asked.
+ * @throws TypeError if `client` is not a client, `token` is not a token, `options` is not a plain object, or
+ *   `options.signal` is no AbortSignal, before Apple is asked.
  * @throws AppleMusicError `UserTokenInvalid` when Apple will not take the token; otherwise what asking failed with:
  *   `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `RateLimited`, `NetworkError`, or `ApiError`, which a 2xx
  *   that names no storefront is too. `_tag` says which.
+ * @throws Whatever a token provider, hook or rate limiter throws, as `client.request` passes it on.
  * @throws The reason `options.signal` aborted with, when it does.
  */
 export async function validateUserToken(client: tAppleMusicClient, token: string, options: tValidateOptions = {}): Promise<string> {
   const music = clientOf("validateUserToken", client);
   const value = tokenOf("validateUserToken", token);
-  const { signal } = optionsOf("validateUserToken", options, "an options object");
+  const signal = signalOf("validateUserToken", optionsOf("validateUserToken", options, "an options object").signal);
   let body: unknown;
   try {
     // Not client.storefront(): that answers from configuration, without asking Apple, when a storefront is set.

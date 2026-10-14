@@ -407,6 +407,19 @@ describe("validateUserToken: what it is handed is checked before Apple is asked"
     await expect(validateUserToken(music, "user-token", options)).resolves.toBe("us");
   });
 
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["a string", "abort"],
+    ["an object that only looks like one", { aborted: false }],
+    ["a controller, where its signal belongs", new AbortController()],
+  ])("a signal that is %s is a TypeError that names validateUserToken, and Apple is not asked", async (_name, signal) => {
+    const { music, calls } = fakeClient();
+    const error: unknown = await validateUserToken(music, "user-token", { signal: signal as AbortSignal }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toMatch(/^validateUserToken: signal must be an AbortSignal; got /);
+    expect(calls).toHaveLength(0);
+  });
+
   test("the client is checked before the token: with both wrong, the error is about the client", async () => {
     const error: unknown = await validateUserToken(undefined as unknown as tAppleMusicClient, "not a token").catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/^validateUserToken: client /);

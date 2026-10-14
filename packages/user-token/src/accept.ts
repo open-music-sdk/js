@@ -1,6 +1,6 @@
 // acceptUserToken: taking a token in for one of your users, without an HTTP request in sight.
 import { optionsOf, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/core";
-import { clientOf, storeOf, tokenOf, userIdOf } from "./check";
+import { clientOf, signalOf, storeOf, tokenOf, userIdOf } from "./check";
 import { validateUserToken, type tValidateOptions } from "./token";
 
 /**
@@ -19,9 +19,11 @@ import { validateUserToken, type tValidateOptions } from "./token";
  * @param options - A `signal` to abort with.
  * @returns The listener's storefront id, such as `us`.
  * @throws TypeError if `client` is not a client, `store` lacks `get`, `set` or `delete`, `userId` is not a string
- *   with something in it, `token` is not a token, or `options` is not a plain object, before Apple is asked.
+ *   with something in it, `token` is not a token, `options` is not a plain object, or `options.signal` is no
+ *   AbortSignal, before Apple is asked.
  * @throws AppleMusicError as `validateUserToken` throws it: `UserTokenInvalid` when Apple will not take the token,
  *   otherwise what asking failed with.
+ * @throws Whatever a token provider, hook or rate limiter throws, as `client.request` passes it on.
  * @throws Whatever `store.set` rejects with, once Apple has accepted the token.
  * @throws The reason `options.signal` aborted with, when it does.
  */
@@ -33,7 +35,8 @@ export async function acceptUserToken(client: tAppleMusicClient, store: tUserTok
   const id = userIdOf("acceptUserToken", userId);
   // The token is stored as it was validated and will be sent: with the whitespace around it dropped.
   const value = tokenOf("acceptUserToken", token);
-  const storefront = await validateUserToken(music, value, optionsOf("acceptUserToken", options, "an options object"));
+  const signal = signalOf("acceptUserToken", optionsOf("acceptUserToken", options, "an options object").signal);
+  const storefront = await validateUserToken(music, value, { signal });
   await kept.set(id, value);
   return storefront;
 }

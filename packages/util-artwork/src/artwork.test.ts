@@ -1,6 +1,6 @@
 import type { tArtwork } from "@open-music-sdk/types";
 import { describe, expect, test, vi } from "vitest";
-import { artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork";
+import { FORMATS, artworkImage, artworkSrcSet, artworkUrl, fit, normalise, type tArtworkOptions, type tArtworkSource, type tArtworkSrcSetOptions } from "./artwork";
 
 const TEMPLATE = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/ef/cover.jpg/{w}x{h}bb.jpg";
 /** A square cover as the API gives it, `side` pixels at its largest. */
@@ -416,6 +416,14 @@ describe("artworkUrl: format and crop say how the image is encoded and cut, wher
     ["a list holding a known one", ["jpg"]],
   ])("a format that is %s, %j, is a TypeError that lists the formats", (_name, format) => {
     expect(() => artworkUrl(cover(), 300, { format: format as "jpg" })).toThrow(/^artwork: format must be one of jpg, jpeg, png, webp, heic, heif$/);
+  });
+
+  test("the exported list of formats cannot be changed, so nothing an app does to it widens what format accepts", () => {
+    expect(Object.isFrozen(FORMATS)).toBe(true);
+    expect(() => (FORMATS as unknown as string[]).push("gif")).toThrow(TypeError);
+    expect(() => ((FORMATS as unknown as string[])[0] = "gif")).toThrow(TypeError);
+    expect(FORMATS).toEqual(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+    expect(() => artworkUrl(cover(), 300, { format: "gif" as "jpg" })).toThrow(/^artwork: format must be one of jpg, jpeg, png, webp, heic, heif$/);
   });
 
   test.each(["bb", "cc", "sr", "w", "h", "bf", "FA01", "bb-60", "cc-60", "SC.DN01", "SH.FPTSW02", "SC.FPESS04"])("%s is accepted as a crop code, as Apple's own are", (crop) => {
@@ -1198,6 +1206,8 @@ describe("artworkImage: everything an <img> needs, worked out together", () => {
   test.each<[string, unknown, number, unknown, RegExp]>([
     ["no artwork", undefined, 300, {}, /^artwork: expected an artwork object with a url/],
     ["a width of zero", cover(), 0, {}, /^artwork: width must be/],
+    ["a width without end", cover(), Infinity, {}, /^artwork: width must be a number above 0 and at most 9007199254740991, got Infinity$/],
+    ["a height past the largest whole number", cover(), 300, { height: 2 ** 53 }, /^artwork: height must be a number above 0 and at most 9007199254740991, got 9007199254740992$/],
     ["a bad height", cover(), 300, { height: -1 }, /^artwork: height must be/],
     ["a bad format", cover(), 300, { format: "avif" }, /^artwork: format must be/],
     ["a bad crop", cover(), 300, { crop: "a/b" }, /^artwork: crop must be/],

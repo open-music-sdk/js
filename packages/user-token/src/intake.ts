@@ -26,6 +26,9 @@ export interface tIntakeOptions {
  *   status that says what was wrong with the request, or that Apple refused or could not be asked.
  * @throws Whatever `userId` or the store rejects with, and a `TypeError` when `userId` resolves to something that is
  *   no string. These are the app's own failures, and yours to answer.
+ * @throws Whatever a token provider, hook or rate limiter throws, as `client.request` passes it on, and whatever the
+ *   runtime rejects with when the body cannot be read.
+ * @throws The reason `req.signal` aborted with, when it does.
  */
 export type tUserTokenIntake = (req: Request) => Promise<Response>;
 
@@ -47,8 +50,9 @@ export const isJson = (contentType: string | null): boolean => /^application\/js
  * @param client - The client to ask Apple with.
  * @param options - Where an accepted token goes, and whose each request is.
  * @returns The handler. It answers a status for everything about the request and for Apple's verdict, and rejects
- *   only with what `userId` or the store rejects with, and with a `TypeError` when `userId` resolves to something
- *   that is no string.
+ *   with what `userId` or the store rejects with, with a `TypeError` when `userId` resolves to something that is no
+ *   string, with whatever a token provider, hook or rate limiter throws, as `client.request` passes it on, with
+ *   whatever the runtime rejects with when the body cannot be read, and with the reason `req.signal` aborted with.
  * @throws TypeError if `client` is not a client, `options` is not an object, `store` lacks `get`, `set` or
  *   `delete`, or `userId` is not a function; when the handler is created, not on a request.
  */
