@@ -1,6 +1,12 @@
-# open-music-sdk
+<div align="center">
+
+<img src="./assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK for JavaScript
 
 [![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
 
 > Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
