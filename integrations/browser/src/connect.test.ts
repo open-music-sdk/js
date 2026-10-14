@@ -361,6 +361,21 @@ describe("createConnect: the developer token is kept fresh off the click path", 
     expect(plain).toHaveBeenCalledTimes(2);
   });
 
+  test.each<[string, string]>([
+    ["a payload that is no JSON", `${Buffer.from('{"alg":"ES256"}').toString("base64url")}.${Buffer.from("not json").toString("base64url")}.c2ln`],
+    ["a payload with no exp in it", `${Buffer.from('{"alg":"ES256"}').toString("base64url")}.${Buffer.from('{"iss":"DEF123GHIJ"}').toString("base64url")}.c2ln`],
+    ["an exp that is no number", `${Buffer.from('{"alg":"ES256"}').toString("base64url")}.${Buffer.from('{"exp":"soon"}').toString("base64url")}.c2ln`],
+  ])("a token with %s says nothing of its end, and is asked about every ten minutes", async (_name, token) => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const developerToken = provider(token);
+    await createConnect({ developerToken }, { app: APP, musicKit: kit() }).ready;
+    await vi.advanceTimersByTimeAsync(599_000);
+    expect(developerToken).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(developerToken).toHaveBeenCalledTimes(2);
+  });
+
   test("when the tab comes back the provider is asked at once; a tab going hidden asks nothing", async () => {
     const doc = page();
     vi.stubGlobal("document", doc);

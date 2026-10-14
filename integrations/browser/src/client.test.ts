@@ -167,6 +167,27 @@ describe("createBrowserClient", () => {
     }
   });
 
+  test("a URL object with no page to resolve against is taken as it is when the client is made, and a change to it afterwards moves nothing", async () => {
+    const { options, endpointCalls } = world();
+    const url = new URL("https://app.example/api/music/token");
+    const music = createBrowserClient({ ...options, tokenUrl: url });
+    url.pathname = "/evil";
+    await music.catalog.getSong("1");
+    expect(endpointCalls.map((c) => c.url)).toEqual(["https://app.example/api/music/token"]);
+  });
+
+  test("a tokenUrl the page cannot read as a URL is left for the fetcher to refuse, and nothing is fetched", async () => {
+    vi.stubGlobal("document", { baseURI: "https://app.example/" });
+    try {
+      const { options, endpointCalls, appleCalls } = world();
+      const music = createBrowserClient({ ...options, tokenUrl: "http://" });
+      await expect(music.catalog.getSong("1")).rejects.toThrow(/^developerTokenFetcher: /);
+      expect([endpointCalls, appleCalls]).toEqual([[], []]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("the options are read once: a change to the object afterwards reaches nothing", async () => {
     const { options, sent } = world();
     const mine = { ...options };
