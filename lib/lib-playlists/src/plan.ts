@@ -20,19 +20,27 @@ export interface tPlaylistSnapshotTrack {
   readonly catalogId?: string;
   /** The recording's ISRC, from the catalog. */
   readonly isrc?: string;
+  /** The track's title. */
   readonly name?: string;
+  /** Who performs it. */
   readonly artistName?: string;
+  /** The album it is on. */
   readonly albumName?: string;
+  /** How long it is, in milliseconds. */
   readonly durationInMillis?: number;
 }
 
 /** A playlist of the listener's library as `read` gives it: what it is called and every track it holds, in order. */
 export interface tPlaylistSnapshot {
+  /** The playlist's id in the listener's library: what `read` was asked for. */
   readonly id: string;
+  /** What the playlist is called, where Apple gave it. */
   readonly name?: string;
+  /** The playlist's description as written, where it has one. */
   readonly description?: string;
   /** Whether the listener may add to it. */
   readonly canEdit?: boolean;
+  /** Every track it holds, in order. */
   readonly tracks: readonly tPlaylistSnapshotTrack[];
 }
 
@@ -42,14 +50,21 @@ export interface tPlaylistSnapshot {
  * place for a mark of your own: Apple keeps nothing else of yours with a playlist.
  */
 export interface tNewPlaylist {
+  /** What the playlist is to be called. A playlist of the listener's is the one meant only when its name is exactly this. */
   readonly name: string;
+  /** Its description. A playlist is the one meant only when its description is exactly this, or has none where this is not given. */
   readonly description?: string | undefined;
 }
 
 /** What `plan` gives: the tracks a playlist is to hold, and what that takes. Plain, and frozen all the way down: it holds nothing of the caller's that could change under it. */
 export interface tPlaylistPlan {
   /** The playlist the plan is for: by its id, or by the name and description of one to find or make. */
-  readonly playlist: { readonly id: string } | tNewPlaylist;
+  readonly playlist:
+    | {
+        /** The id in the listener's library of a playlist that is there. */
+        readonly id: string;
+      }
+    | tNewPlaylist;
   /** The tracks the playlist is to hold, each as `{ id, type }`, in order. */
   readonly tracks: readonly tPlaylistTrack[];
   /** The ones it does not hold yet, in order: what `apply` adds to its end. */

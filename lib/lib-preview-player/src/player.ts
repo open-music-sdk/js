@@ -11,25 +11,61 @@ import { got, has, hostsOf, isOnHost, isPlain, itemsOf, optionsOf, ownOf } from 
  * library song has none, and is skipped like any other track without a clip.
  */
 export interface tPreviewable {
+  /** What the resource says of itself. Its `previews` list is read, and the `url` of the first preview in it. A track without one is skipped. */
   readonly attributes?: object | undefined;
 }
 
-/** The part of an audio element the player uses. An `HTMLAudioElement` fits, and so does a test's own. */
+/**
+ * The part of an audio element the player uses. An `HTMLAudioElement` fits, and so does a test's own. Each member
+ * is read or called as the element's is, and means what it means there.
+ */
 export interface tPreviewAudio {
+  /** The URL of the clip the element holds. Set to a track's clip before it is played. */
   src: string;
+  /** How far into the clip the element is, in seconds. Set by `seek`. */
   currentTime: number;
+  /** How loud, from 0 to 1. Set by `setVolume`. */
   volume: number;
+  /** How long the clip is, in seconds, or `NaN` until the element knows. */
   readonly duration: number;
+  /** Whether the element is not playing. */
   readonly paused: boolean;
+  /** Whether the clip has run to its end. */
   readonly ended: boolean;
   /** What stopped the element playing the clip it holds, or `null` when nothing has: an element forgets it when it is given another clip. */
   readonly error: unknown;
+  /**
+   * Starts playing the clip under `src`, and settles as `HTMLMediaElement.play()` does: once playing has begun, or
+   * with why it will not.
+   *
+   * @throws The element's own refusal, as a rejection: a browser that will not start sound without a click behind
+   * it rejects with its `NotAllowedError`. The player hands it on to whoever called `play`, `next` or `previous`.
+   */
   play(): Promise<void>;
+  /** Stops playing, keeping the clip and the position in it. */
   pause(): void;
   /** With `removeAttribute("src")`, how a clip is taken off the element, so that it holds nothing of a queue that is gone. */
   load(): void;
+  /**
+   * Takes an attribute off the element. The player calls it for `"src"` alone, before `load()`.
+   *
+   * @param name - The attribute's name.
+   */
   removeAttribute(name: string): void;
+  /**
+   * Hears an event of the element. The player listens for `playing`, `pause`, `waiting`, `timeupdate`,
+   * `durationchange`, `volumechange`, `ended` and `error`, from when it is made until it is disposed.
+   *
+   * @param type - The event's name.
+   * @param listener - What to call when it fires.
+   */
   addEventListener(type: string, listener: () => void): void;
+  /**
+   * Stops hearing an event: `dispose` takes off every listener `addEventListener` was given.
+   *
+   * @param type - The event's name.
+   * @param listener - The function `addEventListener` was handed for it.
+   */
   removeEventListener(type: string, listener: () => void): void;
 }
 
@@ -54,6 +90,7 @@ export type tPreviewStatus = "idle" | "loading" | "playing" | "paused" | "ended"
 
 /** What a page draws a player from. Each one is frozen, and replaced by another only when something in it changed. */
 export interface tPreviewPlayerState<T extends tPreviewable = tPreviewable> {
+  /** Where the player stands: idle, loading, playing, paused, ended or in error. */
   readonly status: tPreviewStatus;
   /** The queue: the tracks `load` kept, in the order they were handed over. */
   readonly tracks: readonly T[];
@@ -71,7 +108,9 @@ export interface tPreviewPlayerState<T extends tPreviewable = tPreviewable> {
 
 /** A track `load` left out of the queue: where it was in the list handed over, and why it cannot be played. */
 export interface tSkippedPreview<T> {
+  /** Where the track was in the list handed to `load`, counted from 0. */
   readonly index: number;
+  /** The track as it was handed over. */
   readonly track: T;
   /** `"no-preview"`: the track has no clip. `"host"`: its clip is not on one of the hosts allowed. */
   readonly reason: "no-preview" | "host";
@@ -79,7 +118,9 @@ export interface tSkippedPreview<T> {
 
 /** What `load` answers with: the tracks that are now the queue, and the ones left out of it. */
 export interface tLoadedPreviews<T> {
+  /** The queue: the tracks with a clip, in the order they were handed over. The same list `state.tracks` holds. */
   readonly tracks: readonly T[];
+  /** The tracks left out, in order, each with where it was and why. */
   readonly skipped: readonly tSkippedPreview<T>[];
 }
 
@@ -92,30 +133,86 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
   /**
    * Replaces the queue with the tracks that have a clip, and answers with those and with the ones left out. What
    * was playing stops and its clip is taken off the element, no track is current afterwards, and nothing is played.
+   *
+   * @param tracks - The tracks to queue, as a client handed them over: songs or music videos of the catalog, or
+   * anything else with `attributes.previews`. One without a clip, or whose clip is not on an allowed host, is left
+   * out and is never an error.
+   * @returns The tracks that are now the queue, in the order they were handed over, and the ones left out, each
+   * with where it was and why.
+   * @throws TypeError if the player was disposed, or if `tracks` is no list.
+   * @throws What a listener threw on hearing of the change, after the queue has been replaced.
    */
   readonly load: (tracks: readonly T[]) => tLoadedPreviews<T>;
   /**
    * Plays the track at `index` from its start. With no index, it carries on with the current clip, or starts the
-   * first track when none is current or the queue ran out. It settles as the element's own `play()` does: a
-   * browser that will not start sound without a click says so here, with its own error. With nothing loaded it
-   * does nothing.
+   * first track when none is current or the queue ran out, and asks again for a clip the element could not play.
+   * It settles as the element's own `play()` does: a browser that will not start sound without a click says so
+   * here, with its own error. With nothing loaded and no index it does nothing.
+   *
+   * @param index - The place in the queue of the track to play, counted from 0, or nothing to carry on.
+   * @throws TypeError if the player was disposed, or if `index` is not the place of a track in the queue.
+   * @throws The element's own refusal to play, as it rejected with it. The state is then `paused`, or `error` where
+   * the element said why with an event.
+   * @throws What a listener threw on hearing that the clip is loading or playing. The element was asked all the
+   * same.
    */
   readonly play: (index?: number) => Promise<void>;
-  /** Pauses the current clip. */
+  /**
+   * Pauses the current clip. With none current it does nothing.
+   *
+   * @throws TypeError if the player was disposed.
+   */
   readonly pause: () => void;
-  /** Plays the next track of the queue from its start. At the last one it does nothing. */
+  /**
+   * Plays the next track of the queue from its start. At the last one, or with nothing loaded, it does nothing.
+   *
+   * @throws TypeError if the player was disposed.
+   * @throws The element's own refusal to play, as `play` rejects with it.
+   * @throws What a listener threw on hearing of the change, as `play` rejects with it.
+   */
   readonly next: () => Promise<void>;
-  /** Plays the track before the current one from its start. At the first one it does nothing. */
+  /**
+   * Plays the track before the current one from its start. At the first one, or with none current, it does nothing.
+   *
+   * @throws TypeError if the player was disposed.
+   * @throws The element's own refusal to play, as `play` rejects with it.
+   * @throws What a listener threw on hearing of the change, as `play` rejects with it.
+   */
   readonly previous: () => Promise<void>;
-  /** Moves to `seconds` into the current clip. The element holds it to the clip's length. */
+  /**
+   * Moves to `seconds` into the current clip. The element holds it to the clip's length. With no track current it
+   * does nothing.
+   *
+   * @param seconds - How far into the clip to move, from 0.
+   * @throws TypeError if the player was disposed, or if `seconds` is not a number from 0.
+   * @throws What a listener threw on hearing of the change, after the move.
+   */
   readonly seek: (seconds: number) => void;
-  /** Sets the element's volume, from 0 to 1. */
+  /**
+   * Sets the element's volume.
+   *
+   * @param volume - How loud, from 0 to 1.
+   * @throws TypeError if the player was disposed, or if `volume` is not a number from 0 to 1.
+   * @throws What a listener threw on hearing of the change, after the volume was set.
+   */
   readonly setVolume: (volume: number) => void;
   /** Where the player stands now. The same object for as long as nothing changes. */
   readonly state: tPreviewPlayerState<T>;
-  /** Calls `listener` after each change of `state`, and gives the function that stops it. */
+  /**
+   * Calls `listener` after each change of `state`, and gives the function that stops it. A listener subscribed
+   * twice is called twice, and each of its two is stopped alone. Every listener is called, whatever another throws.
+   *
+   * @param listener - What to call after each change. It takes nothing: the state is read from `state`.
+   * @returns The function that stops the calls. It can be called more than once, and throws nothing.
+   * @throws TypeError if the player was disposed, or if `listener` is no function.
+   */
   readonly subscribe: (listener: () => void) => () => void;
-  /** Pauses, takes its clip off the element and lets go of it, forgets the queue and whoever listens. Afterwards every other function refuses. */
+  /**
+   * Pauses, takes its clip off the element and lets go of it, forgets the queue and whoever listens. Afterwards
+   * every other function refuses, and calling this again does nothing.
+   *
+   * @throws What a listener threw on hearing of the last change. The listeners are let go of all the same.
+   */
   readonly dispose: () => void;
 }
 
@@ -163,6 +260,11 @@ function audioOf(given: unknown): tPreviewAudio {
  *
  * Sound starts only from `play`, `next` and `previous`, and from the end of a clip that was playing, which starts
  * the next one. So the first sound follows a call the page made, which is what a browser wants a click behind.
+ *
+ * @param options - The element to play through, and the hosts a clip may come from.
+ * @returns The player, frozen and inheriting nothing, with an empty queue and no track current.
+ * @throws TypeError if `options` is no plain object, if `hosts` is not a list of host names, if `audio` is no audio
+ * element, or if none was given where there is no `Audio` to make one with, as on a server.
  */
 export function previewPlayer<T extends tPreviewable = tPreviewable>(options?: tPreviewPlayerOptions): tPreviewPlayer<T> {
   const bag = optionsOf(NAME, options, OPTIONS);
