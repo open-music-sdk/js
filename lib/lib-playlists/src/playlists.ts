@@ -22,8 +22,9 @@ export interface tPlaylists {
    * over, with where it was in the list and the songs its search came back with. A description that finds nothing
    * is never an error.
    * @throws TypeError if a description, an option or the storefront is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if a request fails: Apple refused or answered wrongly, the network failed, or a token
-   * provider did; `_tag` says which. Nothing found before it is handed over.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+   * which. Nothing found before it is handed over.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    * @throws The reason `options.signal` aborted with, when it does.
    * @throws What `options.onProgress` threw, when it did, as it is.
    */
@@ -38,9 +39,12 @@ export interface tPlaylists {
    * them, and every track in order, each with the catalog's id and the ISRC where the library knows them.
    * @throws TypeError if `id` could not be one segment of a path, or an option is not what it should be, before
    * Apple is asked.
-   * @throws AppleMusicError if a request fails, if the answer holds no playlist or a track with no id or no type,
-   * or if Apple names another page after the `maxPages` allowed: what was read is not all there is, and none of it
-   * is handed over. `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+   * which. Also if the answer holds no playlist or a track with no id or no type, or if Apple names another page
+   * after the `maxPages` allowed: what was read is not all there is, and none of it is handed over. One failure is
+   * not an error: a 404 for the tracks before any came, borne out by a second read of the playlist with its tracks
+   * that shows none, is a playlist with no tracks, and the verb resolves with it empty.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    * @throws The reason `options.signal` aborted with, when it does.
    * @throws What `options.onProgress` threw, when it did, as it is.
    */
@@ -71,10 +75,13 @@ export interface tPlaylists {
    * @returns The playlist's id, whether this run made it, how many tracks it added, and whether what it wrote
    * showed before it resolved.
    * @throws TypeError if the plan or an option is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if a request fails and what it wrote cannot be seen to have landed, if Apple took the
-   * new playlist and neither answered with it nor lists it within what `settle` allows, if a playlist that was
-   * read holds a track with no id or no type, or if Apple names another page after the `maxPages` allowed. What
-   * was written before it stays written. `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+   * which. That is: if a read before the writes fails, or a write fails and its tracks cannot be seen to have
+   * landed; a read after them that fails only leaves `verified` false. Also if Apple took the new playlist and
+   * neither answered with it nor lists it within what `settle` allows, if a playlist that was read holds a track
+   * with no id or no type, or if Apple names another page after the `maxPages` allowed. What was written before it
+   * stays written.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    * @throws The reason `options.signal` aborted with, when it does.
    * @throws What `options.onProgress` threw, when it did, as it is.
    */

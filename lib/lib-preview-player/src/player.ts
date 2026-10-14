@@ -118,7 +118,7 @@ export interface tSkippedPreview<T> {
 
 /** What `load` answers with: the tracks that are now the queue, and the ones left out of it. */
 export interface tLoadedPreviews<T> {
-  /** The queue: the tracks with a clip, in the order they were handed over. The same list `state.tracks` holds. */
+  /** The queue: the tracks with a clip, in the order they were handed over. The same list `state.tracks` holds, unless a listener loaded another on hearing of the change. */
   readonly tracks: readonly T[];
   /** The tracks left out, in order, each with where it was and why. */
   readonly skipped: readonly tSkippedPreview<T>[];
@@ -152,7 +152,7 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
    * @param index - The place in the queue of the track to play, counted from 0, or nothing to carry on.
    * @throws TypeError if the player was disposed, or if `index` is not the place of a track in the queue.
    * @throws The element's own refusal to play, as it rejected with it. The state is then `paused`, or `error` where
-   * the element said why with an event.
+   * the element said why with an event, unless a later call has taken over, when the state is that call's.
    * @throws What a listener threw on hearing that the clip is loading or playing. The element was asked all the
    * same.
    */
