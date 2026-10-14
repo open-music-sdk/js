@@ -1,4 +1,4 @@
-import { createClient, isAppleMusicError, type tClientOptions } from "@open-music-sdk/core";
+import { createClient, isAppleMusicError, type tClientOptions, type tUnwrap } from "@open-music-sdk/core";
 import type { tLibraryAlbum, tLibraryArtist, tLibraryMusicVideo, tLibraryPlaylist, tLibrarySearchResponse, tLibrarySong, tRating, tResource } from "@open-music-sdk/types";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -244,13 +244,15 @@ describe("a function of the namespace says what the package's function says: an 
     "export const lost = renamed.getLibrarySong;",
   ].join("\n");
 
-  /** What an editor shows as the documentation of each name asked about, by the text the name ends. */
-  function documentation(ends: readonly string[]): string[] {
-    const slashed = (url: URL) => fileURLToPath(url).replace(/\\/g, "/");
-    const root = slashed(new URL("..", import.meta.url)).replace(/\/$/, "");
-    const probe = `${root}/src/hover.probe.ts`;
+  const slashed = (url: URL) => fileURLToPath(url).replace(/\\/g, "/");
+  const root = slashed(new URL("..", import.meta.url)).replace(/\/$/, "");
+  const probe = `${root}/src/hover.probe.ts`;
+  let editor: ts.LanguageService | undefined;
+  /** The compiler reading the module as an editor would, made once for the suite. */
+  function service(): ts.LanguageService {
+    if (editor) return editor;
     const config = ts.getParsedCommandLineOfConfigFile(`${root}/tsconfig.json`, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined });
-    const service = ts.createLanguageService({
+    editor = ts.createLanguageService({
       getCompilationSettings: () => config?.options ?? {},
       getScriptFileNames: () => [probe],
       getScriptVersion: () => "1",
@@ -266,19 +268,73 @@ describe("a function of the namespace says what the package's function says: an 
       directoryExists: (name) => ts.sys.directoryExists(name),
       getDirectories: (name) => ts.sys.getDirectories(name),
     });
-    expect(service.getSemanticDiagnostics(probe)).toEqual([]);
-    return ends.map((end) => ts.displayPartsToString(service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1)?.documentation));
+    expect(editor.getSemanticDiagnostics(probe)).toEqual([]);
+    return editor;
   }
 
+  /** What an editor shows of each name asked about, by the text the name ends: its documentation, and each of its tags as one line, `@param id The song's id.` */
+  function hover(ends: readonly string[]): { readonly documentation: string; readonly tags: readonly string[] }[] {
+    return ends.map((end) => {
+      const info = service().getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1);
+      return { documentation: ts.displayPartsToString(info?.documentation), tags: (info?.tags ?? []).map((tag) => `@${tag.name} ${ts.displayPartsToString(tag.text)}`.trimEnd()) };
+    });
+  }
+
+  const direct = names.map((name) => `direct_${name} = api.${name}`);
+  const ofTheNamespace = names.map((name) => `bound_${name} = bound.${name}`);
+
   test("every one of the 79 is documented, and its documentation is there on the function of the namespace", { timeout: 120_000 }, () => {
-    const direct = documentation(names.map((name) => `direct_${name} = api.${name}`));
-    const ofTheNamespace = documentation(names.map((name) => `bound_${name} = bound.${name}`));
-    expect(names.filter((_, index) => direct[index] === "")).toEqual([]);
-    expect(ofTheNamespace).toEqual(direct);
+    const shown = hover(direct).map((info) => info.documentation);
+    expect(names.filter((_, index) => shown[index] === "")).toEqual([]);
+    expect(hover(ofTheNamespace).map((info) => info.documentation)).toEqual(shown);
     expect(names).toHaveLength(79);
   });
 
+  /** What tells one tag from another in a comment: `@param id`, `@throws TypeError`, `@returns`, `@function`. */
+  const keyOf = (tag: string): string => tag.split(" ", tag.startsWith("@param ") || tag.startsWith("@throws ") ? 2 : 1).join(" ");
+
+  /**
+   * The tags the function of the namespace says in its own words, by what its bound form hands over, and what each
+   * has to say. Every other tag is the function's, word for word, less `@function` and `@param client`.
+   */
+  const own: Record<tUnwrap, Readonly<Record<string, string>>> = {
+    resource: { "@returns": "", "@throws AppleMusicError": "`ApiError`" },
+    resources: { "@returns": "" },
+    pages: { "@returns": "", "@throws TypeError": "as it is called", "@throws AppleMusicError": "as the loop asks" },
+    written: { "@returns": "" },
+    answer: { "@returns": "" },
+  };
+
+  test("a function of the namespace has the function's tags, word for word, less @function and @param client, but says in its own words what it hands over and, where unwrapping changes what is thrown and when, what it throws", { timeout: 120_000 }, () => {
+    const theirs = hover(direct);
+    const ours = hover(ofTheNamespace);
+    /** Each function with the kind its bound form hands over, and the tags shown for it and for the function of the namespace. */
+    const shown = names.map((name, index) => ({
+      name,
+      own: own[(api as unknown as Record<string, { readonly unwrap: tUnwrap }>)[name]?.unwrap ?? "answer"],
+      its: theirs[index]?.tags ?? [],
+      mine: ours[index]?.tags ?? [],
+    }));
+    /** Each tag by its key, with what the bound form says itself left as the key alone: the words there are its own. */
+    const shape = (tags: readonly string[], said: Readonly<Record<string, string>>) => tags.map((tag) => (keyOf(tag) in said ? keyOf(tag) : tag));
+    const expected = Object.fromEntries(shown.map((each) => [each.name, shape(each.its.filter((tag) => tag !== "@function" && keyOf(tag) !== "@param client"), each.own)]));
+    expect(Object.fromEntries(shown.map((each) => [each.name, shape(each.mine, each.own)]))).toEqual(expected);
+    // Each function's tags begin as the model does, and it has something to return and all three kinds of throw: a mistake, a failure, and the caller's own abort.
+    expect(shown.map((each) => each.its.slice(0, 2).map(keyOf))).toEqual(names.map(() => ["@function", "@param client"]));
+    const abort = "@throws The reason `options.signal` aborted with, when it does.";
+    expect(shown.map((each) => ["@returns", "@throws TypeError", "@throws AppleMusicError", abort].filter((key) => !each.its.some((tag) => keyOf(tag) === key || tag === key)))).toEqual(names.map(() => []));
+    // What the bound form says itself is there, says something, says the words that make it its own, and is not what the function says.
+    const said = shown.flatMap((each) =>
+      Object.entries(each.own).map(([key, words]) => {
+        const mine = each.mine.find((tag) => keyOf(tag) === key) ?? "";
+        const its = each.its.find((tag) => keyOf(tag) === key) ?? "";
+        return `${each.name} ${key}: ${mine.length > key.length && mine.includes(words) && mine !== its ? "its own" : "not its own"}`;
+      }),
+    );
+    expect(said.filter((line) => !line.endsWith(": its own"))).toEqual([]);
+  });
+
   test("the check that says so can tell: a function named again with nothing written above the name shows no documentation", { timeout: 120_000 }, () => {
-    expect(documentation(["lost = renamed.getLibrarySong"])).toEqual([""]);
+    expect(hover(["lost = renamed.getLibrarySong"])).toEqual([{ documentation: "", tags: [] }]);
   });
 });

@@ -30,6 +30,18 @@ export interface tSearchCatalogOptions extends tReadOptions<tSearchResponse>, tS
 /**
  * Searches the catalog for a term, and resolves to the results by type, each one a first page. `limit` and
  * `offset` apply to every type asked for.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param term - What to search for: 1 to 256 characters, as typed.
+ * @param options - The types to look for, which have to be given; whether to send the best matches of any type; the
+ *   storefront to ask in; and what to send beside the results.
+ * @returns What Apple answered: the results by type under `results`, each a first page with a `next` of its own, and
+ *   the best matches under `results.top` when they were asked for.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
  */
 export const searchCatalog = /*#__PURE__*/ endpoint("searchCatalog", "answer", (client, term: string, options: tSearchCatalogOptions) => {
   const text = textOf("searchCatalog", "term", term);
@@ -41,7 +53,19 @@ export const searchCatalog = /*#__PURE__*/ endpoint("searchCatalog", "answer", (
 /** The options of `getSearchHints`. */
 export type tSearchHintsOptions = tReadOptions<tSearchHintsResponse> & tStorefrontOption;
 
-/** The terms a search might be for, given the start of one: what to offer as someone types. */
+/**
+ * The terms a search might be for, given the start of one: what to offer as someone types.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param term - The start of a search: 1 to 256 characters, as typed.
+ * @param options - The storefront to ask in, and what to send beside the terms.
+ * @returns What Apple answered: the terms under `results.terms`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getSearchHints = /*#__PURE__*/ endpoint("getSearchHints", "answer", (client, term: string, options?: tSearchHintsOptions) => {
   const text = textOf("getSearchHints", "term", term);
   const bag = optionsOf("getSearchHints", options, OPTIONS);
@@ -57,7 +81,20 @@ export interface tSearchSuggestionsOptions extends tReadOptions<tSearchSuggestio
   readonly types?: readonly tCatalogSearchType[] | undefined;
 }
 
-/** Suggestions for a search, given the start of one: terms to search for, resources that match, or both. */
+/**
+ * Suggestions for a search, given the start of one: terms to search for, resources that match, or both.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param term - The start of a search: 1 to 256 characters, as typed.
+ * @param options - The kinds of suggestion to make, which have to be given; the types the top results may be; the
+ *   storefront to ask in; and what to send beside the suggestions.
+ * @returns What Apple answered: the suggestions under `results.suggestions`, each saying its `kind`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getSearchSuggestions = /*#__PURE__*/ endpoint("getSearchSuggestions", "answer", (client, term: string, options: tSearchSuggestionsOptions) => {
   const text = textOf("getSearchSuggestions", "term", term);
   const bag = optionsOf("getSearchSuggestions", options, OPTIONS);
@@ -77,7 +114,19 @@ export interface tChartsOptions extends tReadOptions<tChartResponse>, tStorefron
   readonly with?: readonly ("cityCharts" | "dailyGlobalTopCharts")[] | undefined;
 }
 
-/** The charts of a storefront, by type of resource, each one a first page. `limit` and `offset` apply to every chart. */
+/**
+ * The charts of a storefront, by type of resource, each one a first page. `limit` and `offset` apply to every chart.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param options - The types to chart, which have to be given; one chart by name; one genre by id; the city or global
+ *   charts; the storefront to ask in; and what to send beside the charts.
+ * @returns What Apple answered: the charts by type under `results`, each a first page with a `next` of its own.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getCharts = /*#__PURE__*/ endpoint("getCharts", "answer", (client, options: tChartsOptions) => {
   const bag = optionsOf("getCharts", options, OPTIONS);
   const init = { ...initOf<tChartResponse>("getCharts", bag, { types: listOf("getCharts", "types", bag.types) }, { chart: "name", genre: "name", with: "list" }), ...NO_LISTENER };
@@ -106,7 +155,20 @@ export type tCatalogIds = Readonly<Partial<Record<tCatalogType, readonly string[
 /** The options of `getCatalogResources`. */
 export type tCatalogResourcesOptions = tReadOptions<tResourceCollectionResponse> & tStorefrontOption;
 
-/** Resources of several types in one request, by their ids: `{ songs: [...], albums: [...] }`. One type at least has to be given. */
+/**
+ * Resources of several types in one request, by their ids: `{ songs: [...], albums: [...] }`. One type at least has to be given.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param ids - The ids by type, such as `{ songs: ["1"], albums: ["2"] }`: 1 to 32 types with 1 to 300 ids between
+ *   them. A type whose list is `undefined` is left out.
+ * @param options - The storefront to ask in, and what to send beside the resources.
+ * @returns What Apple answered: the resources under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getCatalogResources = /*#__PURE__*/ endpoint("getCatalogResources", "resources", (client, ids: tCatalogIds, options?: tCatalogResourcesOptions) => {
   const lists = typedIdsOf("getCatalogResources", "ids", ids);
   const bag = optionsOf("getCatalogResources", options, OPTIONS);
@@ -117,7 +179,18 @@ export const getCatalogResources = /*#__PURE__*/ endpoint("getCatalogResources",
 /** The options of `getLiveRadioStations`. */
 export type tLiveRadioStationsOptions = tReadOptions<tStationsResponse> & tStorefrontOption;
 
-/** The live radio stations of Apple Music, such as Apple Music 1. */
+/**
+ * The live radio stations of Apple Music, such as Apple Music 1.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param options - The storefront to ask in, and what to send beside the stations.
+ * @returns What Apple answered: the live stations under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLiveRadioStations = /*#__PURE__*/ endpoint("getLiveRadioStations", "resources", (client, options?: tLiveRadioStationsOptions) => {
   const bag = optionsOf("getLiveRadioStations", options, OPTIONS);
   const init = { ...initOf<tStationsResponse>("getLiveRadioStations", bag, { "filter[featured]": "apple-music-live-radio" }), ...NO_LISTENER };
@@ -130,6 +203,16 @@ export type tLanguageTagOptions = tReadOptions<tLangageTagResponse> & tStorefron
 /**
  * The language a storefront would answer in, given the ones a reader accepts, best first, such as
  * `["fr-CA", "fr", "en"]`: the tag to pass as `language` to the other functions.
+ *
+ * @function
+ * @param client - The client to ask with.
+ * @param acceptLanguage - The languages a reader accepts, best first, as tags such as `"fr-CA"`, 1 to 300 of them.
+ * @param options - The storefront to ask about, and what to send beside the tag.
+ * @returns What Apple answered: the tag under `results.tag`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
+ *   in; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
  */
 export const getLanguageTag = /*#__PURE__*/ endpoint("getLanguageTag", "answer", (client, acceptLanguage: readonly string[], options?: tLanguageTagOptions) => {
   const accepted = listOf("getLanguageTag", "acceptLanguage", acceptLanguage);

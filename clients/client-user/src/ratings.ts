@@ -51,99 +51,504 @@ const libraryPlaylists = () => "v1/me/ratings/library-playlists";
 
 // Songs
 
-/** The listener's rating of the song with an id. */
+/**
+ * The listener's rating of the song with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The song's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getSongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getSongRating", songs);
-/** The listener's ratings of the songs with the ids given. */
+/**
+ * The listener's ratings of the songs with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The songs' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getSongRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getSongRatings", songs);
-/** Sets the listener's rating of the song with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the song with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The song's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setSongRating = /*#__PURE__*/ ratingSetter("setSongRating", songs);
-/** Takes away the listener's rating of the song with an id. */
+/**
+ * Takes away the listener's rating of the song with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The song's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteSongRating = /*#__PURE__*/ ratingDeleter("deleteSongRating", songs);
 
 // Albums
 
-/** The listener's rating of the album with an id. */
+/**
+ * The listener's rating of the album with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The album's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getAlbumRating", albums);
-/** The listener's ratings of the albums with the ids given. */
+/**
+ * The listener's ratings of the albums with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The albums' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getAlbumRatings", albums);
-/** Sets the listener's rating of the album with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the album with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The album's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setAlbumRating = /*#__PURE__*/ ratingSetter("setAlbumRating", albums);
-/** Takes away the listener's rating of the album with an id. */
+/**
+ * Takes away the listener's rating of the album with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The album's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteAlbumRating = /*#__PURE__*/ ratingDeleter("deleteAlbumRating", albums);
 
 // Music videos
 
-/** The listener's rating of the music video with an id. */
+/**
+ * The listener's rating of the music video with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The music video's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getMusicVideoRating", musicVideos);
-/** The listener's ratings of the music videos with the ids given. */
+/**
+ * The listener's ratings of the music videos with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The music videos' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getMusicVideoRatings", musicVideos);
-/** Sets the listener's rating of the music video with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the music video with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The music video's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setMusicVideoRating = /*#__PURE__*/ ratingSetter("setMusicVideoRating", musicVideos);
-/** Takes away the listener's rating of the music video with an id. */
+/**
+ * Takes away the listener's rating of the music video with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The music video's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteMusicVideoRating = /*#__PURE__*/ ratingDeleter("deleteMusicVideoRating", musicVideos);
 
 // Playlists
 
-/** The listener's rating of the playlist with an id. */
+/**
+ * The listener's rating of the playlist with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The playlist's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getPlaylistRating", playlists);
-/** The listener's ratings of the playlists with the ids given. */
+/**
+ * The listener's ratings of the playlists with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The playlists' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getPlaylistRatings", playlists);
-/** Sets the listener's rating of the playlist with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the playlist with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The playlist's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setPlaylistRating = /*#__PURE__*/ ratingSetter("setPlaylistRating", playlists);
-/** Takes away the listener's rating of the playlist with an id. */
+/**
+ * Takes away the listener's rating of the playlist with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The playlist's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deletePlaylistRating = /*#__PURE__*/ ratingDeleter("deletePlaylistRating", playlists);
 
 // Stations
 
-/** The listener's rating of the station with an id. */
+/**
+ * The listener's rating of the station with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The station's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getStationRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getStationRating", stations);
-/** The listener's ratings of the stations with the ids given. */
+/**
+ * The listener's ratings of the stations with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The stations' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getStationRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getStationRatings", stations);
-/** Sets the listener's rating of the station with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the station with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The station's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setStationRating = /*#__PURE__*/ ratingSetter("setStationRating", stations);
-/** Takes away the listener's rating of the station with an id. */
+/**
+ * Takes away the listener's rating of the station with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The station's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteStationRating = /*#__PURE__*/ ratingDeleter("deleteStationRating", stations);
 
 // Library songs
 
-/** The listener's rating of the library song with an id. */
+/**
+ * The listener's rating of the library song with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library song's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibrarySongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibrarySongRating", librarySongs);
-/** The listener's ratings of the library songs with the ids given. */
+/**
+ * The listener's ratings of the library songs with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The library songs' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibrarySongRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibrarySongRatings", librarySongs);
-/** Sets the listener's rating of the library song with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the library song with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library song's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setLibrarySongRating = /*#__PURE__*/ ratingSetter("setLibrarySongRating", librarySongs);
-/** Takes away the listener's rating of the library song with an id. */
+/**
+ * Takes away the listener's rating of the library song with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library song's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteLibrarySongRating = /*#__PURE__*/ ratingDeleter("deleteLibrarySongRating", librarySongs);
 
 // Library albums
 
-/** The listener's rating of the library album with an id. */
+/**
+ * The listener's rating of the library album with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library album's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryAlbumRating", libraryAlbums);
-/** The listener's ratings of the library albums with the ids given. */
+/**
+ * The listener's ratings of the library albums with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The library albums' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryAlbumRatings", libraryAlbums);
-/** Sets the listener's rating of the library album with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the library album with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library album's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setLibraryAlbumRating = /*#__PURE__*/ ratingSetter("setLibraryAlbumRating", libraryAlbums);
-/** Takes away the listener's rating of the library album with an id. */
+/**
+ * Takes away the listener's rating of the library album with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library album's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteLibraryAlbumRating = /*#__PURE__*/ ratingDeleter("deleteLibraryAlbumRating", libraryAlbums);
 
 // Library music videos
 
-/** The listener's rating of the library music video with an id. */
+/**
+ * The listener's rating of the library music video with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library music video's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryMusicVideoRating", libraryMusicVideos);
-/** The listener's ratings of the library music videos with the ids given. */
+/**
+ * The listener's ratings of the library music videos with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The library music videos' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryMusicVideoRatings", libraryMusicVideos);
-/** Sets the listener's rating of the library music video with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the library music video with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library music video's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setLibraryMusicVideoRating = /*#__PURE__*/ ratingSetter("setLibraryMusicVideoRating", libraryMusicVideos);
-/** Takes away the listener's rating of the library music video with an id. */
+/**
+ * Takes away the listener's rating of the library music video with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library music video's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteLibraryMusicVideoRating = /*#__PURE__*/ ratingDeleter("deleteLibraryMusicVideoRating", libraryMusicVideos);
 
 // Library playlists
 
-/** The listener's rating of the library playlist with an id. */
+/**
+ * The listener's rating of the library playlist with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library playlist's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryPlaylistRating", libraryPlaylists);
-/** The listener's ratings of the library playlists with the ids given. */
+/**
+ * The listener's ratings of the library playlists with the ids given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The library playlists' ids.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the ratings under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryPlaylistRatings", libraryPlaylists);
-/** Sets the listener's rating of the library playlist with an id: 1 for a like, -1 for a dislike. */
+/**
+ * Sets the listener's rating of the library playlist with an id: 1 for a like, -1 for a dislike.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library playlist's id.
+ * @param value - The rating: 1 for a like, -1 for a dislike.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns What Apple answered: the rating as set, under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const setLibraryPlaylistRating = /*#__PURE__*/ ratingSetter("setLibraryPlaylistRating", libraryPlaylists);
-/** Takes away the listener's rating of the library playlist with an id. */
+/**
+ * Takes away the listener's rating of the library playlist with an id.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library playlist's id.
+ * @param options - The language to answer in, and what else to send with the request.
+ * @returns Nothing: it resolves once Apple has taken the rating away.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const deleteLibraryPlaylistRating = /*#__PURE__*/ ratingDeleter("deleteLibraryPlaylistRating", libraryPlaylists);

@@ -53,6 +53,15 @@ export interface tSearchLibraryOptions extends tReadOptions<tLibrarySearchRespon
 /**
  * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
  * and `offset` apply to every type asked for.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param term - What to look for, as the listener typed it.
+ * @param options - The types to look for, which have to be given; how many of each to send and where to start; and what to send beside each.
+ * @returns What Apple answered: the results by type under `results`, each a first page of its own.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
  */
 export const searchLibrary = /*#__PURE__*/ endpoint("searchLibrary", "answer", (_client, term: string, options: tSearchLibraryOptions): tRequestPlan<tLibrarySearchResponse> => {
   const text = textOf("searchLibrary", "term", term);
@@ -69,7 +78,18 @@ export type tLibraryIds = Readonly<Partial<Record<tLibraryType, readonly string[
 /** The options of `getLibraryResources`. */
 export type tLibraryResourcesOptions = tReadOptions<tResourceCollectionResponse>;
 
-/** Library resources of several types in one request, by their ids: `{ "library-songs": [...] }`. One type at least has to be given. */
+/**
+ * Library resources of several types in one request, by their ids: `{ "library-songs": [...] }`. One type at least has to be given.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The ids by type of library resource, one type at least.
+ * @param options - What to send beside the resources.
+ * @returns What Apple answered: the resources under `data`, of every type asked for.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getLibraryResources = /*#__PURE__*/ endpoint("getLibraryResources", "resources", (_client, ids: tLibraryIds, options?: tLibraryResourcesOptions): tRequestPlan<tResourceCollectionResponse> => {
   const lists = typedIdsOf("getLibraryResources", "ids", ids);
   return ["v1/me/library", initOf<tResourceCollectionResponse>("getLibraryResources", optionsOf("getLibraryResources", options, OPTIONS), lists)];
@@ -84,13 +104,35 @@ export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "pla
 /** The options of a function that adds to what the listener has. Apple answers with nothing, so there is nothing for a `schema` to check. */
 export type tAddOptions = tReadOptions<void>;
 
-/** Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. */
+/**
+ * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The ids of the catalog resources to add, by type, one type at least.
+ * @param options - What else to send with the request, such as a `signal` to abort it with.
+ * @returns Nothing: it resolves once Apple has accepted the request, which is before the resources appear in the library.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const addToLibrary = /*#__PURE__*/ endpoint("addToLibrary", "written", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
   const lists = typedIdsOf("addToLibrary", "ids", ids);
   return ["v1/me/library", { ...initOf("addToLibrary", optionsOf("addToLibrary", options, OPTIONS), lists), method: "POST" }];
 });
 
-/** Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. */
+/**
+ * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param ids - The ids of the resources to add, by type, one type at least.
+ * @param options - What else to send with the request, such as a `signal` to abort it with.
+ * @returns Nothing: it resolves once Apple has accepted the request, which is before the resources appear among the favorites.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const addToFavorites = /*#__PURE__*/ endpoint("addToFavorites", "written", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
   const lists = typedIdsOf("addToFavorites", "ids", ids);
   return ["v1/me/favorites", { ...initOf("addToFavorites", optionsOf("addToFavorites", options, OPTIONS), lists), method: "POST" }];
@@ -118,7 +160,19 @@ function tracksOf(fn: string, tracks: unknown): tPlaylistTrack[] {
   );
 }
 
-/** Adds tracks to the end of a playlist in the listener's library: `[{ id, type: "songs" }]`. It resolves to nothing. */
+/**
+ * Adds tracks to the end of a playlist in the listener's library: `[{ id, type: "songs" }]`. It resolves to nothing.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param id - The library playlist's id.
+ * @param tracks - The tracks to add: each its id and its type, and nothing else of it is sent.
+ * @param options - What else to send with the request, such as a `signal` to abort it with.
+ * @returns Nothing: it resolves once Apple has accepted the tracks.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const addLibraryPlaylistTracks = /*#__PURE__*/ endpoint(
   "addLibraryPlaylistTracks",
   "written",
@@ -133,7 +187,17 @@ export const addLibraryPlaylistTracks = /*#__PURE__*/ endpoint(
 /** The options of `getRootLibraryPlaylistFolder`. */
 export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFoldersResponse>;
 
-/** The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from. */
+/**
+ * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - What to send beside the folder.
+ * @returns What Apple answered: the root folder under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getRootLibraryPlaylistFolder = /*#__PURE__*/ endpoint(
   "getRootLibraryPlaylistFolder",
   "resource",
@@ -143,10 +207,30 @@ export const getRootLibraryPlaylistFolder = /*#__PURE__*/ endpoint(
   ],
 );
 
-/** What the listener added to their library lately, newest first, a page at a time. */
+/**
+ * What the listener added to their library lately, newest first, a page at a time.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
+ * @returns What Apple answered: the first page, what was added under `data`, newest first, and `next` when there is more.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const listRecentlyAdded = /*#__PURE__*/ resourceLister<tResourceCollectionResponse>("listRecentlyAdded", () => "v1/me/library/recently-added");
 
-/** What the listener plays most at present, a page at a time. */
+/**
+ * What the listener plays most at present, a page at a time.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
+ * @returns What Apple answered: the first page, what is played most under `data`, and `next` when there is more.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const listHeavyRotation = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse>("listHeavyRotation", () => "v1/me/history/heavy-rotation");
 
 /** The option of `listRecentlyPlayed`: which types of what was played. */
@@ -155,7 +239,17 @@ export interface tRecentlyPlayedTypesOption {
   readonly types?: readonly ("albums" | "artists" | "curators" | "library-albums" | "library-playlists" | "playlists" | "stations")[] | undefined;
 }
 
-/** What the listener played lately, newest first, a page at a time: the albums, playlists and stations, not the tracks in them. */
+/**
+ * What the listener played lately, newest first, a page at a time: the albums, playlists and stations, not the tracks in them.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - The types to keep to, and the rest: how many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
+ * @returns What Apple answered: the first page, what was played under `data`, newest first, and `next` when there is more.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const listRecentlyPlayed = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse, tNone, tRecentlyPlayedTypesOption>("listRecentlyPlayed", () => "v1/me/recent/played", { types: "list" });
 
 /** The option of `listRecentlyPlayedTracks`: which types of track. */
@@ -164,17 +258,48 @@ export interface tRecentlyPlayedTrackTypesOption {
   readonly types?: readonly ("library-music-videos" | "library-songs" | "music-videos" | "songs")[] | undefined;
 }
 
-/** The tracks the listener played lately, newest first, a page at a time. */
+/**
+ * The tracks the listener played lately, newest first, a page at a time.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - The types to keep to, and the rest: how many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
+ * @returns What Apple answered: the first page, the tracks under `data`, newest first, and `next` when there are more.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const listRecentlyPlayedTracks = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse, tNone, tRecentlyPlayedTrackTypesOption>(
   "listRecentlyPlayedTracks",
   () => "v1/me/recent/played/tracks",
   { types: "list" },
 );
 
-/** The radio stations the listener played lately, newest first, a page at a time. */
+/**
+ * The radio stations the listener played lately, newest first, a page at a time.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
+ * @returns What Apple answered: the first page, the stations under `data`, newest first, and `next` when there are more.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const listRecentlyPlayedStations = /*#__PURE__*/ resourceLister<tPaginatedResourceCollectionResponse>("listRecentlyPlayedStations", () => "v1/me/recent/radio-stations");
 
-/** The listener's replay: a summary of what they played in each of the years given. The one year Apple takes at present is `"latest"`. */
+/**
+ * The listener's replay: a summary of what they played in each of the years given. The one year Apple takes at present is `"latest"`.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param values - The years, as Apple names them: `"latest"` is the one it takes at present.
+ * @param options - The views to send with each summary, and what else to send beside it.
+ * @returns What Apple answered: a summary for each year under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getMusicSummariesByYear = /*#__PURE__*/ resourcesFinder<tMusicSummariesResponse, tNone, tViewsOption<tMusicSummaryViews>>("getMusicSummariesByYear", "year", () => "v1/me/music-summaries", { views: "list" });
 
 /** The options of `getPersonalStation`: the station is in a storefront's catalog, so they say whose, as a catalog function's do. */
@@ -183,6 +308,14 @@ export type tPersonalStationOptions = tReadOptions<tStationsResponse> & tStorefr
 /**
  * The listener's own station, which plays what Apple picks for them. It is kept in the catalog, and is the one
  * resource there that is asked for with the Music User Token.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - The storefront whose catalog the station is in, and what to send beside it.
+ * @returns What Apple answered: the station under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
  */
 export const getPersonalStation = /*#__PURE__*/ endpoint("getPersonalStation", "resource", (client, options?: tPersonalStationOptions) => {
   const bag = optionsOf("getPersonalStation", options, OPTIONS);
@@ -194,7 +327,17 @@ export const getPersonalStation = /*#__PURE__*/ endpoint("getPersonalStation", "
 /** The options of `getUserStorefront`. */
 export type tUserStorefrontOptions = tReadOptions<tStorefrontsResponse>;
 
-/** The storefront the listener's account is in: the one whose catalog they see. */
+/**
+ * The storefront the listener's account is in: the one whose catalog they see.
+ *
+ * @function
+ * @param client - The listener's client to ask with.
+ * @param options - What to send beside the storefront.
+ * @returns What Apple answered: the storefront under `data`.
+ * @throws TypeError if an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws The reason `options.signal` aborted with, when it does.
+ */
 export const getUserStorefront = /*#__PURE__*/ endpoint("getUserStorefront", "resource", (_client, options?: tUserStorefrontOptions): tRequestPlan<tStorefrontsResponse> => [
   "v1/me/storefront",
   initOf<tStorefrontsResponse>("getUserStorefront", optionsOf("getUserStorefront", options, OPTIONS)),

@@ -2,13 +2,20 @@
 // one, and hold every function to saying what each argument is and what it returns. What a function throws is not
 // checked here: a function with no @throws throws nothing, and no check can tell that from a forgotten tag, so it
 // is read for in review.
+import ts from "typescript";
 import { Application, Converter, ParameterReflection, ReflectionFlag, ReflectionKind } from "typedoc";
 
 /** @param {Application} app */
 export function load(app) {
-  // A function made by a builder takes its arguments as one rest tuple: ...args: [id: string, options?: X].
-  // TypeScript shows them one by one, and so does this, which gives @param id an argument to belong to.
   app.converter.on(Converter.EVENT_CREATE_SIGNATURE, (context, signature) => {
+    // A const with @function is shown as a function, with the signature its type declares. That signature is core's
+    // tEndpoint call signature, and TypeDoc would take the comment written there, the same for all 137, over the one
+    // written on the const. The const's own comment is the function's.
+    const declared = signature.parent.kindOf(ReflectionKind.Function) && signature.parent.comment && context.getSymbolFromReflection(signature.parent)?.declarations?.some((node) => ts.isVariableDeclaration(node));
+    if (declared) signature.comment = signature.parent.comment.clone();
+
+    // A function made by a builder takes its arguments as one rest tuple: ...args: [id: string, options?: X].
+    // TypeScript shows them one by one, and so does this, which gives @param id an argument to belong to.
     const rest = signature.parameters?.at(-1);
     if (!rest?.flags.isRest || rest.type?.type !== "tuple" || !rest.type.elements.every((member) => member.type === "namedTupleMember")) return;
     signature.parameters.pop();

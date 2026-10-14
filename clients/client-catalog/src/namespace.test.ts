@@ -228,9 +228,8 @@ describe("the types: a function of the namespace takes what the package's takes,
 });
 
 describe("a function of the namespace says what the package's function says: an editor shows the same documentation for both", () => {
-  const names = Object.entries(api)
-    .filter(([, value]) => typeof (value as { bound?: unknown }).bound === "function")
-    .map(([name]) => name);
+  const functions = Object.entries(api).filter(([, value]) => typeof (value as { bound?: unknown }).bound === "function") as [string, { readonly unwrap: string }][];
+  const names = functions.map(([name]) => name);
   /** A module as an app would write one, never saved: read by the compiler as if it were beside this file. */
   const source = [
     'import type { tAppleMusicClient } from "@open-music-sdk/core";',
@@ -243,8 +242,8 @@ describe("a function of the namespace says what the package's function says: an 
     "export const lost = renamed.getSong;",
   ].join("\n");
 
-  /** What an editor shows as the documentation of each name asked about, by the text the name ends. */
-  function documentation(ends: readonly string[]): string[] {
+  /** What an editor shows of each name asked about, by the text the name ends: its documentation, and each of its tags as `@name text`, flowed into one line as an editor flows it. */
+  function shown(ends: readonly string[]): { readonly documentation: string; readonly tags: readonly string[] }[] {
     const slashed = (url: URL) => fileURLToPath(url).replace(/\\/g, "/");
     const root = slashed(new URL("..", import.meta.url)).replace(/\/$/, "");
     const probe = `${root}/src/hover.probe.ts`;
@@ -266,8 +265,14 @@ describe("a function of the namespace says what the package's function says: an 
       getDirectories: (name) => ts.sys.getDirectories(name),
     });
     expect(service.getSemanticDiagnostics(probe)).toEqual([]);
-    return ends.map((end) => ts.displayPartsToString(service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1)?.documentation));
+    return ends.map((end) => {
+      const info = service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1);
+      return { documentation: ts.displayPartsToString(info?.documentation), tags: (info?.tags ?? []).map((tag) => `@${tag.name} ${ts.displayPartsToString(tag.text)}`.replace(/\s+/g, " ").trimEnd()) };
+    });
   }
+
+  /** The documentation alone of each name asked about. */
+  const documentation = (ends: readonly string[]): string[] => shown(ends).map((each) => each.documentation);
 
   test("every one of the 58 is documented, and its documentation is there on the function of the namespace", { timeout: 120_000 }, () => {
     const direct = documentation(names.map((name) => `direct_${name} = api.${name}`));
@@ -280,4 +285,33 @@ describe("a function of the namespace says what the package's function says: an 
   test("the check that says so can tell: a function named again with nothing written above the name shows no documentation", { timeout: 120_000 }, () => {
     expect(documentation(["lost = renamed.getSong"])).toEqual([""]);
   });
+
+  test(
+    "each argument is said the same way on both, less the client; what is handed over is said in the bound form's own words unless it is the answer as it is; and both say they throw a TypeError, an AppleMusicError and the abort's reason, once each, in that order, the last in the same words",
+    { timeout: 120_000 },
+    () => {
+      const direct = shown(names.map((name) => `direct_${name} = api.${name}`)).map((each) => each.tags);
+      const ofTheNamespace = shown(names.map((name) => `bound_${name} = bound.${name}`)).map((each) => each.tags);
+      const only = (tags: readonly string[], tag: string) => tags.filter((each) => each.startsWith(`@${tag} `));
+      /** What each `@throws` is of: the error class it names, or the abort's reason, which is said in the same words everywhere. */
+      const ABORT = "@throws The reason `options.signal` aborted with, when it does.";
+      const kinds = (tags: readonly string[]) => only(tags, "throws").map((each) => (each === ABORT ? "abort" : /^@throws (\w+)\b/.exec(each)?.[1]));
+      /** The names whose tags fail `holds`. */
+      const failing = (holds: (fn: readonly string[], bound: readonly string[], unwrap: string) => boolean) => names.filter((_, index) => !holds(direct[index] ?? [], ofTheNamespace[index] ?? [], functions[index]?.[1].unwrap ?? ""));
+
+      // The function is shown as one, and its first argument is the client.
+      expect(failing((fn) => fn[0] === "@function" && fn[1] === "@param client - The client to ask with.")).toEqual([]);
+      // Every argument after the client is said the same way on both, in the same order, and the bound form says nothing of a client.
+      expect(failing((fn, bound) => JSON.stringify(only(bound, "param")) === JSON.stringify(only(fn, "param").slice(1)))).toEqual([]);
+      // Each says once what it hands over: the same thing where the bound form hands the answer over as it is, and otherwise what is taken out of it.
+      expect(failing((fn, bound) => only(fn, "returns").length === 1 && only(bound, "returns").length === 1)).toEqual([]);
+      expect(failing((fn, bound, unwrap) => (only(fn, "returns")[0] === only(bound, "returns")[0]) === (unwrap === "answer"))).toEqual([]);
+      // Every function asks Apple and takes a signal, so every one may fail with a caller's mistake, with Apple's, or with an abort: one tag for each kind, and the bound form the same kinds.
+      expect(failing((fn) => JSON.stringify(kinds(fn)) === JSON.stringify(["TypeError", "AppleMusicError", "abort"]))).toEqual([]);
+      expect(failing((fn, bound) => JSON.stringify(kinds(bound)) === JSON.stringify(kinds(fn)))).toEqual([]);
+      // And a member of the namespace says nothing else: no `@function`, which is for the declaration, and no tag of another kind.
+      expect(failing((_, bound) => bound.every((tag) => /^@(?:param|returns|throws) /.test(tag)))).toEqual([]);
+      expect(names).toHaveLength(58);
+    },
+  );
 });
