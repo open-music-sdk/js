@@ -163,6 +163,14 @@ function paramsOf(fn: string, value: unknown): [string, tValue][] {
  * `language` sent as `l`; then `set`, which is what the function itself puts there, such as the ids it was handed.
  * `also` names any further options the function takes, such as `views`, with what each one is, a `"list"` or a
  * `"name"`. Each is checked as that, and sent under its own name.
+ *
+ * @param fn - The name of the function the options were handed to, for the errors.
+ * @param options - What the caller gave, or `undefined` for nothing.
+ * @param set - The parameters the function itself sends, such as `{ ids }`, which win over every option.
+ * @param also - The further options the function takes, by name, with what each is.
+ * @returns What `request` takes: the query as `params`, and the `schema` and `signal` as given.
+ * @throws TypeError if `options` is not a plain object, an option is not what `tReadOptions` says it is, a further
+ * option is not what `also` says it is, or `also` says a kind that is neither `"list"` nor `"name"`.
  */
 export function initOf<T>(fn: string, options: tReadOptions<T> | undefined, set: tParams = {}, also: tAlsoKinds = {}): tRequestInit<T> {
   const bag = optionsOf(fn, options, "an options object");
@@ -185,6 +193,13 @@ export function initOf<T>(fn: string, options: tReadOptions<T> | undefined, set:
 /**
  * As `initOf`, for a function that walks pages: what it gives also holds `maxPages`, the most pages the walk may
  * ask for, when the caller gave one. It is what `paginate` takes, and `request` has no use for it.
+ *
+ * @param fn - The name of the function the options were handed to, for the errors.
+ * @param options - What the caller gave, or `undefined` for nothing.
+ * @param set - The parameters the function itself sends, which win over every option.
+ * @param also - The further options the function takes, by name, with what each is.
+ * @returns What `paginate` takes: what `initOf` gives, with `maxPages` when the caller gave one.
+ * @throws TypeError if `initOf` would throw it, or `maxPages` is given and is not a whole number above 0.
  */
 export function walkOf<T>(fn: string, options: (tReadOptions<T> & tWalkOptions) | undefined, set: tParams = {}, also: tAlsoKinds = {}): tRequestInit<T> & tWalkOptions {
   const bag = optionsOf(fn, options, "an options object");

@@ -4,7 +4,13 @@ import { got } from "./got";
 /**
  * The body of a request or a response as text, or undefined once it has run past `maxBytes`. It is counted as it
  * arrives, after any decompression, and what lies beyond the limit is cancelled rather than read: whoever sends a
- * body decides how much is sent, and must not decide how much is kept.
+ * body decides how much is sent, and must not decide how much is kept. A body that cannot be read, since it was read
+ * already or the connection dropped, rejects with the runtime's own error, as it is.
+ *
+ * @param message - The request or response whose body to read.
+ * @param maxBytes - The most bytes to keep, a whole number from 0.
+ * @returns The whole body as text, or `undefined` when it ran past `maxBytes` or a Content-Length header said it would.
+ * @throws TypeError if `maxBytes` is not a whole number from 0.
  */
 export async function readBounded(message: Request | Response, maxBytes: number): Promise<string | undefined> {
   if (!Number.isInteger(maxBytes) || maxBytes < 0) throw new TypeError(`readBounded: maxBytes must be a whole number from 0, got ${got(maxBytes)}`);

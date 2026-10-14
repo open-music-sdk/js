@@ -18,7 +18,10 @@ export type {
 export { endpoint, endpointNamespace, inStorefront, relationshipGetter, resourceGetter, resourceLister, resourcesFinder, resourcesGetter } from "./endpoint";
 export type {
   tAlso,
+  tAlsoGiven,
+  tBindable,
   tCollection,
+  tCollectionGiven,
   tEndpoint,
   tEndpointNamespace,
   tEndpointOptions,
@@ -26,6 +29,7 @@ export type {
   tLater,
   tNone,
   tPaged,
+  tPlan,
   tPlanned,
   tRelated,
   tRelationshipEndpoint,
