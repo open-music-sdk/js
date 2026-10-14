@@ -24,3 +24,7 @@ the change or have the right to submit it under the MIT license.
   Classes are PascalCase, methods and properties are camelCase. ESLint enforces this.
 - No Apple marks in package names or identifiers. Say "for the Apple Music API" in descriptions and keywords instead.
 - Never commit raw pages from Apple's documentation; codegen commits only the intermediate representation.
+- Every export has a doc comment, and every function, method and namespace member says what each argument is
+  (`@param`), what it returns (`@returns`) and what it throws (`@throws`, one per kind of error). A function with no
+  `@throws` throws nothing. `pnpm --filter docs check` holds the first two; the third is read for in review. See
+  [apps/docs](./apps/docs/README.md).
