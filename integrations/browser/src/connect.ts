@@ -6,6 +6,15 @@ import { AppleMusicError, got, has, optionsOf, ownOf, parseToken, type tTokenPro
 
 /** Apple's script, as the helper uses it: the global it defines, `MusicKit`. */
 export interface tMusicKit {
+  /**
+   * Apple's own: configures the script for one app, with the developer token its requests carry. Called once per
+   * page by the first helper, and again after a configuration that failed.
+   *
+   * @param options - The developer token and the app as the sign-in window shows it.
+   * @returns The configured instance, or a promise of it, as the script's version gives it.
+   * @throws Whatever Apple's script throws or rejects with when it refuses the token or the app; the helper hands
+   * it on as it came, through `ready` and `connect()`.
+   */
   configure(options: { readonly developerToken: string; readonly app: tConnectApp }): tMusicKitInstance | Promise<tMusicKitInstance>;
 }
 
@@ -15,7 +24,13 @@ export interface tMusicKitInstance {
   readonly musicUserToken?: string | null | undefined;
   /** The developer token the instance was configured with. Whether a configured instance takes a new one is a live check; the helper sets it where it can. */
   developerToken?: string | undefined;
-  /** Opens Apple's sign-in window and resolves to the Music User Token, or to nothing when the listener declined. */
+  /**
+   * Apple's own: opens the sign-in window.
+   *
+   * @returns The Music User Token, or nothing when the listener declined.
+   * @throws Whatever Apple's script rejects with when the window cannot be opened or the sign-in fails; the helper
+   * hands it on as it came.
+   */
   authorize(): Promise<string | null | undefined>;
   /** Apple's own sign-out, where the instance has one: ends the sign-in in the script, and the copy of the token it kept. */
   unauthorize?: (() => unknown) | undefined;
@@ -23,7 +38,9 @@ export interface tMusicKitInstance {
 
 /** What Apple's sign-in window shows of the app. */
 export interface tConnectApp {
+  /** The app's name, as the window shows it: a string with something in it. */
   readonly name: string;
+  /** The app's version, where the window is to show one. */
   readonly build?: string | undefined;
 }
 
@@ -42,21 +59,26 @@ export interface tConnectOptions {
 export interface tConnect {
   /**
    * Settles once Apple's script is loaded and configured: with the token the script restored for a returning
-   * listener, or with `undefined`. Rejects with a `NetworkError` when the script cannot be loaded.
+   * listener, or with `undefined`. Rejects with an `AppleMusicError` tagged `NetworkError` when the script cannot be
+   * loaded, with what the developer-token provider rejects with, `DeveloperTokenUnavailable` for the client's own,
+   * when the token cannot be fetched, and with what Apple's `configure` throws, as it came.
    */
   readonly ready: Promise<string | undefined>;
   /**
    * Opens Apple's sign-in window, to be called inside the listener's click, and resolves to the Music User Token,
    * or to `undefined` when the script answers with nothing, which is taken for a decline. Waits on nothing but
-   * `ready`, which is settled by the time there is a button to click. What the script throws is handed on as it
-   * came. After a `ready` that failed, the script is loaded and configured afresh, so a page whose endpoint was down
-   * when it loaded can still sign in.
+   * `ready`, which is settled by the time there is a button to click. After a `ready` that failed, the script is
+   * loaded and configured afresh, so a page whose endpoint was down when it loaded can still sign in; what that
+   * fails with, it rejects with, as `ready` would. What the script's `authorize()` throws is handed on as it came.
+   * Called after `dispose()` it is a `TypeError`.
    */
   readonly connect: () => Promise<string | undefined>;
   /**
    * Apple's own sign-out, through the script's `unauthorize()`: ends the sign-in in the script and the copy of the
    * token it kept, so that a later page load does not restore it. Whether it also ends the token at Apple, and with
-   * it a copy your server stored, is a live check. Does nothing where the script has no such function.
+   * it a copy your server stored, is a live check. Does nothing where the script has no such function, or where the
+   * page holds no configuration. Rejects with what the configuration failed with, or what `unauthorize()` throws,
+   * as it came. Called after `dispose()` it is a `TypeError`.
    */
   readonly disconnect: () => Promise<void>;
   /** Stops keeping the developer token fresh. The script stays: it is the page's. */
@@ -168,6 +190,15 @@ function appOf(app: unknown): tConnectApp {
  * or anything with a `developerToken` provider. Apple's script is one per page, so a second helper on a page
  * already configured for another app is a TypeError. While the helper lives it keeps the developer token fresh,
  * at the token's half-life and when the tab comes back, so that `connect()` waits on no network inside the click.
+ * What loading and configuring the script fails with is nobody's unhandled rejection: it waits for whoever awaits
+ * `ready` or `connect()`.
+ *
+ * @param music - The client from `createBrowserClient`, or anything with a `developerToken` provider on it.
+ * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
+ * @returns The helper, frozen: `ready`, `connect`, `disconnect` and `dispose`.
+ * @throws TypeError if `music` has no `developerToken`, `options` is not a plain object, `app` is not an object
+ * with a `name` that has something in it or a `build` that is not a string, `musicKit` has no `configure`, there
+ * is no `document`, or the page's script is configured for another app.
  */
 export function createConnect(music: { readonly developerToken: tTokenProvider }, options: tConnectOptions): tConnect {
   if (!has(music, ["developerToken"])) throw new TypeError(`createConnect: music must be a client from createBrowserClient, or anything with a developerToken provider; got ${got(music)}`);

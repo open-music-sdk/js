@@ -173,7 +173,7 @@ enough:
 | [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with. |
 | [`developer-token`](../../packages/developer-token/README.md) | `developerTokenFetcher`, from the entry with no signing code. Not the minter. |
 | [`user-token`](../../packages/user-token/README.md) | `validateUserToken`, for a page that holds the token itself. Not the stores and the intake, which are a server's. |
-| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet` |
+| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet`, `FORMATS` |
 | [`client-catalog`](../../clients/client-catalog/README.md), [`client-user`](../../clients/client-user/README.md) | Every function, and `catalog` and `user` |
 | [`lib-playlists`](../../lib/lib-playlists/README.md) | `playlists` |
 | [`lib-preview-player`](../../lib/lib-preview-player/README.md) | `previewPlayer` |

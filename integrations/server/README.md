@@ -152,7 +152,7 @@ import is enough:
 | [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with: an assembly of your own is the feature tier directly. |
 | [`developer-token`](../../packages/developer-token/README.md) | `mintDeveloperToken`, `developerTokenMinter`, `developerTokenFetcher` |
 | [`user-token`](../../packages/user-token/README.md) | `validateUserToken`, `acceptUserToken`, `userTokenIntake`, `MemoryUserTokenStore`, `KvUserTokenStore` |
-| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet` |
+| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet`, `FORMATS` |
 | [`client-catalog`](../../clients/client-catalog/README.md), [`client-user`](../../clients/client-user/README.md) | Every function, and `catalog` and `user` |
 | [`lib-playlists`](../../lib/lib-playlists/README.md) | `playlists` |
 | [`validate`](../../packages/validate/README.md) | Every validator, under `schemas`: `schemas.song`, `schemas.libraryPlaylist`, to pass as `schema` |

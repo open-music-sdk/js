@@ -30,7 +30,7 @@ export { developerTokenFetcher, developerTokenMinter, mintDeveloperToken } from 
 export type { tDeveloperTokenProvider, tFetcherOptions, tMinterOptions, tMintOptions } from "@open-music-sdk/developer-token";
 export { KvUserTokenStore, MemoryUserTokenStore, acceptUserToken, userTokenIntake, validateUserToken } from "@open-music-sdk/user-token";
 export type { tIntakeOptions, tKvNamespace, tKvStoreOptions, tUserTokenIntake, tValidateOptions } from "@open-music-sdk/user-token";
-export { artworkImage, artworkSrcSet, artworkUrl } from "@open-music-sdk/util-artwork";
+export { FORMATS, artworkImage, artworkSrcSet, artworkUrl } from "@open-music-sdk/util-artwork";
 export type { tArtworkFormat, tArtworkImage, tArtworkOptions, tArtworkSource, tArtworkSrcSetOptions } from "@open-music-sdk/util-artwork";
 export * from "@open-music-sdk/client-catalog";
 export * from "@open-music-sdk/client-user";

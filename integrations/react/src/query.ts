@@ -9,7 +9,9 @@ import { clientOf, got, isPlain, ownOf, type tAppleMusicClient, type tEndpoint, 
 
 /** What `useQuery` takes, for one answer. */
 export interface tQuery<T> {
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
   readonly queryKey: readonly unknown[];
+  /** Asks as the bound function does, and gives what it hands over; rejects as it rejects, with a `TypeError` for an argument that is not what it should be and an `AppleMusicError` for what fails at Apple. */
   readonly queryFn: () => Promise<T>;
   /** Core retried what should be retried; three more tries on a refusal, or on a mistake, would help nobody. */
   readonly retry: false;
@@ -17,14 +19,24 @@ export interface tQuery<T> {
 
 /** What `useInfiniteQuery` takes, for a walk: Apple's pages, each with the `next` Apple sent, and nothing kept back. */
 export interface tInfiniteQuery<P extends tPage<unknown>> {
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
   readonly queryKey: readonly unknown[];
+  /** One page, frozen: the function's own for no `pageParam`, else the one at that `next` link, asked for as `paginate` asks, with the same schema. Rejects as the function or `request` rejects. */
   readonly queryFn: (context: { readonly pageParam: string | undefined }) => Promise<P>;
+  /** `undefined`: the first page is the function's. */
   readonly initialPageParam: string | undefined;
+  /** The page's `next`, as Apple wrote it, or `undefined` at the last page. */
   readonly getNextPageParam: (lastPage: P) => string | undefined;
+  /** Core retried what should be retried; three more tries on a refusal, or on a mistake, would help nobody. */
   readonly retry: false;
 }
 
-/** A function for an endpoint as a function of the same arguments giving its query: one answer, or a walk. A write has none. */
+/**
+ * A function for an endpoint as a function of the same arguments giving its query: one answer, or a walk. A write
+ * has none. Building a query asks nothing and throws nothing, but a walk's with `maxPages` among its options, which
+ * is a `TypeError`: how many pages are kept is TanStack's `maxPages`, on `useInfiniteQuery`. What the arguments are
+ * is checked when the query runs, by the function itself.
+ */
 export type tQueryOf<F> =
   F extends tEndpoint<infer A, infer R, infer U, infer K> ?
     K extends "pages" ? (...args: A) => tInfiniteQuery<R & tPage<unknown>>
@@ -37,7 +49,9 @@ export type tQueries<F> = { readonly [K in keyof F as [tQueryOf<F[K]>] extends [
 
 /** What `musicQueries` gives: the catalog's and the listener's read functions, each as its query. */
 export interface tMusicQueries {
+  /** The catalog's read functions, each as its query; a later page of a walk is asked for with no Music User Token. */
   readonly catalog: tQueries<tCatalogFunctions>;
+  /** The listener's library's read functions, each as its query. */
   readonly user: tQueries<tUserFunctions>;
 }
 
@@ -127,6 +141,12 @@ function queriesOf<F extends object>(ns: "catalog" | "user", music: tAppleMusicC
  * that one listener's cache is never another's: `useMusicQueries` passes the provider's generation, raised by every
  * change of token. A token is never part of a key. Made once for one client and reused; nothing is asked until a
  * query runs.
+ *
+ * @param music - The client the queries ask through: from `createClient`, `createServerClient` or
+ * `createBrowserClient`, or anything with its five functions.
+ * @param scope - What tells one listener's keys from another's: the provider's generation, or your own. Default 0.
+ * @returns The two namespaces of query builders, frozen.
+ * @throws TypeError if `music` is not a client, or `scope` is neither a string nor a number.
  */
 export function musicQueries(music: tAppleMusicClient, scope?: string | number): tMusicQueries {
   const client = clientOf("musicQueries", music, METHODS);
