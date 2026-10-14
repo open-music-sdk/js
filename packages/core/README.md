@@ -4,8 +4,7 @@ The HTTP layer every other package in the family is built on: a client factory o
 attaches the two tokens, encodes parameters, follows `next` links, turns status codes into tagged
 errors, and retries what is worth retrying. Zero runtime dependencies; runs anywhere `fetch` does.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use `core` directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use `core` directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/core
@@ -34,7 +33,8 @@ try {
 
 | Export | Does |
 | --- | --- |
-| `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser` |
+| `createClient(options)` | `request`, `paginate`, `storefront`, `as`, `forUser`. The options are checked when the client is made, so a mistake in one fails there and not on the first request: `null` where an option belongs is a mistake like any other value, and a store needs its three functions, though `forUser` reads only one. `as()` checks the token it is handed under its own name |
+| `withNamespaces(client, namespaces)` | The client with namespaces on it, such as `{ catalog, user, playlists }`, each made for it by its factory, under its name; `as()` and `forUser()` give the same again. What an integration's client is |
 | `AppleMusicError`, `isAppleMusicError(e, tag?)` | One error class; `_tag` is one of `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `UserTokenInvalid`, `RateLimited`, `ApiError`, `ValidationError`, `NetworkError` |
 | `retry(fn, policy?, signal?)`, `retryable` | Exponential backoff with full jitter; honours `Retry-After` |
 | `createRateLimiter({ capacity, refillPerSecond })` | Token bucket to share across clients on one developer token |
@@ -212,7 +212,12 @@ client and hands over what the answer holds:
 `endpoint` is what the others are made with, for anything they do not cover. Its `written` is for a
 function that makes or changes something: bound, it gives the resource the answer holds, and
 `undefined` where a success holds none. The write happened either way, and an error there would have a
-caller do it again.
+caller do it again. An add or a delete, whose answer holds nothing, is `written` over a plan typed
+`tRequestPlan<void>`, and resolves to `undefined`.
+
+What a declaration gives carries its kind as `unwrap`, frozen beside `bound`, so a reader of a function,
+or anything built over one, can tell a write from a read: `addToLibrary.unwrap` is `"written"` and
+`getSong.unwrap` is `"resource"`, in the types as at runtime.
 
 ### A declaration
 
@@ -244,7 +249,7 @@ compile. So an option that is typed is an option that is sent, and a call is hel
 list was declared, one string is a `TypeError`, and not a list of one. A declaration is checked as it
 is made: a name with something in it, a `collection` that is a function, an `also` that says what each
 option is, one of the five `unwrap`s, a `plan` that is a function. A mistake in one is a `TypeError` when its module loads, naming the function that was
-called. What a declaration gives is frozen.
+called. What a declaration gives is frozen, with its `unwrap` on it.
 
 ### The collection
 

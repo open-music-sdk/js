@@ -6,8 +6,7 @@ Every function takes a client from [`@open-music-sdk/core`](../../packages/core)
 Apple answered, typed by [`@open-music-sdk/types`](../../packages/types). The developer token is the
 only token any of them sends.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use this package directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/client-catalog @open-music-sdk/core

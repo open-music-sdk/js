@@ -80,11 +80,13 @@ function check(options: tMintOptions): tClaims & { readonly pem: tRedacted<strin
   if (origin !== undefined) {
     // An empty list is refused rather than sent: whether Apple reads it as "no origin" or "any origin" is undocumented.
     if (!Array.isArray(origin) || origin.length === 0) throw new TypeError("developer token: origin must be a non-empty array; omit it for no restriction");
-    // By index, so a hole in a sparse array is seen. An entry Apple can never match would lock every browser out.
-    for (let i = 0; i < origin.length; i++)
-      if (!isOrigin(origin[i]))
+    // A list of the minter's own, copied by index, so a hole in a sparse array is seen and an iterator that would say
+    // otherwise is not asked; and checked as the copy, so what was checked is what is signed. An entry Apple can never
+    // match would lock every browser out.
+    origins = Array.from({ length: origin.length }, (_, i): string => origin[i] as string);
+    for (let i = 0; i < origins.length; i++)
+      if (!isOrigin(origins[i]))
         throw new TypeError(`developer token: origin[${String(i)}] must be a web origin such as https://app.example: scheme, host and port, with no path or trailing slash`);
-    origins = Array.from(origin as readonly string[]); // a list of the minter's own, which the caller's later changes do not reach
   }
   // An environment variable often carries the PEM with its line breaks escaped; a PEM has no backslashes of its own.
   // jose insists the armor is the very first thing, so a stray newline or a byte order mark is trimmed away.

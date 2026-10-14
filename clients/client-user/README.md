@@ -6,8 +6,7 @@ and their own station. Every function takes a client from [`@open-music-sdk/core
 that holds the listener's Music User Token, and resolves to what Apple answered, typed by
 [`@open-music-sdk/types`](../../packages/types).
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use this package directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/client-user @open-music-sdk/core

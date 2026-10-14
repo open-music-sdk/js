@@ -6,6 +6,7 @@
   "exports": "./index.ts",
   "dependencies": {
     "@eslint/js": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
     "globals": "catalog:",
     "typescript-eslint": "catalog:"
   },

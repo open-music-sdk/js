@@ -561,6 +561,38 @@ describe("endpoint: bound to a client, a function hands over what the answer hol
     });
   });
 
+  describe("the kind a function was declared with", () => {
+    const forget = endpoint("forget", "written", (_client, id: string): tRequestPlan<void> => [`v1/me/ratings/songs/${id}`, { method: "DELETE" }]);
+
+    test("is on the function, beside bound, for each way of declaring one", () => {
+      const getOne = resourceGetter<tSongsResponse>("getOne", () => SONGS);
+      const getSome = resourcesGetter<tSongsResponse>("getSome", () => SONGS);
+      const findSome = resourcesFinder<tSongsResponse>("findSome", "isrc", () => SONGS);
+      const listAll = resourceLister<tSongsResponse>("listAll", () => SONGS);
+      const getRel = relationshipGetter<tAlbumRelationships>("getRel", () => SONGS);
+      const search = endpoint("search", "answer", (_client, term: string): tRequestPlan<tSongsResponse> => [SONGS, { params: { term } }]);
+      expect([getOne.unwrap, getSome.unwrap, findSome.unwrap, listAll.unwrap, getRel.unwrap, forget.unwrap, search.unwrap]).toEqual(["resource", "resources", "resources", "pages", "pages", "written", "answer"]);
+      expectTypeOf(getOne.unwrap).toEqualTypeOf<"resource">();
+      expectTypeOf(listAll.unwrap).toEqualTypeOf<"pages">();
+      expectTypeOf(getRel.unwrap).toEqualTypeOf<"pages">();
+      expectTypeOf(forget.unwrap).toEqualTypeOf<"written">();
+      expectTypeOf(search.unwrap).toEqualTypeOf<"answer">();
+    });
+
+    test("cannot be changed, any more than bound can", () => {
+      expect(Object.isFrozen(forget)).toBe(true);
+      expect(() => Object.assign(forget, { unwrap: "answer" })).toThrow(TypeError);
+      expect(forget.unwrap).toBe("written");
+    });
+
+    test("a write whose answer is nothing is declared written: bound, it resolves to undefined, and the write happened", async () => {
+      const { music, sent } = apple([{ status: 204 }], { userToken: "user" });
+      await expect(forget.bound(music)("1")).resolves.toBeUndefined();
+      expect(sent()).toEqual(["DELETE /v1/me/ratings/songs/1"]);
+      expectTypeOf(forget.bound(music)("1")).toEqualTypeOf<Promise<undefined>>();
+    });
+  });
+
   describe("what a write has written", () => {
     const createPlaylist = endpoint("createPlaylist", "written", (_client, name: string): tRequestPlan<tSongsResponse> => ["v1/me/library/playlists", { method: "POST", body: { attributes: { name } } }]);
     const made = { id: "p.new", type: "library-playlists", href: "/v1/me/library/playlists/p.new" };

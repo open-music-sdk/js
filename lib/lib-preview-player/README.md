@@ -6,7 +6,7 @@ that: a queue of tracks, play, pause, next and previous, one clip following anot
 of where things stand for the page to draw. It has no framework in it, and asks Apple for nothing: it
 is fed songs that were already fetched.
 
-You probably want one of the integrations instead (`browser`, `react`, `next`) once they exist. Use
+You probably want one of the integrations instead (`browser`, `react`). Use
 this package directly to assemble your own client or to build one of those.
 
 ```

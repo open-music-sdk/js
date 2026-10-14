@@ -128,7 +128,7 @@ describe("the package entry", () => {
       "tSearchHintsOptions",
       "tSearchSuggestionsOptions",
       "tStorefrontOption",
-      "tViewAttributes",
+      "tViewAttributesOf",
       "tViewEndpoint",
       "tViewOptions",
       "tViewPage",

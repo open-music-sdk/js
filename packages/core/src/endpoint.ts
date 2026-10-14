@@ -13,11 +13,14 @@ export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R> & t
 
 /**
  * A function for one endpoint. Called with a client it resolves to what Apple answered. `bound(client)` is the same
- * call with the client fixed and the answer unwrapped, and is what an endpoint namespace is made of.
+ * call with the client fixed and the answer unwrapped, and is what an endpoint namespace is made of. `unwrap` says
+ * how, and is on the function so that a reader of it, or anything built over it, can tell a write from a read.
  */
-export interface tEndpoint<A extends readonly unknown[], R, U> {
+export interface tEndpoint<A extends readonly unknown[], R, U, K extends tUnwrap = tUnwrap> {
   (client: tAppleMusicClient, ...args: A): Promise<R>;
   readonly bound: (client: tAppleMusicClient) => (...args: A) => U;
+  /** The kind the function was declared with: what its bound form hands over. */
+  readonly unwrap: K;
 }
 
 /** An answer whose resources are under `data`. */
@@ -92,7 +95,7 @@ function named(builder: string, fn: unknown): void {
  * What every declaration comes to, whichever function made it. `builder` is that function's name: a declaration is
  * checked as it is made, so a mistake in one is found when the module loads and names what was called.
  */
-function declare<A extends readonly unknown[], R, U>(builder: string, fn: string, unwrap: tUnwrap, plan: tPlan<A, R>): tEndpoint<A, R, U> {
+function declare<A extends readonly unknown[], R, U, K extends tUnwrap>(builder: string, fn: string, unwrap: K, plan: tPlan<A, R>): tEndpoint<A, R, U, K> {
   named(builder, fn);
   if (!UNWRAPS.includes(unwrap)) throw new TypeError(`${builder}: unwrap must be "resource", "resources", "pages", "written" or "answer"; got ${got(unwrap)}`);
   if (typeof plan !== "function") throw new TypeError(`${builder}: plan must be a function; got ${got(plan)}`);
@@ -146,8 +149,8 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
       return data[0];
     };
   };
-  // Frozen, so that what a namespace binds is what was declared: nothing can put another `bound` in its place.
-  return Object.freeze(Object.assign(send, { bound })) as unknown as tEndpoint<A, R, U>;
+  // Frozen, so that what a namespace binds is what was declared: nothing can put another `bound`, or another kind, in its place.
+  return Object.freeze(Object.assign(send, { bound, unwrap })) as unknown as tEndpoint<A, R, U, K>;
 }
 
 /**
@@ -160,11 +163,13 @@ function declare<A extends readonly unknown[], R, U>(builder: string, fn: string
  * starts, and each loop over what the call gave asks afresh. A plan that has to ask the client for something gives
  * the rest of itself as a function, a `tLater`, which is what keeps that asking for the loop as well.
  */
-export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>>;
-export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>>;
-export function endpoint<A extends readonly unknown[], R extends tPage<unknown>>(fn: string, unwrap: "pages", plan: tPlan<A, R>): tEndpoint<A, R, AsyncIterable<tItem<R>>>;
-export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "written", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R> | undefined>>;
-export function endpoint<A extends readonly unknown[], R>(fn: string, unwrap: "answer", plan: tPlan<A, R>): tEndpoint<A, R, Promise<R>>;
+export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>, "resource">;
+export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>, "resources">;
+export function endpoint<A extends readonly unknown[], R extends tPage<unknown>>(fn: string, unwrap: "pages", plan: tPlan<A, R>): tEndpoint<A, R, AsyncIterable<tItem<R>>, "pages">;
+export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "written", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R> | undefined>, "written">;
+/** A write whose answer holds nothing, such as an add or a delete: bound, it resolves to `undefined`, and the write happened. */
+export function endpoint<A extends readonly unknown[]>(fn: string, unwrap: "written", plan: tPlan<A, void>): tEndpoint<A, void, Promise<undefined>, "written">;
+export function endpoint<A extends readonly unknown[], R>(fn: string, unwrap: "answer", plan: tPlan<A, R>): tEndpoint<A, R, Promise<R>, "answer">;
 export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unknown>): tEndpoint<unknown[], unknown, unknown> {
   return declare("endpoint", fn, unwrap, plan);
 }
@@ -316,7 +321,7 @@ export function resourceGetter<R extends tResources = never, C extends object = 
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>> {
+): tEndpoint<[id: string, options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>>, "resource"> {
   named("resourceGetter", fn);
   const [locate, names, user] = given<C>("resourceGetter", collection, (also as readonly unknown[])[0]);
   // Here and below, what a call was handed is checked in the order it was handed over, so the first mistake is the one named.
@@ -336,7 +341,7 @@ function picked<R extends tResources, C extends object, E extends object>(
   name: string,
   collection: unknown,
   also: unknown,
-): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>, "resources"> {
   named(builder, fn);
   const [locate, names, user] = given<C>(builder, collection, also);
   return declare(builder, fn, "resources", (client, values: readonly string[], options?: tEndpointOptions<R, C, E>) => {
@@ -352,7 +357,7 @@ export function resourcesGetter<R extends tResources = never, C extends object =
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[ids: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+): tEndpoint<[ids: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>, "resources"> {
   return picked("resourcesGetter", fn, "ids", "ids", collection, (also as readonly unknown[])[0]);
 }
 
@@ -366,7 +371,7 @@ export function resourcesFinder<R extends tResources = never, C extends object =
   filter: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>> {
+): tEndpoint<[values: readonly string[], options?: tEndpointOptions<R, C, E>], R, Promise<tItem<R>[]>, "resources"> {
   named("resourcesFinder", fn);
   if (!isBracketed(filter)) throw new TypeError(`resourcesFinder: filter must be the name of a filter, lowercase words with hyphens between and at most 64 characters, such as "isrc"; got ${got(filter)}`);
   return picked("resourcesFinder", fn, `filter[${filter}]`, "values", collection, (also as readonly unknown[])[0]);
@@ -377,7 +382,7 @@ export function resourceLister<R extends tResources = never, C extends object = 
   fn: string,
   collection: tCollectionGiven<R, C>,
   ...also: tAlsoGiven<E>
-): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions], tPaged<R>, AsyncIterable<tItem<R>>> {
+): tEndpoint<[options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions], tPaged<R>, AsyncIterable<tItem<R>>, "pages"> {
   named("resourceLister", fn);
   const [locate, names, user] = given<C>("resourceLister", collection, (also as readonly unknown[])[0]);
   return declare("resourceLister", fn, "pages", (client, options?: tEndpointOptions<tPaged<R>, C, E> & tWalkOptions) => {
@@ -403,6 +408,7 @@ export interface tRelationshipEndpoint<Rels, C = tNone> {
   readonly bound: (
     client: tAppleMusicClient,
   ) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions) => AsyncIterable<tRelated<Rels, K>>;
+  readonly unwrap: "pages";
 }
 
 /** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */

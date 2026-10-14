@@ -4,8 +4,7 @@ Where a developer token comes from: signed with your MusicKit private key on a m
 fetched from an endpoint you host by code that must not. Both are `developerToken` providers for
 [`@open-music-sdk/core`](../core), cached and replaced when Apple rejects them.
 
-You probably want one of the integrations instead (`server`, `browser`, `react`, `next`) once they
-exist. Use this package directly to assemble your own client or to build one of those.
+You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
 
 ```
 pnpm add @open-music-sdk/developer-token @open-music-sdk/core

@@ -6,7 +6,7 @@ builds the `srcset` that gives a dense screen a sharper image. Strings and numbe
 numbers out. Its one dependency is [`@open-music-sdk/core`](../core), for the check on where a URL
 points, and that check is all of `core` an app carries because of this package.
 
-You probably want one of the integrations instead (`browser`, `react`, `next`) once they exist. Use
+You probably want one of the integrations instead (`browser`, `react`). Use
 this package directly to assemble your own client or to build one of those.
 
 ```

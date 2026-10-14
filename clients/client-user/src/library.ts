@@ -85,13 +85,13 @@ export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "pla
 export type tAddOptions = tReadOptions<void>;
 
 /** Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. */
-export const addToLibrary = /*#__PURE__*/ endpoint("addToLibrary", "answer", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
+export const addToLibrary = /*#__PURE__*/ endpoint("addToLibrary", "written", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
   const lists = typedIdsOf("addToLibrary", "ids", ids);
   return ["v1/me/library", { ...initOf("addToLibrary", optionsOf("addToLibrary", options, OPTIONS), lists), method: "POST" }];
 });
 
 /** Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. */
-export const addToFavorites = /*#__PURE__*/ endpoint("addToFavorites", "answer", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
+export const addToFavorites = /*#__PURE__*/ endpoint("addToFavorites", "written", (_client, ids: tAddedIds, options?: tAddOptions): tRequestPlan<void> => {
   const lists = typedIdsOf("addToFavorites", "ids", ids);
   return ["v1/me/favorites", { ...initOf("addToFavorites", optionsOf("addToFavorites", options, OPTIONS), lists), method: "POST" }];
 });
@@ -121,7 +121,7 @@ function tracksOf(fn: string, tracks: unknown): tPlaylistTrack[] {
 /** Adds tracks to the end of a playlist in the listener's library: `[{ id, type: "songs" }]`. It resolves to nothing. */
 export const addLibraryPlaylistTracks = /*#__PURE__*/ endpoint(
   "addLibraryPlaylistTracks",
-  "answer",
+  "written",
   (_client, id: string, tracks: readonly tPlaylistTrack[], options?: tAddOptions): tRequestPlan<void> => {
     const segment = segmentOf("addLibraryPlaylistTracks", "id", id);
     const body: tLibraryPlaylistTracksRequest = { data: tracksOf("addLibraryPlaylistTracks", tracks) };
