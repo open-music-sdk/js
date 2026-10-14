@@ -59,9 +59,10 @@ const libraryPlaylists = () => "v1/me/ratings/library-playlists";
  * @param id - The song's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getSongRating", songs);
 /**
@@ -69,12 +70,13 @@ export const getSongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("get
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The songs' ids.
+ * @param ids - The songs' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getSongRatings", songs);
 /**
@@ -86,9 +88,10 @@ export const getSongRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("g
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setSongRating = /*#__PURE__*/ ratingSetter("setSongRating", songs);
 /**
@@ -99,9 +102,10 @@ export const setSongRating = /*#__PURE__*/ ratingSetter("setSongRating", songs);
  * @param id - The song's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteSongRating = /*#__PURE__*/ ratingDeleter("deleteSongRating", songs);
 
@@ -115,9 +119,10 @@ export const deleteSongRating = /*#__PURE__*/ ratingDeleter("deleteSongRating", 
  * @param id - The album's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getAlbumRating", albums);
 /**
@@ -125,12 +130,13 @@ export const getAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("ge
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The albums' ids.
+ * @param ids - The albums' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getAlbumRatings", albums);
 /**
@@ -142,9 +148,10 @@ export const getAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setAlbumRating = /*#__PURE__*/ ratingSetter("setAlbumRating", albums);
 /**
@@ -155,9 +162,10 @@ export const setAlbumRating = /*#__PURE__*/ ratingSetter("setAlbumRating", album
  * @param id - The album's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteAlbumRating = /*#__PURE__*/ ratingDeleter("deleteAlbumRating", albums);
 
@@ -171,9 +179,10 @@ export const deleteAlbumRating = /*#__PURE__*/ ratingDeleter("deleteAlbumRating"
  * @param id - The music video's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getMusicVideoRating", musicVideos);
 /**
@@ -181,12 +190,13 @@ export const getMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsResponse
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The music videos' ids.
+ * @param ids - The music videos' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getMusicVideoRatings", musicVideos);
 /**
@@ -198,9 +208,10 @@ export const getMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRatingsRespon
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setMusicVideoRating = /*#__PURE__*/ ratingSetter("setMusicVideoRating", musicVideos);
 /**
@@ -211,9 +222,10 @@ export const setMusicVideoRating = /*#__PURE__*/ ratingSetter("setMusicVideoRati
  * @param id - The music video's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteMusicVideoRating = /*#__PURE__*/ ratingDeleter("deleteMusicVideoRating", musicVideos);
 
@@ -227,9 +239,10 @@ export const deleteMusicVideoRating = /*#__PURE__*/ ratingDeleter("deleteMusicVi
  * @param id - The playlist's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getPlaylistRating", playlists);
 /**
@@ -237,12 +250,13 @@ export const getPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>(
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The playlists' ids.
+ * @param ids - The playlists' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getPlaylistRatings", playlists);
 /**
@@ -254,9 +268,10 @@ export const getPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setPlaylistRating = /*#__PURE__*/ ratingSetter("setPlaylistRating", playlists);
 /**
@@ -267,9 +282,10 @@ export const setPlaylistRating = /*#__PURE__*/ ratingSetter("setPlaylistRating",
  * @param id - The playlist's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deletePlaylistRating = /*#__PURE__*/ ratingDeleter("deletePlaylistRating", playlists);
 
@@ -283,9 +299,10 @@ export const deletePlaylistRating = /*#__PURE__*/ ratingDeleter("deletePlaylistR
  * @param id - The station's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getStationRating", stations);
 /**
@@ -293,12 +310,13 @@ export const getStationRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The stations' ids.
+ * @param ids - The stations' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getStationRatings", stations);
 /**
@@ -310,9 +328,10 @@ export const getStationRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setStationRating = /*#__PURE__*/ ratingSetter("setStationRating", stations);
 /**
@@ -323,9 +342,10 @@ export const setStationRating = /*#__PURE__*/ ratingSetter("setStationRating", s
  * @param id - The station's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteStationRating = /*#__PURE__*/ ratingDeleter("deleteStationRating", stations);
 
@@ -339,9 +359,10 @@ export const deleteStationRating = /*#__PURE__*/ ratingDeleter("deleteStationRat
  * @param id - The library song's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibrarySongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibrarySongRating", librarySongs);
 /**
@@ -349,12 +370,13 @@ export const getLibrarySongRating = /*#__PURE__*/ resourceGetter<tRatingsRespons
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The library songs' ids.
+ * @param ids - The library songs' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibrarySongRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibrarySongRatings", librarySongs);
 /**
@@ -366,9 +388,10 @@ export const getLibrarySongRatings = /*#__PURE__*/ resourcesGetter<tRatingsRespo
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setLibrarySongRating = /*#__PURE__*/ ratingSetter("setLibrarySongRating", librarySongs);
 /**
@@ -379,9 +402,10 @@ export const setLibrarySongRating = /*#__PURE__*/ ratingSetter("setLibrarySongRa
  * @param id - The library song's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteLibrarySongRating = /*#__PURE__*/ ratingDeleter("deleteLibrarySongRating", librarySongs);
 
@@ -395,9 +419,10 @@ export const deleteLibrarySongRating = /*#__PURE__*/ ratingDeleter("deleteLibrar
  * @param id - The library album's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryAlbumRating", libraryAlbums);
 /**
@@ -405,12 +430,13 @@ export const getLibraryAlbumRating = /*#__PURE__*/ resourceGetter<tRatingsRespon
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The library albums' ids.
+ * @param ids - The library albums' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryAlbumRatings", libraryAlbums);
 /**
@@ -422,9 +448,10 @@ export const getLibraryAlbumRatings = /*#__PURE__*/ resourcesGetter<tRatingsResp
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setLibraryAlbumRating = /*#__PURE__*/ ratingSetter("setLibraryAlbumRating", libraryAlbums);
 /**
@@ -435,9 +462,10 @@ export const setLibraryAlbumRating = /*#__PURE__*/ ratingSetter("setLibraryAlbum
  * @param id - The library album's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteLibraryAlbumRating = /*#__PURE__*/ ratingDeleter("deleteLibraryAlbumRating", libraryAlbums);
 
@@ -451,9 +479,10 @@ export const deleteLibraryAlbumRating = /*#__PURE__*/ ratingDeleter("deleteLibra
  * @param id - The library music video's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryMusicVideoRating", libraryMusicVideos);
 /**
@@ -461,12 +490,13 @@ export const getLibraryMusicVideoRating = /*#__PURE__*/ resourceGetter<tRatingsR
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The library music videos' ids.
+ * @param ids - The library music videos' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryMusicVideoRatings", libraryMusicVideos);
 /**
@@ -478,9 +508,10 @@ export const getLibraryMusicVideoRatings = /*#__PURE__*/ resourcesGetter<tRating
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setLibraryMusicVideoRating = /*#__PURE__*/ ratingSetter("setLibraryMusicVideoRating", libraryMusicVideos);
 /**
@@ -491,9 +522,10 @@ export const setLibraryMusicVideoRating = /*#__PURE__*/ ratingSetter("setLibrary
  * @param id - The library music video's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteLibraryMusicVideoRating = /*#__PURE__*/ ratingDeleter("deleteLibraryMusicVideoRating", libraryMusicVideos);
 
@@ -507,9 +539,10 @@ export const deleteLibraryMusicVideoRating = /*#__PURE__*/ ratingDeleter("delete
  * @param id - The library playlist's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getLibraryPlaylistRating", libraryPlaylists);
 /**
@@ -517,12 +550,13 @@ export const getLibraryPlaylistRating = /*#__PURE__*/ resourceGetter<tRatingsRes
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param ids - The library playlists' ids.
+ * @param ids - The library playlists' ids, 1 to 300 of them.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the ratings under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getLibraryPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsResponse>("getLibraryPlaylistRatings", libraryPlaylists);
 /**
@@ -534,9 +568,10 @@ export const getLibraryPlaylistRatings = /*#__PURE__*/ resourcesGetter<tRatingsR
  * @param value - The rating: 1 for a like, -1 for a dislike.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns What Apple answered: the rating as set, under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const setLibraryPlaylistRating = /*#__PURE__*/ ratingSetter("setLibraryPlaylistRating", libraryPlaylists);
 /**
@@ -547,8 +582,9 @@ export const setLibraryPlaylistRating = /*#__PURE__*/ ratingSetter("setLibraryPl
  * @param id - The library playlist's id.
  * @param options - The language to answer in, and what else to send with the request.
  * @returns Nothing: it resolves once Apple has taken the rating away.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const deleteLibraryPlaylistRating = /*#__PURE__*/ ratingDeleter("deleteLibraryPlaylistRating", libraryPlaylists);

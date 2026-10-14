@@ -287,30 +287,39 @@ describe("a function of the namespace says what the package's function says: an 
   });
 
   test(
-    "each argument is said the same way on both, less the client; what is handed over is said in the bound form's own words unless it is the answer as it is; and both say they throw a TypeError, an AppleMusicError and the abort's reason, once each, in that order, the last in the same words",
+    "a member's tags are the function's less @function and the client, except what the bound form owns: its TypeError, about the arguments alone, and by its unwrap what it hands over and the AppleMusicError of unwrapping, each present, different, and saying what binding and unwrapping change",
     { timeout: 120_000 },
     () => {
       const direct = shown(names.map((name) => `direct_${name} = api.${name}`)).map((each) => each.tags);
       const ofTheNamespace = shown(names.map((name) => `bound_${name} = bound.${name}`)).map((each) => each.tags);
-      const only = (tags: readonly string[], tag: string) => tags.filter((each) => each.startsWith(`@${tag} `));
-      /** What each `@throws` is of: the error class it names, or the abort's reason, which is said in the same words everywhere. */
-      const ABORT = "@throws The reason `options.signal` aborted with, when it does.";
-      const kinds = (tags: readonly string[]) => only(tags, "throws").map((each) => (each === ABORT ? "abort" : /^@throws (\w+)\b/.exec(each)?.[1]));
+      /** The start of a tag that says which it is: `@returns`, or `@throws` and the error class it names. */
+      const head = (tag: string) => /^@(?:returns|throws \w+)/.exec(tag)?.[0] ?? tag;
+      /**
+       * By `unwrap`, the tags the bound form says in its own words, and what each has to say: the rest are the function's,
+       * word for word. A bound form was given its client when the namespace was made, so its TypeError is about the
+       * arguments alone, whatever it hands over.
+       */
+      const MISTAKE = "if an argument is not what it should be";
+      const own: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+        resource: { "@returns": ["out of `data`"], "@throws TypeError": [MISTAKE], "@throws AppleMusicError": ["`ApiError`"] },
+        resources: { "@returns": ["out of `data`", "empty list"], "@throws TypeError": [MISTAKE], "@throws AppleMusicError": ["`ApiError`"] },
+        pages: { "@returns": ["every page"], "@throws TypeError": [MISTAKE, "from the call itself"], "@throws AppleMusicError": ["`ApiError`"] },
+        answer: { "@throws TypeError": [MISTAKE] },
+      };
+      /** Whether the bound form's tag is what the function's tag asks of it: the same, or its own and saying what it has to. */
+      const said = (fn: string, bound: string, unwrap: string): boolean => {
+        const phrases = own[unwrap]?.[head(fn)];
+        if (phrases === undefined) return bound === fn;
+        return bound !== fn && head(bound) === head(fn) && bound.length > head(fn).length + 1 && phrases.every((phrase) => bound.includes(phrase));
+      };
       /** The names whose tags fail `holds`. */
       const failing = (holds: (fn: readonly string[], bound: readonly string[], unwrap: string) => boolean) => names.filter((_, index) => !holds(direct[index] ?? [], ofTheNamespace[index] ?? [], functions[index]?.[1].unwrap ?? ""));
 
-      // The function is shown as one, and its first argument is the client.
+      // The function is shown as one, its first argument is the client, and it names the four kinds it throws, in order.
       expect(failing((fn) => fn[0] === "@function" && fn[1] === "@param client - The client to ask with.")).toEqual([]);
-      // Every argument after the client is said the same way on both, in the same order, and the bound form says nothing of a client.
-      expect(failing((fn, bound) => JSON.stringify(only(bound, "param")) === JSON.stringify(only(fn, "param").slice(1)))).toEqual([]);
-      // Each says once what it hands over: the same thing where the bound form hands the answer over as it is, and otherwise what is taken out of it.
-      expect(failing((fn, bound) => only(fn, "returns").length === 1 && only(bound, "returns").length === 1)).toEqual([]);
-      expect(failing((fn, bound, unwrap) => (only(fn, "returns")[0] === only(bound, "returns")[0]) === (unwrap === "answer"))).toEqual([]);
-      // Every function asks Apple and takes a signal, so every one may fail with a caller's mistake, with Apple's, or with an abort: one tag for each kind, and the bound form the same kinds.
-      expect(failing((fn) => JSON.stringify(kinds(fn)) === JSON.stringify(["TypeError", "AppleMusicError", "abort"]))).toEqual([]);
-      expect(failing((fn, bound) => JSON.stringify(kinds(bound)) === JSON.stringify(kinds(fn)))).toEqual([]);
-      // And a member of the namespace says nothing else: no `@function`, which is for the declaration, and no tag of another kind.
-      expect(failing((_, bound) => bound.every((tag) => /^@(?:param|returns|throws) /.test(tag)))).toEqual([]);
+      expect(failing((fn) => JSON.stringify(fn.filter((tag) => tag.startsWith("@throws ")).map(head)) === JSON.stringify(["@throws TypeError", "@throws AppleMusicError", "@throws The", "@throws Whatever"]))).toEqual([]);
+      // The member: the function's tags less those two, one for one, each the same or the bound form's own.
+      expect(failing((fn, bound, unwrap) => own[unwrap] !== undefined && bound.length === fn.length - 2 && fn.slice(2).every((tag, index) => said(tag, bound[index] ?? "", unwrap)))).toEqual([]);
       expect(names).toHaveLength(58);
     },
   );

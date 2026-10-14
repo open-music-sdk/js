@@ -98,15 +98,16 @@ export interface tViewEndpoint<Views> {
    *
    * @param client - The client to ask with.
    * @param id - The resource's id.
-   * @param name - The view: one of `Views`, as the type has them; Apple says whether there is such a one.
-   * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each
-   *   item, and the most pages a walk may ask for.
-   * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked
-   *   for, and `next` when there are more; `maxPages` plays no part.
-   * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to
-   *   ask in; `_tag` says which.
+   * @param name - The view's name, one of `Views` as the type has them; Apple says whether there is such a one.
+   * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one
+   *   page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+   *   there is more; `maxPages` plays no part.
+   * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask
+   *   in, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   <K extends keyof Views & string>(client: tAppleMusicClient, id: string, name: K, options?: tViewOptions<Views, K>): Promise<tViewPage<Views, K>>;
   /**
@@ -155,10 +156,11 @@ const recordLabels = /*#__PURE__*/ catalogOf("record-labels");
  * @param id - The song's id.
  * @param options - The storefront to ask in, and what to send beside the song.
  * @returns What Apple answered: the song under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSong = /*#__PURE__*/ resourceGetter<tSongsResponse, tStorefrontOption>("getSong", songs);
 /**
@@ -169,10 +171,11 @@ export const getSong = /*#__PURE__*/ resourceGetter<tSongsResponse, tStorefrontO
  * @param ids - The songs' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the songs.
  * @returns What Apple answered: the songs under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongs = /*#__PURE__*/ resourcesGetter<tSongsResponse, tStorefrontOption>("getSongs", songs);
 /**
@@ -180,13 +183,14 @@ export const getSongs = /*#__PURE__*/ resourcesGetter<tSongsResponse, tStorefron
  *
  * @function
  * @param client - The client to ask with.
- * @param values - The ISRCs, 1 to 300 of them.
+ * @param values - The ISRCs, 1 to 300 of them; one ISRC may be that of more than one song.
  * @param options - The storefront to ask in, and what to send beside the songs.
  * @returns What Apple answered: the songs under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongsByIsrc = /*#__PURE__*/ resourcesFinder<tSongsResponse, tStorefrontOption>("getSongsByIsrc", "isrc", songs);
 /**
@@ -198,10 +202,11 @@ export const getSongsByIsrc = /*#__PURE__*/ resourcesFinder<tSongsResponse, tSto
  * @param options - The storefront to ask in, which is where the equivalents are looked for; what to leave out of them;
  *   and what to send beside them.
  * @returns What Apple answered: the songs under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongsByEquivalents = /*#__PURE__*/ resourcesFinder<tSongsResponse, tStorefrontOption, tRestrictOption>("getSongsByEquivalents", "equivalents", songs, { restrict: "list" });
 /**
@@ -210,15 +215,16 @@ export const getSongsByEquivalents = /*#__PURE__*/ resourcesFinder<tSongsRespons
  * @function
  * @param client - The client to ask with.
  * @param id - The song's id.
- * @param name - The relationship, such as `albums`: one of the song's, as the type has them; Apple says whether there
- *   is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the song's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getSongRelationship = /*#__PURE__*/ relationshipGetter<Omit<tSongRelationships, "library">, tStorefrontOption>("getSongRelationship", songs);
 
@@ -232,10 +238,11 @@ export const getSongRelationship = /*#__PURE__*/ relationshipGetter<Omit<tSongRe
  * @param id - The album's id.
  * @param options - The storefront to ask in, the views to send with the album, and what else to send beside it.
  * @returns What Apple answered: the album under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbum = /*#__PURE__*/ resourceGetter<tAlbumsResponse, tStorefrontOption, tViewsOption<tAlbumViews>>("getAlbum", albums, { views: "list" });
 /**
@@ -246,10 +253,11 @@ export const getAlbum = /*#__PURE__*/ resourceGetter<tAlbumsResponse, tStorefron
  * @param ids - The albums' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the albums.
  * @returns What Apple answered: the albums under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbums = /*#__PURE__*/ resourcesGetter<tAlbumsResponse, tStorefrontOption>("getAlbums", albums);
 /**
@@ -260,10 +268,11 @@ export const getAlbums = /*#__PURE__*/ resourcesGetter<tAlbumsResponse, tStorefr
  * @param values - The UPCs, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the albums.
  * @returns What Apple answered: the albums under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumsByUpc = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tStorefrontOption>("getAlbumsByUpc", "upc", albums);
 /**
@@ -275,10 +284,11 @@ export const getAlbumsByUpc = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tSt
  * @param options - The storefront to ask in, which is where the equivalents are looked for; what to leave out of them;
  *   and what to send beside them.
  * @returns What Apple answered: the albums under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsResponse, tStorefrontOption, tRestrictOption>("getAlbumsByEquivalents", "equivalents", albums, { restrict: "list" });
 /**
@@ -287,15 +297,16 @@ export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsRespo
  * @function
  * @param client - The client to ask with.
  * @param id - The album's id.
- * @param name - The relationship, such as `tracks`: one of the album's, as the type has them; Apple says whether there
- *   is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the album's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumRelationship = /*#__PURE__*/ relationshipGetter<Omit<tAlbumRelationships, "library">, tStorefrontOption>("getAlbumRelationship", albums);
 /**
@@ -304,16 +315,16 @@ export const getAlbumRelationship = /*#__PURE__*/ relationshipGetter<Omit<tAlbum
  * @function
  * @param client - The client to ask with.
  * @param id - The album's id.
- * @param name - The view, such as `other-versions`: one of the album's, as the type has them; Apple says whether there
- *   is such a one.
- * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each item,
- *   and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked for,
- *   and `next` when there are more; `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The view's name, one of the album's as the type has them; Apple says whether there is such a one.
+ * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one page,
+ *   where to start, what to send beside them, and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+ *   there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAlbumView = /*#__PURE__*/ viewGetter<tAlbumViews>("getAlbumView", "albums");
 
@@ -327,10 +338,11 @@ export const getAlbumView = /*#__PURE__*/ viewGetter<tAlbumViews>("getAlbumView"
  * @param id - The artist's id.
  * @param options - The storefront to ask in, the views to send with the artist, and what else to send beside it.
  * @returns What Apple answered: the artist under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getArtist = /*#__PURE__*/ resourceGetter<tArtistsResponse, tStorefrontOption, tViewsOption<tArtistViews>>("getArtist", artists, { views: "list" });
 /**
@@ -341,10 +353,11 @@ export const getArtist = /*#__PURE__*/ resourceGetter<tArtistsResponse, tStorefr
  * @param ids - The artists' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the artists.
  * @returns What Apple answered: the artists under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getArtists = /*#__PURE__*/ resourcesGetter<tArtistsResponse, tStorefrontOption>("getArtists", artists);
 /**
@@ -353,15 +366,16 @@ export const getArtists = /*#__PURE__*/ resourcesGetter<tArtistsResponse, tStore
  * @function
  * @param client - The client to ask with.
  * @param id - The artist's id.
- * @param name - The relationship, such as `albums`: one of the artist's, as the type has them; Apple says whether there
- *   is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the artist's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getArtistRelationship = /*#__PURE__*/ relationshipGetter<tArtistRelationships, tStorefrontOption>("getArtistRelationship", artists);
 /**
@@ -370,16 +384,16 @@ export const getArtistRelationship = /*#__PURE__*/ relationshipGetter<tArtistRel
  * @function
  * @param client - The client to ask with.
  * @param id - The artist's id.
- * @param name - The view, such as `top-songs`: one of the artist's, as the type has them; Apple says whether there is
- *   such a one.
- * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each item,
- *   and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked for,
- *   and `next` when there are more; `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The view's name, one of the artist's as the type has them; Apple says whether there is such a one.
+ * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one page,
+ *   where to start, what to send beside them, and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+ *   there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getArtistView = /*#__PURE__*/ viewGetter<tArtistViews>("getArtistView", "artists");
 
@@ -393,10 +407,11 @@ export const getArtistView = /*#__PURE__*/ viewGetter<tArtistViews>("getArtistVi
  * @param id - The playlist's id.
  * @param options - The storefront to ask in, the views to send with the playlist, and what else to send beside it.
  * @returns What Apple answered: the playlist under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylist = /*#__PURE__*/ resourceGetter<tPlaylistsResponse, tStorefrontOption, tViewsOption<tPlaylistViews>>("getPlaylist", playlists, { views: "list" });
 /**
@@ -407,10 +422,11 @@ export const getPlaylist = /*#__PURE__*/ resourceGetter<tPlaylistsResponse, tSto
  * @param ids - The playlists' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the playlists.
  * @returns What Apple answered: the playlists under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylists = /*#__PURE__*/ resourcesGetter<tPlaylistsResponse, tStorefrontOption>("getPlaylists", playlists);
 /**
@@ -418,13 +434,14 @@ export const getPlaylists = /*#__PURE__*/ resourcesGetter<tPlaylistsResponse, tS
  *
  * @function
  * @param client - The client to ask with.
- * @param values - The storefronts' ids, such as `"gb"`, 1 to 300 of them.
+ * @param values - The storefronts' ids, 1 to 300 of them; each one such as `"gb"`.
  * @param options - The storefront to ask in, and what to send beside the playlists.
  * @returns What Apple answered: the playlists under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylistsByStorefrontChart = /*#__PURE__*/ resourcesFinder<tPlaylistsResponse, tStorefrontOption>("getPlaylistsByStorefrontChart", "storefront-chart", playlists);
 /**
@@ -433,15 +450,16 @@ export const getPlaylistsByStorefrontChart = /*#__PURE__*/ resourcesFinder<tPlay
  * @function
  * @param client - The client to ask with.
  * @param id - The playlist's id.
- * @param name - The relationship, such as `tracks`: one of the playlist's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the playlist's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylistRelationship = /*#__PURE__*/ relationshipGetter<Omit<tPlaylistRelationships, "library">, tStorefrontOption>("getPlaylistRelationship", playlists);
 /**
@@ -450,16 +468,16 @@ export const getPlaylistRelationship = /*#__PURE__*/ relationshipGetter<Omit<tPl
  * @function
  * @param client - The client to ask with.
  * @param id - The playlist's id.
- * @param name - The view, such as `featured-artists`: one of the playlist's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each item,
- *   and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked for,
- *   and `next` when there are more; `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The view's name, one of the playlist's as the type has them; Apple says whether there is such a one.
+ * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one page,
+ *   where to start, what to send beside them, and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+ *   there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getPlaylistView = /*#__PURE__*/ viewGetter<tPlaylistViews>("getPlaylistView", "playlists");
 
@@ -473,10 +491,11 @@ export const getPlaylistView = /*#__PURE__*/ viewGetter<tPlaylistViews>("getPlay
  * @param id - The music video's id.
  * @param options - The storefront to ask in, the views to send with the music video, and what else to send beside it.
  * @returns What Apple answered: the music video under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideo = /*#__PURE__*/ resourceGetter<tMusicVideosResponse, tStorefrontOption, tViewsOption<tMusicVideoViews>>("getMusicVideo", musicVideos, { views: "list" });
 /**
@@ -487,10 +506,11 @@ export const getMusicVideo = /*#__PURE__*/ resourceGetter<tMusicVideosResponse, 
  * @param ids - The music videos' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the music videos.
  * @returns What Apple answered: the music videos under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideos = /*#__PURE__*/ resourcesGetter<tMusicVideosResponse, tStorefrontOption>("getMusicVideos", musicVideos);
 /**
@@ -498,13 +518,14 @@ export const getMusicVideos = /*#__PURE__*/ resourcesGetter<tMusicVideosResponse
  *
  * @function
  * @param client - The client to ask with.
- * @param values - The ISRCs, 1 to 300 of them.
+ * @param values - The ISRCs, 1 to 300 of them; one ISRC may be that of more than one music video.
  * @param options - The storefront to ask in, and what to send beside the music videos.
  * @returns What Apple answered: the music videos under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideosByIsrc = /*#__PURE__*/ resourcesFinder<tMusicVideosResponse, tStorefrontOption>("getMusicVideosByIsrc", "isrc", musicVideos);
 /**
@@ -517,10 +538,11 @@ export const getMusicVideosByIsrc = /*#__PURE__*/ resourcesFinder<tMusicVideosRe
  * @param options - The storefront to ask in, which is where the equivalents are looked for; what to leave out of them;
  *   and what to send beside them.
  * @returns What Apple answered: the music videos under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicVideosResponse, tStorefrontOption, tRestrictOption>("getMusicVideosByEquivalents", "equivalents", musicVideos, { restrict: "list" });
 /**
@@ -529,15 +551,16 @@ export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicV
  * @function
  * @param client - The client to ask with.
  * @param id - The music video's id.
- * @param name - The relationship, such as `artists`: one of the music video's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the music video's as the type has them; Apple says whether there is
+ *   such a one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideoRelationship = /*#__PURE__*/ relationshipGetter<Omit<tMusicVideoRelationships, "library">, tStorefrontOption>("getMusicVideoRelationship", musicVideos);
 /**
@@ -546,16 +569,16 @@ export const getMusicVideoRelationship = /*#__PURE__*/ relationshipGetter<Omit<t
  * @function
  * @param client - The client to ask with.
  * @param id - The music video's id.
- * @param name - The view, such as `more-by-artist`: one of the music video's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each item,
- *   and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked for,
- *   and `next` when there are more; `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The view's name, one of the music video's as the type has them; Apple says whether there is such a one.
+ * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one page,
+ *   where to start, what to send beside them, and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+ *   there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getMusicVideoView = /*#__PURE__*/ viewGetter<tMusicVideoViews>("getMusicVideoView", "music-videos");
 
@@ -569,10 +592,11 @@ export const getMusicVideoView = /*#__PURE__*/ viewGetter<tMusicVideoViews>("get
  * @param id - The station's id.
  * @param options - The storefront to ask in, and what to send beside the station.
  * @returns What Apple answered: the station under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStation = /*#__PURE__*/ resourceGetter<tStationsResponse, tStorefrontOption>("getStation", stations);
 /**
@@ -583,10 +607,11 @@ export const getStation = /*#__PURE__*/ resourceGetter<tStationsResponse, tStore
  * @param ids - The stations' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the stations.
  * @returns What Apple answered: the stations under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStations = /*#__PURE__*/ resourcesGetter<tStationsResponse, tStorefrontOption>("getStations", stations);
 /**
@@ -595,15 +620,16 @@ export const getStations = /*#__PURE__*/ resourcesGetter<tStationsResponse, tSto
  * @function
  * @param client - The client to ask with.
  * @param id - The station's id.
- * @param name - The relationship, such as `radio-show`: one of the station's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the station's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationRelationship = /*#__PURE__*/ relationshipGetter<tStationRelationships, tStorefrontOption>("getStationRelationship", stations);
 /**
@@ -614,10 +640,11 @@ export const getStationRelationship = /*#__PURE__*/ relationshipGetter<tStationR
  * @param id - The station genre's id.
  * @param options - The storefront to ask in, and what to send beside the station genre.
  * @returns What Apple answered: the station genre under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationGenre = /*#__PURE__*/ resourceGetter<tStationGenresResponse, tStorefrontOption>("getStationGenre", stationGenres);
 /**
@@ -628,10 +655,11 @@ export const getStationGenre = /*#__PURE__*/ resourceGetter<tStationGenresRespon
  * @param ids - The station genres' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the station genres.
  * @returns What Apple answered: the station genres under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationGenres = /*#__PURE__*/ resourcesGetter<tStationGenresResponse, tStorefrontOption>("getStationGenres", stationGenres);
 /**
@@ -639,14 +667,14 @@ export const getStationGenres = /*#__PURE__*/ resourcesGetter<tStationGenresResp
  *
  * @function
  * @param client - The client to ask with.
- * @param options - The storefront to ask in, what to send beside each station genre, and the most pages a walk may ask
- *   for.
- * @returns What Apple answered: the first page of station genres under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const listStationGenres = /*#__PURE__*/ resourceLister<tStationGenresResponse, tStorefrontOption>("listStationGenres", stationGenres);
 /**
@@ -655,15 +683,16 @@ export const listStationGenres = /*#__PURE__*/ resourceLister<tStationGenresResp
  * @function
  * @param client - The client to ask with.
  * @param id - The station genre's id.
- * @param name - The relationship, such as `stations`: one of the station genre's, as the type has them; Apple says
- *   whether there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the station genre's as the type has them; Apple says whether there is
+ *   such a one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStationGenreRelationship = /*#__PURE__*/ relationshipGetter<tStationGenreRelationships, tStorefrontOption>("getStationGenreRelationship", stationGenres);
 
@@ -677,10 +706,11 @@ export const getStationGenreRelationship = /*#__PURE__*/ relationshipGetter<tSta
  * @param id - The genre's id.
  * @param options - The storefront to ask in, and what to send beside the genre.
  * @returns What Apple answered: the genre under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getGenre = /*#__PURE__*/ resourceGetter<tGenresResponse, tStorefrontOption>("getGenre", genres);
 /**
@@ -691,10 +721,11 @@ export const getGenre = /*#__PURE__*/ resourceGetter<tGenresResponse, tStorefron
  * @param ids - The genres' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the genres.
  * @returns What Apple answered: the genres under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getGenres = /*#__PURE__*/ resourcesGetter<tGenresResponse, tStorefrontOption>("getGenres", genres);
 /**
@@ -702,13 +733,14 @@ export const getGenres = /*#__PURE__*/ resourcesGetter<tGenresResponse, tStorefr
  *
  * @function
  * @param client - The client to ask with.
- * @param options - The storefront to ask in, what to send beside each genre, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of genres under `data`, with `next` when there are more; `maxPages`
- *   plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const listGenres = /*#__PURE__*/ resourceLister<tGenresResponse, tStorefrontOption>("listGenres", genres);
 
@@ -722,10 +754,11 @@ export const listGenres = /*#__PURE__*/ resourceLister<tGenresResponse, tStorefr
  * @param id - The curator's id.
  * @param options - The storefront to ask in, and what to send beside the curator.
  * @returns What Apple answered: the curator under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getCurator = /*#__PURE__*/ resourceGetter<tCuratorsResponse, tStorefrontOption>("getCurator", curators);
 /**
@@ -736,10 +769,11 @@ export const getCurator = /*#__PURE__*/ resourceGetter<tCuratorsResponse, tStore
  * @param ids - The curators' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the curators.
  * @returns What Apple answered: the curators under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getCurators = /*#__PURE__*/ resourcesGetter<tCuratorsResponse, tStorefrontOption>("getCurators", curators);
 /**
@@ -748,15 +782,16 @@ export const getCurators = /*#__PURE__*/ resourcesGetter<tCuratorsResponse, tSto
  * @function
  * @param client - The client to ask with.
  * @param id - The curator's id.
- * @param name - The relationship, such as `playlists`: one of the curator's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the curator's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getCuratorRelationship = /*#__PURE__*/ relationshipGetter<tCuratorRelationships, tStorefrontOption>("getCuratorRelationship", curators);
 /**
@@ -767,10 +802,11 @@ export const getCuratorRelationship = /*#__PURE__*/ relationshipGetter<tCuratorR
  * @param id - The Apple curator's id.
  * @param options - The storefront to ask in, and what to send beside the Apple curator.
  * @returns What Apple answered: the Apple curator under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAppleCurator = /*#__PURE__*/ resourceGetter<tAppleCuratorsResponse, tStorefrontOption>("getAppleCurator", appleCurators);
 /**
@@ -781,10 +817,11 @@ export const getAppleCurator = /*#__PURE__*/ resourceGetter<tAppleCuratorsRespon
  * @param ids - The Apple curators' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the Apple curators.
  * @returns What Apple answered: the Apple curators under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAppleCurators = /*#__PURE__*/ resourcesGetter<tAppleCuratorsResponse, tStorefrontOption>("getAppleCurators", appleCurators);
 /**
@@ -793,15 +830,16 @@ export const getAppleCurators = /*#__PURE__*/ resourcesGetter<tAppleCuratorsResp
  * @function
  * @param client - The client to ask with.
  * @param id - The Apple curator's id.
- * @param name - The relationship, such as `playlists`: one of the Apple curator's, as the type has them; Apple says
- *   whether there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the Apple curator's as the type has them; Apple says whether there is
+ *   such a one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getAppleCuratorRelationship = /*#__PURE__*/ relationshipGetter<tAppleCuratorRelationships, tStorefrontOption>("getAppleCuratorRelationship", appleCurators);
 /**
@@ -812,10 +850,11 @@ export const getAppleCuratorRelationship = /*#__PURE__*/ relationshipGetter<tApp
  * @param id - The activity's id.
  * @param options - The storefront to ask in, and what to send beside the activity.
  * @returns What Apple answered: the activity under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getActivity = /*#__PURE__*/ resourceGetter<tActivitiesResponse, tStorefrontOption>("getActivity", activities);
 /**
@@ -826,10 +865,11 @@ export const getActivity = /*#__PURE__*/ resourceGetter<tActivitiesResponse, tSt
  * @param ids - The activities' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the activities.
  * @returns What Apple answered: the activities under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getActivities = /*#__PURE__*/ resourcesGetter<tActivitiesResponse, tStorefrontOption>("getActivities", activities);
 /**
@@ -838,15 +878,16 @@ export const getActivities = /*#__PURE__*/ resourcesGetter<tActivitiesResponse, 
  * @function
  * @param client - The client to ask with.
  * @param id - The activity's id.
- * @param name - The relationship, such as `playlists`: one of the activity's, as the type has them; Apple says whether
- *   there is such a one.
- * @param options - The storefront to ask in, what to send beside each item, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the relationship under `data`, with `next` when there are more;
- *   `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The relationship's name, one of the activity's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, how many to send in one page, where to start, what to send beside them,
+ *   and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getActivityRelationship = /*#__PURE__*/ relationshipGetter<tActivityRelationships, tStorefrontOption>("getActivityRelationship", activities);
 
@@ -860,10 +901,11 @@ export const getActivityRelationship = /*#__PURE__*/ relationshipGetter<tActivit
  * @param id - The record label's id.
  * @param options - The storefront to ask in, the views to send with the record label, and what else to send beside it.
  * @returns What Apple answered: the record label under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse, tStorefrontOption, tViewsOption<tRecordLabelViews>>("getRecordLabel", recordLabels, { views: "list" });
 /**
@@ -874,10 +916,11 @@ export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse
  * @param ids - The record labels' ids, 1 to 300 of them.
  * @param options - The storefront to ask in, and what to send beside the record labels.
  * @returns What Apple answered: the record labels under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getRecordLabels = /*#__PURE__*/ resourcesGetter<tRecordLabelsResponse, tStorefrontOption>("getRecordLabels", recordLabels);
 /**
@@ -886,16 +929,17 @@ export const getRecordLabels = /*#__PURE__*/ resourcesGetter<tRecordLabelsRespon
  * @function
  * @param client - The client to ask with.
  * @param id - The record label's id.
- * @param name - The view, such as `latest-releases`: one of the record label's, as the type has them; Apple says
- *   whether there is such a one.
- * @param options - The storefront to ask in, whether to send the view's own attributes, what to send beside each item,
- *   and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of the view under `data`, its own attributes when they were asked for,
- *   and `next` when there are more; `maxPages` plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails, or if the client has no storefront to ask
- *   in; `_tag` says which.
+ * @param name - The view's name, one of the record label's as the type has them; Apple says whether there is such a
+ *   one.
+ * @param options - The storefront to ask in, whether to send the view's own attributes, how many to send in one page,
+ *   where to start, what to send beside them, and the signal and schema of the request.
+ * @returns What Apple answered: the first page, with its own attributes where they were asked for and `next` where
+ *   there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in,
+ *   or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getRecordLabelView = /*#__PURE__*/ viewGetter<tRecordLabelViews>("getRecordLabelView", "record-labels");
 
@@ -909,9 +953,11 @@ export const getRecordLabelView = /*#__PURE__*/ viewGetter<tRecordLabelViews>("g
  * @param id - The storefront's id.
  * @param options - What to send beside the storefront.
  * @returns What Apple answered: the storefront under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+ *   which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStorefront = /*#__PURE__*/ resourceGetter<tStorefrontsResponse>("getStorefront", storefronts);
 /**
@@ -919,12 +965,14 @@ export const getStorefront = /*#__PURE__*/ resourceGetter<tStorefrontsResponse>(
  *
  * @function
  * @param client - The client to ask with.
- * @param ids - The storefronts' ids, such as `"gb"`, 1 to 300 of them.
+ * @param ids - The storefronts' ids, 1 to 300 of them; each one such as `"gb"`.
  * @param options - What to send beside the storefronts.
  * @returns What Apple answered: the storefronts under `data`.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+ *   which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const getStorefronts = /*#__PURE__*/ resourcesGetter<tStorefrontsResponse>("getStorefronts", storefronts);
 /**
@@ -932,11 +980,13 @@ export const getStorefronts = /*#__PURE__*/ resourcesGetter<tStorefrontsResponse
  *
  * @function
  * @param client - The client to ask with.
- * @param options - What to send beside each storefront, and the most pages a walk may ask for.
- * @returns What Apple answered: the first page of storefronts under `data`, with `next` when there are more; `maxPages`
- *   plays no part.
- * @throws TypeError if an argument is not what it should be, before Apple is asked.
- * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+ * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of
+ *   the request.
+ * @returns What Apple answered: the first page, with `next` where there is more; `maxPages` plays no part.
+ * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
+ * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says
+ *   which.
  * @throws The reason `options.signal` aborted with, when it does.
+ * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
  */
 export const listStorefronts = /*#__PURE__*/ resourceLister<tStorefrontsResponse>("listStorefronts", storefronts);

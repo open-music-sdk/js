@@ -20,43 +20,47 @@ export interface tUserFunctions {
    *
    * @param id - The library song's id.
    * @param options - What to send beside the song.
-   * @returns The song, out of Apple's answer.
+   * @returns The song, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no song is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no song, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibrarySong: typeof resources.getLibrarySong;
   /**
    * The songs with the ids given in the listener's library.
    *
-   * @param ids - The library songs' ids.
+   * @param ids - The library songs' ids, 1 to 300 of them.
    * @param options - What to send beside the songs.
-   * @returns The songs, out of Apple's answer: a list, empty when it holds none.
+   * @returns The songs, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibrarySongs: typeof resources.getLibrarySongs;
   /**
    * Every song in the listener's library, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every song in the library, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every song of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listLibrarySongs: typeof resources.listLibrarySongs;
   /**
    * One relationship of a library song, such as its `albums`, a page at a time.
    *
    * @param id - The library song's id.
-   * @param name - The relationship's name, such as its `albums`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library song's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibrarySongRelationship: typeof resources.getLibrarySongRelationship;
   /**
@@ -64,43 +68,47 @@ export interface tUserFunctions {
    *
    * @param id - The library album's id.
    * @param options - What to send beside the album.
-   * @returns The album, out of Apple's answer.
+   * @returns The album, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no album is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no album, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryAlbum: typeof resources.getLibraryAlbum;
   /**
    * The albums with the ids given in the listener's library.
    *
-   * @param ids - The library albums' ids.
+   * @param ids - The library albums' ids, 1 to 300 of them.
    * @param options - What to send beside the albums.
-   * @returns The albums, out of Apple's answer: a list, empty when it holds none.
+   * @returns The albums, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryAlbums: typeof resources.getLibraryAlbums;
   /**
    * Every album in the listener's library, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every album in the library, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every album of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listLibraryAlbums: typeof resources.listLibraryAlbums;
   /**
    * One relationship of a library album, such as its `tracks`, a page at a time.
    *
    * @param id - The library album's id.
-   * @param name - The relationship's name, such as its `tracks`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library album's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryAlbumRelationship: typeof resources.getLibraryAlbumRelationship;
   /**
@@ -108,43 +116,47 @@ export interface tUserFunctions {
    *
    * @param id - The library artist's id.
    * @param options - What to send beside the artist.
-   * @returns The artist, out of Apple's answer.
+   * @returns The artist, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no artist is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no artist, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryArtist: typeof resources.getLibraryArtist;
   /**
    * The artists with the ids given in the listener's library.
    *
-   * @param ids - The library artists' ids.
+   * @param ids - The library artists' ids, 1 to 300 of them.
    * @param options - What to send beside the artists.
-   * @returns The artists, out of Apple's answer: a list, empty when it holds none.
+   * @returns The artists, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryArtists: typeof resources.getLibraryArtists;
   /**
    * Every artist in the listener's library, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every artist in the library, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every artist of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listLibraryArtists: typeof resources.listLibraryArtists;
   /**
    * One relationship of a library artist, such as their `albums`, a page at a time.
    *
    * @param id - The library artist's id.
-   * @param name - The relationship's name, such as their `albums`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library artist's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryArtistRelationship: typeof resources.getLibraryArtistRelationship;
   /**
@@ -152,43 +164,47 @@ export interface tUserFunctions {
    *
    * @param id - The library music video's id.
    * @param options - What to send beside the music video.
-   * @returns The music video, out of Apple's answer.
+   * @returns The music video, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no music video is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no music video, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryMusicVideo: typeof resources.getLibraryMusicVideo;
   /**
    * The music videos with the ids given in the listener's library.
    *
-   * @param ids - The library music videos' ids.
+   * @param ids - The library music videos' ids, 1 to 300 of them.
    * @param options - What to send beside the music videos.
-   * @returns The music videos, out of Apple's answer: a list, empty when it holds none.
+   * @returns The music videos, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryMusicVideos: typeof resources.getLibraryMusicVideos;
   /**
    * Every music video in the listener's library, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every music video in the library, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every music video of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listLibraryMusicVideos: typeof resources.listLibraryMusicVideos;
   /**
    * One relationship of a library music video, such as its `artists`, a page at a time.
    *
    * @param id - The library music video's id.
-   * @param name - The relationship's name, such as its `artists`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library music video's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryMusicVideoRelationship: typeof resources.getLibraryMusicVideoRelationship;
   /**
@@ -196,43 +212,47 @@ export interface tUserFunctions {
    *
    * @param id - The library playlist's id.
    * @param options - What to send beside the playlist.
-   * @returns The playlist, out of Apple's answer.
+   * @returns The playlist, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no playlist is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no playlist, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylist: typeof resources.getLibraryPlaylist;
   /**
    * The playlists with the ids given in the listener's library.
    *
-   * @param ids - The library playlists' ids.
+   * @param ids - The library playlists' ids, 1 to 300 of them.
    * @param options - What to send beside the playlists.
-   * @returns The playlists, out of Apple's answer: a list, empty when it holds none.
+   * @returns The playlists, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylists: typeof resources.getLibraryPlaylists;
   /**
    * Every playlist in the listener's library, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every playlist in the library, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every playlist of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listLibraryPlaylists: typeof resources.listLibraryPlaylists;
   /**
    * One relationship of a library playlist, such as its `tracks`, a page at a time.
    *
    * @param id - The library playlist's id.
-   * @param name - The relationship's name, such as its `tracks`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library playlist's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistRelationship: typeof resources.getLibraryPlaylistRelationship;
   /**
@@ -242,10 +262,11 @@ export interface tUserFunctions {
    *
    * @param playlist - The playlist to make: its name under `attributes`, and its tracks and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The new playlist, out of Apple's answer, or `undefined` when the answer holds none: it was made either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly createLibraryPlaylist: typeof resources.createLibraryPlaylist;
   /**
@@ -253,33 +274,36 @@ export interface tUserFunctions {
    *
    * @param id - The library playlist folder's id.
    * @param options - What to send beside the playlist folder.
-   * @returns The playlist folder, out of Apple's answer.
+   * @returns The playlist folder, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no playlist folder is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no playlist folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistFolder: typeof resources.getLibraryPlaylistFolder;
   /**
    * The playlist folders with the ids given in the listener's library.
    *
-   * @param ids - The library playlist folders' ids.
+   * @param ids - The library playlist folders' ids, 1 to 300 of them.
    * @param options - What to send beside the playlist folders.
-   * @returns The playlist folders, out of Apple's answer: a list, empty when it holds none.
+   * @returns The playlist folders, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistFolders: typeof resources.getLibraryPlaylistFolders;
   /**
    * One relationship of a library playlist folder, such as its `children`, a page at a time.
    *
    * @param id - The library playlist folder's id.
-   * @param name - The relationship's name, such as its `children`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the library playlist folder's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistFolderRelationship: typeof resources.getLibraryPlaylistFolderRelationship;
   /**
@@ -289,10 +313,11 @@ export interface tUserFunctions {
    *
    * @param folder - The folder to make: its name under `attributes`, and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The new folder, out of Apple's answer, or `undefined` when the answer holds none: it was made either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly createLibraryPlaylistFolder: typeof resources.createLibraryPlaylistFolder;
   /**
@@ -300,43 +325,47 @@ export interface tUserFunctions {
    *
    * @param id - The recommendation's id.
    * @param options - What to send beside the recommendation.
-   * @returns The recommendation, out of Apple's answer.
+   * @returns The recommendation, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no recommendation is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no recommendation, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPersonalRecommendation: typeof resources.getPersonalRecommendation;
   /**
    * The recommendations with the ids given, of the ones made for the listener.
    *
-   * @param ids - The recommendations' ids.
+   * @param ids - The recommendations' ids, 1 to 300 of them.
    * @param options - What to send beside the recommendations.
-   * @returns The recommendations, out of Apple's answer: a list, empty when it holds none.
+   * @returns The recommendations, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPersonalRecommendations: typeof resources.getPersonalRecommendations;
   /**
    * Every recommendation made for the listener, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every recommendation made for the listener, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every recommendation of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listPersonalRecommendations: typeof resources.listPersonalRecommendations;
   /**
    * One relationship of a recommendation, such as its `contents`, a page at a time.
    *
    * @param id - The recommendation's id.
-   * @param name - The relationship's name, such as its `contents`.
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything the relationship holds, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param name - The relationship's name, one of the recommendation's as the type has them; Apple says whether there is such a one.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPersonalRecommendationRelationship: typeof resources.getPersonalRecommendationRelationship;
   /**
@@ -344,21 +373,23 @@ export interface tUserFunctions {
    *
    * @param id - The song's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getSongRating: typeof ratings.getSongRating;
   /**
    * The listener's ratings of the songs with the ids given.
    *
-   * @param ids - The songs' ids.
+   * @param ids - The songs' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getSongRatings: typeof ratings.getSongRatings;
   /**
@@ -367,10 +398,11 @@ export interface tUserFunctions {
    * @param id - The song's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setSongRating: typeof ratings.setSongRating;
   /**
@@ -378,10 +410,11 @@ export interface tUserFunctions {
    *
    * @param id - The song's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteSongRating: typeof ratings.deleteSongRating;
   /**
@@ -389,21 +422,23 @@ export interface tUserFunctions {
    *
    * @param id - The album's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getAlbumRating: typeof ratings.getAlbumRating;
   /**
    * The listener's ratings of the albums with the ids given.
    *
-   * @param ids - The albums' ids.
+   * @param ids - The albums' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getAlbumRatings: typeof ratings.getAlbumRatings;
   /**
@@ -412,10 +447,11 @@ export interface tUserFunctions {
    * @param id - The album's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setAlbumRating: typeof ratings.setAlbumRating;
   /**
@@ -423,10 +459,11 @@ export interface tUserFunctions {
    *
    * @param id - The album's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteAlbumRating: typeof ratings.deleteAlbumRating;
   /**
@@ -434,21 +471,23 @@ export interface tUserFunctions {
    *
    * @param id - The music video's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getMusicVideoRating: typeof ratings.getMusicVideoRating;
   /**
    * The listener's ratings of the music videos with the ids given.
    *
-   * @param ids - The music videos' ids.
+   * @param ids - The music videos' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getMusicVideoRatings: typeof ratings.getMusicVideoRatings;
   /**
@@ -457,10 +496,11 @@ export interface tUserFunctions {
    * @param id - The music video's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setMusicVideoRating: typeof ratings.setMusicVideoRating;
   /**
@@ -468,10 +508,11 @@ export interface tUserFunctions {
    *
    * @param id - The music video's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteMusicVideoRating: typeof ratings.deleteMusicVideoRating;
   /**
@@ -479,21 +520,23 @@ export interface tUserFunctions {
    *
    * @param id - The playlist's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPlaylistRating: typeof ratings.getPlaylistRating;
   /**
    * The listener's ratings of the playlists with the ids given.
    *
-   * @param ids - The playlists' ids.
+   * @param ids - The playlists' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPlaylistRatings: typeof ratings.getPlaylistRatings;
   /**
@@ -502,10 +545,11 @@ export interface tUserFunctions {
    * @param id - The playlist's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setPlaylistRating: typeof ratings.setPlaylistRating;
   /**
@@ -513,10 +557,11 @@ export interface tUserFunctions {
    *
    * @param id - The playlist's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deletePlaylistRating: typeof ratings.deletePlaylistRating;
   /**
@@ -524,21 +569,23 @@ export interface tUserFunctions {
    *
    * @param id - The station's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getStationRating: typeof ratings.getStationRating;
   /**
    * The listener's ratings of the stations with the ids given.
    *
-   * @param ids - The stations' ids.
+   * @param ids - The stations' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getStationRatings: typeof ratings.getStationRatings;
   /**
@@ -547,10 +594,11 @@ export interface tUserFunctions {
    * @param id - The station's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setStationRating: typeof ratings.setStationRating;
   /**
@@ -558,10 +606,11 @@ export interface tUserFunctions {
    *
    * @param id - The station's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteStationRating: typeof ratings.deleteStationRating;
   /**
@@ -569,21 +618,23 @@ export interface tUserFunctions {
    *
    * @param id - The library song's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibrarySongRating: typeof ratings.getLibrarySongRating;
   /**
    * The listener's ratings of the library songs with the ids given.
    *
-   * @param ids - The library songs' ids.
+   * @param ids - The library songs' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibrarySongRatings: typeof ratings.getLibrarySongRatings;
   /**
@@ -592,10 +643,11 @@ export interface tUserFunctions {
    * @param id - The library song's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setLibrarySongRating: typeof ratings.setLibrarySongRating;
   /**
@@ -603,10 +655,11 @@ export interface tUserFunctions {
    *
    * @param id - The library song's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteLibrarySongRating: typeof ratings.deleteLibrarySongRating;
   /**
@@ -614,21 +667,23 @@ export interface tUserFunctions {
    *
    * @param id - The library album's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryAlbumRating: typeof ratings.getLibraryAlbumRating;
   /**
    * The listener's ratings of the library albums with the ids given.
    *
-   * @param ids - The library albums' ids.
+   * @param ids - The library albums' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryAlbumRatings: typeof ratings.getLibraryAlbumRatings;
   /**
@@ -637,10 +692,11 @@ export interface tUserFunctions {
    * @param id - The library album's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setLibraryAlbumRating: typeof ratings.setLibraryAlbumRating;
   /**
@@ -648,10 +704,11 @@ export interface tUserFunctions {
    *
    * @param id - The library album's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteLibraryAlbumRating: typeof ratings.deleteLibraryAlbumRating;
   /**
@@ -659,21 +716,23 @@ export interface tUserFunctions {
    *
    * @param id - The library music video's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryMusicVideoRating: typeof ratings.getLibraryMusicVideoRating;
   /**
    * The listener's ratings of the library music videos with the ids given.
    *
-   * @param ids - The library music videos' ids.
+   * @param ids - The library music videos' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryMusicVideoRatings: typeof ratings.getLibraryMusicVideoRatings;
   /**
@@ -682,10 +741,11 @@ export interface tUserFunctions {
    * @param id - The library music video's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setLibraryMusicVideoRating: typeof ratings.setLibraryMusicVideoRating;
   /**
@@ -693,10 +753,11 @@ export interface tUserFunctions {
    *
    * @param id - The library music video's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteLibraryMusicVideoRating: typeof ratings.deleteLibraryMusicVideoRating;
   /**
@@ -704,21 +765,23 @@ export interface tUserFunctions {
    *
    * @param id - The library playlist's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating, out of Apple's answer.
+   * @returns The rating, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no rating is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no rating, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistRating: typeof ratings.getLibraryPlaylistRating;
   /**
    * The listener's ratings of the library playlists with the ids given.
    *
-   * @param ids - The library playlists' ids.
+   * @param ids - The library playlists' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The ratings, out of Apple's answer: a list, empty when it holds none.
+   * @returns The ratings, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryPlaylistRatings: typeof ratings.getLibraryPlaylistRatings;
   /**
@@ -727,10 +790,11 @@ export interface tUserFunctions {
    * @param id - The library playlist's id.
    * @param value - The rating: 1 for a like, -1 for a dislike.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns The rating as set, out of Apple's answer, or `undefined` when the answer holds none: it was set either way.
+   * @returns What Apple sent back of what was written, out of `data`, or `undefined` where it sent nothing.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly setLibraryPlaylistRating: typeof ratings.setLibraryPlaylistRating;
   /**
@@ -738,138 +802,151 @@ export interface tUserFunctions {
    *
    * @param id - The library playlist's id.
    * @param options - The language to answer in, and what else to send with the request.
-   * @returns Nothing: `undefined` once Apple has taken the rating away.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly deleteLibraryPlaylistRating: typeof ratings.deleteLibraryPlaylistRating;
   /**
    * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
    * and `offset` apply to every type asked for.
    *
-   * @param term - What to look for, as the listener typed it.
+   * @param term - What to search for, 1 to 256 characters.
    * @param options - The types to look for, which have to be given; how many of each to send and where to start; and what to send beside each.
-   * @returns Apple's answer as it is, the results by type under `results`: it holds no one `data` to hand over in its place.
+   * @returns What Apple answered: the results by type under `results`, each a first page of its own.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly searchLibrary: typeof library.searchLibrary;
   /**
    * Library resources of several types in one request, by their ids: `{ "library-songs": [...] }`. One type at least has to be given.
    *
-   * @param ids - The ids by type of library resource, one type at least.
+   * @param ids - Ids by type of library resource: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What to send beside the resources.
-   * @returns The resources of every type asked for, out of Apple's answer: one list, empty when it holds none.
+   * @returns The resources, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getLibraryResources: typeof library.getLibraryResources;
   /**
    * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
    *
-   * @param ids - The ids of the catalog resources to add, by type, one type at least.
+   * @param ids - The ids of the catalog resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
-   * @returns Nothing: `undefined` once Apple has accepted the request, which is before the resources appear in the library.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly addToLibrary: typeof library.addToLibrary;
   /**
    * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
    *
-   * @param ids - The ids of the resources to add, by type, one type at least.
+   * @param ids - The ids of the resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
-   * @returns Nothing: `undefined` once Apple has accepted the request, which is before the resources appear among the favorites.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly addToFavorites: typeof library.addToFavorites;
   /**
    * Adds tracks to the end of a playlist in the listener's library: `[{ id, type: "songs" }]`. It resolves to nothing.
    *
    * @param id - The library playlist's id.
-   * @param tracks - The tracks to add: each its id and its type, and nothing else of it is sent.
+   * @param tracks - What to add, 1 to 300 of them, each by `id` and `type`; nothing else of a track is sent.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
-   * @returns Nothing: `undefined` once Apple has accepted the tracks.
+   * @returns Nothing: it resolves once Apple has accepted the write.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly addLibraryPlaylistTracks: typeof library.addLibraryPlaylistTracks;
   /**
    * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
    *
    * @param options - What to send beside the folder.
-   * @returns The root folder, out of Apple's answer.
+   * @returns The root folder, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no folder is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getRootLibraryPlaylistFolder: typeof library.getRootLibraryPlaylistFolder;
   /**
    * What the listener added to their library lately, newest first, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything added lately, newest first, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listRecentlyAdded: typeof library.listRecentlyAdded;
   /**
    * What the listener plays most at present, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything played most at present, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listHeavyRotation: typeof library.listHeavyRotation;
   /**
    * What the listener played lately, newest first, a page at a time: the albums, playlists and stations, not the tracks in them.
    *
-   * @param options - The types to keep to, and the rest: how many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Everything played lately, newest first, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - The types to keep to, how many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every item of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listRecentlyPlayed: typeof library.listRecentlyPlayed;
   /**
    * The tracks the listener played lately, newest first, a page at a time.
    *
-   * @param options - The types to keep to, and the rest: how many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every track played lately, newest first, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - The types to keep to, how many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every track of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listRecentlyPlayedTracks: typeof library.listRecentlyPlayedTracks;
   /**
    * The radio stations the listener played lately, newest first, a page at a time.
    *
-   * @param options - How many to send in one page, where to start, what to send beside each, and the most pages a walk may ask for.
-   * @returns Every station played lately, newest first, from every page: each page is asked for as the one before runs out, and none until the loop starts.
-   * @throws TypeError if an argument is not what it should be: thrown as it is called, before any loop, and before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails as the loop asks for a page; `_tag` says which.
+   * @param options - How many to send in one page, where to start, what to send beside them, and the signal and schema of the request.
+   * @returns Every station of every page, asking for each page as the one before runs out; `maxPages` says how many pages at most.
+   * @throws TypeError if an argument is not what it should be, thrown from the call itself, before a loop starts.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if a page is no object or its `data` is there and is no list, which is an `ApiError`, each thrown as the loop asks for the page; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly listRecentlyPlayedStations: typeof library.listRecentlyPlayedStations;
   /**
    * The listener's replay: a summary of what they played in each of the years given. The one year Apple takes at present is `"latest"`.
    *
-   * @param values - The years, as Apple names them: `"latest"` is the one it takes at present.
+   * @param values - The years, 1 to 300 of them; `"latest"` is the one Apple takes at present.
    * @param options - The views to send with each summary, and what else to send beside it.
-   * @returns The summaries, out of Apple's answer: a list, empty when it holds none.
+   * @returns The summaries, out of `data`: an empty list where Apple sends none.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer is no object or its `data` is there and is no list, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getMusicSummariesByYear: typeof library.getMusicSummariesByYear;
   /**
@@ -877,20 +954,22 @@ export interface tUserFunctions {
    * resource there that is asked for with the Music User Token.
    *
    * @param options - The storefront whose catalog the station is in, and what to send beside it.
-   * @returns The station, out of Apple's answer.
+   * @returns The station, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no station is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, if the client has no storefront to ask in, or a schema finds issues, or if the answer holds no station, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getPersonalStation: typeof library.getPersonalStation;
   /**
    * The storefront the listener's account is in: the one whose catalog they see.
    *
    * @param options - What to send beside the storefront.
-   * @returns The storefront, out of Apple's answer.
+   * @returns The storefront, out of `data`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
-   * @throws AppleMusicError if Apple, the network, or a token provider fails; `_tag` says which. An answer that holds no storefront is an `ApiError` with the status it came with.
+   * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no storefront, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
   readonly getUserStorefront: typeof library.getUserStorefront;
 }

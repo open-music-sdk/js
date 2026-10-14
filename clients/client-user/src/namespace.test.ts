@@ -294,18 +294,21 @@ describe("a function of the namespace says what the package's function says: an 
   const keyOf = (tag: string): string => tag.split(" ", tag.startsWith("@param ") || tag.startsWith("@throws ") ? 2 : 1).join(" ");
 
   /**
-   * The tags the function of the namespace says in its own words, by what its bound form hands over, and what each
-   * has to say. Every other tag is the function's, word for word, less `@function` and `@param client`.
+   * The tags the function of the namespace says in its own words, by what its bound form hands over, each with the
+   * phrases it has to say, one of each group. Every other tag is the function's, word for word, less `@function` and
+   * `@param client`. The TypeError is every member's own: the client was checked as the namespace was made, so the
+   * member names the arguments alone, and a walk throws from the call itself. A search hands the answer over as it is.
    */
-  const own: Record<tUnwrap, Readonly<Record<string, string>>> = {
-    resource: { "@returns": "", "@throws AppleMusicError": "`ApiError`" },
-    resources: { "@returns": "" },
-    pages: { "@returns": "", "@throws TypeError": "as it is called", "@throws AppleMusicError": "as the loop asks" },
-    written: { "@returns": "" },
-    answer: { "@returns": "" },
+  const ARGUMENT = "if an argument is not what it should be";
+  const own: Record<tUnwrap, Readonly<Record<string, readonly (readonly string[])[]>>> = {
+    resource: { "@returns": [["out of `data`"]], "@throws TypeError": [[ARGUMENT]], "@throws AppleMusicError": [["`ApiError`"]] },
+    resources: { "@returns": [["out of `data`"], ["empty list"]], "@throws TypeError": [[ARGUMENT]], "@throws AppleMusicError": [["`ApiError`"]] },
+    pages: { "@returns": [["every page"]], "@throws TypeError": [[ARGUMENT], ["from the call itself"]], "@throws AppleMusicError": [["`ApiError`"]] },
+    written: { "@returns": [["out of `data`", "resolves once Apple has accepted"]], "@throws TypeError": [[ARGUMENT]] },
+    answer: { "@throws TypeError": [[ARGUMENT]] },
   };
 
-  test("a function of the namespace has the function's tags, word for word, less @function and @param client, but says in its own words what it hands over and, where unwrapping changes what is thrown and when, what it throws", { timeout: 120_000 }, () => {
+  test("a function of the namespace has the function's tags, word for word, less @function and @param client, but for what unwrapping changes: what it hands over, and the ApiError and the moment a throw gets from unwrapping, each said with the phrase its kind calls for", { timeout: 120_000 }, () => {
     const theirs = hover(direct);
     const ours = hover(ofTheNamespace);
     /** Each function with the kind its bound form hands over, and the tags shown for it and for the function of the namespace. */
@@ -316,19 +319,20 @@ describe("a function of the namespace says what the package's function says: an 
       mine: ours[index]?.tags ?? [],
     }));
     /** Each tag by its key, with what the bound form says itself left as the key alone: the words there are its own. */
-    const shape = (tags: readonly string[], said: Readonly<Record<string, string>>) => tags.map((tag) => (keyOf(tag) in said ? keyOf(tag) : tag));
+    const shape = (tags: readonly string[], said: Readonly<Record<string, unknown>>) => tags.map((tag) => (keyOf(tag) in said ? keyOf(tag) : tag));
     const expected = Object.fromEntries(shown.map((each) => [each.name, shape(each.its.filter((tag) => tag !== "@function" && keyOf(tag) !== "@param client"), each.own)]));
     expect(Object.fromEntries(shown.map((each) => [each.name, shape(each.mine, each.own)]))).toEqual(expected);
-    // Each function's tags begin as the model does, and it has something to return and all three kinds of throw: a mistake, a failure, and the caller's own abort.
+    // Each function's tags begin as the model does, it says what it returns, and it throws four kinds in one order: a mistake, a failure, the caller's abort, and what the client passes on.
     expect(shown.map((each) => each.its.slice(0, 2).map(keyOf))).toEqual(names.map(() => ["@function", "@param client"]));
-    const abort = "@throws The reason `options.signal` aborted with, when it does.";
-    expect(shown.map((each) => ["@returns", "@throws TypeError", "@throws AppleMusicError", abort].filter((key) => !each.its.some((tag) => keyOf(tag) === key || tag === key)))).toEqual(names.map(() => []));
-    // What the bound form says itself is there, says something, says the words that make it its own, and is not what the function says.
+    expect(shown.map((each) => each.its.filter((tag) => keyOf(tag) === "@returns").length)).toEqual(names.map(() => 1));
+    expect(shown.map((each) => each.its.filter((tag) => tag.startsWith("@throws ")).map(keyOf))).toEqual(names.map(() => ["@throws TypeError", "@throws AppleMusicError", "@throws The", "@throws Whatever"]));
+    // What the bound form says itself is there, is not what the function says, and says each phrase its kind calls for.
     const said = shown.flatMap((each) =>
-      Object.entries(each.own).map(([key, words]) => {
+      Object.entries(each.own).map(([key, groups]) => {
         const mine = each.mine.find((tag) => keyOf(tag) === key) ?? "";
         const its = each.its.find((tag) => keyOf(tag) === key) ?? "";
-        return `${each.name} ${key}: ${mine.length > key.length && mine.includes(words) && mine !== its ? "its own" : "not its own"}`;
+        const fine = mine.length > key.length && mine !== its && groups.every((phrases) => phrases.some((phrase) => mine.includes(phrase)));
+        return `${each.name} ${key}: ${fine ? "its own" : "not its own"}`;
       }),
     );
     expect(said.filter((line) => !line.endsWith(": its own"))).toEqual([]);
