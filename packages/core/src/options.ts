@@ -82,10 +82,16 @@ function schemaOf<T>(fn: string, value: unknown): tSchemaLike<T> | undefined {
 }
 
 /**
- * A signal as `fetch` will take it. Anything else would be found out late, after other things had been asked for,
- * and by the runtime, whose own complaint prints what it was handed.
+ * A signal as `fetch` will take it, or none. Anything else would be found out late, after other things had been asked
+ * for, and by the runtime, whose own complaint prints what it was handed; here it is the caller's mistake, said so.
+ * Every package that takes a `signal` option holds it to this.
+ *
+ * @param fn - The name of the function whose option it is, for the error.
+ * @param value - What was handed over as the signal.
+ * @returns The signal, or `undefined` where none was given.
+ * @throws TypeError if `value` is neither `undefined` nor an `AbortSignal`.
  */
-function signalOf(fn: string, value: unknown): AbortSignal | undefined {
+export function signalOf(fn: string, value: unknown): AbortSignal | undefined {
   if (value === undefined || value instanceof AbortSignal) return value;
   throw new TypeError(`${fn}: signal must be an AbortSignal; got ${got(value)}`);
 }

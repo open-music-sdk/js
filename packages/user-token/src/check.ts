@@ -19,15 +19,6 @@ export function userIdOf(fn: string, userId: unknown): string {
 }
 
 /**
- * The signal to abort with, or none. What is no AbortSignal would fail inside core, in an error that names no
- * function and nothing it was handed; here it is this function's mistake, said so.
- */
-export function signalOf(fn: string, signal: unknown): AbortSignal | undefined {
-  if (signal === undefined || signal instanceof AbortSignal) return signal;
-  throw new TypeError(`${fn}: signal must be an AbortSignal; got ${got(signal)}`);
-}
-
-/**
  * The token as core will send it, with the whitespace around it dropped. What a token is, is core's rule and
  * decided nowhere else.
  */

@@ -4,9 +4,9 @@
 // plainly the same is not matched. It is handed back with what the search found, for the app or the listener to
 // choose from.
 import { getSongsByIsrc, searchCatalog } from "@open-music-sdk/client-catalog";
-import { got, isPlain, itemsOf, optionsOf, ownOf, segmentOf, type tAppleMusicClient, type tStorefrontOption } from "@open-music-sdk/core";
+import { got, isPlain, itemsOf, optionsOf, ownOf, segmentOf, signalOf, type tAppleMusicClient, type tStorefrontOption } from "@open-music-sdk/core";
 import type { tSong } from "@open-music-sdk/types";
-import { pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
+import { pause, progressOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
 import { held } from "./own";
 
 /**

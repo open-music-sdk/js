@@ -1,7 +1,8 @@
 // A Music User Token is handed over by the app, wherever the app got it; nothing here reads an environment or a
 // file. What this does is ask Apple about it before anything depends on it.
 import { AppleMusicError, isAppleMusicError, optionsOf, type tAppleMusicClient } from "@open-music-sdk/core";
-import { clientOf, signalOf, tokenOf } from "./check";
+import { signalOf } from "@open-music-sdk/core";
+import { clientOf, tokenOf } from "./check";
 
 /** Invalid values throw a TypeError. No error quotes a token. */
 export interface tValidateOptions {

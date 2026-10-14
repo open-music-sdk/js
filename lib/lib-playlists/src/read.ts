@@ -1,8 +1,8 @@
 // A playlist of the listener's library, read whole: what it is called, and every track on every page, each with
 // the catalog's id for it and the recording's ISRC where the library knows them. What comes of it is plain JSON.
 import { getLibraryPlaylist, getLibraryPlaylistRelationship } from "@open-music-sdk/client-user";
-import { AppleMusicError, isAppleMusicError, isName, optionsOf, segmentOf, type tAppleMusicClient } from "@open-music-sdk/core";
-import { maxPagesOf, progressOf, signalOf, type tAskOptions, type tLimitOptions } from "./options";
+import { AppleMusicError, isAppleMusicError, isName, optionsOf, segmentOf, signalOf, type tAppleMusicClient } from "@open-music-sdk/core";
+import { maxPagesOf, progressOf, type tAskOptions, type tLimitOptions } from "./options";
 import { first, held } from "./own";
 import type { tPlaylistSnapshot, tPlaylistSnapshotTrack } from "./plan";
 import { pagesOf, type tWalk } from "./walk";
