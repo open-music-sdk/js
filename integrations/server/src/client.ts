@@ -16,10 +16,7 @@ export interface tServerClientOptions extends Omit<tClientOptions, "developerTok
 /** What goes on the client, under these names, made for it and for each client it derives. */
 const NAMESPACES = { catalog, user, playlists };
 
-/**
- * Core's client with `catalog`, `user` and `playlists` on it: `catalog(client)`, `user(client)` and
- * `playlists(client)` made for this client, and again for each one `as()` or `forUser()` gives.
- */
+/** Core's client with `catalog`, `user` and `playlists` on it, made for this client and for each one `as()` or `forUser()` gives. */
 export type tMusic = tWithNamespaces<{
   /** `catalog` of `@open-music-sdk/client-catalog`. */
   catalog: typeof catalog;

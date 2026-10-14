@@ -47,7 +47,8 @@ export interface tBrowserMusic extends Omit<tMusic, "as" | "forUser"> {
    *
    * @param userToken - The listener's Music User Token, or a provider that gives it.
    * @returns The listener's client, frozen.
-   * @throws TypeError if `userToken` is neither a token nor a function.
+   * @throws TypeError if `userToken` is neither a token nor a function. The three namespaces are fixed here, and
+   * each checks nothing but the client it is handed, which is one just made, so this is the whole list.
    */
   as(userToken: string | tTokenProvider): tBrowserMusic;
   /**
@@ -56,7 +57,8 @@ export interface tBrowserMusic extends Omit<tMusic, "as" | "forUser"> {
    *
    * @param userId - The id the store keeps the listener's token under.
    * @returns The listener's client, frozen.
-   * @throws TypeError if the client was made without a `userTokenStore`.
+   * @throws TypeError if the client was made without a `userTokenStore`. The three namespaces are fixed here, and
+   * each checks nothing but the client it is handed, which is one just made, so this is the whole list.
    */
   forUser(userId: string): tBrowserMusic;
 }

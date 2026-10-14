@@ -148,8 +148,8 @@ export interface tUseConnect {
  * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
  * @returns Where the sign-in stands, and `connect` and `disconnect`, each keeping its identity.
  * @throws TypeError if there is no `MusicProvider` above the component; what `createConnect` refuses in the
- * options, and a mount with no `document`, is a `TypeError` thrown when the component mounts, from the effect,
- * so it reaches the nearest error boundary rather than this call.
+ * options, a mount with no `document`, or a page whose script is configured for another app, is a `TypeError`
+ * thrown when the component mounts, from the effect, so it reaches the nearest error boundary rather than this call.
  */
 export function useConnect(options: tConnectOptions): tUseConnect {
   const { base, restorable, setToken } = useHeld("useConnect");

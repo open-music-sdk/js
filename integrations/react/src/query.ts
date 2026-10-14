@@ -11,7 +11,7 @@ import { clientOf, got, isPlain, ownOf, type tAppleMusicClient, type tEndpoint, 
 export interface tQuery<T> {
   /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
   readonly queryKey: readonly unknown[];
-  /** Asks as the bound function does, and gives what it hands over; rejects as it rejects, with a `TypeError` for an argument that is not what it should be and an `AppleMusicError` for what fails at Apple. */
+  /** Asks as the bound function does, and gives what it hands over. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: () => Promise<T>;
   /** Core retried what should be retried; three more tries on a refusal, or on a mistake, would help nobody. */
   readonly retry: false;
@@ -21,7 +21,7 @@ export interface tQuery<T> {
 export interface tInfiniteQuery<P extends tPage<unknown>> {
   /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
   readonly queryKey: readonly unknown[];
-  /** One page, frozen: the function's own for no `pageParam`, else the one at that `next` link, asked for as `paginate` asks, with the same schema. Rejects as the function or `request` rejects. */
+  /** One page, frozen: the function's own for no `pageParam`, else the one at that `next` link, asked for as `paginate` asks, with the same schema. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: (context: { readonly pageParam: string | undefined }) => Promise<P>;
   /** `undefined`: the first page is the function's. */
   readonly initialPageParam: string | undefined;
