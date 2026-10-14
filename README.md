@@ -26,7 +26,7 @@ libs, and the integrations people actually install. Every package ships the same
 | Sub-task | Status | Progress | Description |
 | --- | :---: | :---: | --- |
 | Repository tooling | 🚧 In progress | 80% | pnpm workspace · Turborepo · TypeScript · ESLint · tsdown · Vitest · CI workflow · Changesets and the release workflow not yet set up |
-| [`codegen`](./codegen/README.md) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
+| [`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
 | [`@open-music-sdk/types`](./packages/types/README.md) | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
 | [`@open-music-sdk/validate`](./packages/validate/README.md) | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
 | [`@open-music-sdk/core`](./packages/core/README.md) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · the checks and builders the clients declare their endpoints with · the check on where a URL may point · untested against the live API |
@@ -40,7 +40,7 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/server`](./integrations/server/README.md) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
 | [`@open-music-sdk/browser`](./integrations/browser/README.md) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
 | [`@open-music-sdk/react`](./integrations/react/README.md) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
-| [Reference site, `apps/docs`](./apps/docs/README.md) | 🚧 In progress | 90% | TypeDoc over every package's doc comments · a comment on every export, and arguments, returns and throws on every function, method and namespace member, which CI checks · published to GitHub Pages from `main` once Pages is turned on |
+| [Reference site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 90% | TypeDoc over every package's doc comments · a comment on every export, and arguments, returns and throws on every function, method and namespace member, which CI checks · published to GitHub Pages from `main` once Pages is turned on |
 | `@open-music-sdk/cli`, `apps/cli` | ⬜ Not started | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
@@ -124,6 +124,6 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test
 
 ## License
 
-[MIT](./LICENSE) with a [Developer Certificate of Origin](./CONTRIBUTING.md#developer-certificate-of-origin) sign-off on contributions.
-The project name and logo are not covered by the code license; see [TRADEMARKS.md](./TRADEMARKS.md).
+[MIT](./LICENSE) with a [Developer Certificate of Origin](https://github.com/open-music-sdk/js/blob/main/CONTRIBUTING.md#developer-certificate-of-origin) sign-off on contributions.
+The project name and logo are not covered by the code license; see [TRADEMARKS.md](https://github.com/open-music-sdk/js/blob/main/TRADEMARKS.md).
 Using the Apple Music API requires your own Apple Developer account and agreement with Apple.
