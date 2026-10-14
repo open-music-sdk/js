@@ -64,8 +64,11 @@ describe("createClient: what it is handed is checked when the client is made, no
     ["a developer token with a space in it", { developerToken: "de v" }, "createClient: developerToken must be a token or a function that gives one; got 4 characters"],
     ["a user token that is no token", { developerToken: "dev", userToken: "" }, "createClient: userToken must be a token or a function that gives one; got 0 characters"],
     ["a store without delete", { developerToken: "dev", userTokenStore: { get: noop, set: noop } }, "createClient: userTokenStore must be a store with get, set and delete; got object"],
-    ["a storefront that is no id", { developerToken: "dev", storefront: 3 }, "createClient: storefront must be a storefront id, a string of 1 to 64 characters; got 3"],
+    ["a storefront that is no id", { developerToken: "dev", storefront: 3 }, `createClient: storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 3`],
+    ["a storefront that is not one segment of a path", { developerToken: "dev", storefront: "us/x" }, `createClient: storefront must be a string of 1 to 64 characters, with no slash, backslash, percent sign or control character in it, and not "." or ".."; got 4 characters`],
     ["a fetch that is no function", { developerToken: "dev", fetch: 42 }, "createClient: fetch must be a function; got 42"],
+    ["a retry that is true", { developerToken: "dev", retry: true }, "createClient: retry must be false or a plain object of retry policy fields; got boolean"],
+    ["a retry that is a number", { developerToken: "dev", retry: 5 }, "createClient: retry must be false or a plain object of retry policy fields; got 5"],
     ["a rate limiter without acquire", { developerToken: "dev", rateLimit: {} }, "createClient: rateLimit must be a rate limiter with acquire; got object"],
     ["an onRequest that is no function", { developerToken: "dev", onRequest: true }, "createClient: onRequest must be a function; got boolean"],
     ["an onResponse that is no function", { developerToken: "dev", onResponse: "log" }, "createClient: onResponse must be a function; got 3 characters"],
@@ -77,7 +80,15 @@ describe("createClient: what it is handed is checked when the client is made, no
     const store = { get: () => Promise.resolve(undefined), set: () => Promise.resolve(), delete: () => Promise.resolve() };
     const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 1 });
     expect(made({ developerToken: () => "dev", userToken: () => Promise.resolve("user"), userTokenStore: store, storefront: "gb", fetch: noop, rateLimit: limiter, onRequest: noop, onResponse: noop })).not.toThrow();
-    expect(made({ developerToken: " dev\n", userToken: "user" })).not.toThrow();
+    expect(made({ developerToken: " dev\n", userToken: "user", retry: false })).not.toThrow();
+    expect(made({ developerToken: "dev", retry: { maxAttempts: 1 } })).not.toThrow();
+  });
+
+  test("a storefront the client accepts is one every call accepts, as given: storefront() hands it back unencoded, and a call encodes it", async () => {
+    const { music } = client([{ body: { data: [song] } }], { storefront: "u s" });
+    expect(await music.storefront()).toBe("u s");
+    expect(() => createClient({ developerToken: "dev", storefront: "us/x" })).toThrow(TypeError);
+    expect(() => createClient({ developerToken: "dev", storefront: ".." })).toThrow(TypeError);
   });
 
   test("a mistake fails before a provider is asked or a fetch is made", () => {

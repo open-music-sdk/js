@@ -11,6 +11,7 @@ import { got } from "./got";
  * @param maxBytes - The most bytes to keep, a whole number from 0.
  * @returns The whole body as text, or `undefined` when it ran past `maxBytes` or a Content-Length header said it would.
  * @throws TypeError if `maxBytes` is not a whole number from 0.
+ * @throws Whatever the runtime rejects with when the body cannot be read, as it is.
  */
 export async function readBounded(message: Request | Response, maxBytes: number): Promise<string | undefined> {
   if (!Number.isInteger(maxBytes) || maxBytes < 0) throw new TypeError(`readBounded: maxBytes must be a whole number from 0, got ${got(maxBytes)}`);

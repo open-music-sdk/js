@@ -25,8 +25,9 @@ export interface tEndpoint<A extends readonly unknown[], R, U, K extends tUnwrap
    * @param args - The function's own arguments, as it declares them: an id, a list of ids, a name, options.
    * @returns What Apple answered, parsed, as the function's answer type says.
    * @throws TypeError if `client` is no client, an argument is not what it should be, or the collection's path could
-   * not be asked for as written; before Apple is asked.
-   * @throws AppleMusicError as `client.request` rejects with; `_tag` says which.
+   * not be asked for as written; before this endpoint is asked.
+   * @throws AppleMusicError as `client.request` rejects with, `_tag` says which; or as `client.storefront()` rejects
+   * with, where the collection asks it.
    * @throws The reason `options.signal` aborted with, when it does.
    * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */
@@ -34,8 +35,10 @@ export interface tEndpoint<A extends readonly unknown[], R, U, K extends tUnwrap
   /**
    * The same call with the client fixed and the answer unwrapped as `unwrap` says. Binding checks the client and
    * nothing else; the arguments are checked as the bound function is called. Beyond what the call throws, a
-   * `resource` function rejects with an `ApiError` when a success holds no resource, and a `pages` function hands
-   * over an iterable that asks for nothing until a loop starts, and throws from the loop what `client.paginate` does.
+   * `resource` or `resources` function rejects with an `ApiError` when a success is no object, or its `data` is
+   * there and is no list, and a `resource` function also when the success holds no resource; a `pages` function
+   * hands over an iterable that asks for nothing until a loop starts, and throws from the loop what
+   * `client.paginate` does, an `ApiError` for a page that is none among them.
    */
   readonly bound: (client: tAppleMusicClient) => (...args: A) => U;
   /** The kind the function was declared with: what its bound form hands over. */
@@ -531,8 +534,9 @@ export interface tRelationshipEndpoint<Rels, C = tNone> {
    * @param options - What everyone's options are, the collection's, and `maxPages`, which this call has no use for.
    * @returns What Apple answered: the first page of the relationship, with `next` when there is more.
    * @throws TypeError if `client` is no client, `id` or `name` is not one segment of a path, an option is not what it
-   * should be, or the collection's path could not be asked for as written; before Apple is asked.
-   * @throws AppleMusicError as `client.request` rejects with; `_tag` says which.
+   * should be, or the collection's path could not be asked for as written; before this endpoint is asked.
+   * @throws AppleMusicError as `client.request` rejects with, `_tag` says which; or as `client.storefront()` rejects
+   * with, where the collection asks it.
    * @throws The reason `options.signal` aborted with, when it does.
    * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
    */

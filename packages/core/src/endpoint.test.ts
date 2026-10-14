@@ -1212,8 +1212,10 @@ describe("inStorefront: the storefront a call is for, as one segment of a path",
     expect(() => inStorefront("getSong", apple().music, storefront, path)).toThrow(new TypeError(`getSong: storefront ${SEGMENT}${what}`));
   });
 
-  test("the client's own storefront is held to the same, when it comes", async () => {
-    const later = inStorefront("getSong", apple([], { storefront: "../me/library" }).music, undefined, path) as () => Promise<string>;
+  test("the client's own storefront is held to the same, when it comes: createClient refuses such a storefront, so it is a wrapped client that can answer with one", async () => {
+    expect(() => apple([], { storefront: "../me/library" })).toThrow(new TypeError(`createClient: storefront ${SEGMENT}13 characters`));
+    const wrapped = { storefront: () => Promise.resolve("../me/library") } as unknown as tAppleMusicClient;
+    const later = inStorefront("getSong", wrapped, undefined, path) as () => Promise<string>;
     expect(await rejection(later())).toEqual(new TypeError(`getSong: storefront ${SEGMENT}13 characters`));
   });
 

@@ -1,7 +1,7 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
-import { gotFor, has, isName, ownOf } from "./check";
+import { gotFor, has, isPlain, ownOf, segmentOf } from "./check";
 import { AppleMusicError, type tValidationIssue } from "./errors";
 import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
@@ -98,11 +98,11 @@ export interface tClientOptions {
   userToken?: string | tTokenProvider | undefined;
   /** Where `forUser()` finds a listener's token. Needs `get`, `set` and `delete`; the client itself calls only `get`. */
   userTokenStore?: tUserTokenStore | undefined;
-  /** Catalog storefront. Without it, storefront() resolves the listener's from /v1/me/storefront. */
+  /** Catalog storefront, by its id, such as `"us"`: one segment of a path. Without it, storefront() resolves the listener's from /v1/me/storefront. */
   storefront?: string | undefined;
   /** What sends each request. Default: the global `fetch`. */
   fetch?: typeof fetch | undefined;
-  /** `false` disables retries. Default: 2 attempts, 250 ms base, 4 s cap, full jitter, Retry-After honoured. */
+  /** `false` disables retries; a plain object sets the policy field by field. Default: 2 attempts, 250 ms base, 4 s cap, full jitter, Retry-After honoured. */
   retry?: tRetryPolicy | false | undefined;
   /** Opt-in token bucket. Share one instance across every client using the same developer token. */
   rateLimit?: tRateLimiter | undefined;
@@ -202,7 +202,8 @@ export interface tAppleMusicClient {
    *
    * `from` is a path, or a page already fetched: the page's own items come first and nothing is asked for until
    * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A page
-   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError. A
+   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError, but
+   * `undefined`, which is a last, empty page. A
    * promise of a page is not a page: await it, so that what it rejects with reaches the code that asked.
    *
    * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
@@ -217,7 +218,7 @@ export interface tAppleMusicClient {
    * @param init - What each page is asked for with, as `request` takes it, and `maxPages`, the most pages to ask for.
    * @returns The items of `data`, page by page: those of the page given, then those of each `next` page asked for.
    * @throws TypeError if `init.maxPages` is given and is not a whole number above 0, `from` is a promise, or `from`
-   * is neither a path nor a page; and as `request` throws it for a page asked for.
+   * is neither a path nor a page nor `undefined`; and as `request` throws it for a page asked for.
    * @throws AppleMusicError as `request` rejects with for a page; and `ApiError` when a `next` link answers with
    * what is no page: not an object, a `data` that is no list, or a `next` that is no string.
    * @throws The reason `init.signal` aborted with, when it does.
@@ -350,8 +351,11 @@ function checked(given: unknown): tClientOptions {
   if (!isTokenSource(options.developerToken)) refuse("developerToken", TOKEN, options.developerToken);
   if (options.userToken !== undefined && !isTokenSource(options.userToken)) refuse("userToken", TOKEN, options.userToken);
   if (options.userTokenStore !== undefined && !has(options.userTokenStore, ["get", "set", "delete"])) refuse("userTokenStore", "a store with get, set and delete", options.userTokenStore);
-  if (options.storefront !== undefined && !isName(options.storefront)) refuse("storefront", "a storefront id, a string of 1 to 64 characters", options.storefront);
+  // Held to what a function for an endpoint holds a storefront to, one segment of a path, so that a storefront that
+  // would be refused at every call is refused here instead. It is kept as given: the call encodes it.
+  if (options.storefront !== undefined) segmentOf("createClient", "storefront", options.storefront);
   for (const name of ["fetch", "onRequest", "onResponse"] as const) if (options[name] !== undefined && typeof options[name] !== "function") refuse(name, "a function", options[name]);
+  if (options.retry !== undefined && options.retry !== false && !isPlain(options.retry)) refuse("retry", "false or a plain object of retry policy fields", options.retry);
   if (options.rateLimit !== undefined && !has(options.rateLimit, ["acquire"])) refuse("rateLimit", "a rate limiter with acquire", options.rateLimit);
   return options;
 }
@@ -366,9 +370,9 @@ function checked(given: unknown): tClientOptions {
  * `fetch`, a retry policy, a rate limiter and the hooks.
  * @returns A client with `request`, `paginate`, `storefront`, `as` and `forUser`.
  * @throws TypeError if `given` is no object, `developerToken` or `userToken` is neither a token nor a function,
- * `userTokenStore` has no `get`, `set` and `delete`, `storefront` is not a string of 1 to 64 characters, `fetch`,
- * `onRequest` or `onResponse` is no function, `rateLimit` has no `acquire`, or a field of `retry` is not what
- * `tRetryPolicy` says.
+ * `userTokenStore` has no `get`, `set` and `delete`, `storefront` is not one segment of a path as `segmentOf` holds
+ * it to be, `fetch`, `onRequest` or `onResponse` is no function, `retry` is neither `false` nor a plain object,
+ * a field of `retry` is not what `tRetryPolicy` says, or `rateLimit` has no `acquire`.
  */
 export function createClient(given: tClientOptions): tAppleMusicClient {
   const options = checked(given);
