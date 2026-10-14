@@ -40,11 +40,14 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/server`](./integrations/server) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
 | [`@open-music-sdk/browser`](./integrations/browser) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
 | [`@open-music-sdk/react`](./integrations/react) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
-| `@open-music-sdk/next` | ⬜ Deferred | 0% | A Next.js app installs `server` and `react`; the recipe is in react's README · returns when it has Next-specific code worth a package |
-| Sample apps | ⬜ Not started | 0% | CLI · Worker · vanilla web · React · Next.js · Electron |
+| Reference site, `apps/docs` | ⬜ Not started | 0% | TypeDoc over every package's doc comments · arguments, returns and throws on every function · published to GitHub Pages from `main` |
+| `@open-music-sdk/cli`, `apps/cli` | ⬜ Not started | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
+| Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
-Progress is a judgement of how much of the described scope exists and is tested.
+Progress is a judgement of how much of the described scope exists and is tested. What comes next, in
+order: the reference site; the CLI, and a first run against the live API through it with the fixes it
+brings; the sample apps; Changesets; the first release.
 
 An app installs one integration: `server` for anything server-side, `browser` for a page, `react` for
 a React app, and `server` with `react` for a Next.js app. Each gives a preconfigured client with the
@@ -107,7 +110,7 @@ integrations/         what people install: server, browser, react
 .github/workflows/    ci: build, typecheck, lint and test on what a change affects
 ```
 
-Planned workspaces: `apps/` (private samples).
+Planned workspaces: `apps/` (the CLI and the reference site) and `samples/` (private sample apps).
 
 ## Development
 
