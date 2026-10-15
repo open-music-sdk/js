@@ -40,13 +40,13 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/server`](./integrations/server/README.md) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
 | [`@open-music-sdk/browser`](./integrations/browser/README.md) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
 | [`@open-music-sdk/react`](./integrations/react/README.md) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
-| [Reference site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 90% | TypeDoc over every package's doc comments · a comment on every export, and arguments, returns and throws on every function, method and namespace member, which CI checks · published to GitHub Pages from `main` once Pages is turned on |
+| [Docs site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 40% | The reference: TypeDoc over every package's doc comments, with arguments, returns and throws on every function, which CI checks, published to GitHub Pages from `main` · one VitePress site with guides, concepts and the reference · package READMEs cut to a short template · a tutorial once the samples exist |
 | `@open-music-sdk/cli`, `apps/cli` | ⬜ Not started | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
 Progress is a judgement of how much of the described scope exists and is tested. What comes next, in
-order: the reference site; the CLI, and a first run against the live API through it with the fixes it
+order: the docs site; the CLI, and a first run against the live API through it with the fixes it
 brings; the sample apps; Changesets; the first release.
 
 An app installs one integration: `server` for anything server-side, `browser` for a page, `react` for
