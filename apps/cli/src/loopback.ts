@@ -43,7 +43,7 @@ const CSP = [
   "default-src 'self' https://*.apple.com",
   "script-src 'self' https://js-cdn.music.apple.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:",
+  "img-src 'self' data: https://*.apple.com https://*.mzstatic.com",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
@@ -138,6 +138,10 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
 
   const route = async (req: Request): Promise<Response> => {
     if (req.headers.get("host")?.toLowerCase() !== host) return text(421, "Misdirected Request");
+    // What a browser sends from another page, or from no page at all as `null`, is refused whatever it asks for: the
+    // page's own requests carry its origin or none.
+    const from = req.headers.get("origin");
+    if (from !== null && from !== origin) return text(403, "Forbidden");
     const url = new URL(req.url);
     const given = url.searchParams.get("state");
     if (url.pathname === "/" && req.method === "GET" && isSecret(ticket, given)) {

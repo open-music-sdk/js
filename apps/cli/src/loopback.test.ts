@@ -153,6 +153,9 @@ describe("startLoopback: the page and its address", () => {
     expect(page.headers["x-content-type-options"]).toBe("nosniff");
     expect(page.headers["content-security-policy"]).toMatch(/script-src 'self' https:\/\/js-cdn\.music\.apple\.com;/);
     expect(page.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+    // Every source the page may load from is the page's own or Apple's, images included.
+    expect(page.headers["content-security-policy"]).toContain("img-src 'self' data: https://*.apple.com https://*.mzstatic.com;");
+    expect(page.headers["content-security-policy"]).not.toMatch(/ https:(;|$| )/);
     expect(page.headers["referrer-policy"]).toBeUndefined();
     expect(page.headers["cross-origin-opener-policy"]).toBeUndefined();
   });
@@ -278,12 +281,17 @@ describe("startLoopback: the token route, a dispenser only for this page", () =>
     expect(exp - iat).toBe(900);
   });
 
-  test("the page's own origin may read it, and no other", async () => {
+  test("the page's own origin may read it, and a request from any other origin, or from none as null, is refused outright", async () => {
     const { port, state } = await start();
     const own = await send(port, `/token?state=${state}`, { headers: { origin: `http://localhost:${String(port)}` } });
+    expect(own.status).toBe(200);
     expect(own.headers["access-control-allow-origin"]).toBe(`http://localhost:${String(port)}`);
-    const other = await send(port, `/token?state=${state}`, { headers: { origin: "https://evil.example" } });
-    expect(other.headers["access-control-allow-origin"]).toBeUndefined();
+    for (const origin of ["https://evil.example", "null", `http://localhost:${String(port + 1)}`, `http://127.0.0.1:${String(port)}`]) {
+      const other = await send(port, `/token?state=${state}`, { headers: { origin } });
+      expect(other.status, origin).toBe(403);
+      expect(other.body, origin).not.toContain("token");
+      expect(other.headers["access-control-allow-origin"], origin).toBeUndefined();
+    }
   });
 });
 
@@ -374,7 +382,7 @@ describe("startLoopback: the intake, which asks Apple before it stores", () => {
       method: "OPTIONS",
       headers: { origin: "https://evil.example", "access-control-request-method": "POST", "access-control-request-headers": "content-type,x-login-state" },
     });
-    expect(preflight.status).toBe(405);
+    expect(preflight.status).toBe(403);
     expect(preflight.headers["access-control-allow-origin"]).toBeUndefined();
     expect(preflight.headers["access-control-allow-headers"]).toBeUndefined();
     expect(await store.get("default")).toBeUndefined();
