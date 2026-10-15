@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tokenEndpoint, userTokenIntake, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/server";
 import { usage, type tKey } from "./files";
@@ -91,8 +91,8 @@ function isState(state: Buffer, given: string | null): boolean {
 }
 
 /**
- * Starts the sign-in server on 127.0.0.1. Its page is `http://localhost:<port>/?state=<state>`, and it answers only
- * requests whose `Host` is `localhost:<port>`, so a name rebound to the address reaches nothing:
+ * Starts the sign-in server on 127.0.0.1 and ::1. Its page is `http://localhost:<port>/?state=<state>`, and it
+ * answers only requests whose `Host` is `localhost:<port>`, so a name rebound to the address reaches nothing:
  *
  * - `GET /?state=` is the page, and `GET /page.js` its script;
  * - `/token?state=` is `tokenEndpoint`, minting fifteen-minute tokens bound to the page's origin;
@@ -120,14 +120,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
   let asking = false;
   let kept = false;
 
-  const server = createServer();
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", (e: NodeJS.ErrnoException) => {
-      reject(e.code === "EADDRINUSE" ? usage(`Port ${String(options.port)} is in use: pick another with --port, or leave it out and the system picks one.`) : e);
-    });
-    server.listen(options.port, "127.0.0.1", resolve);
-  });
-  const { port } = server.address() as AddressInfo;
+  const { servers, port } = await listenOnLoopback(options.port);
   const host = `localhost:${String(port)}`;
   const origin = `http://${host}`;
 
@@ -157,7 +150,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
     return text(404, "Not Found");
   };
 
-  server.on("request", (req: IncomingMessage, res: ServerResponse) => {
+  const handle = (req: IncomingMessage, res: ServerResponse) => {
     const request = toRequest(req, res, origin, options.timeoutMs);
     if (request === undefined) {
       res.writeHead(400, { "cache-control": "no-store" }).end();
@@ -182,19 +175,61 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
         if (!request.signal.aborted) rejectStored(e);
       },
     );
-  });
+  };
+  for (const server of servers) server.on("request", handle);
 
   return {
     url: `${origin}/?state=${state}`,
     stored,
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.close(() => {
-          resolve();
-        });
-        server.closeAllConnections();
-      }),
+    close: () => Promise.all(servers.map(close)).then(() => undefined),
   };
+}
+
+/** Stops `server` listening and drops its connections. */
+const close = (server: Server) =>
+  new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+    server.closeAllConnections();
+  });
+
+const listen = (server: Server, port: number, address: string) =>
+  new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, address, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+const taken = (e: unknown, port: number) =>
+  (e as NodeJS.ErrnoException).code === "EADDRINUSE" ? usage(`Port ${String(port)} is in use: pick another with --port, or leave it out and the system picks one.`) : e;
+
+/**
+ * Servers on both loopback addresses, 127.0.0.1 and ::1, on one port. `localhost` is either, and a browser may try
+ * ::1 first: a port held on one address alone leaves the other to whoever takes it, page, state and token included.
+ * Where the system has no IPv6, 127.0.0.1 is all `localhost` can be. A port the system picked that someone holds on
+ * ::1 is picked again; a port asked for is refused.
+ */
+async function listenOnLoopback(wanted: number): Promise<{ servers: Server[]; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const v4 = createServer();
+    await listen(v4, wanted, "127.0.0.1").catch((e: unknown) => {
+      throw taken(e, wanted);
+    });
+    const { port } = v4.address() as AddressInfo;
+    const v6 = createServer();
+    try {
+      await listen(v6, port, "::1");
+      return { servers: [v4, v6], port };
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EADDRNOTAVAIL" || code === "EAFNOSUPPORT") return { servers: [v4], port };
+      await close(v4);
+      if (code !== "EADDRINUSE" || wanted !== 0 || attempt === 5) throw taken(e, port);
+    }
+  }
 }
 
 /**

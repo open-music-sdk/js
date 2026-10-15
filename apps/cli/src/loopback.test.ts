@@ -81,9 +81,9 @@ interface tSent {
 }
 
 /** One request over node:http, with whatever Host and target it is given, as a browser or another program could send. */
-function send(port: number, path: string, options: { method?: string; host?: string; headers?: Record<string, string>; body?: string } = {}): Promise<tSent> {
+function send(port: number, path: string, options: { method?: string; host?: string; address?: string; headers?: Record<string, string>; body?: string } = {}): Promise<tSent> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest({ host: "127.0.0.1", port, path, method: options.method ?? "GET", headers: { host: options.host ?? `localhost:${String(port)}`, ...options.headers } }, (res) => {
+    const req = httpRequest({ host: options.address ?? "127.0.0.1", port, path, method: options.method ?? "GET", headers: { host: options.host ?? `localhost:${String(port)}`, ...options.headers } }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
@@ -97,6 +97,23 @@ function send(port: number, path: string, options: { method?: string; host?: str
 
 const postToken = (port: number, state: string | undefined, body = JSON.stringify({ token: TOKEN }), contentType = "application/json") =>
   send(port, "/user-token", { method: "POST", headers: { "content-type": contentType, ...(state === undefined ? {} : { "x-login-state": state }) }, body });
+
+/** Whether this system can listen on ::1. */
+function hasIpv6(): Promise<boolean> {
+  const probe = createServer();
+  return new Promise((resolve) => {
+    probe.once("error", () => {
+      resolve(false);
+    });
+    probe.listen(0, "::1", () => {
+      probe.close(() => {
+        resolve(true);
+      });
+    });
+  });
+}
+
+const IPV6 = await hasIpv6();
 
 const claimsOf = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1] ?? "", "base64url").toString("utf8")) as { origin?: string[]; iat: number; exp: number };
 
@@ -177,6 +194,35 @@ describe("startLoopback: the page and its address", () => {
     } finally {
       await new Promise((resolve) => taken.close(resolve));
     }
+  });
+
+  describe.runIf(IPV6)("on a system with IPv6, where localhost is ::1 as well as 127.0.0.1", () => {
+    test("it holds the port on both, so localhost reaches it whichever address the browser tries first", async () => {
+      const { port, state } = await start();
+      expect((await send(port, `/?state=${state}`, { address: "::1" })).status).toBe(200);
+      expect((await send(port, `/?state=${state}`, { address: "127.0.0.1" })).status).toBe(200);
+    });
+
+    test("a port asked for that another program holds on ::1 is refused, not shared with it", async () => {
+      const squatter = createServer((_req, res) => res.end("someone else"));
+      await new Promise<void>((resolve) => squatter.listen(0, "::1", resolve));
+      const { port } = squatter.address() as AddressInfo;
+      try {
+        const failed = await start({ port }).catch((e: unknown) => e);
+        expect(failed).toMatchObject({ exitCode: 2, message: expect.stringContaining(`Port ${String(port)} is in use`) as unknown });
+        // Nothing was left listening on 127.0.0.1 either.
+        await expect(send(port, "/page.js")).rejects.toThrow(/ECONNREFUSED/);
+      } finally {
+        await new Promise((resolve) => squatter.close(resolve));
+      }
+    });
+
+    test("close stops listening on both", async () => {
+      const { loopback: running, port } = await start();
+      await running.close();
+      loopback = undefined;
+      await expect(send(port, "/page.js", { address: "::1" })).rejects.toThrow(/ECONNREFUSED/);
+    });
   });
 
   test("close stops listening", async () => {
