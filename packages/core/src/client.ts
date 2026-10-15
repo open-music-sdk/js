@@ -109,12 +109,16 @@ export interface tClientOptions {
   retry?: tRetryPolicy | false | undefined;
   /** Opt-in token bucket. Share one instance across every client using the same developer token. */
   rateLimit?: tRateLimiter | undefined;
-  /** Called just before each attempt is sent, with the final Request. */
+  /**
+   * Called just before each attempt is sent, with the final Request. Its headers hold the developer token and,
+   * where it is sent, the Music User Token, so a hook that logs requests logs both tokens.
+   */
   onRequest?: ((req: Request) => void) | undefined;
   /**
    * Called once per response, after the client is done with it: the body has been read and the
    * outcome decided. `outcome.error` is what the request will throw unless a retry succeeds. The body has been
-   * read, so take it from `outcome.body`, not from `res.json()`.
+   * read, so take it from `outcome.body`, not from `res.json()`. `req` is the Request `onRequest` is handed, token
+   * headers and all, so a hook that logs it logs the tokens.
    */
   onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
@@ -148,7 +152,8 @@ export interface tRequestInit<T = unknown> {
   /**
    * Called as the client's own `onResponse` is, and after it, for this request alone: once per response, when the
    * body has been read and the outcome decided. It is how a caller learns what `request` does not resolve to, such
-   * as the status of the answer or one of its headers.
+   * as the status of the answer or one of its headers. `req` is the Request as sent, token headers and all, so a
+   * hook that logs it logs the tokens.
    */
   readonly onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
@@ -214,7 +219,8 @@ export interface tAppleMusicClient {
    * relationship's are. A search or a chart answers with its pages nested under `results`, and is not walked.
    *
    * A walk has no end but the last page unless `init.maxPages` gives it one. A `next` link is followed wherever on
-   * Apple's origin it points, so a page or a path from outside your app is as trusted as you make it.
+   * Apple's origin it points, so a page or a path from outside your app is as trusted as you make it: for one, pass
+   * `user: false`, so that no Music User Token goes along, and a `maxPages`.
    *
    * Nothing runs until the loop first asks: what is thrown is thrown from the loop, not from the call.
    *
