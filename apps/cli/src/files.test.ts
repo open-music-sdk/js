@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, posix, resolve, win32 } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { CliError, FileUserTokenStore, configDir, loadKey, readSavedKey, saveKey, type tKey, type tSavedKey } from "./files";
 
@@ -38,24 +38,28 @@ async function thrown(fn: () => Promise<unknown>): Promise<CliError> {
   throw new Error("expected a CliError");
 }
 
-describe("configDir: where the CLI keeps what it keeps", () => {
+describe("configDir: where the CLI keeps what it keeps, by each system's own path rules, whichever system the tests run on", () => {
+  const home = (path: typeof win32) => path.join(homedir(), ".config", "open-music-sdk");
+
   test("on Windows, a folder of its own in %LOCALAPPDATA%, which stays on this machine, and not the roaming %APPDATA%", () => {
     const env = { LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local", APPDATA: "C:\\Users\\a\\AppData\\Roaming" };
-    expect(configDir(env, "win32")).toBe(join("C:\\Users\\a\\AppData\\Local", "open-music-sdk"));
-    expect(configDir({ APPDATA: env.APPDATA }, "win32")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    expect(configDir(env, "win32")).toBe("C:\\Users\\a\\AppData\\Local\\open-music-sdk");
+    expect(configDir({ APPDATA: env.APPDATA }, "win32")).toBe(home(win32));
   });
 
   test("elsewhere, in $XDG_CONFIG_HOME, or in ~/.config without it", () => {
-    expect(configDir({ XDG_CONFIG_HOME: "/xdg" }, "linux")).toBe(join("/xdg", "open-music-sdk"));
-    expect(configDir({}, "darwin")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    expect(configDir({ XDG_CONFIG_HOME: "/xdg" }, "linux")).toBe("/xdg/open-music-sdk");
+    expect(configDir({}, "darwin")).toBe(home(posix));
     // %LOCALAPPDATA% is Windows's alone, wherever it happens to be set.
-    expect(configDir({ LOCALAPPDATA: "/appdata" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    expect(configDir({ LOCALAPPDATA: "/appdata" }, "linux")).toBe(home(posix));
   });
 
   test("a relative or empty location is ignored, as the XDG spec says to, so a file never lands under whatever folder the CLI was run from", () => {
-    expect(configDir({ XDG_CONFIG_HOME: "relative/dir" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
-    expect(configDir({ XDG_CONFIG_HOME: "" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
-    expect(configDir({ LOCALAPPDATA: "relative" }, "win32")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    expect(configDir({ XDG_CONFIG_HOME: "relative/dir" }, "linux")).toBe(home(posix));
+    expect(configDir({ XDG_CONFIG_HOME: "" }, "linux")).toBe(home(posix));
+    expect(configDir({ LOCALAPPDATA: "relative" }, "win32")).toBe(home(win32));
+    // Absolute on Windows only by Windows's rules: a drive with no slash after it is relative to that drive's folder.
+    expect(configDir({ LOCALAPPDATA: "C:relative" }, "win32")).toBe(home(win32));
   });
 });
 

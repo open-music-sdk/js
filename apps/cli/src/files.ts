@@ -4,7 +4,7 @@ import { createPrivateKey, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, posix, resolve, win32 } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { tUserTokenStore } from "@open-music-sdk/server";
 
@@ -28,12 +28,14 @@ export type tEnv = Readonly<Record<string, string | undefined>>;
  * Where the CLI keeps what it keeps: `%LOCALAPPDATA%\open-music-sdk` on Windows, and `$XDG_CONFIG_HOME/open-music-sdk`,
  * or `~/.config/open-music-sdk`, elsewhere. Not the roaming `%APPDATA%`, which a domain copies to its servers and to
  * the user's other machines: what is kept here includes a token. A relative location is ignored, as the XDG spec says.
+ * Paths are read and joined by `platform`'s own rules.
  */
 export function configDir(env: tEnv, platform: NodeJS.Platform = process.platform): string {
+  const path = platform === "win32" ? win32 : posix;
   const local = env.LOCALAPPDATA;
-  if (platform === "win32" && local !== undefined && isAbsolute(local)) return join(local, "open-music-sdk");
+  if (platform === "win32" && local !== undefined && path.isAbsolute(local)) return path.join(local, "open-music-sdk");
   const xdg = env.XDG_CONFIG_HOME;
-  return join(xdg !== undefined && isAbsolute(xdg) ? xdg : join(homedir(), ".config"), "open-music-sdk");
+  return path.join(xdg !== undefined && path.isAbsolute(xdg) ? xdg : path.join(homedir(), ".config"), "open-music-sdk");
 }
 
 /**
