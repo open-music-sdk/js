@@ -78,10 +78,11 @@ const concepts = [
 ];
 
 // A package README links to the site by its full URL, so the link works on GitHub and npm too. On the site it is
-// made relative, which keeps it in the same tab and puts it under VitePress's check for dead links.
+// made relative, which keeps it in the same tab and puts it under VitePress's check for dead links. It runs after
+// linkify, so a bare URL that linkify turns into a link is caught too.
 const site = "https://open-music-sdk.github.io/js/";
 const siteLinks = (md) =>
-  md.core.ruler.after("inline", "site-links", (state) => {
+  md.core.ruler.after("linkify", "site-links", (state) => {
     for (const token of state.tokens)
       for (const child of token.children ?? []) {
         const href = child.type === "link_open" ? child.attrGet("href") : null;
