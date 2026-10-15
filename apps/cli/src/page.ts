@@ -3,7 +3,8 @@
 // `dist/page.js` with the browser package bundled in; it carries no signing code, which a test holds it to.
 import { createBrowserClient, createConnect } from "@open-music-sdk/browser";
 
-const state = new URLSearchParams(location.search).get("state") ?? "";
+// The secret the server put in the page, for its token routes. The address's own ticket is used up by now.
+const state = document.querySelector<HTMLMetaElement>('meta[name="login-state"]')?.content ?? "";
 const status = document.getElementById("status") as HTMLParagraphElement;
 const button = document.getElementById("connect") as HTMLButtonElement;
 const say = (message: string) => {

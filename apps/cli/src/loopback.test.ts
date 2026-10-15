@@ -59,7 +59,11 @@ afterEach(async () => {
   for (const res of responses.splice(0)) expect(res.bodyUsed).toBe(true);
 });
 
-async function start(overrides: { store?: tUserTokenStore; port?: number; timeoutMs?: number } = {}): Promise<{ loopback: tLoopback; port: number; state: string }> {
+/**
+ * Starts the server and, unless `open` is false, opens its page as the browser would, which uses up the address's
+ * ticket: `state` is then the secret the page carries for the token routes.
+ */
+async function start(overrides: { store?: tUserTokenStore; port?: number; timeoutMs?: number; open?: false } = {}): Promise<{ loopback: tLoopback; port: number; ticket: string; state: string }> {
   const music = createServerClient({ pem: KEY.pem, teamId: TEAM, keyId: KEY_ID, fetch: appleFetch, retry: false });
   loopback = await startLoopback({
     key: KEY,
@@ -71,8 +75,15 @@ async function start(overrides: { store?: tUserTokenStore; port?: number; timeou
     timeoutMs: overrides.timeoutMs ?? 10_000,
   });
   const url = new URL(loopback.url);
-  return { loopback, port: Number(url.port), state: url.searchParams.get("state") ?? "" };
+  const port = Number(url.port);
+  const ticket = url.searchParams.get("state") ?? "";
+  if (overrides.open === false) return { loopback, port, ticket, state: "" };
+  const page = await send(port, `/?state=${ticket}`);
+  return { loopback, port, ticket, state: secretOf(page.body) };
 }
+
+/** The secret a page carries for the token routes. */
+const secretOf = (html: string) => /<meta name="login-state" content="([\w-]+)">/.exec(html)?.[1] ?? "";
 
 interface tSent {
   readonly status: number;
@@ -80,10 +91,13 @@ interface tSent {
   readonly body: string;
 }
 
-/** One request over node:http, with whatever Host and target it is given, as a browser or another program could send. */
+/**
+ * One request over node:http, with whatever Host and target it is given, as a browser or another program could send,
+ * each on a connection of its own.
+ */
 function send(port: number, path: string, options: { method?: string; host?: string; address?: string; headers?: Record<string, string>; body?: string } = {}): Promise<tSent> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest({ host: options.address ?? "127.0.0.1", port, path, method: options.method ?? "GET", headers: { host: options.host ?? `localhost:${String(port)}`, ...options.headers } }, (res) => {
+    const req = httpRequest({ agent: false, host: options.address ?? "127.0.0.1", port, path, method: options.method ?? "GET", headers: { host: options.host ?? `localhost:${String(port)}`, ...options.headers } }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
@@ -118,17 +132,20 @@ const IPV6 = await hasIpv6();
 const claimsOf = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1] ?? "", "base64url").toString("utf8")) as { origin?: string[]; iat: number; exp: number };
 
 describe("startLoopback: the page and its address", () => {
-  test("listens on a loopback address, and its page is on localhost with a state of its own each run", async () => {
+  test("listens on a loopback address, and its page is on localhost with a ticket and a secret of its own each run", async () => {
     const first = await start();
     expect(first.loopback.url).toMatch(/^http:\/\/localhost:\d+\/\?state=[\w-]{43}$/);
+    expect(first.state).toMatch(/^[\w-]{43}$/);
+    expect(first.state).not.toBe(first.ticket);
     await first.loopback.close();
     const second = await start();
+    expect(second.ticket).not.toBe(first.ticket);
     expect(second.state).not.toBe(first.state);
   });
 
-  test("serves the page for this run's state, with Apple's CDN let in, nothing kept by a cache, and no referrer rule that breaks Apple's sign-in", async () => {
-    const { port, state } = await start();
-    const page = await send(port, `/?state=${state}`);
+  test("serves the page for this run's ticket, with Apple's CDN let in, nothing kept by a cache, and no referrer rule that breaks Apple's sign-in", async () => {
+    const { port, ticket } = await start({ open: false });
+    const page = await send(port, `/?state=${ticket}`);
     expect(page.status).toBe(200);
     expect(page.headers["content-type"]).toBe("text/html; charset=utf-8");
     expect(page.body).toContain('<script type="module" src="/page.js"></script>');
@@ -147,18 +164,34 @@ describe("startLoopback: the page and its address", () => {
     expect(script.headers["content-type"]).toBe("text/javascript; charset=utf-8");
   });
 
-  test("the page and the token need this run's state; anything else is not here", async () => {
-    const { port, state } = await start();
-    const changed = state.slice(0, -1) + (state.endsWith("A") ? "B" : "A");
-    for (const path of ["/", "/?state=", `/?state=${state}x`, `/?state=${state.slice(1)}`, `/?state=${changed}`, "/token", `/token?state=${changed}`, "/favicon.ico", "/user-token/x", `/page.js/x`]) {
+  test("the page needs this run's ticket and the token its secret, and neither is the other; anything else is not here", async () => {
+    const { port, ticket } = await start({ open: false });
+    const change = (value: string) => value.slice(0, -1) + (value.endsWith("A") ? "B" : "A");
+    for (const path of ["/", "/?state=", `/?state=${ticket}x`, `/?state=${ticket.slice(1)}`, `/?state=${change(ticket)}`, "/token", `/token?state=${ticket}`, "/favicon.ico", "/user-token/x", `/page.js/x`]) {
       expect((await send(port, path)).status, path).toBe(404);
     }
+    const state = secretOf((await send(port, `/?state=${ticket}`)).body);
+    for (const path of [`/?state=${state}`, `/token?state=${change(state)}`]) expect((await send(port, path)).status, path).toBe(404);
+    expect((await postToken(port, ticket)).status).toBe(401);
+  });
+
+  test("the ticket opens the page once: the address is in a command line others may read, so whoever opens it second is told", async () => {
+    const { port, ticket } = await start({ open: false });
+    const first = await send(port, `/?state=${ticket}`);
+    expect(first.status).toBe(200);
+    const second = await send(port, `/?state=${ticket}`);
+    expect(second.status).toBe(410);
+    expect(second.body).toContain("opened already");
+    expect(second.body).toContain("Ctrl+C");
+    expect(secretOf(second.body)).toBe("");
+    // The page that did open still has what it needs.
+    expect((await send(port, `/token?state=${secretOf(first.body)}`)).status).toBe(200);
   });
 
   test("only asked for as localhost:<port>: a name rebound to the address, or the address itself, reaches nothing", async () => {
-    const { port, state } = await start();
+    const { port, ticket, state } = await start();
     for (const host of ["evil.example", `evil.example:${String(port)}`, `127.0.0.1:${String(port)}`, "localhost", `localhost:${String(port + 1)}`]) {
-      expect((await send(port, `/?state=${state}`, { host })).status, host).toBe(421);
+      expect((await send(port, `/?state=${ticket}`, { host })).status, host).toBe(421);
       expect((await send(port, `/token?state=${state}`, { host })).status, host).toBe(421);
       expect((await send(port, "/page.js", { host })).status, host).toBe(421);
       expect((await send(port, "/user-token", { method: "POST", host, headers: { "content-type": "application/json", "x-login-state": state }, body: JSON.stringify({ token: TOKEN }) })).status, host).toBe(421);
@@ -174,13 +207,13 @@ describe("startLoopback: the page and its address", () => {
   });
 
   test("a request node:http takes and fetch does not, from anyone on this machine, is refused and leaves the server running", async () => {
-    const { port, state } = await start();
+    const { port, ticket } = await start({ open: false });
     for (const method of ["TRACE", "TRACK", "CONNECT"]) {
       // node:http drops a CONNECT it has no handler for; the others are answered.
       const answered = await send(port, method === "CONNECT" ? `localhost:${String(port)}` : "/", { method }).catch((e: unknown) => e as Error);
       if (!(answered instanceof Error)) expect(answered.status, method).toBe(400);
     }
-    expect((await send(port, `/?state=${state}`)).status).toBe(200);
+    expect((await send(port, `/?state=${ticket}`)).status).toBe(200);
   });
 
   test("a port that is taken is a mistake in how the CLI was run", async () => {
@@ -198,9 +231,10 @@ describe("startLoopback: the page and its address", () => {
 
   describe.runIf(IPV6)("on a system with IPv6, where localhost is ::1 as well as 127.0.0.1", () => {
     test("it holds the port on both, so localhost reaches it whichever address the browser tries first", async () => {
-      const { port, state } = await start();
-      expect((await send(port, `/?state=${state}`, { address: "::1" })).status).toBe(200);
-      expect((await send(port, `/?state=${state}`, { address: "127.0.0.1" })).status).toBe(200);
+      const { port, ticket } = await start({ open: false });
+      expect((await send(port, `/?state=${ticket}`, { address: "::1" })).status).toBe(200);
+      // The same server: the ticket the first used up is used up here too.
+      expect((await send(port, `/?state=${ticket}`, { address: "127.0.0.1" })).status).toBe(410);
     });
 
     test("a port asked for that another program holds on ::1 is refused, not shared with it", async () => {

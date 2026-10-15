@@ -80,10 +80,10 @@ async function signIn(argv: string[]): Promise<{ status: number; posted: number 
   );
   const page = await realFetch(url);
   expect(page.status).toBe(200);
-  await page.text();
+  const secret = /<meta name="login-state" content="([\w-]+)">/.exec(await page.text())?.[1] ?? "";
   const posted = await realFetch(new URL("/user-token", url), {
     method: "POST",
-    headers: { "content-type": "application/json", "x-login-state": url.searchParams.get("state") ?? "" },
+    headers: { "content-type": "application/json", "x-login-state": secret },
     body: JSON.stringify({ token: TOKEN }),
   });
   await posted.arrayBuffer();

@@ -26,7 +26,10 @@ beforeEach(async () => {
   authorize = signedIn;
   intakeStatus = 204;
   posted = [];
-  history.replaceState(null, "", `/?state=${STATE}`);
+  // The page as the server sends it: the secret for the token routes in a meta element, and the address's ticket,
+  // which is not that secret, in the address.
+  history.replaceState(null, "", "/?state=the-address-ticket");
+  document.head.innerHTML = `<meta name="login-state" content="${STATE}">`;
   document.body.innerHTML = '<p id="status"></p><button id="connect" type="button" disabled></button>';
   // What other servers on localhost keep, which share its cookies, and what this origin held before.
   document.cookie = "other-app-session=theirs; path=/";

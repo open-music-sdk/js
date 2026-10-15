@@ -26,7 +26,7 @@ export interface tLoopbackOptions {
 }
 
 export interface tLoopback {
-  /** The page, with this run's state in it: what the browser opens. */
+  /** The page, with this run's one-time ticket in it: what the browser opens. */
   readonly url: string;
   /**
    * Settles once the store has the token Apple accepted and the page has been told, or its connection is gone; or
@@ -55,11 +55,13 @@ const CSP = [
 // sign-in window has to talk back to the page that opened it.
 const PAGE_HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
 
-const PAGE = `<!doctype html>
+/** The page, with the secret its script sends to the token routes. The secret is base64url, which needs no escaping. */
+const page = (secret: string) => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="login-state" content="${secret}">
 <title>Sign in · open-music-sdk</title>
 <style>
 :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
@@ -84,30 +86,37 @@ button:disabled { cursor: default; opacity: 0.6; }
 const text = (status: number, body: string, headers: Record<string, string> = {}) =>
   new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", ...headers } });
 
-/** Whether `given` is this run's state, compared in constant time. */
-function isState(state: Buffer, given: string | null): boolean {
+/** Whether `given` is `secret`, compared in constant time. */
+function isSecret(secret: Buffer, given: string | null): boolean {
   const bytes = Buffer.from(given ?? "");
-  return bytes.length === state.length && timingSafeEqual(bytes, state);
+  return bytes.length === secret.length && timingSafeEqual(bytes, secret);
 }
 
+const OPENED =
+  "This sign-in page has been opened already, and it opens once. If the tab that opened it is yours, use it. If not, someone else on this machine may have opened it first: press Ctrl+C in the terminal and run login again.";
+
 /**
- * Starts the sign-in server on 127.0.0.1 and ::1. Its page is `http://localhost:<port>/?state=<state>`, and it
+ * Starts the sign-in server on 127.0.0.1 and ::1. Its page is `http://localhost:<port>/?state=<ticket>`, and it
  * answers only requests whose `Host` is `localhost:<port>`, so a name rebound to the address reaches nothing:
  *
- * - `GET /?state=` is the page, and `GET /page.js` its script;
- * - `/token?state=` is `tokenEndpoint`, minting fifteen-minute tokens bound to the page's origin;
- * - `/user-token` is `userTokenIntake`, which takes a post only with the state in an `x-login-state` header, asks
+ * - `GET /?state=` is the page, once: the ticket in the address is used up by the first request, since the address
+ *   is passed to the browser in a command line other users may read. The page carries a second secret, which its
+ *   script sends to the two routes below. `GET /page.js` is its script.
+ * - `/token?state=<secret>` is `tokenEndpoint`, minting fifteen-minute tokens bound to the page's origin;
+ * - `/user-token` is `userTokenIntake`, which takes a post only with the secret in an `x-login-state` header, asks
  *   Apple, and only then stores; the header and the JSON body make another site's post ask first, and nothing
  *   here answers that asking. One token is taken: a post while another is asked about, or after one is kept, is 409.
  *
- * Anything else is 404. The state is fresh for each run.
+ * Anything else is 404. Both secrets are fresh for each run.
  *
  * @throws CliError with exit status 2 when `port` is taken.
  */
 export async function startLoopback(options: tLoopbackOptions): Promise<tLoopback> {
   const { key, music, store, userId, script } = options;
-  const state = randomBytes(32).toString("base64url");
-  const stateBytes = Buffer.from(state);
+  const ticket = Buffer.from(randomBytes(32).toString("base64url"));
+  const secret = randomBytes(32).toString("base64url");
+  const secretBytes = Buffer.from(secret);
+  let opened = false;
 
   let resolveStored!: () => void;
   let rejectStored!: (reason: unknown) => void;
@@ -125,16 +134,19 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
   const origin = `http://${host}`;
 
   const endpoint = tokenEndpoint({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, origin: [origin] });
-  const intake = userTokenIntake(music, { store, userId: (req) => (isState(stateBytes, req.headers.get("x-login-state")) ? userId : undefined) });
+  const intake = userTokenIntake(music, { store, userId: (req) => (isSecret(secretBytes, req.headers.get("x-login-state")) ? userId : undefined) });
 
   const route = async (req: Request): Promise<Response> => {
     if (req.headers.get("host")?.toLowerCase() !== host) return text(421, "Misdirected Request");
     const url = new URL(req.url);
-    const ours = isState(stateBytes, url.searchParams.get("state"));
-    if (url.pathname === "/" && req.method === "GET" && ours)
-      return new Response(PAGE, { headers: { ...PAGE_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": CSP } });
+    const given = url.searchParams.get("state");
+    if (url.pathname === "/" && req.method === "GET" && isSecret(ticket, given)) {
+      if (opened) return text(410, OPENED);
+      opened = true;
+      return new Response(page(secret), { headers: { ...PAGE_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": CSP } });
+    }
     if (url.pathname === "/page.js" && req.method === "GET") return new Response(await readFile(script), { headers: { ...PAGE_HEADERS, "content-type": "text/javascript; charset=utf-8" } });
-    if (url.pathname === "/token" && ours) return endpoint(req);
+    if (url.pathname === "/token" && isSecret(secretBytes, given)) return endpoint(req);
     if (url.pathname === "/user-token") {
       if (asking || kept) return text(409, kept ? "A token is kept already." : "Another token is being asked about.");
       asking = true;
@@ -179,7 +191,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
   for (const server of servers) server.on("request", handle);
 
   return {
-    url: `${origin}/?state=${state}`,
+    url: `${origin}/?state=${ticket.toString()}`,
     stored,
     close: () => Promise.all(servers.map(close)).then(() => undefined),
   };
