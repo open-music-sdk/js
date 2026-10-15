@@ -180,7 +180,7 @@ describe("musicQueries: what is in it, and what is kept out of a key", () => {
   test.each<[string, unknown, unknown, string]>([
     ["no client", undefined, undefined, "musicQueries: client must be a client from createClient; got undefined"],
     ["a token where the client belongs", "dev", undefined, "musicQueries: client must be a client from createClient; got 3 characters"],
-    ["a scope that is an object", "client", { generation: 1 }, "musicQueries: scope must be a string or a number, such as the provider's generation; got object"],
+    ["a scope that is an object", "client", { scope: 1 }, "musicQueries: scope must be a string or a number, such as the provider's scope; got object"],
   ])("%s is a TypeError naming musicQueries", (_name, music, scope, message) => {
     const client = music === "client" ? apple().music : (music as tAppleMusicClient);
     expect(() => musicQueries(client, scope as number)).toThrow(new TypeError(message));

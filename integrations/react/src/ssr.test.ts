@@ -8,7 +8,7 @@ import { MusicProvider, useConnect, useMusic, useMusicQueries, useMusicUserToken
 describe("on a server, with no document, no element and no script", () => {
   const music = createBrowserClient({ tokenUrl: "https://app.example/api/music/token" });
 
-  test("a tree with every hook renders: the page's client, no token, not ready, the idle snapshot, the first generation", () => {
+  test("a tree with every hook renders: the page's client, no token, not ready, the idle snapshot, scope 0", () => {
     function App() {
       const held = useMusic();
       const [token] = useMusicUserToken();

@@ -9,7 +9,7 @@ import { clientOf, got, isPlain, ownOf, type tAppleMusicClient, type tEndpoint, 
 
 /** What `useQuery` takes, for one answer. */
 export interface tQuery<T> {
-  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`. An argument that is a schema is the marker `"schema"`, and one that is a function or a signal is `undefined` in its place. A plain object is keyed by what it holds, the same way, except that a function, a signal or an `undefined` in it is left out. Anything else is as it is. */
   readonly queryKey: readonly unknown[];
   /** Asks as the bound function does, and gives what it hands over. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: () => Promise<T>;
@@ -19,7 +19,7 @@ export interface tQuery<T> {
 
 /** What `useInfiniteQuery` takes, for a walk: Apple's pages, each with the `next` Apple sent, and nothing kept back. */
 export interface tInfiniteQuery<P extends tPage<unknown>> {
-  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`. An argument that is a schema is the marker `"schema"`, and one that is a function or a signal is `undefined` in its place. A plain object is keyed by what it holds, the same way, except that a function, a signal or an `undefined` in it is left out. Anything else is as it is. */
   readonly queryKey: readonly unknown[];
   /** One page, frozen: the function's own for no `pageParam`, else the one at that `next` link, asked for as `paginate` asks, with the same schema. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: (context: { readonly pageParam: string | undefined }) => Promise<P>;
@@ -80,7 +80,7 @@ const bagOf = (args: readonly unknown[]): Record<string, unknown> | undefined =>
 
 /**
  * An argument as it goes into a key. A schema is a marker, since two are not told apart by a key; a function or a
- * signal is nothing to key on, and is left out; what is plain is keyed by what it holds.
+ * signal is nothing to key on, and is `undefined`, which a plain object leaves out; what is plain is keyed by what it holds.
  */
 function keyed(value: unknown): unknown {
   if (isSchema(value)) return "schema";
@@ -154,6 +154,6 @@ function queriesOf<F extends object>(ns: "catalog" | "user", music: tAppleMusicC
  */
 export function musicQueries(music: tAppleMusicClient, scope?: string | number): tMusicQueries {
   const client = clientOf("musicQueries", music, METHODS);
-  if (scope !== undefined && typeof scope !== "string" && typeof scope !== "number") throw new TypeError(`musicQueries: scope must be a string or a number, such as the provider's generation; got ${got(scope)}`);
+  if (scope !== undefined && typeof scope !== "string" && typeof scope !== "number") throw new TypeError(`musicQueries: scope must be a string or a number, such as the provider's scope; got ${got(scope)}`);
   return Object.freeze(ownOf({ catalog: queriesOf("catalog", client, scope, catalogFunctions), user: queriesOf("user", client, scope, userFunctions) }));
 }
