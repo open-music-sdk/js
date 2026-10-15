@@ -104,8 +104,8 @@ async function signIn(argv: string[]): Promise<{ status: number; posted: number 
 }
 
 describe("help and version: every form shows it, and it goes to stdout", () => {
-  test("no arguments, --help, -h and help show the commands, the files and the exit statuses", async () => {
-    for (const argv of [[], ["--help"], ["-h"], ["help"]]) {
+  test("no arguments, --help, -h, help and help help show the commands, the files and the exit statuses", async () => {
+    for (const argv of [[], ["--help"], ["-h"], ["help"], ["help", "help"], ["--help", "--bogus"]]) {
       stdout = "";
       expect(await main(argv), argv.join(" ")).toBe(0);
       for (const command of ["login", "token", "doctor", "logout"]) expect(stdout).toContain(command);
@@ -117,7 +117,7 @@ describe("help and version: every form shows it, and it goes to stdout", () => {
   });
 
   test("help <command>, <command> --help and <command> -h show that command's options, whatever else was passed", async () => {
-    for (const argv of [["help", "login"], ["login", "--help"], ["login", "-h", "--port", "nonsense"], ["-h", "login"]]) {
+    for (const argv of [["help", "login"], ["login", "--help"], ["login", "-h", "--port", "nonsense"], ["-h", "login"], ["login", "-h", "--bogus"], ["login", "--bogus", "--help"]]) {
       stdout = "";
       expect(await main(argv), argv.join(" ")).toBe(0);
       expect(stdout).toContain("--no-browser");
@@ -136,9 +136,18 @@ describe("help and version: every form shows it, and it goes to stdout", () => {
     expect(stderr).toContain("There is no command 'logn'");
   });
 
-  test("printed to a terminal or a pipe without NO_COLOR, help is plain text when stdout is no terminal", async () => {
+  test("--no-color prints without color where color would otherwise be used", async () => {
+    const escape = String.fromCharCode(27);
+    // FORCE_COLOR stands in for a terminal: stdout here is none, and without it nothing is colored either way.
+    vi.stubEnv("FORCE_COLOR", "1");
     await main(["--help"]);
-    expect(stdout).not.toContain("\u001b[");
+    expect(stdout).toContain(escape);
+    stdout = "";
+    await main(["--help", "--no-color"]);
+    expect(stdout).not.toContain(escape);
+    stdout = "";
+    await main(["login", "--no-color", "--bogus", "-h"]);
+    expect(stdout).not.toContain(escape);
   });
 });
 
@@ -153,6 +162,10 @@ describe("mistakes in how the CLI was run: exit status 2, and a pointer to the h
     [["login", "--key"], "--key", "open-music-sdk login --help"],
     [["doctor"], "No key", "open-music-sdk doctor --help"],
     [["token", "--key", "k"], "go with --developer", "open-music-sdk token --help"],
+    [["doctor", "--color"], "There is no option '--color'", "open-music-sdk doctor --help"],
+    [["login", "--browser"], "There is no option '--browser'", "open-music-sdk login --help"],
+    [["token", "--no-developer"], "There is no option '--no-developer'", "open-music-sdk token --help"],
+    [["--no-help"], "There is no option '--no-help'", "open-music-sdk --help"],
   ])("%j", async (argv, message, hint) => {
     expect(await main(argv)).toBe(2);
     expect(stderr).toContain(message);

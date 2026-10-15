@@ -22,6 +22,8 @@ const OPTIONS = {
 
 /** Options every command takes. */
 const GLOBAL = ["help", "version", "color"];
+/** The flags that are given as `--no-`, and only so. */
+const NEGATABLE = ["color", "browser"];
 
 const KEY_HELP = [
   "      --key <path>    Your MusicKit private key, AuthKey_XXXXXXXXXX.p8",
@@ -65,7 +67,8 @@ const COMMANDS: Readonly<Record<string, tCommand>> = {
     ],
     options: ["developer", "key", "team-id", "key-id"],
     optionHelp: ["      --developer     Mint and print a developer token instead", ...KEY_HELP],
-    examples: [`APPLE_MUSIC_USER_TOKEN=$(${NAME} token) node job.js`, `curl -H "Authorization: Bearer $(${NAME} token --developer)" https://api.music.apple.com/v1/test`],
+    // In a variable, not an argument: a program's arguments are there for every user of the machine to read.
+    examples: [`APPLE_MUSIC_USER_TOKEN=$(${NAME} token) node job.js`, `APPLE_MUSIC_DEVELOPER_TOKEN=$(${NAME} token --developer) node job.js`],
     run: token,
   },
   doctor: {
@@ -176,6 +179,18 @@ function report(e: unknown, ctx: tContext, command: string | undefined): number 
   return 1;
 }
 
+/** Prints the help for `topic`, a command, or the CLI's own for none or for `help`. */
+function help(ctx: tContext, topic: string | undefined): number {
+  if (topic === undefined || topic === "help") {
+    process.stdout.write(`${topHelp(ctx)}\n`);
+    return 0;
+  }
+  const command = Object.hasOwn(COMMANDS, topic) ? COMMANDS[topic] : undefined;
+  if (command === undefined) throw usage(`There is no command${quoted(topic)} to show help for. The commands are ${Object.keys(COMMANDS).join(", ")}.`);
+  process.stdout.write(`${commandHelp(ctx, command)}\n`);
+  return 0;
+}
+
 /** The arguments as `parseArgs` reads them; what it refuses is a mistake in how the CLI was run. */
 function parse(argv: readonly string[]) {
   try {
@@ -193,34 +208,34 @@ function parse(argv: readonly string[]) {
  */
 export async function main(argv: readonly string[]): Promise<number> {
   const env = process.env;
-  let ctx: tContext = { env, color: true };
+  let ctx: tContext = { env, color: !argv.includes("--no-color") };
   // Known before the flags are read, so that a flag it refuses still points at the command's own help.
   let name = argv[0] !== undefined && Object.hasOwn(COMMANDS, argv[0]) ? argv[0] : undefined;
   try {
-    const { values, positionals } = parse(argv);
+    let parsed;
+    try {
+      parsed = parse(argv);
+    } catch (e) {
+      // -h and --help show the help whatever else was passed, a flag that is not there included.
+      if (argv.includes("-h") || argv.includes("--help")) return help(ctx, name);
+      throw e;
+    }
+    const { values, positionals } = parsed;
     ctx = { env, color: values.color !== false };
     const [first, ...rest] = positionals;
     name = first;
 
+    // parseArgs takes a `--no-` of every flag and the plain form of every `--no-` one; only these are options.
+    for (const [option, value] of Object.entries(values)) {
+      if (typeof value === "boolean" && !value !== NEGATABLE.includes(option)) throw usage(`There is no option${quoted(value ? `--${option}` : `--no-${option}`)}.`);
+    }
     if (values.version === true) {
       process.stdout.write(`${manifest.version}\n`);
       return 0;
     }
-    if (first === undefined) {
-      process.stdout.write(`${topHelp(ctx)}\n`);
-      return 0;
-    }
-    const topic = first === "help" ? rest[0] : values.help === true ? first : undefined;
-    if (first === "help" || values.help === true) {
-      if (topic === undefined) {
-        process.stdout.write(`${topHelp(ctx)}\n`);
-        return 0;
-      }
-      const command = Object.hasOwn(COMMANDS, topic) ? COMMANDS[topic] : undefined;
-      if (command === undefined) throw usage(`There is no command${quoted(topic)} to show help for. The commands are ${Object.keys(COMMANDS).join(", ")}.`);
-      process.stdout.write(`${commandHelp(ctx, command)}\n`);
-      return 0;
-    }
+    if (first === undefined) return help(ctx, undefined);
+    if (first === "help") return help(ctx, rest[0]);
+    if (values.help === true) return help(ctx, first);
 
     const command = Object.hasOwn(COMMANDS, first) ? COMMANDS[first] : undefined;
     if (command === undefined) {
