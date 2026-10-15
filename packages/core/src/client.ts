@@ -87,6 +87,9 @@ export type tSchemaResult<T> =
 /**
  * What `createClient` takes. Only `developerToken` is needed. Each option is checked at creation, so a mistake is a
  * TypeError there and not on the first request; what a provider gives, and what a store holds, are checked when used.
+ *
+ * Only `undefined` leaves an option out: `null` is a mistake like any other value. An option is one the object holds
+ * itself. One it inherits, or that other code has put on `Object.prototype`, is not one.
  */
 export interface tClientOptions {
   /**
@@ -110,7 +113,8 @@ export interface tClientOptions {
   onRequest?: ((req: Request) => void) | undefined;
   /**
    * Called once per response, after the client is done with it: the body has been read and the
-   * outcome decided. `outcome.error` is what the request will throw unless a retry succeeds.
+   * outcome decided. `outcome.error` is what the request will throw unless a retry succeeds. The body has been
+   * read, so take it from `outcome.body`, not from `res.json()`.
    */
   onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
@@ -133,7 +137,7 @@ export interface tRequestInit<T = unknown> {
   readonly method?: "GET" | "POST" | "PUT" | "DELETE" | undefined;
   /** The query, encoded as `tParams` says and set on the URL over whatever the path carries. */
   readonly params?: tParams | undefined;
-  /** JSON-encoded. */
+  /** JSON-encoded, and sent with `Content-Type: application/json`. */
   readonly body?: unknown;
   /** Send the Music User Token. Default: true under /v1/me. */
   readonly user?: boolean | undefined;

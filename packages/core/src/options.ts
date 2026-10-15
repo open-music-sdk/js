@@ -9,22 +9,41 @@ import { got } from "./got";
  * it was not given. Invalid values throw a TypeError, and no error quotes a value.
  */
 export interface tReadOptions<T = unknown> {
-  /** The language to answer in, as a tag the storefront supports, such as `"en-GB"`. Default: the storefront's own. */
+  /**
+   * The language to answer in, as a tag the storefront supports, such as `"en-GB"`: a string of 1 to 64 characters,
+   * sent as `l`. Default: the storefront's own.
+   */
   readonly language?: string | undefined;
-  /** The relationships to send in full with each resource, such as `["albums", "artists"]`. An empty list is none. */
+  /**
+   * The relationships to send in full with each resource, such as `["albums", "artists"]`: at most 300 names, each of
+   * 1 to 64 characters with no comma in it. An empty list is none, and is not sent.
+   */
   readonly include?: readonly string[] | undefined;
-  /** The attributes to add to those sent by default, such as `["artistUrl"]`. An empty list is none. */
+  /**
+   * The attributes to add to those sent by default, such as `["artistUrl"]`: at most 300 names, each of 1 to 64
+   * characters with no comma in it. An empty list is none, and is not sent.
+   */
   readonly extend?: readonly string[] | undefined;
   /** How many to send in one answer: a whole number above zero. Apple sets the default and the most. */
   readonly limit?: number | undefined;
-  /** Where in the collection to start: a whole number from zero, or a cursor as Apple gave it. */
+  /** Where in the collection to start: a whole number from zero, or a cursor as Apple gave it, of 1 to 256 characters. */
   readonly offset?: number | string | undefined;
   /**
    * Any other query parameter, sent as given: what Apple takes and no option here names. An option that is given,
    * or an argument of the function, wins over the same key here.
+   *
+   * It is a plain object of at most 100 parameters; a `Map` or a `URLSearchParams` is a TypeError, where it would
+   * otherwise be read as no parameters at all. A name is one as Apple writes them, such as `ids[albums]` or
+   * `limit[songs:tracks]`: a letter, then letters, digits, `-`, `_`, `.` and `:`, with any part in brackets after, in
+   * at most 64 characters. A name that does not fit is described in the error, not repeated. A value is a string of at
+   * most 256 characters, a number, `true` or `false`, or a list of at most 300 numbers and strings, each string of 1
+   * to 64 characters with no comma in it. `null`, `undefined` and an empty list are not sent.
    */
   readonly params?: tParams | undefined;
-  /** Validates the answer; a failure throws ValidationError. Any Standard Schema, such as a validator from @open-music-sdk/validate. */
+  /**
+   * Validates the answer; a failure throws ValidationError. Any Standard Schema, such as a validator from
+   * `@open-music-sdk/validate`: an object or a function with a `validate` function under `~standard`.
+   */
   readonly schema?: tSchemaLike<T> | undefined;
   /** Aborts the request. An abort is rethrown as it is. */
   readonly signal?: AbortSignal | undefined;

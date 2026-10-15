@@ -229,8 +229,23 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
  * taken too, and is on its way from the moment the collection gave it.
  *
  * What it gives is checked before it is asked for: plain ASCII segments with single slashes between, none of them
- * "." or "..", and no question mark, hash or backslash. So a storefront from outside cannot move a request, and a
- * collection that checks its own parts, with `segmentOf`, gets to name the option that was wrong.
+ * "." or "..", and no question mark, hash or backslash. A path that is not is a TypeError that says what is wrong
+ * with it, and never shows it:
+ *
+ * | A path that | Is refused because |
+ * | --- | --- |
+ * | holds a segment that is `.` or `..`, written out or as `%2e` | a URL reads them as "here" and "one up", so the request would go to another path |
+ * | holds a backslash | a URL reads it as a slash, so it would begin another segment |
+ * | holds a question mark | it begins the query, so what follows would not be part of the path |
+ * | holds a hash | it begins a fragment, so what follows would not be sent |
+ * | holds a space, a tab, a line break or another control character | a URL drops or trims it, joining what was on either side |
+ * | holds a character outside ASCII | a URL rewrites it |
+ * | holds an empty segment | two slashes together, or one at the end, leave out what was meant to be there |
+ * | begins with a name and a colon | a URL reads it as a scheme, and the rest as another address |
+ * | is empty, longer than 256 characters, or no string | no collection's path is |
+ *
+ * So a storefront from outside cannot move a request under `/v1/me`, where the client sends the Music User Token.
+ * A collection that checks its own parts with `segmentOf` gets to name the option that was wrong.
  */
 export interface tCollection<C = tNone> {
   /**
@@ -247,7 +262,7 @@ export interface tCollection<C = tNone> {
   /**
    * Whether what is asked of this collection carries the Music User Token. Left out, the client goes by the path,
    * and sends it under /v1/me. `false` holds for every page of a walk, wherever a next link points: it is how a
-   * catalog says that nothing asked of it is the listener's.
+   * catalog says that nothing asked of it is the listener's. `true` sends it outside /v1/me as well.
    */
   readonly user?: boolean | undefined;
 }
