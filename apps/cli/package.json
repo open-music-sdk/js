@@ -1,0 +1,50 @@
+{
+  "name": "@open-music-sdk/cli",
+  "version": "0.0.0",
+  "description": "A Music User Token for your own Apple Music account, through Apple's sign-in in your browser, and a check of your MusicKit key, from the command line.",
+  "license": "MIT",
+  "keywords": [
+    "apple-music-api",
+    "apple-music",
+    "musickit",
+    "cli",
+    "music-user-token",
+    "developer-token"
+  ],
+  "homepage": "https://github.com/open-music-sdk/js/tree/main/apps/cli#readme",
+  "bugs": "https://github.com/open-music-sdk/js/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-music-sdk/js.git",
+    "directory": "apps/cli"
+  },
+  "type": "module",
+  "bin": {
+    "open-music-sdk": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepack": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@open-music-sdk/server": "workspace:^"
+  },
+  "devDependencies": {
+    "@open-music-sdk/browser": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "happy-dom": "catalog:",
+    "tooling-vitest-config": "workspace:*",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  }
+}
