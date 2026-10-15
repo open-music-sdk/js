@@ -3,7 +3,13 @@
 import type { tAppleMusicClient } from "./client";
 import { got } from "./got";
 
-/** Whether `value` is an object with a function under each of `methods`. Nothing is called on it. */
+/**
+ * Whether `value` is an object with a function under each of `methods`. Nothing is called on it.
+ *
+ * @param value - What to look at.
+ * @param methods - The names that each have to hold a function.
+ * @returns Whether `value` is a non-null object and every name of `methods` holds a function on it.
+ */
 export const has = (value: unknown, methods: readonly string[]): boolean =>
   typeof value === "object" && value !== null && methods.every((method) => typeof (value as Record<string, unknown>)[method] === "function");
 
@@ -11,6 +17,9 @@ export const has = (value: unknown, methods: readonly string[]): boolean =>
  * What an object holds itself, each property read once, as an object of this call's own that inherits nothing. A
  * property is then there or it is not, whatever other code has put on `Object.prototype`: an option nobody passed
  * cannot be found there.
+ *
+ * @param bag - The object to read.
+ * @returns A new object with `bag`'s own enumerable properties and a `null` prototype.
  */
 export const ownOf = <T extends object>(bag: T): T => Object.assign(Object.create(null) as T, bag);
 
@@ -19,6 +28,9 @@ export const ownOf = <T extends object>(bag: T): T => Object.assign(Object.creat
  * URLSearchParams, a Buffer and a class's instance are not: what each holds is not in properties of its own, so
  * read as a bag of them it would be an empty bag, and what the caller meant by it would be dropped without a word.
  * The prototype is asked about rather than compared, so an object from another realm is as plain as one from here.
+ *
+ * @param value - What to look at.
+ * @returns Whether `value` is an object whose prototype is `null` or is itself prototype-less, as `Object.prototype` is.
  */
 export function isPlain(value: unknown): value is object {
   if (typeof value !== "object" || value === null) return false;
@@ -32,6 +44,12 @@ export const gotFor = (value: unknown): string => (Array.isArray(value) ? "a lis
 /**
  * An options bag as this call's own: what the caller's object holds itself, and the empty bag when none was
  * given. The types rule anything but a plain object out, and a caller without them can still pass it.
+ *
+ * @param fn - The name of the function the options were handed to, for the error.
+ * @param options - What the caller gave, or `undefined` for nothing.
+ * @param what - What the error says was expected, such as `"an options object"`.
+ * @returns The options' own properties as a new object with no prototype; an empty one when `options` is `undefined`.
+ * @throws TypeError if `options` is neither `undefined` nor a plain object.
  */
 export function optionsOf<T extends object>(fn: string, options: T | undefined, what: string): T {
   if (options === undefined) return ownOf({} as T);
@@ -42,6 +60,12 @@ export function optionsOf<T extends object>(fn: string, options: T | undefined, 
 /**
  * A client from createClient, or anything with the `methods` the caller is about to use: a wrapped client, or a
  * test's own. Naming the methods is what keeps the check to what is called.
+ *
+ * @param fn - The name of the function the client was handed to, for the error.
+ * @param client - What the caller gave as a client.
+ * @param methods - The client's methods the caller is about to call, such as `["request"]`.
+ * @returns `client` itself, as a client.
+ * @throws TypeError if `client` is not an object with a function under each of `methods`.
  */
 export function clientOf(fn: string, client: unknown, methods: readonly (keyof tAppleMusicClient)[]): tAppleMusicClient {
   if (has(client, methods)) return client as tAppleMusicClient;
@@ -58,12 +82,23 @@ export const MAX_NAME = 64;
 /** The longest a piece of text that is no name may be, such as a cursor Apple gave. */
 export const MAX_LENGTH = 256;
 
-/** Whether `value` is a name: a string of 1 to 64 characters, which is what an id, a type or a code may be wherever it is sent. */
+/**
+ * Whether `value` is a name: a string of 1 to 64 characters, which is what an id, a type or a code may be wherever it is sent.
+ *
+ * @param value - What to look at.
+ * @returns Whether `value` is a string of 1 to 64 characters.
+ */
 export const isName = (value: unknown): value is string => typeof value === "string" && value !== "" && value.length <= MAX_NAME;
 
 /**
  * `value` as a piece of text that is no name, such as what someone typed into a search box: a string of 1 to 256
  * characters. It is sent in the URL, so how long it may be is not left open.
+ *
+ * @param fn - The name of the function the text was handed to, for the error.
+ * @param name - What the function calls this argument, for the error, such as `"term"`.
+ * @param value - What the caller gave.
+ * @returns `value` itself, as a string.
+ * @throws TypeError if `value` is not a string of 1 to 256 characters.
  */
 export function textOf(fn: string, name: string, value: unknown): string {
   if (typeof value === "string" && value !== "" && value.length <= MAX_LENGTH) return value;
@@ -83,6 +118,13 @@ const UNFIT = /[/\\%\p{Cc}]/u;
  * the segment. What could be read as leaving it is refused: a slash, a backslash, a percent sign and a control
  * character, and "." and "..", which a URL parser reads as "here" and "one up". So a value from outside cannot turn
  * a request for one endpoint into a request for another, where a different token may be sent.
+ *
+ * @param fn - The name of the function the value was handed to, for the error.
+ * @param name - What the function calls this argument, for the error, such as `"id"`.
+ * @param value - What the caller gave.
+ * @returns `value` percent-encoded, as `encodeURIComponent` encodes it.
+ * @throws TypeError if `value` is not a string of 1 to 64 characters, holds a slash, a backslash, a percent sign, a
+ * control character or half of a surrogate pair, or is `"."` or `".."`.
  */
 export function segmentOf(fn: string, name: string, value: unknown): string {
   if (typeof value === "string" && value !== "" && value.length <= MAX_NAME && value !== "." && value !== ".." && !UNFIT.test(value)) {
@@ -122,6 +164,11 @@ export const copyOf = (list: unknown, length: number): unknown[] => Array.from({
  * A caller's list as this call's own copy of its items, whatever they are: asked its length once and read by index,
  * as `listOf` reads a list of strings. `undefined` when it is no list, or holds fewer than `least` items or more
  * than `most`, and a list too long is not read at all. What each item has to be is the caller's to check.
+ *
+ * @param value - What the caller gave as a list.
+ * @param least - The fewest items it may hold.
+ * @param most - The most items it may hold.
+ * @returns A new array of the list's items, or `undefined` when `value` is no array or its length is outside `least` to `most`.
  */
 export function itemsOf(value: unknown, least: number, most: number): unknown[] | undefined {
   const length = lengthOf(value);
@@ -131,6 +178,12 @@ export function itemsOf(value: unknown, least: number, most: number): unknown[] 
 /**
  * `value` as a list of one or more strings, of the caller's ids, types or codes: this call's own copy, taken
  * before it is checked, so what was checked is what is sent.
+ *
+ * @param fn - The name of the function the list was handed to, for the error.
+ * @param name - What the function calls this argument, for the error, such as `"ids"`.
+ * @param value - What the caller gave as a list.
+ * @returns A new array of the list's strings, in their order.
+ * @throws TypeError if `value` is not an array of 1 to 300 strings, each of 1 to 64 characters with no comma in it.
  */
 export const listOf = (fn: string, name: string, value: unknown): readonly string[] => listed(fn, name, value, 1);
 
@@ -160,6 +213,14 @@ export const isBracketed = (name: unknown): name is string => typeof name === "s
  * All of it goes into one URL, so all of it is bounded: the names by how many there may be, counted before anything
  * is made of them, and the ids by how many there may be over every type together, which is as many as one list
  * may hold.
+ *
+ * @param fn - The name of the function the ids were handed to, for the error.
+ * @param name - What the function calls this argument, for the error, such as `"ids"`.
+ * @param value - What the caller gave: ids by type.
+ * @returns The lists by parameter name, `ids[songs]` for `songs`, each a new array; types whose list was `undefined` are left out.
+ * @throws TypeError if `value` is not a plain object, names more than 32 types or none with a list, names a type
+ * that is not lowercase words with hyphens between, holds a list that is not one as `listOf` takes it, or holds
+ * more than 300 ids over all its types.
  */
 export function typedIdsOf(fn: string, name: string, value: unknown): Record<string, readonly string[]> {
   if (!isPlain(value)) throw new TypeError(`${fn}: ${name} must be a plain object of ids by type, such as { songs: ["1"] }; got ${gotFor(value)}`);

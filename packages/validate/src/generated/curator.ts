@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { artwork, editorialNotes } from "./common";
 import { playlist } from "./playlist";
 
+/** Validates a `tCurator`: a resource object that represents a curator. */
 export const curator: r.tSchema<t.tCurator> = r.object<t.tCurator>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const curator: r.tSchema<t.tCurator> = r.object<t.tCurator>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tCuratorAttributes`: the attributes for a curator resource. */
 export const curatorAttributes: r.tSchema<t.tCuratorAttributes> = r.object<t.tCuratorAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -26,6 +28,7 @@ export const curatorAttributes: r.tSchema<t.tCuratorAttributes> = r.object<t.tCu
   ["artwork", "name", "url"],
 );
 
+/** Validates a `tCuratorRelationships`: the relationships for a curator resource. */
 export const curatorRelationships: r.tSchema<t.tCuratorRelationships> = r.object<t.tCuratorRelationships>(
   {
     playlists: r.lazy(() => curatorRelationshipsCuratorPlaylistsRelationship),
@@ -33,6 +36,7 @@ export const curatorRelationships: r.tSchema<t.tCuratorRelationships> = r.object
   [],
 );
 
+/** Validates a `tCuratorRelationshipsCuratorPlaylistsRelationship`: a relationship from the curator to its playlists. */
 export const curatorRelationshipsCuratorPlaylistsRelationship: r.tSchema<t.tCuratorRelationshipsCuratorPlaylistsRelationship> = r.object<t.tCuratorRelationshipsCuratorPlaylistsRelationship>(
   {
     href: r.string,
@@ -42,6 +46,7 @@ export const curatorRelationshipsCuratorPlaylistsRelationship: r.tSchema<t.tCura
   ["data"],
 );
 
+/** Validates a `tCuratorsResponse`: the response to a request for curators. */
 export const curatorsResponse: r.tSchema<t.tCuratorsResponse> = r.object<t.tCuratorsResponse>(
   {
     data: r.array(r.lazy(() => curator)),

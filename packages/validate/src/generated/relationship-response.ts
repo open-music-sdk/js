@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { resource } from "./resource";
 
+/** Validates a `tRelationshipResponse`: the response for a direct resource relationship fetch. */
 export const relationshipResponse: r.tSchema<t.tRelationshipResponse> = r.object<t.tRelationshipResponse>(
   {
     data: r.array(r.lazy(() => resource)),
@@ -13,4 +14,5 @@ export const relationshipResponse: r.tSchema<t.tRelationshipResponse> = r.object
   ["data"],
 );
 
+/** Validates a `tRelationshipResponseMeta`: Contextual data about the relationship. */
 export const relationshipResponseMeta: r.tSchema<t.tRelationshipResponseMeta> = r.schema<t.tRelationshipResponseMeta>(r.record);

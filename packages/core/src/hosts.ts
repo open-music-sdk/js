@@ -14,6 +14,12 @@ const isHostName = (host: unknown): host is string => typeof host === "string" &
  * name in small letters, as a URL parser gives a host: `https://mzstatic.com`, `*.mzstatic.com` and `MzStatic.com`
  * would each match nothing, so they are refused here and not left to refuse every URL later. `fn` is who a mistake
  * is named for, and `example` a host to show in the error, such as `mzstatic.com`.
+ *
+ * @param fn - The name of the function the hosts were handed to, for the error.
+ * @param value - What the caller gave as hosts: a list of 1 to 16 host names, or `undefined` for none.
+ * @param example - A host name to show in the error, such as `mzstatic.com`.
+ * @returns The hosts as a list of this call's own, or `undefined` when none were named.
+ * @throws TypeError if `value` is neither `undefined` nor a list of 1 to 16 bare host names in small letters.
  */
 export function hostsOf(fn: string, value: unknown, example: string): readonly string[] | undefined {
   if (value === undefined) return undefined;
@@ -37,6 +43,10 @@ const ELSEWHERE = "https://elsewhere.invalid/";
  * It answers whatever it is asked, since other packages call it: what is no string is on no host, and neither is
  * anything when `hosts` is no list. A name in the list that is no host name, as `hostsOf` holds one to be, allows
  * nothing: an empty one would otherwise allow every host written with a dot at its end.
+ *
+ * @param url - The URL to check, as it will be requested.
+ * @param hosts - The host names allowed, as `hostsOf` gives them.
+ * @returns Whether `url` is `https`, with no port and no credentials, on one of `hosts` or a subdomain of one.
  */
 export function isOnHost(url: string, hosts: readonly string[]): boolean {
   if (typeof url !== "string" || !Array.isArray(hosts)) return false;

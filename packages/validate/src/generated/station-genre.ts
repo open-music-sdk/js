@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { station } from "./station";
 
+/** Validates a `tStationGenre`: a resource object that represents a station genre. */
 export const stationGenre: r.tSchema<t.tStationGenre> = r.object<t.tStationGenre>(
   {
     id: r.string,
@@ -15,6 +16,7 @@ export const stationGenre: r.tSchema<t.tStationGenre> = r.object<t.tStationGenre
   ["id", "type", "href"],
 );
 
+/** Validates a `tStationGenreAttributes`: the attributes for the station genre resource. */
 export const stationGenreAttributes: r.tSchema<t.tStationGenreAttributes> = r.object<t.tStationGenreAttributes>(
   {
     name: r.string,
@@ -22,6 +24,7 @@ export const stationGenreAttributes: r.tSchema<t.tStationGenreAttributes> = r.ob
   ["name"],
 );
 
+/** Validates a `tStationGenreRelationships`: the relationships for a station genre resource. */
 export const stationGenreRelationships: r.tSchema<t.tStationGenreRelationships> = r.object<t.tStationGenreRelationships>(
   {
     stations: r.lazy(() => stationGenreRelationshipsStationGenreStationsRelationship),
@@ -29,6 +32,7 @@ export const stationGenreRelationships: r.tSchema<t.tStationGenreRelationships> 
   [],
 );
 
+/** Validates a `tStationGenreRelationshipsStationGenreStationsRelationship`: a relationship from the station genre to associated stations. */
 export const stationGenreRelationshipsStationGenreStationsRelationship: r.tSchema<t.tStationGenreRelationshipsStationGenreStationsRelationship> = r.object<t.tStationGenreRelationshipsStationGenreStationsRelationship>(
   {
     href: r.string,
@@ -38,6 +42,7 @@ export const stationGenreRelationshipsStationGenreStationsRelationship: r.tSchem
   ["data"],
 );
 
+/** Validates a `tStationGenresResponse`: the response to a specific station genres resource request. */
 export const stationGenresResponse: r.tSchema<t.tStationGenresResponse> = r.object<t.tStationGenresResponse>(
   {
     data: r.array(r.lazy(() => stationGenre)),

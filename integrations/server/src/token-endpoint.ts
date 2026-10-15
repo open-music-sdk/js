@@ -15,7 +15,14 @@ export interface tTokenEndpointOptions extends Omit<tMinterOptions, "origin" | "
   readonly ttlSeconds?: number | undefined;
 }
 
-/** A web-standard handler, to mount wherever your framework takes one: `export const GET = tokenEndpoint(…)`. */
+/**
+ * A web-standard handler, to mount wherever your framework takes one: `export const GET = tokenEndpoint(…)`.
+ *
+ * @param req - The request as the framework hands it over; its method and `Origin` header are read.
+ * @returns The answer: the token as JSON for a `GET`, `204` for `OPTIONS`, `405` for any other method.
+ * @throws TypeError if the first mint finds the `pem` is no key: the minter's own, inside the request, since the
+ * handler catches nothing.
+ */
 export type tTokenEndpoint = (req: Request) => Promise<Response>;
 
 const DEFAULT_TTL_SECONDS = 900;
@@ -33,6 +40,11 @@ const WHAT = "an options object with pem, teamId, keyId and origin";
  * It catches nothing. A `pem` that is a string but no key fails at the first mint, inside the request, with the
  * TypeError the minter throws; the framework logs it, and the developer finds it there. The options are checked
  * and taken here, once.
+ *
+ * @param options - The key and its two ids, the origins the token is for, and how long it lives.
+ * @returns The handler, which asks nothing of the key until its first request.
+ * @throws TypeError if `options` is not a plain object, `origin` is not a list of one or more web origins,
+ * `ttlSeconds` is not a whole number of seconds up to one day, or a value is not what the minter takes.
  */
 export function tokenEndpoint(options: tTokenEndpointOptions): tTokenEndpoint {
   if ((options as unknown) === undefined) throw new TypeError(`tokenEndpoint: expected ${WHAT}; got undefined`);

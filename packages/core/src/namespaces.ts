@@ -13,9 +13,23 @@ export type tNamespaces = Readonly<Record<string, (client: tAppleMusicClient) =>
 export type tWithNamespaces<N extends tNamespaces> = Omit<tAppleMusicClient, "as" | "forUser"> & {
   readonly [K in keyof N]: ReturnType<N[K]>;
 } & {
-  /** A client for one listener, with the same namespaces made for it. */
+  /**
+   * A client for one listener, with the same namespaces made for it.
+   *
+   * @param userToken - The listener's Music User Token, or a function that gives it when a request needs it.
+   * @returns A client that sends `userToken` under `/v1/me`, frozen, with each namespace made afresh for it.
+   * @throws TypeError if `userToken` is neither a token nor a function, or a namespace's factory gives no object for the new client.
+   * @throws Whatever a namespace's factory throws, as it is.
+   */
   as(userToken: string | tTokenProvider): tWithNamespaces<N>;
-  /** `as()`, with the token looked up in the client's store, and the same namespaces made for it. */
+  /**
+   * `as()`, with the token looked up in the client's store, and the same namespaces made for it.
+   *
+   * @param userId - Whose token to look up, under the name the store knows them by.
+   * @returns A client that looks the listener's token up at each request, frozen, with each namespace made afresh for it.
+   * @throws TypeError if the client was made without a `userTokenStore`, or a namespace's factory gives no object for the new client.
+   * @throws Whatever a namespace's factory throws, as it is.
+   */
   forUser(userId: string): tWithNamespaces<N>;
 };
 
@@ -27,6 +41,14 @@ const METHODS = ["request", "paginate", "storefront", "as", "forUser"] as const;
  * client whose `catalog` is `catalog(music)`. The factories are checked and read here, once, and each is called
  * once for this client and once for each client that `as()` or `forUser()` derives. What is given is frozen and
  * inherits nothing, and its functions need no `this`.
+ *
+ * @typeParam N - The factories by name, from which the names and what each holds are read.
+ * @param client - The client to put the namespaces on, from `createClient` or anything with its five methods.
+ * @param namespaces - A plain object of factories, each taking a client and giving an object, under the name each goes by.
+ * @returns A frozen object with the client's `request`, `paginate`, `storefront`, `as` and `forUser`, and each namespace under its name.
+ * @throws TypeError if `client` is no client, `namespaces` is not a plain object, one of its values is no function,
+ * one of its names is a method of the client, or a factory gives no object.
+ * @throws Whatever a factory throws, as it is.
  */
 export function withNamespaces<N extends tNamespaces>(client: tAppleMusicClient, namespaces: N): tWithNamespaces<N> {
   const music = clientOf("withNamespaces", client, METHODS);

@@ -1,25 +1,8 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { countOf, maxPagesOf, pause, progressOf, signalOf, waitOf } from "./options";
+import { countOf, maxPagesOf, pause, progressOf, waitOf } from "./options";
 
 afterEach(() => {
   vi.useRealTimers();
-});
-
-describe("signalOf", () => {
-  test("no signal is no signal, and a signal is taken as it is", () => {
-    const { signal } = new AbortController();
-    expect(signalOf("playlists.read", undefined)).toBeUndefined();
-    expect(signalOf("playlists.read", signal)).toBe(signal);
-  });
-
-  test.each<[string, unknown]>([
-    ["a controller, which holds one", new AbortController()],
-    ["true", true],
-    ["an object that looks like one", { aborted: false, addEventListener: () => undefined }],
-    ["null", null],
-  ])("%s is refused, under the verb's name", (_name, value) => {
-    expect(() => signalOf("playlists.read", value)).toThrow(/^playlists\.read: signal must be an AbortSignal; got /);
-  });
 });
 
 describe("progressOf", () => {

@@ -26,21 +26,21 @@ libs, and the integrations people actually install. Every package ships the same
 | Sub-task | Status | Progress | Description |
 | --- | :---: | :---: | --- |
 | Repository tooling | 🚧 In progress | 80% | pnpm workspace · Turborepo · TypeScript · ESLint · tsdown · Vitest · CI workflow · Changesets and the release workflow not yet set up |
-| [`codegen`](./codegen) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
-| [`@open-music-sdk/types`](./packages/types) | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
-| [`@open-music-sdk/validate`](./packages/validate) | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
-| [`@open-music-sdk/core`](./packages/core) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · the checks and builders the clients declare their endpoints with · the check on where a URL may point · untested against the live API |
-| [`@open-music-sdk/developer-token`](./packages/developer-token) | 🚧 In progress | 80% | JWT minting · minter and fetcher providers over one cache · a `/fetcher` entry with no signing code · untested against the live API |
-| [`@open-music-sdk/user-token`](./packages/user-token) | 🚧 In progress | 80% | Validation · intake handler, and the same step without HTTP · memory and KV stores · untested against the live API |
-| [`@open-music-sdk/util-artwork`](./packages/util-artwork) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check, which is all of `core` it carries · checked against Apple's image server, untested against the live API |
-| [`@open-music-sdk/client-catalog`](./clients/client-catalog) | 🚧 In progress | 80% | A function for each of the 58 catalog, storefront, search, and chart endpoints · `catalog(client)` with the answers unwrapped · developer token only · held to Apple's documentation by its tests, untested against the live API |
-| [`@open-music-sdk/client-user`](./clients/client-user) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
-| [`@open-music-sdk/lib-playlists`](./lib/lib-playlists) | 🚧 In progress | 80% | `playlists(client)` · resolve tracks by ISRC, then by a search held to an exact match · read a playlist whole, which is also the export · plan what it is missing · apply it with each write sent once · progress, a delay between requests and an opt-in limit on pages · untested against the live API |
-| [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · untested in a browser against the live API |
-| [`@open-music-sdk/server`](./integrations/server) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
-| [`@open-music-sdk/browser`](./integrations/browser) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
-| [`@open-music-sdk/react`](./integrations/react) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
-| Reference site, `apps/docs` | 🚧 In progress | 0% | TypeDoc over every package's doc comments · arguments, returns and throws on every function · published to GitHub Pages from `main` |
+| [`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme) | ✅ Done | 100% | Crawl Apple's docs · commit a normalized IR · emit types and validators · one file per resource family |
+| [`@open-music-sdk/types`](./packages/types/README.md) | ✅ Done | 100% | An interface for every API object · singular names · discriminated resource union · zero dependencies |
+| [`@open-music-sdk/validate`](./packages/validate/README.md) | ✅ Done | 100% | A Standard Schema validator for every API object · tiny runtime · no dependencies · tested |
+| [`@open-music-sdk/core`](./packages/core/README.md) | 🚧 In progress | 80% | Client factory · tagged errors · retry and rate limiting · pagination · request hooks · the token and bounded-read primitives the other packages share · the checks and builders the clients declare their endpoints with · the check on where a URL may point · untested against the live API |
+| [`@open-music-sdk/developer-token`](./packages/developer-token/README.md) | 🚧 In progress | 80% | JWT minting · minter and fetcher providers over one cache · a `/fetcher` entry with no signing code · untested against the live API |
+| [`@open-music-sdk/user-token`](./packages/user-token/README.md) | 🚧 In progress | 80% | Validation · intake handler, and the same step without HTTP · memory and KV stores · untested against the live API |
+| [`@open-music-sdk/util-artwork`](./packages/util-artwork/README.md) | 🚧 In progress | 80% | Artwork URL templates · `src`, `srcset` and layout size for an `<img>` · format and crop · opt-in host check, which is all of `core` it carries · checked against Apple's image server, untested against the live API |
+| [`@open-music-sdk/client-catalog`](./clients/client-catalog/README.md) | 🚧 In progress | 80% | A function for each of the 58 catalog, storefront, search, and chart endpoints · `catalog(client)` with the answers unwrapped · developer token only · held to Apple's documentation by its tests, untested against the live API |
+| [`@open-music-sdk/client-user`](./clients/client-user/README.md) | 🚧 In progress | 80% | A function for each of the 79 library, ratings, recommendations, history, and replay endpoints · `user(client)` with the answers unwrapped · both tokens · held to Apple's documentation by its tests, untested against the live API |
+| [`@open-music-sdk/lib-playlists`](./lib/lib-playlists/README.md) | 🚧 In progress | 80% | `playlists(client)` · resolve tracks by ISRC, then by a search held to an exact match · read a playlist whole, which is also the export · plan what it is missing · apply it with each write sent once · progress, a delay between requests and an opt-in limit on pages · untested against the live API |
+| [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player/README.md) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · untested in a browser against the live API |
+| [`@open-music-sdk/server`](./integrations/server/README.md) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · the feature tier from one path · one build for Node, Workers, Bun and Deno · untested against the live API |
+| [`@open-music-sdk/browser`](./integrations/browser/README.md) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
+| [`@open-music-sdk/react`](./integrations/react/README.md) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
+| [Reference site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 90% | TypeDoc over every package's doc comments · a comment on every export, and arguments, returns and throws on every function, method and namespace member, which CI checks · published to GitHub Pages from `main` once Pages is turned on |
 | `@open-music-sdk/cli`, `apps/cli` | ⬜ Not started | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
@@ -55,7 +55,8 @@ catalog, the listener's library and the playlist verbs on it, and re-exports wha
 feature tier from one path. An app can also put the pieces together itself: a client from `core`, a
 developer token from `developer-token`, and the functions of `client-catalog` and `client-user`, each
 of which takes that client; `lib-playlists` takes the same client, and `lib-preview-player` the songs
-it fetched. Each README linked above shows how.
+it fetched. Each README linked above shows how, and [the reference](https://open-music-sdk.github.io/js/)
+has every function of every package with its arguments, what it returns and what it throws.
 
 ## What every package holds to
 
@@ -98,7 +99,7 @@ packages still to come.
 
 ```
 pnpm-workspace.yaml   workspace globs and the dependency catalog
-turbo.json            codegen → build → typecheck → lint → test
+turbo.json            codegen → build → typecheck → lint → test → check
 tsconfig.base.json    strict TypeScript base every package extends
 eslint.config.ts      root ESLint config (tooling/eslint-config)
 tooling/              private shared configs: eslint, tsdown, vitest
@@ -107,10 +108,11 @@ packages/             foundation packages: types, validate, core, developer-toke
 clients/              one client per token boundary: client-catalog, client-user
 lib/                  conveniences over the clients: lib-playlists, lib-preview-player
 integrations/         what people install: server, browser, react
-.github/workflows/    ci: build, typecheck, lint and test on what a change affects
+apps/                 private apps of the repository: docs, the TypeDoc reference (see apps/docs/README.md)
+.github/workflows/    ci: build, typecheck, lint, test and check on what a change affects · pages: the reference, from main
 ```
 
-Planned workspaces: `apps/` (the CLI and the reference site) and `samples/` (private sample apps).
+Planned workspaces: `apps/cli` (the CLI) and `samples/` (private sample apps).
 
 ## Development
 
@@ -122,6 +124,6 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test
 
 ## License
 
-[MIT](./LICENSE) with a [Developer Certificate of Origin](./CONTRIBUTING.md#developer-certificate-of-origin) sign-off on contributions.
-The project name and logo are not covered by the code license; see [TRADEMARKS.md](./TRADEMARKS.md).
+[MIT](./LICENSE) with a [Developer Certificate of Origin](https://github.com/open-music-sdk/js/blob/main/CONTRIBUTING.md#developer-certificate-of-origin) sign-off on contributions.
+The project name and logo are not covered by the code license; see [TRADEMARKS.md](https://github.com/open-music-sdk/js/blob/main/TRADEMARKS.md).
 Using the Apple Music API requires your own Apple Developer account and agreement with Apple.

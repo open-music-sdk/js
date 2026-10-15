@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tSearchHintsResponse`: the response to a request for search hints. */
 export const searchHintsResponse: r.tSchema<t.tSearchHintsResponse> = r.object<t.tSearchHintsResponse>(
   {
     results: r.lazy(() => searchHintsResponseResults),
@@ -10,6 +11,7 @@ export const searchHintsResponse: r.tSchema<t.tSearchHintsResponse> = r.object<t
   ["results"],
 );
 
+/** Validates a `tSearchHintsResponseResults`: an object that represents the autocomplete options for the hint. */
 export const searchHintsResponseResults: r.tSchema<t.tSearchHintsResponseResults> = r.object<t.tSearchHintsResponseResults>(
   {
     terms: r.array(r.string),

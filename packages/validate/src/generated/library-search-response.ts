@@ -8,6 +8,7 @@ import { libraryMusicVideo } from "./library-music-video";
 import { libraryPlaylist } from "./library-playlist";
 import { librarySong } from "./library-song";
 
+/** Validates a `tLibrarySearchResponse`: the response to a request for a library search. */
 export const librarySearchResponse: r.tSchema<t.tLibrarySearchResponse> = r.object<t.tLibrarySearchResponse>(
   {
     results: r.lazy(() => librarySearchResponseResults),
@@ -15,6 +16,7 @@ export const librarySearchResponse: r.tSchema<t.tLibrarySearchResponse> = r.obje
   ["results"],
 );
 
+/** Validates a `tLibrarySearchResponseResults`: an object that represents the results of a library search query. */
 export const librarySearchResponseResults: r.tSchema<t.tLibrarySearchResponseResults> = r.object<t.tLibrarySearchResponseResults>(
   {
     "library-albums": r.lazy(() => librarySearchResponseResultsLibraryAlbumsSearchResult),
@@ -26,6 +28,7 @@ export const librarySearchResponseResults: r.tSchema<t.tLibrarySearchResponseRes
   [],
 );
 
+/** Validates a `tLibrarySearchResponseResultsLibraryAlbumsSearchResult`: the library albums results for a term search for specific resource types. */
 export const librarySearchResponseResultsLibraryAlbumsSearchResult: r.tSchema<t.tLibrarySearchResponseResultsLibraryAlbumsSearchResult> = r.object<t.tLibrarySearchResponseResultsLibraryAlbumsSearchResult>(
   {
     data: r.array(r.lazy(() => libraryAlbum)),
@@ -35,6 +38,7 @@ export const librarySearchResponseResultsLibraryAlbumsSearchResult: r.tSchema<t.
   ["data"],
 );
 
+/** Validates a `tLibrarySearchResponseResultsLibraryArtistsSearchResult`: the library artists results for a term search for specific resource types. */
 export const librarySearchResponseResultsLibraryArtistsSearchResult: r.tSchema<t.tLibrarySearchResponseResultsLibraryArtistsSearchResult> = r.object<t.tLibrarySearchResponseResultsLibraryArtistsSearchResult>(
   {
     data: r.array(r.lazy(() => libraryArtist)),
@@ -44,6 +48,7 @@ export const librarySearchResponseResultsLibraryArtistsSearchResult: r.tSchema<t
   ["data"],
 );
 
+/** Validates a `tLibrarySearchResponseResultsLibraryMusicVideosSearchResult`: the library music videos results for a term search for specific resource types. */
 export const librarySearchResponseResultsLibraryMusicVideosSearchResult: r.tSchema<t.tLibrarySearchResponseResultsLibraryMusicVideosSearchResult> = r.object<t.tLibrarySearchResponseResultsLibraryMusicVideosSearchResult>(
   {
     data: r.array(r.lazy(() => libraryMusicVideo)),
@@ -53,6 +58,7 @@ export const librarySearchResponseResultsLibraryMusicVideosSearchResult: r.tSche
   ["data"],
 );
 
+/** Validates a `tLibrarySearchResponseResultsLibraryPlaylistsSearchResult`: the library playlists results for a term search for specific resource types. */
 export const librarySearchResponseResultsLibraryPlaylistsSearchResult: r.tSchema<t.tLibrarySearchResponseResultsLibraryPlaylistsSearchResult> = r.object<t.tLibrarySearchResponseResultsLibraryPlaylistsSearchResult>(
   {
     data: r.array(r.lazy(() => libraryPlaylist)),
@@ -62,6 +68,7 @@ export const librarySearchResponseResultsLibraryPlaylistsSearchResult: r.tSchema
   ["data"],
 );
 
+/** Validates a `tLibrarySearchResponseResultsLibrarySongsSearchResult`: the library songs results for a term search for specific resource types. */
 export const librarySearchResponseResultsLibrarySongsSearchResult: r.tSchema<t.tLibrarySearchResponseResultsLibrarySongsSearchResult> = r.object<t.tLibrarySearchResponseResultsLibrarySongsSearchResult>(
   {
     data: r.array(r.lazy(() => librarySong)),

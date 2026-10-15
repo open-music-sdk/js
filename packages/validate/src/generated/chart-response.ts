@@ -7,6 +7,7 @@ import { musicVideo } from "./music-video";
 import { playlist } from "./playlist";
 import { song } from "./song";
 
+/** Validates a `tChartResponse`: the response to a request for a chart. */
 export const chartResponse: r.tSchema<t.tChartResponse> = r.object<t.tChartResponse>(
   {
     results: r.lazy(() => chartResponseResults),
@@ -14,6 +15,7 @@ export const chartResponse: r.tSchema<t.tChartResponse> = r.object<t.tChartRespo
   ["results"],
 );
 
+/** Validates a `tChartResponseResults`: a mapping of a requested type to an array of charts. */
 export const chartResponseResults: r.tSchema<t.tChartResponseResults> = r.object<t.tChartResponseResults>(
   {
     albums: r.array(r.lazy(() => chartResponseResultsAlbumsChart)),
@@ -24,6 +26,7 @@ export const chartResponseResults: r.tSchema<t.tChartResponseResults> = r.object
   ["albums", "music-videos", "playlists", "songs"],
 );
 
+/** Validates a `tChartResponseResultsAlbumsChart`: the albums results of a chart. */
 export const chartResponseResultsAlbumsChart: r.tSchema<t.tChartResponseResultsAlbumsChart> = r.object<t.tChartResponseResultsAlbumsChart>(
   {
     chart: r.string,
@@ -35,6 +38,7 @@ export const chartResponseResultsAlbumsChart: r.tSchema<t.tChartResponseResultsA
   ["chart", "data", "name"],
 );
 
+/** Validates a `tChartResponseResultsMusicVideosChart`: the music videos results of a chart. */
 export const chartResponseResultsMusicVideosChart: r.tSchema<t.tChartResponseResultsMusicVideosChart> = r.object<t.tChartResponseResultsMusicVideosChart>(
   {
     chart: r.string,
@@ -46,6 +50,7 @@ export const chartResponseResultsMusicVideosChart: r.tSchema<t.tChartResponseRes
   ["chart", "data", "name"],
 );
 
+/** Validates a `tChartResponseResultsPlaylistsChart`: the playlists results of a chart. */
 export const chartResponseResultsPlaylistsChart: r.tSchema<t.tChartResponseResultsPlaylistsChart> = r.object<t.tChartResponseResultsPlaylistsChart>(
   {
     chart: r.string,
@@ -57,6 +62,7 @@ export const chartResponseResultsPlaylistsChart: r.tSchema<t.tChartResponseResul
   ["chart", "data", "name"],
 );
 
+/** Validates a `tChartResponseResultsSongsChart`: the songs results of a chart. */
 export const chartResponseResultsSongsChart: r.tSchema<t.tChartResponseResultsSongsChart> = r.object<t.tChartResponseResultsSongsChart>(
   {
     chart: r.string,

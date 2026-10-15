@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { relationship } from "./relationship";
 import { view } from "./view";
 
+/** Validates a `tResource`: a resource—such as an album, song, or playlist. */
 export const resource: r.tSchema<t.tResource> = r.object<t.tResource>(
   {
     id: r.string,
@@ -18,10 +19,13 @@ export const resource: r.tSchema<t.tResource> = r.object<t.tResource>(
   ["id", "type"],
 );
 
+/** Validates a `tResourceAttributes`: Attributes representing the metadata of the resource. */
 export const resourceAttributes: r.tSchema<t.tResourceAttributes> = r.schema<t.tResourceAttributes>(r.record);
 
+/** Validates a `tResourceMeta`: Information about the request or response. */
 export const resourceMeta: r.tSchema<t.tResourceMeta> = r.schema<t.tResourceMeta>(r.record);
 
+/** Validates a `tResourceRelationships`: Relationships belonging to the resource. */
 export const resourceRelationships: r.tSchema<t.tResourceRelationships> = r.object<t.tResourceRelationships>(
   {
     "Any Key": r.lazy(() => relationship),
@@ -29,6 +33,7 @@ export const resourceRelationships: r.tSchema<t.tResourceRelationships> = r.obje
   [],
 );
 
+/** Validates a `tResourceViews`: Views belonging to the resource. */
 export const resourceViews: r.tSchema<t.tResourceViews> = r.object<t.tResourceViews>(
   {
     "Any Key": r.lazy(() => view),

@@ -4,9 +4,9 @@
 // plainly the same is not matched. It is handed back with what the search found, for the app or the listener to
 // choose from.
 import { getSongsByIsrc, searchCatalog } from "@open-music-sdk/client-catalog";
-import { got, isPlain, itemsOf, optionsOf, ownOf, segmentOf, type tAppleMusicClient, type tStorefrontOption } from "@open-music-sdk/core";
+import { got, isPlain, itemsOf, optionsOf, ownOf, segmentOf, signalOf, type tAppleMusicClient, type tStorefrontOption } from "@open-music-sdk/core";
 import type { tSong } from "@open-music-sdk/types";
-import { pause, progressOf, signalOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
+import { pause, progressOf, waitOf, type tAskOptions, type tPaceOptions } from "./options";
 import { held } from "./own";
 
 /**
@@ -18,7 +18,9 @@ import { held } from "./own";
 export interface tTrackDescription {
   /** The recording's International Standard Recording Code, such as `"USUM71703861"`. */
   readonly isrc?: string | undefined;
+  /** The track's title, as a song's `name` attribute has it. Searched for together with `artistName`, and a song is kept only when both are the same. */
   readonly name?: string | undefined;
+  /** Who performs it, as a song's `artistName` attribute has it. Without it a name alone is searched for, and nothing the search finds is kept. */
   readonly artistName?: string | undefined;
   /** Decides between several songs that match: the one on this album is taken. */
   readonly albumName?: string | undefined;
@@ -28,6 +30,7 @@ export interface tTrackDescription {
 
 /** A description `resolve` found no song for: where it was in the list handed over, and the songs a search for it came back with. */
 export interface tSkippedTrack<D> {
+  /** Where the description was in the list handed over, counted from 0. */
   readonly index: number;
   /** The description as it was handed over. */
   readonly track: D;
@@ -39,7 +42,9 @@ export interface tSkippedTrack<D> {
 
 /** What `resolve` answers with: the songs found, in the order of the descriptions they were found for, and the descriptions left over. */
 export interface tResolvedTracks<D> {
+  /** The songs found, one for each description that found one, in the order of those descriptions. Each is a track `plan` takes and a track `previewPlayer` can play. */
   readonly tracks: readonly tSong[];
+  /** The descriptions no song was found for, in order, each with where it was and the songs its search came back with. */
   readonly skipped: readonly tSkippedTrack<D>[];
 }
 

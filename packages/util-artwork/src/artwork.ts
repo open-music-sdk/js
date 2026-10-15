@@ -14,11 +14,12 @@ export interface tArtworkSource {
  * The formats Apple's image server converts to. It answers 400 to `avif`, `bmp` and others, and to `gif` and
  * `tiff` it sends a JPEG under that name, so those are not here.
  */
-const FORMATS = ["jpg", "jpeg", "png", "webp", "heic", "heif"] as const;
+export const FORMATS = Object.freeze(["jpg", "jpeg", "png", "webp", "heic", "heif"] as const);
 
 /** A file format the image server converts artwork to. */
 export type tArtworkFormat = (typeof FORMATS)[number];
 
+/** What `artworkUrl` takes beside the artwork and the width. Invalid values throw a TypeError. */
 export interface tArtworkOptions {
   /** Height in CSS pixels. Default: the height that keeps the artwork's own shape at `width`, or `width` where its shape is unknown. */
   readonly height?: number | undefined;
@@ -37,6 +38,7 @@ export interface tArtworkOptions {
   readonly hosts?: readonly string[] | undefined;
 }
 
+/** What `artworkSrcSet` and `artworkImage` take: `artworkUrl`'s options, and which densities to offer. */
 export interface tArtworkSrcSetOptions extends tArtworkOptions {
   /** The pixel densities to offer, 16 at most. Default 1, 2 and 3. */
   readonly densities?: readonly number[] | undefined;
@@ -270,6 +272,14 @@ export function normalise(url: string): string {
  * Where it points is not checked unless `hosts` says where it may: artwork that did not come straight from
  * Apple's API can hold any URL, which an `<img>` will request, a link will run if it is `javascript:`, and a
  * server-side fetch will follow into your own network.
+ *
+ * @param artwork - The artwork as the API gave it: the URL template and, where it says, how large the image comes.
+ * @param width - How wide the image is shown, in CSS pixels.
+ * @param options - The height, the format, the crop, and where the URL may point.
+ * @returns The URL of the image, ready for `src`.
+ * @throws TypeError if `artwork` is not an object with a `url`, `options` is not an object, `width` or `height` is
+ *   not a number above 0 and at most 2^53 - 1 (so `Infinity` is refused), `format` or `crop` is not one the image
+ *   server takes, `hosts` is not a list of host names, or, with `hosts`, the URL is not `https` on one of them.
  */
 export function artworkUrl(artwork: tArtworkSource, width: number, options: tArtworkOptions = {}): string {
   return image(read(artwork, width, options), 1).url;
@@ -283,6 +293,16 @@ export function artworkUrl(artwork: tArtworkSource, width: number, options: tArt
  * the largest it has is offered once, under the density that image amounts to.
  *
  * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
+ *
+ * @param artwork - The artwork as the API gave it: the URL template and, where it says, how large the image comes.
+ * @param width - How wide the image is shown, in CSS pixels.
+ * @param options - The densities to offer, and what `artworkUrl` takes.
+ * @returns The `srcset` value: one `url Nx` candidate per density, joined by commas; or the one URL alone, with no
+ *   density, where the template has no size to fill in.
+ * @throws TypeError if `artwork` is not an object with a `url`, `options` is not an object, `width`, `height` or a
+ *   density is not a number above 0 and at most 2^53 - 1 (so `Infinity` is refused), `densities` is not a list of
+ *   1 to 16, `format` or `crop` is not one the image server takes, `hosts` is not a list of host names, or, with
+ *   `hosts`, a URL is not `https` on one of them.
  */
 export function artworkSrcSet(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): string {
   return srcset(read(artwork, width, options), options);
@@ -299,6 +319,13 @@ export function artworkSrcSet(artwork: tArtworkSource, width: number, options: t
  * artwork inside the box, that is the artwork standing in your box, not the box.
  *
  * As with `artworkUrl`, where the URLs point is not checked unless `hosts` says where they may.
+ *
+ * @param artwork - The artwork as the API gave it: the URL template and, where it says, how large the image comes.
+ * @param width - How wide the image is shown, in CSS pixels.
+ * @param options - The densities to offer, and what `artworkUrl` takes.
+ * @returns `src`, `srcset`, `width` and `height`, named as an `<img>` names them, so the object can be assigned to one.
+ * @throws TypeError as `artworkSrcSet` throws it: for an `artwork`, a `width`, an option or a density that is not
+ *   what it should be, and, with `hosts`, for a URL that is not `https` on one of them.
  */
 export function artworkImage(artwork: tArtworkSource, width: number, options: tArtworkSrcSetOptions = {}): tArtworkImage {
   const request = read(artwork, width, options);

@@ -228,9 +228,8 @@ describe("the types: a function of the namespace takes what the package's takes,
 });
 
 describe("a function of the namespace says what the package's function says: an editor shows the same documentation for both", () => {
-  const names = Object.entries(api)
-    .filter(([, value]) => typeof (value as { bound?: unknown }).bound === "function")
-    .map(([name]) => name);
+  const functions = Object.entries(api).filter(([, value]) => typeof (value as { bound?: unknown }).bound === "function") as [string, { readonly unwrap: string }][];
+  const names = functions.map(([name]) => name);
   /** A module as an app would write one, never saved: read by the compiler as if it were beside this file. */
   const source = [
     'import type { tAppleMusicClient } from "@open-music-sdk/core";',
@@ -243,8 +242,8 @@ describe("a function of the namespace says what the package's function says: an 
     "export const lost = renamed.getSong;",
   ].join("\n");
 
-  /** What an editor shows as the documentation of each name asked about, by the text the name ends. */
-  function documentation(ends: readonly string[]): string[] {
+  /** What an editor shows of each name asked about, by the text the name ends: its documentation, and each of its tags as `@name text`, flowed into one line as an editor flows it. */
+  function shown(ends: readonly string[]): { readonly documentation: string; readonly tags: readonly string[] }[] {
     const slashed = (url: URL) => fileURLToPath(url).replace(/\\/g, "/");
     const root = slashed(new URL("..", import.meta.url)).replace(/\/$/, "");
     const probe = `${root}/src/hover.probe.ts`;
@@ -266,8 +265,14 @@ describe("a function of the namespace says what the package's function says: an 
       getDirectories: (name) => ts.sys.getDirectories(name),
     });
     expect(service.getSemanticDiagnostics(probe)).toEqual([]);
-    return ends.map((end) => ts.displayPartsToString(service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1)?.documentation));
+    return ends.map((end) => {
+      const info = service.getQuickInfoAtPosition(probe, source.indexOf(end) + end.length - 1);
+      return { documentation: ts.displayPartsToString(info?.documentation), tags: (info?.tags ?? []).map((tag) => `@${tag.name} ${ts.displayPartsToString(tag.text)}`.replace(/\s+/g, " ").trimEnd()) };
+    });
   }
+
+  /** The documentation alone of each name asked about. */
+  const documentation = (ends: readonly string[]): string[] => shown(ends).map((each) => each.documentation);
 
   test("every one of the 58 is documented, and its documentation is there on the function of the namespace", { timeout: 120_000 }, () => {
     const direct = documentation(names.map((name) => `direct_${name} = api.${name}`));
@@ -280,4 +285,42 @@ describe("a function of the namespace says what the package's function says: an 
   test("the check that says so can tell: a function named again with nothing written above the name shows no documentation", { timeout: 120_000 }, () => {
     expect(documentation(["lost = renamed.getSong"])).toEqual([""]);
   });
+
+  test(
+    "a member's tags are the function's less @function and the client, except what the bound form owns: its TypeError, about the arguments alone, and by its unwrap what it hands over and the AppleMusicError of unwrapping, each present, different, and saying what binding and unwrapping change",
+    { timeout: 120_000 },
+    () => {
+      const direct = shown(names.map((name) => `direct_${name} = api.${name}`)).map((each) => each.tags);
+      const ofTheNamespace = shown(names.map((name) => `bound_${name} = bound.${name}`)).map((each) => each.tags);
+      /** The start of a tag that says which it is: `@returns`, or `@throws` and the error class it names. */
+      const head = (tag: string) => /^@(?:returns|throws \w+)/.exec(tag)?.[0] ?? tag;
+      /**
+       * By `unwrap`, the tags the bound form says in its own words, and what each has to say: the rest are the function's,
+       * word for word. A bound form was given its client when the namespace was made, so its TypeError is about the
+       * arguments alone, whatever it hands over.
+       */
+      const MISTAKE = "if an argument is not what it should be";
+      const own: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+        resource: { "@returns": ["out of `data`"], "@throws TypeError": [MISTAKE], "@throws AppleMusicError": ["`ApiError`"] },
+        resources: { "@returns": ["out of `data`", "empty list"], "@throws TypeError": [MISTAKE], "@throws AppleMusicError": ["`ApiError`"] },
+        pages: { "@returns": ["every page"], "@throws TypeError": [MISTAKE, "from the call itself"], "@throws AppleMusicError": ["`ApiError`"] },
+        answer: { "@throws TypeError": [MISTAKE] },
+      };
+      /** Whether the bound form's tag is what the function's tag asks of it: the same, or its own and saying what it has to. */
+      const said = (fn: string, bound: string, unwrap: string): boolean => {
+        const phrases = own[unwrap]?.[head(fn)];
+        if (phrases === undefined) return bound === fn;
+        return bound !== fn && head(bound) === head(fn) && bound.length > head(fn).length + 1 && phrases.every((phrase) => bound.includes(phrase));
+      };
+      /** The names whose tags fail `holds`. */
+      const failing = (holds: (fn: readonly string[], bound: readonly string[], unwrap: string) => boolean) => names.filter((_, index) => !holds(direct[index] ?? [], ofTheNamespace[index] ?? [], functions[index]?.[1].unwrap ?? ""));
+
+      // The function is shown as one, its first argument is the client, and it names the four kinds it throws, in order.
+      expect(failing((fn) => fn[0] === "@function" && fn[1] === "@param client - The client to ask with.")).toEqual([]);
+      expect(failing((fn) => JSON.stringify(fn.filter((tag) => tag.startsWith("@throws ")).map(head)) === JSON.stringify(["@throws TypeError", "@throws AppleMusicError", "@throws The", "@throws Whatever"]))).toEqual([]);
+      // The member: the function's tags less those two, one for one, each the same or the bound form's own.
+      expect(failing((fn, bound, unwrap) => own[unwrap] !== undefined && bound.length === fn.length - 2 && fn.slice(2).every((tag, index) => said(tag, bound[index] ?? "", unwrap)))).toEqual([]);
+      expect(names).toHaveLength(58);
+    },
+  );
 });

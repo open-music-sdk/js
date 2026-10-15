@@ -54,4 +54,5 @@ export type tAnyResource =
   | tStation
   | tStorefront;
 
+/** The `type` a resource object carries: what tells one kind of `tAnyResource` from another. */
 export type tResourceType = tAnyResource["type"];

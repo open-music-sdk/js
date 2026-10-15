@@ -16,11 +16,15 @@ export interface tServerClientOptions extends Omit<tClientOptions, "developerTok
 /** What goes on the client, under these names, made for it and for each client it derives. */
 const NAMESPACES = { catalog, user, playlists };
 
-/**
- * Core's client with `catalog`, `user` and `playlists` on it: `catalog(client)`, `user(client)` and
- * `playlists(client)` made for this client, and again for each one `as()` or `forUser()` gives.
- */
-export type tMusic = tWithNamespaces<typeof NAMESPACES>;
+/** Core's client with `catalog`, `user` and `playlists` on it, made for this client and for each one `as()` or `forUser()` gives. */
+export type tMusic = tWithNamespaces<{
+  /** `catalog` of `@open-music-sdk/client-catalog`. */
+  catalog: typeof catalog;
+  /** `user` of `@open-music-sdk/client-user`. */
+  user: typeof user;
+  /** `playlists` of `@open-music-sdk/lib-playlists`. */
+  playlists: typeof playlists;
+}>;
 
 const WHAT = "an options object with pem, teamId and keyId";
 
@@ -30,6 +34,12 @@ const WHAT = "an options object with pem, teamId and keyId";
  * here, once: what the minter checks it names itself, and so does `createClient`. Nothing is asked of Apple until a
  * call. Make it once, at module level: on a worker that is handed its secrets per request, a client made per request
  * imports the key and signs a token on every one.
+ *
+ * @param options - The key and its two ids, and every option of core's client but the developer token.
+ * @returns The client, frozen, with the three namespaces made for it.
+ * @throws TypeError if `options` is not a plain object, holds `origin`, or a value in it is not what the minter or
+ * `createClient` takes; a `pem` that is a string but no key is found at the first call, as the `TypeError` the
+ * minter throws then.
  */
 export function createServerClient(options: tServerClientOptions): tMusic {
   if ((options as unknown) === undefined) throw new TypeError(`createServerClient: expected ${WHAT}; got undefined`);

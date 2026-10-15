@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { album } from "./album";
 
+/** Validates a `tAlbumPeriodSummary`: the album for the period summary. */
 export const albumPeriodSummary: r.tSchema<t.tAlbumPeriodSummary> = r.object<t.tAlbumPeriodSummary>(
   {
     id: r.string,
@@ -13,6 +14,7 @@ export const albumPeriodSummary: r.tSchema<t.tAlbumPeriodSummary> = r.object<t.t
   ["id", "type"],
 );
 
+/** Validates a `tAlbumPeriodSummaryRelationships`: the relationships from album-period-summary to other resources. */
 export const albumPeriodSummaryRelationships: r.tSchema<t.tAlbumPeriodSummaryRelationships> = r.object<t.tAlbumPeriodSummaryRelationships>(
   {
     album: r.lazy(() => albumPeriodSummaryRelationshipsAlbumPeriodSummaryAlbumRelationship),
@@ -20,6 +22,7 @@ export const albumPeriodSummaryRelationships: r.tSchema<t.tAlbumPeriodSummaryRel
   [],
 );
 
+/** Validates a `tAlbumPeriodSummaryRelationshipsAlbumPeriodSummaryAlbumRelationship`: the relationships from album-period-summary to other resources. */
 export const albumPeriodSummaryRelationshipsAlbumPeriodSummaryAlbumRelationship: r.tSchema<t.tAlbumPeriodSummaryRelationshipsAlbumPeriodSummaryAlbumRelationship> = r.object<t.tAlbumPeriodSummaryRelationshipsAlbumPeriodSummaryAlbumRelationship>(
   {
     data: r.array(r.lazy(() => album)),

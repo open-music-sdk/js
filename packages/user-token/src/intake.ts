@@ -18,7 +18,18 @@ export interface tIntakeOptions {
   readonly userId: (req: Request) => string | null | undefined | Promise<string | null | undefined>;
 }
 
-/** A web-standard handler, to mount wherever your framework takes one. */
+/**
+ * A web-standard handler, to mount wherever your framework takes one.
+ *
+ * @param req - The request as the platform hands it over.
+ * @returns 204 with no body once the token is accepted and stored; otherwise `{ "error": "<tag>" }` with the
+ *   status that says what was wrong with the request, or that Apple refused or could not be asked.
+ * @throws Whatever `userId` or the store rejects with, and a `TypeError` when `userId` resolves to something that is
+ *   no string. These are the app's own failures, and yours to answer.
+ * @throws Whatever a token provider, hook or rate limiter throws, as `client.request` passes it on, and whatever the
+ *   runtime rejects with when the body cannot be read.
+ * @throws The reason `req.signal` aborted with, when it does.
+ */
 export type tUserTokenIntake = (req: Request) => Promise<Response>;
 
 const reply = (status: number, error: string, headers: Record<string, string> = {}) =>
@@ -35,6 +46,15 @@ export const isJson = (contentType: string | null): boolean => /^application\/js
  *
  * What it is handed is checked and taken here, once: a mistake is a TypeError now and not on the first request,
  * and nothing done to the options object afterwards changes where a token goes or whose it is.
+ *
+ * @param client - The client to ask Apple with.
+ * @param options - Where an accepted token goes, and whose each request is.
+ * @returns The handler. It answers a status for everything about the request and for Apple's verdict, and rejects
+ *   with what `userId` or the store rejects with, with a `TypeError` when `userId` resolves to something that is no
+ *   string, with whatever a token provider, hook or rate limiter throws, as `client.request` passes it on, with
+ *   whatever the runtime rejects with when the body cannot be read, and with the reason `req.signal` aborted with.
+ * @throws TypeError if `client` is not a client, `options` is not an object, `store` lacks `get`, `set` or
+ *   `delete`, or `userId` is not a function; when the handler is created, not on a request.
  */
 export function userTokenIntake(client: tAppleMusicClient, options: tIntakeOptions): tUserTokenIntake {
   const music = clientOf("userTokenIntake", client);

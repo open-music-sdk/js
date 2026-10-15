@@ -174,10 +174,8 @@ describe("the listener's own station is in the catalog, and is asked for with th
     expect(calls).toHaveLength(0);
   });
 
-  test("a client's own storefront is held to the same, so one that is no storefront takes the token nowhere either", async () => {
-    const { music, calls } = apple([], { storefront: "../me/library" });
-    expect(await rejection(api.getPersonalStation(music))).toEqual(new TypeError(`getPersonalStation: storefront ${SEGMENT}13 characters`));
-    expect(calls).toHaveLength(0);
+  test("a client's own storefront is held to the same as the client is made, so one that is no storefront takes the token nowhere either", () => {
+    expect(() => apple([], { storefront: "../me/library" })).toThrow(new TypeError(`createClient: storefront ${SEGMENT}13 characters`));
   });
 
   test.each(["u s", "us?filter[identity]=x", "us#x"])("a storefront of %j is one segment after /v1/catalog, so the token goes nowhere but to the stations", async (storefront) => {

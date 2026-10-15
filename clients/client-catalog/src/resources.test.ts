@@ -194,13 +194,11 @@ describe("a value put in a path stays where it was put, so a request for the cat
     expect(calls).toHaveLength(0);
   });
 
-  test("a client's own storefront is held to the same, whether it was given to the client or is the one Apple answered with", async () => {
-    const given = apple([], { storefront: "../me/library" });
-    expect(await rejection(api.getSong(given.music, "1"))).toEqual(new TypeError(`getSong: storefront ${SEGMENT}13 characters`));
-    expect(await rejection(api.getAlbumView(given.music, "1", "other-versions"))).toEqual(new TypeError(`getAlbumView: storefront ${SEGMENT}13 characters`));
+  test("a client's own storefront is held to the same: one given to the client is refused as the client is made, and one Apple answered with as it is asked for", async () => {
+    expect(() => apple([], { storefront: "../me/library" })).toThrow(new TypeError(`createClient: storefront ${SEGMENT}13 characters`));
     const answered = apple([{ body: { data: [{ id: "../../me/library", type: "storefronts" }] } }], { storefront: undefined, userToken: "listener" });
     expect(await rejection(api.getSong(answered.music, "1"))).toEqual(new TypeError(`getSong: storefront ${SEGMENT}16 characters`));
-    expect([given.calls.length, answered.sent()]).toEqual([0, ["GET /v1/me/storefront"]]);
+    expect(answered.sent()).toEqual(["GET /v1/me/storefront"]);
   });
   /** The path of the one request sent, in segments, and whether it carried the listener's token. */
   const asked = async (call: (music: tAppleMusicClient) => Promise<unknown>) => {

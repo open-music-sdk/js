@@ -22,9 +22,9 @@ if (result.issues) {
 
 Validation is synchronous, so `result` never needs awaiting.
 
-Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core),
-or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
-[`@open-music-sdk/client-user`](../../clients/client-user). A failure there is a `ValidationError`
+Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core/README.md),
+or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md). A failure there is a `ValidationError`
 with the issues attached.
 
 ```ts
@@ -42,11 +42,11 @@ const { data } = await getSong(music, "1613600188", { schema: songsResponse });
 | `songAttributes`, `artwork`, ...        | Any dictionary from the docs, by its camelCase name |
 | `songsResponse`, `errorsResponse`, ...  | Response envelopes                            |
 | `anyResource`                           | Any resource, discriminated by `type`         |
-| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult` | Types for writing code against validators |
+| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult`, `tCheck` | Types for writing code against validators, and the raw check a validator is composed from |
 
 Names are the dictionary names from Apple's docs with dots removed, the first letter lowercased, and
 the prefix singularized where the object is a single thing: `Songs.Attributes` is `songAttributes`,
-and its output type is `tSongAttributes` from [`@open-music-sdk/types`](../types). Collections keep
+and its output type is `tSongAttributes` from [`@open-music-sdk/types`](../types/README.md). Collections keep
 their plural (`songsResponse`).
 
 ## What a validator checks
@@ -66,6 +66,6 @@ keeps only the ones you import plus what they reference.
 ## Regenerating
 
 Everything under `src/generated/` and `src/index.ts` is written by
-[`codegen`](../../codegen/README.md), one file per resource family mirroring `@open-music-sdk/types`;
+[`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme), one file per resource family mirroring `@open-music-sdk/types`;
 `src/runtime.ts` is the hand-written part. Do not edit the generated files; re-run the crawl and the
 emitter instead.

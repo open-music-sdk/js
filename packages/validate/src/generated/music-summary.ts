@@ -6,6 +6,7 @@ import { albumPeriodSummary } from "./album-period-summary";
 import { artistPeriodSummary } from "./artist-period-summary";
 import { songPeriodSummary } from "./song-period-summary";
 
+/** Validates a `tMusicSummary`: the music for the period summary. */
 export const musicSummary: r.tSchema<t.tMusicSummary> = r.object<t.tMusicSummary>(
   {
     attributes: r.lazy(() => musicSummaryAttributes),
@@ -17,6 +18,7 @@ export const musicSummary: r.tSchema<t.tMusicSummary> = r.object<t.tMusicSummary
   ["href", "id", "type"],
 );
 
+/** Validates a `tMusicSummaryAttributes`: the attributes for the music summaries resource type. */
 export const musicSummaryAttributes: r.tSchema<t.tMusicSummaryAttributes> = r.object<t.tMusicSummaryAttributes>(
   {
     period: r.string,
@@ -25,6 +27,7 @@ export const musicSummaryAttributes: r.tSchema<t.tMusicSummaryAttributes> = r.ob
   ["period", "year"],
 );
 
+/** Validates a `tMusicSummaryViews`: the top albums, artists, and songs that the user listened to for the given period. */
 export const musicSummaryViews: r.tSchema<t.tMusicSummaryViews> = r.object<t.tMusicSummaryViews>(
   {
     "top-albums": r.lazy(() => musicSummaryViewsTopAlbumsView),
@@ -34,6 +37,7 @@ export const musicSummaryViews: r.tSchema<t.tMusicSummaryViews> = r.object<t.tMu
   [],
 );
 
+/** Validates a `tMusicSummaryViewsTopAlbumsView`: the top albums that the user listened to for the given period. */
 export const musicSummaryViewsTopAlbumsView: r.tSchema<t.tMusicSummaryViewsTopAlbumsView> = r.object<t.tMusicSummaryViewsTopAlbumsView>(
   {
     data: r.array(r.lazy(() => albumPeriodSummary)),
@@ -43,6 +47,7 @@ export const musicSummaryViewsTopAlbumsView: r.tSchema<t.tMusicSummaryViewsTopAl
   ["data"],
 );
 
+/** Validates a `tMusicSummaryViewsTopArtistsView`: the top artists that the user listened to for the given period. */
 export const musicSummaryViewsTopArtistsView: r.tSchema<t.tMusicSummaryViewsTopArtistsView> = r.object<t.tMusicSummaryViewsTopArtistsView>(
   {
     data: r.array(r.lazy(() => artistPeriodSummary)),
@@ -52,6 +57,7 @@ export const musicSummaryViewsTopArtistsView: r.tSchema<t.tMusicSummaryViewsTopA
   ["data"],
 );
 
+/** Validates a `tMusicSummaryViewsTopSongsView`: the top songs that the user listened to for the given period. */
 export const musicSummaryViewsTopSongsView: r.tSchema<t.tMusicSummaryViewsTopSongsView> = r.object<t.tMusicSummaryViewsTopSongsView>(
   {
     data: r.array(r.lazy(() => songPeriodSummary)),
@@ -61,6 +67,7 @@ export const musicSummaryViewsTopSongsView: r.tSchema<t.tMusicSummaryViewsTopSon
   ["data"],
 );
 
+/** Validates a `tMusicSummariesResponse`: the response to a music summaries request. */
 export const musicSummariesResponse: r.tSchema<t.tMusicSummariesResponse> = r.object<t.tMusicSummariesResponse>(
   {
     data: r.array(r.lazy(() => musicSummary)),

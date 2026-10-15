@@ -41,12 +41,6 @@ export interface tLimitOptions {
 /** The longest a timer waits: past it, `setTimeout` fires at once. */
 const MAX_WAIT_MS = 2 ** 31 - 1;
 
-/** A signal as `fetch` will take it. Anything else would be found out late, by the runtime, whose own complaint prints what it was handed. */
-export function signalOf(fn: string, value: unknown): AbortSignal | undefined {
-  if (value === undefined || value instanceof AbortSignal) return value;
-  throw new TypeError(`${fn}: signal must be an AbortSignal; got ${got(value)}`);
-}
-
 /** What a verb calls as it gets on: the caller's `onProgress`, handed a frozen progress of its own, or nothing when none was given. */
 export function progressOf(fn: string, value: unknown): (done: number, total: number | undefined) => void {
   if (value === undefined) return () => undefined;

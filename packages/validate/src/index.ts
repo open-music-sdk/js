@@ -44,4 +44,4 @@ export * from "./generated/station";
 export * from "./generated/station-genre";
 export * from "./generated/storefront";
 export * from "./generated/view";
-export type { tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime";
+export type { tCheck, tIssue, tResult, tSchema, tStandardSchemaV1 } from "./runtime";

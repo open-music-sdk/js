@@ -10,6 +10,7 @@ import { playlist } from "./playlist";
 import { song } from "./song";
 import { station } from "./station";
 
+/** Validates a `tArtist`: a resource object that represents the artist of an album where an artist can be one or more people. */
 export const artist: r.tSchema<t.tArtist> = r.object<t.tArtist>(
   {
     id: r.string,
@@ -22,6 +23,7 @@ export const artist: r.tSchema<t.tArtist> = r.object<t.tArtist>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tArtistAttributes`: the attributes for an artist resource. */
 export const artistAttributes: r.tSchema<t.tArtistAttributes> = r.object<t.tArtistAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -34,6 +36,7 @@ export const artistAttributes: r.tSchema<t.tArtistAttributes> = r.object<t.tArti
   ["genreNames", "name", "url"],
 );
 
+/** Validates a `tArtistRelationships`: the relationships for an artist resource. */
 export const artistRelationships: r.tSchema<t.tArtistRelationships> = r.object<t.tArtistRelationships>(
   {
     albums: r.lazy(() => artistRelationshipsArtistAlbumsRelationship),
@@ -45,6 +48,7 @@ export const artistRelationships: r.tSchema<t.tArtistRelationships> = r.object<t
   [],
 );
 
+/** Validates a `tArtistRelationshipsArtistAlbumsRelationship`: a relationship from the artist to its albums. */
 export const artistRelationshipsArtistAlbumsRelationship: r.tSchema<t.tArtistRelationshipsArtistAlbumsRelationship> = r.object<t.tArtistRelationshipsArtistAlbumsRelationship>(
   {
     href: r.string,
@@ -54,6 +58,7 @@ export const artistRelationshipsArtistAlbumsRelationship: r.tSchema<t.tArtistRel
   ["data"],
 );
 
+/** Validates a `tArtistRelationshipsArtistGenresRelationship`: a relationship from the artist to its genres. */
 export const artistRelationshipsArtistGenresRelationship: r.tSchema<t.tArtistRelationshipsArtistGenresRelationship> = r.object<t.tArtistRelationshipsArtistGenresRelationship>(
   {
     href: r.string,
@@ -63,6 +68,7 @@ export const artistRelationshipsArtistGenresRelationship: r.tSchema<t.tArtistRel
   ["data"],
 );
 
+/** Validates a `tArtistRelationshipsArtistMusicVideosRelationship`: a relationship from the artist to its music videos. */
 export const artistRelationshipsArtistMusicVideosRelationship: r.tSchema<t.tArtistRelationshipsArtistMusicVideosRelationship> = r.object<t.tArtistRelationshipsArtistMusicVideosRelationship>(
   {
     href: r.string,
@@ -72,6 +78,7 @@ export const artistRelationshipsArtistMusicVideosRelationship: r.tSchema<t.tArti
   ["data"],
 );
 
+/** Validates a `tArtistRelationshipsArtistPlaylistsRelationship`: a relationship from the artist to its playlists. */
 export const artistRelationshipsArtistPlaylistsRelationship: r.tSchema<t.tArtistRelationshipsArtistPlaylistsRelationship> = r.object<t.tArtistRelationshipsArtistPlaylistsRelationship>(
   {
     href: r.string,
@@ -81,6 +88,7 @@ export const artistRelationshipsArtistPlaylistsRelationship: r.tSchema<t.tArtist
   ["data"],
 );
 
+/** Validates a `tArtistRelationshipsArtistStationRelationship`: a relationship from the artist to its station. */
 export const artistRelationshipsArtistStationRelationship: r.tSchema<t.tArtistRelationshipsArtistStationRelationship> = r.object<t.tArtistRelationshipsArtistStationRelationship>(
   {
     href: r.string,
@@ -90,6 +98,7 @@ export const artistRelationshipsArtistStationRelationship: r.tSchema<t.tArtistRe
   ["data"],
 );
 
+/** Validates a `tArtistViews`: the views for associations between artists and other resources. */
 export const artistViews: r.tSchema<t.tArtistViews> = r.object<t.tArtistViews>(
   {
     "appears-on-albums": r.lazy(() => artistViewsArtistAppearsOnAlbumsView),
@@ -108,6 +117,7 @@ export const artistViews: r.tSchema<t.tArtistViews> = r.object<t.tArtistViews>(
   [],
 );
 
+/** Validates a `tArtistViewsArtistAppearsOnAlbumsView`: a relationship view from this artist to a selection of albums from other artists on which this artist also appears. */
 export const artistViewsArtistAppearsOnAlbumsView: r.tSchema<t.tArtistViewsArtistAppearsOnAlbumsView> = r.object<t.tArtistViewsArtistAppearsOnAlbumsView>(
   {
     href: r.string,
@@ -118,6 +128,7 @@ export const artistViewsArtistAppearsOnAlbumsView: r.tSchema<t.tArtistViewsArtis
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistAppearsOnAlbumsViewAttributes`: Albums from other artists on which this artist appears or with which they’re associated. */
 export const artistViewsArtistAppearsOnAlbumsViewAttributes: r.tSchema<t.tArtistViewsArtistAppearsOnAlbumsViewAttributes> = r.object<t.tArtistViewsArtistAppearsOnAlbumsViewAttributes>(
   {
     title: r.string,
@@ -125,6 +136,7 @@ export const artistViewsArtistAppearsOnAlbumsViewAttributes: r.tSchema<t.tArtist
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistCompilationAlbumsView`: a relationship view from this artist to albums associated with the artist categorized as compilations. */
 export const artistViewsArtistCompilationAlbumsView: r.tSchema<t.tArtistViewsArtistCompilationAlbumsView> = r.object<t.tArtistViewsArtistCompilationAlbumsView>(
   {
     href: r.string,
@@ -135,6 +147,7 @@ export const artistViewsArtistCompilationAlbumsView: r.tSchema<t.tArtistViewsArt
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistCompilationAlbumsViewAttributes`: Albums associated with the artist categorized as compilations. */
 export const artistViewsArtistCompilationAlbumsViewAttributes: r.tSchema<t.tArtistViewsArtistCompilationAlbumsViewAttributes> = r.object<t.tArtistViewsArtistCompilationAlbumsViewAttributes>(
   {
     title: r.string,
@@ -142,6 +155,7 @@ export const artistViewsArtistCompilationAlbumsViewAttributes: r.tSchema<t.tArti
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedAlbumsView`: a relationship view from this artist to a collection of albums selected as featured for the artist. */
 export const artistViewsArtistFeaturedAlbumsView: r.tSchema<t.tArtistViewsArtistFeaturedAlbumsView> = r.object<t.tArtistViewsArtistFeaturedAlbumsView>(
   {
     href: r.string,
@@ -152,6 +166,7 @@ export const artistViewsArtistFeaturedAlbumsView: r.tSchema<t.tArtistViewsArtist
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedAlbumsViewAttributes`: a collection of selected albums to be featured with the artist. */
 export const artistViewsArtistFeaturedAlbumsViewAttributes: r.tSchema<t.tArtistViewsArtistFeaturedAlbumsViewAttributes> = r.object<t.tArtistViewsArtistFeaturedAlbumsViewAttributes>(
   {
     title: r.string,
@@ -159,6 +174,7 @@ export const artistViewsArtistFeaturedAlbumsViewAttributes: r.tSchema<t.tArtistV
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedMusicVideosView`: a relationship view from this artist to a collection of music videos selected as featured for the artist. */
 export const artistViewsArtistFeaturedMusicVideosView: r.tSchema<t.tArtistViewsArtistFeaturedMusicVideosView> = r.object<t.tArtistViewsArtistFeaturedMusicVideosView>(
   {
     attributes: r.lazy(() => artistViewsArtistFeaturedMusicVideosViewAttributes),
@@ -169,6 +185,7 @@ export const artistViewsArtistFeaturedMusicVideosView: r.tSchema<t.tArtistViewsA
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedMusicVideosViewAttributes`: a collection of selected music videos to be featured with the artist. */
 export const artistViewsArtistFeaturedMusicVideosViewAttributes: r.tSchema<t.tArtistViewsArtistFeaturedMusicVideosViewAttributes> = r.object<t.tArtistViewsArtistFeaturedMusicVideosViewAttributes>(
   {
     title: r.string,
@@ -176,6 +193,7 @@ export const artistViewsArtistFeaturedMusicVideosViewAttributes: r.tSchema<t.tAr
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedPlaylistsView`: a relationship view from this artist to relevant playlists associated with the artist. */
 export const artistViewsArtistFeaturedPlaylistsView: r.tSchema<t.tArtistViewsArtistFeaturedPlaylistsView> = r.object<t.tArtistViewsArtistFeaturedPlaylistsView>(
   {
     href: r.string,
@@ -186,6 +204,7 @@ export const artistViewsArtistFeaturedPlaylistsView: r.tSchema<t.tArtistViewsArt
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistFeaturedPlaylistsViewAttributes`: Relevant playlists associated with the artist. */
 export const artistViewsArtistFeaturedPlaylistsViewAttributes: r.tSchema<t.tArtistViewsArtistFeaturedPlaylistsViewAttributes> = r.object<t.tArtistViewsArtistFeaturedPlaylistsViewAttributes>(
   {
     title: r.string,
@@ -193,6 +212,7 @@ export const artistViewsArtistFeaturedPlaylistsViewAttributes: r.tSchema<t.tArti
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistFullAlbumsView`: a relationship view from this artist to full-release albums associated with the artist. */
 export const artistViewsArtistFullAlbumsView: r.tSchema<t.tArtistViewsArtistFullAlbumsView> = r.object<t.tArtistViewsArtistFullAlbumsView>(
   {
     href: r.string,
@@ -203,6 +223,7 @@ export const artistViewsArtistFullAlbumsView: r.tSchema<t.tArtistViewsArtistFull
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistFullAlbumsViewAttributes`: Full-release albums associated with the artist. */
 export const artistViewsArtistFullAlbumsViewAttributes: r.tSchema<t.tArtistViewsArtistFullAlbumsViewAttributes> = r.object<t.tArtistViewsArtistFullAlbumsViewAttributes>(
   {
     title: r.string,
@@ -210,6 +231,7 @@ export const artistViewsArtistFullAlbumsViewAttributes: r.tSchema<t.tArtistViews
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistLatestReleaseView`: a relationship view from this artist to the latest release for the artist determined to still be recent by the Apple Music Catalog. */
 export const artistViewsArtistLatestReleaseView: r.tSchema<t.tArtistViewsArtistLatestReleaseView> = r.object<t.tArtistViewsArtistLatestReleaseView>(
   {
     href: r.string,
@@ -220,6 +242,7 @@ export const artistViewsArtistLatestReleaseView: r.tSchema<t.tArtistViewsArtistL
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistLatestReleaseViewAttributes`: the latest release for the artist determined to still be recent by the Apple Music Catalog. */
 export const artistViewsArtistLatestReleaseViewAttributes: r.tSchema<t.tArtistViewsArtistLatestReleaseViewAttributes> = r.object<t.tArtistViewsArtistLatestReleaseViewAttributes>(
   {
     title: r.string,
@@ -227,6 +250,7 @@ export const artistViewsArtistLatestReleaseViewAttributes: r.tSchema<t.tArtistVi
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistLiveAlbumsView`: a relationship view from this artist to albums associated with the artist categorized as live performances. */
 export const artistViewsArtistLiveAlbumsView: r.tSchema<t.tArtistViewsArtistLiveAlbumsView> = r.object<t.tArtistViewsArtistLiveAlbumsView>(
   {
     href: r.string,
@@ -237,6 +261,7 @@ export const artistViewsArtistLiveAlbumsView: r.tSchema<t.tArtistViewsArtistLive
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistLiveAlbumsViewAttributes`: Albums associated with the artist and categorized as live performances. */
 export const artistViewsArtistLiveAlbumsViewAttributes: r.tSchema<t.tArtistViewsArtistLiveAlbumsViewAttributes> = r.object<t.tArtistViewsArtistLiveAlbumsViewAttributes>(
   {
     title: r.string,
@@ -244,6 +269,7 @@ export const artistViewsArtistLiveAlbumsViewAttributes: r.tSchema<t.tArtistViews
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistSimilarArtistsView`: a relationship view from this artist to other artists similar to this artist. */
 export const artistViewsArtistSimilarArtistsView: r.tSchema<t.tArtistViewsArtistSimilarArtistsView> = r.object<t.tArtistViewsArtistSimilarArtistsView>(
   {
     href: r.string,
@@ -254,6 +280,7 @@ export const artistViewsArtistSimilarArtistsView: r.tSchema<t.tArtistViewsArtist
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistSimilarArtistsViewAttributes`: Other artists similar to this artist. */
 export const artistViewsArtistSimilarArtistsViewAttributes: r.tSchema<t.tArtistViewsArtistSimilarArtistsViewAttributes> = r.object<t.tArtistViewsArtistSimilarArtistsViewAttributes>(
   {
     title: r.string,
@@ -261,6 +288,7 @@ export const artistViewsArtistSimilarArtistsViewAttributes: r.tSchema<t.tArtistV
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistSinglesView`: a relationship view from this artist to albums associated with the artist categorized as singles. */
 export const artistViewsArtistSinglesView: r.tSchema<t.tArtistViewsArtistSinglesView> = r.object<t.tArtistViewsArtistSinglesView>(
   {
     href: r.string,
@@ -271,6 +299,7 @@ export const artistViewsArtistSinglesView: r.tSchema<t.tArtistViewsArtistSingles
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistSinglesViewAttributes`: Albums associated with the artist and categorized as singles. */
 export const artistViewsArtistSinglesViewAttributes: r.tSchema<t.tArtistViewsArtistSinglesViewAttributes> = r.object<t.tArtistViewsArtistSinglesViewAttributes>(
   {
     title: r.string,
@@ -278,6 +307,7 @@ export const artistViewsArtistSinglesViewAttributes: r.tSchema<t.tArtistViewsArt
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistTopMusicVideosView`: a relationship view from this artist to relevant music videos associated with the artist. */
 export const artistViewsArtistTopMusicVideosView: r.tSchema<t.tArtistViewsArtistTopMusicVideosView> = r.object<t.tArtistViewsArtistTopMusicVideosView>(
   {
     href: r.string,
@@ -288,6 +318,7 @@ export const artistViewsArtistTopMusicVideosView: r.tSchema<t.tArtistViewsArtist
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistTopMusicVideosViewAttributes`: Relevant music videos associated with the artist. */
 export const artistViewsArtistTopMusicVideosViewAttributes: r.tSchema<t.tArtistViewsArtistTopMusicVideosViewAttributes> = r.object<t.tArtistViewsArtistTopMusicVideosViewAttributes>(
   {
     title: r.string,
@@ -295,6 +326,7 @@ export const artistViewsArtistTopMusicVideosViewAttributes: r.tSchema<t.tArtistV
   ["title"],
 );
 
+/** Validates a `tArtistViewsArtistTopSongsView`: a relationship view from this artist to songs associated with the artist based on popularity in the current storefront. */
 export const artistViewsArtistTopSongsView: r.tSchema<t.tArtistViewsArtistTopSongsView> = r.object<t.tArtistViewsArtistTopSongsView>(
   {
     href: r.string,
@@ -305,6 +337,7 @@ export const artistViewsArtistTopSongsView: r.tSchema<t.tArtistViewsArtistTopSon
   ["attributes", "data"],
 );
 
+/** Validates a `tArtistViewsArtistTopSongsViewAttributes`: Songs associated with the artist based on popularity in the current storefront. */
 export const artistViewsArtistTopSongsViewAttributes: r.tSchema<t.tArtistViewsArtistTopSongsViewAttributes> = r.object<t.tArtistViewsArtistTopSongsViewAttributes>(
   {
     title: r.string,
@@ -312,6 +345,7 @@ export const artistViewsArtistTopSongsViewAttributes: r.tSchema<t.tArtistViewsAr
   ["title"],
 );
 
+/** Validates a `tArtistsResponse`: the response to an artists request. */
 export const artistsResponse: r.tSchema<t.tArtistsResponse> = r.object<t.tArtistsResponse>(
   {
     data: r.array(r.lazy(() => artist)),

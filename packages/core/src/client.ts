@@ -1,7 +1,7 @@
 // createClient: one fetch wrapper that attaches the tokens, encodes params, follows `next` links,
 // maps status codes to tagged errors, and retries what is worth retrying.
 import type { tError, tStorefrontsResponse } from "@open-music-sdk/types";
-import { gotFor, has, isName, ownOf } from "./check";
+import { gotFor, has, isPlain, ownOf, segmentOf } from "./check";
 import { AppleMusicError, type tValidationIssue } from "./errors";
 import { got } from "./got";
 import type { tRateLimiter } from "./rate-limit";
@@ -12,17 +12,50 @@ import { parseRetryAfter, resolveRetryPolicy, retry, type tRetryPolicy } from ".
 const BASE_ORIGIN = "https://api.music.apple.com";
 const BASE_URL = "https://api.music.apple.com/";
 
+/** What a token provider is told when it is asked for a token. */
 export interface tTokenContext {
+  /** The signal of the request the token is for, when it has one: a provider that fetches its token can pass it on. */
   readonly signal?: AbortSignal | undefined;
   /** The token Apple just rejected with a 401. A caching provider should mint or fetch a fresh one. */
   readonly rejected?: string | undefined;
 }
+
+/**
+ * Gives a token when a request needs one: a developer token, or a listener's Music User Token. It is called at each
+ * attempt, and a developer token provider once more, with `rejected`, when Apple answered 401 to what it gave; a
+ * different token is then tried before the error stands. What it gives is held to being a token, printable ASCII
+ * with no spaces or line breaks inside, and anything else is a `TypeError` from the request. What it throws ends
+ * the request, which rejects with it as it is; an `AppleMusicError` it throws is tried again when the retry policy
+ * says so, as a `DeveloperTokenUnavailable` from the developer-token package is.
+ */
 export type tTokenProvider = (ctx: tTokenContext) => string | Promise<string>;
 
-/** Where forUser(userId) finds a listener's Music User Token. */
+/**
+ * Where forUser(userId) finds a listener's Music User Token. The client reads it, through `get`, each time a request
+ * of that listener's needs the token; `set` and `delete` are for whoever signs listeners in and out, such as an
+ * integration, and the client needs them to be there without calling them.
+ */
 export interface tUserTokenStore {
+  /**
+   * The listener's token, or `undefined` when none is stored: the request then rejects with a `UserTokenInvalid`.
+   * What it rejects with, the request that asked rejects with, as it is.
+   *
+   * @param userId - Whose token, under the name the app knows the listener by.
+   * @returns The token, or `undefined` for a listener with none.
+   */
   get(userId: string): Promise<string | undefined>;
+  /**
+   * Keeps a listener's token, in place of any stored before.
+   *
+   * @param userId - Whose token, under the name the app knows the listener by.
+   * @param token - The Music User Token to keep.
+   */
   set(userId: string, token: string): Promise<void>;
+  /**
+   * Forgets a listener's token, if one is stored.
+   *
+   * @param userId - Whose token, under the name the app knows the listener by.
+   */
   delete(userId: string): Promise<void>;
 }
 
@@ -31,21 +64,45 @@ export type tParams = Readonly<Record<string, string | number | boolean | readon
 
 /** Anything with a Standard Schema `validate`, such as the validators in @open-music-sdk/validate. */
 export interface tSchemaLike<T> {
+  /** The Standard Schema interface: the one part of a schema the client reads. */
   readonly "~standard": {
+    /** Judges a value: gives it back, typed, or the issues found. The client awaits it, so it may be async. */
     readonly validate: (value: unknown) => tSchemaResult<T> | Promise<tSchemaResult<T>>;
   };
 }
-export type tSchemaResult<T> = { readonly value: T; readonly issues?: undefined } | { readonly issues: readonly tValidationIssue[] };
 
+/** What a Standard Schema's `validate` gives: the value as the schema typed it, or the issues it found. */
+export type tSchemaResult<T> =
+  | {
+      /** The value, accepted. */
+      readonly value: T;
+      /** Nothing: the value was accepted. */
+      readonly issues?: undefined;
+    }
+  | {
+      /** What was wrong, one issue at least. */
+      readonly issues: readonly tValidationIssue[];
+    };
+
+/**
+ * What `createClient` takes. Only `developerToken` is needed. Each option is checked at creation, so a mistake is a
+ * TypeError there and not on the first request; what a provider gives, and what a store holds, are checked when used.
+ */
 export interface tClientOptions {
+  /**
+   * The developer token, or a function that gives one when a request needs it, such as a minter or a fetcher from
+   * @open-music-sdk/developer-token. A string is checked here to be a token; a function's answer where it is sent.
+   */
   developerToken: string | tTokenProvider;
   /** Binds the client to one listener. Alternatively set userTokenStore and use forUser(). */
   userToken?: string | tTokenProvider | undefined;
+  /** Where `forUser()` finds a listener's token. Needs `get`, `set` and `delete`; the client itself calls only `get`. */
   userTokenStore?: tUserTokenStore | undefined;
-  /** Catalog storefront. Without it, storefront() resolves the listener's from /v1/me/storefront. */
+  /** Catalog storefront, by its id, such as `"us"`: one segment of a path. Without it, storefront() resolves the listener's from /v1/me/storefront. */
   storefront?: string | undefined;
+  /** What sends each request. Default: the global `fetch`. */
   fetch?: typeof fetch | undefined;
-  /** `false` disables retries. Default: 2 attempts, 250 ms base, 4 s cap, full jitter, Retry-After honoured. */
+  /** `false` disables retries; a plain object sets the policy field by field. Default: 2 attempts, 250 ms base, 4 s cap, full jitter, Retry-After honoured. */
   retry?: tRetryPolicy | false | undefined;
   /** Opt-in token bucket. Share one instance across every client using the same developer token. */
   rateLimit?: tRateLimiter | undefined;
@@ -58,6 +115,7 @@ export interface tClientOptions {
   onResponse?: ((res: Response, req: Request, outcome: tResponseOutcome) => void) | undefined;
 }
 
+/** What a response came to, as an `onResponse` hook hears it: the body read and parsed, and the error it made, if any. */
 export interface tResponseOutcome {
   /** The parsed JSON body; undefined when there was none or it was not JSON. */
   readonly body: unknown;
@@ -65,8 +123,15 @@ export interface tResponseOutcome {
   readonly error: AppleMusicError | undefined;
 }
 
+/**
+ * What `request` sends beside the path, and what it makes of the answer. Every field is optional. It is read as its
+ * own properties, once, when the request is made, and sent as it is: a caller's options are checked by `initOf`, and
+ * a function for an endpoint hands over what it made of them. What cannot be encoded is a `TypeError` from the request.
+ */
 export interface tRequestInit<T = unknown> {
+  /** The HTTP method. Default: GET. */
   readonly method?: "GET" | "POST" | "PUT" | "DELETE" | undefined;
+  /** The query, encoded as `tParams` says and set on the URL over whatever the path carries. */
   readonly params?: tParams | undefined;
   /** JSON-encoded. */
   readonly body?: unknown;
@@ -74,6 +139,7 @@ export interface tRequestInit<T = unknown> {
   readonly user?: boolean | undefined;
   /** Validates the parsed body; a failure throws ValidationError. */
   readonly schema?: tSchemaLike<T> | undefined;
+  /** Aborts the request at any point: before an attempt, in the rate limiter, in `fetch`, reading the body, or between attempts. Its reason is what the request then rejects with, as it is. */
   readonly signal?: AbortSignal | undefined;
   /**
    * Called as the client's own `onResponse` is, and after it, for this request alone: once per response, when the
@@ -85,7 +151,9 @@ export interface tRequestInit<T = unknown> {
 
 /** One page of a collection or relationship response. */
 export interface tPage<T> {
+  /** The items of this page; left out when the page holds none. */
   readonly data?: readonly T[] | undefined;
+  /** Where the next page is, as Apple gives it: a path on its origin with the query in it. Left out on the last page. */
   readonly next?: string | undefined;
 }
 
@@ -99,15 +167,43 @@ export interface tPaginateInit<T> extends tRequestInit<tPage<T>> {
   readonly maxPages?: number | undefined;
 }
 
+/**
+ * The client: what every function of the SDK asks Apple through. `createClient` makes one; anything with these five
+ * methods passes for one wherever a client is taken, since a function checks only the methods it calls.
+ */
 export interface tAppleMusicClient {
-  /** `path` is "v1/...", "/v1/...", or a `next` subpath from a response. Resolves to the parsed body, or undefined when there is none. */
+  /**
+   * One request to Apple: the tokens attached, the parameters encoded, the body read, and the status read as an error
+   * where it is one. The developer token goes on every request, and the Music User Token under `/v1/me` or where
+   * `init.user` says so, so a path has to stay on Apple's origin. A failing attempt is made again as the client's
+   * retry policy says, a POST only after a failure that says it was not carried out, and what the last attempt failed
+   * with is what the promise rejects with. A 401 gives a developer token provider one chance to replace its token.
+   *
+   * @param path - Where to ask: `"v1/..."`, `"/v1/..."`, or a `next` link from an answer.
+   * @param init - What to send and what to make of the answer: the method, the query, a JSON body, whether the Music
+   * User Token goes along, a schema, a signal and a hook for the response.
+   * @returns The parsed body, as `init.schema` typed it where one was given; `undefined` when the answer had no body.
+   * @throws TypeError if `path` leaves `https://api.music.apple.com` or is no URL, a value of `init.params` or
+   * `init.body` cannot be encoded, a GET is given a body, `init.signal` is no AbortSignal, or a token provider gives
+   * what is no token.
+   * @throws AppleMusicError, once the retries are over, with `_tag` `DeveloperTokenInvalid` when Apple answers 401;
+   * `UserTokenInvalid` when Apple answers 403, or the path needs a Music User Token and the client has none;
+   * `RateLimited` when Apple answers 429; `ApiError` on any other failing status, or a 2xx body that is not JSON;
+   * `ValidationError` when `init.schema` finds issues; `NetworkError` when `fetch` fails or the body cannot be read
+   * while `init.signal` has not fired. A `DeveloperTokenUnavailable` is never made here: it is a token provider's,
+   * passed on.
+   * @throws The reason `init.signal` aborted with, when it does.
+   * @throws Whatever a token provider, a user token store, a schema's `validate`, an `onRequest` or `onResponse` hook
+   * or the rate limiter throws, as it is.
+   */
   request<T>(path: string, init?: tRequestInit<T>): Promise<T>;
   /**
    * The items of `data` across every `next` page. Breaking out of the loop stops fetching.
    *
    * `from` is a path, or a page already fetched: the page's own items come first and nothing is asked for until
    * they run out. With a page, `init.params` is not sent, since its `next` link already carries the query. A page
-   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError. A
+   * is an object with a `data` list, a `next` link or both, and anything else handed over is a TypeError, but
+   * `undefined`, which is a last, empty page. A
    * promise of a page is not a page: await it, so that what it rejects with reaches the code that asked.
    *
    * What a `next` link answers with has to be a page itself, with `data` at the top, as a collection's and a
@@ -115,13 +211,48 @@ export interface tAppleMusicClient {
    *
    * A walk has no end but the last page unless `init.maxPages` gives it one. A `next` link is followed wherever on
    * Apple's origin it points, so a page or a path from outside your app is as trusted as you make it.
+   *
+   * Nothing runs until the loop first asks: what is thrown is thrown from the loop, not from the call.
+   *
+   * @param from - The path to ask first, or a page already fetched to begin with.
+   * @param init - What each page is asked for with, as `request` takes it, and `maxPages`, the most pages to ask for.
+   * @returns The items of `data`, page by page: those of the page given, then those of each `next` page asked for.
+   * @throws TypeError if `init.maxPages` is given and is not a whole number above 0, `from` is a promise, or `from`
+   * is neither a path nor a page nor `undefined`; and as `request` throws it for a page asked for.
+   * @throws AppleMusicError as `request` rejects with for a page; and `ApiError` when a `next` link answers with
+   * what is no page: not an object, a `data` that is no list, or a `next` that is no string.
+   * @throws The reason `init.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `request` does.
    */
   paginate<T>(from: string | tPage<T>, init?: tPaginateInit<T>): AsyncIterable<T>;
-  /** The configured storefront, or the listener's, resolved once. */
+  /**
+   * The configured storefront, or the listener's, resolved once. A failure is not kept: the next call asks again.
+   *
+   * @returns The storefront's id, such as `"us"`: the one the client was created with, or else the one
+   * `/v1/me/storefront` names for the listener, asked for once and kept.
+   * @throws TypeError if a token provider gives what is no token, as `request` throws it.
+   * @throws AppleMusicError with `_tag` `UserTokenInvalid` when no storefront was configured and there is no Music User
+   * Token to look one up with; otherwise what `request` rejects with for `v1/me/storefront`, and `ApiError` when
+   * its answer names no storefront.
+   * @throws Whatever a token provider, store, hook or rate limiter throws, as `request` does.
+   */
   storefront(): Promise<string>;
-  /** A client for one listener. Shares the developer token, limiter, retry policy, and hooks. */
+  /**
+   * A client for one listener. Shares the developer token, storefront, store, fetch, limiter, retry policy and hooks.
+   *
+   * @param userToken - The listener's Music User Token, or a function that gives it when a request needs it.
+   * @returns A client that sends `userToken` under `/v1/me`, made with this client's options otherwise.
+   * @throws TypeError if `userToken` is neither a token nor a function.
+   */
   as(userToken: string | tTokenProvider): tAppleMusicClient;
-  /** as(), with the token looked up in userTokenStore. */
+  /**
+   * as(), with the token looked up in userTokenStore at each request. A listener the store has no token for is a
+   * `UserTokenInvalid` from the first request that needs it, and that error names the listener as `userId` does.
+   *
+   * @param userId - Whose token to look up, under the name the store knows the listener by. It is not checked here.
+   * @returns A client that asks the store for the listener's token when a request needs it.
+   * @throws TypeError if the client was made without a `userTokenStore`.
+   */
   forUser(userId: string): tAppleMusicClient;
 }
 
@@ -180,6 +311,9 @@ const isUserPath = (pathname: string) => /^\/v1\/me(\/|$)/.test(pathname);
  * `value` as a token fit to be a header value, or undefined when it is not one: printable ASCII with no spaces or
  * line breaks inside. Whitespace around it, as a token read from a file has, is dropped. This is the one rule for
  * what a token is, for a developer token and a Music User Token alike.
+ *
+ * @param value - What was given as a token.
+ * @returns The token, trimmed, or `undefined` when `value` is not a string of printable ASCII with no spaces or line breaks inside.
  */
 export function parseToken(value: unknown): string | undefined {
   const token = typeof value === "string" ? value.trim() : "";
@@ -217,12 +351,29 @@ function checked(given: unknown): tClientOptions {
   if (!isTokenSource(options.developerToken)) refuse("developerToken", TOKEN, options.developerToken);
   if (options.userToken !== undefined && !isTokenSource(options.userToken)) refuse("userToken", TOKEN, options.userToken);
   if (options.userTokenStore !== undefined && !has(options.userTokenStore, ["get", "set", "delete"])) refuse("userTokenStore", "a store with get, set and delete", options.userTokenStore);
-  if (options.storefront !== undefined && !isName(options.storefront)) refuse("storefront", "a storefront id, a string of 1 to 64 characters", options.storefront);
+  // Held to what a function for an endpoint holds a storefront to, one segment of a path, so that a storefront that
+  // would be refused at every call is refused here instead. It is kept as given: the call encodes it.
+  if (options.storefront !== undefined) segmentOf("createClient", "storefront", options.storefront);
   for (const name of ["fetch", "onRequest", "onResponse"] as const) if (options[name] !== undefined && typeof options[name] !== "function") refuse(name, "a function", options[name]);
+  if (options.retry !== undefined && options.retry !== false && !isPlain(options.retry)) refuse("retry", "false or a plain object of retry policy fields", options.retry);
   if (options.rateLimit !== undefined && !has(options.rateLimit, ["acquire"])) refuse("rateLimit", "a rate limiter with acquire", options.rateLimit);
   return options;
 }
 
+/**
+ * The client: one `fetch` wrapper that attaches the tokens, encodes the parameters, follows `next` links, reads
+ * Apple's statuses as tagged errors and retries what is worth retrying. The options are checked here, so a mistake
+ * fails at creation and not on the first request; what a provider gives, and what a store holds, are checked when
+ * they are used. Every function of the SDK takes what this gives.
+ *
+ * @param given - The developer token, and whatever else: a listener's token or a store of them, a storefront, a
+ * `fetch`, a retry policy, a rate limiter and the hooks.
+ * @returns A client with `request`, `paginate`, `storefront`, `as` and `forUser`.
+ * @throws TypeError if `given` is no object, `developerToken` or `userToken` is neither a token nor a function,
+ * `userTokenStore` has no `get`, `set` and `delete`, `storefront` is not one segment of a path as `segmentOf` holds
+ * it to be, `fetch`, `onRequest` or `onResponse` is no function, `retry` is neither `false` nor a plain object,
+ * a field of `retry` is not what `tRetryPolicy` says, or `rateLimit` has no `acquire`.
+ */
 export function createClient(given: tClientOptions): tAppleMusicClient {
   const options = checked(given);
   const developerToken = toProvider(options.developerToken);

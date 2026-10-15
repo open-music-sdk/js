@@ -2,8 +2,8 @@
 
 The catalog of the Apple Music API, with a function for each of its endpoints: songs, albums, artists,
 playlists, music videos, stations, genres, curators, record labels, storefronts, search and charts.
-Every function takes a client from [`@open-music-sdk/core`](../../packages/core) and resolves to what
-Apple answered, typed by [`@open-music-sdk/types`](../../packages/types). The developer token is the
+Every function takes a client from [`@open-music-sdk/core`](../../packages/core/README.md) and resolves to what
+Apple answered, typed by [`@open-music-sdk/types`](../../packages/types/README.md). The developer token is the
 only token any of them sends.
 
 You probably want one of the integrations instead (`server`, `browser`, `react`). Use this package directly to assemble your own client or to build one of those.
@@ -35,7 +35,7 @@ for await (const track of store.getAlbumRelationship("1613600183", "tracks")) {
 ```
 
 The listener's side of the API, which needs a Music User Token, is
-[`@open-music-sdk/client-user`](../client-user). The two are used in the same way.
+[`@open-music-sdk/client-user`](../client-user/README.md). The two are used in the same way.
 
 ## What is in it
 
@@ -134,7 +134,7 @@ Some functions take one more:
 | `types`, `chart`, `genre`, `with` | `getCharts` | The types to chart, one chart by name, one genre by id, and the city or global charts |
 
 Nothing is validated unless a `schema` is passed, and this package does not depend on a validator. The
-ones in [`@open-music-sdk/validate`](../../packages/validate) fit:
+ones in [`@open-music-sdk/validate`](../../packages/validate/README.md) fit:
 
 ```ts
 import { songsResponse } from "@open-music-sdk/validate";
@@ -238,8 +238,8 @@ documentation, it is in these:
 ## Not here
 
 - The listener's library, ratings, recommendations and history, and their personal station, which is
-  kept in the catalog and needs their token: [`@open-music-sdk/client-user`](../client-user).
-- Validators: [`@open-music-sdk/validate`](../../packages/validate), through the `schema` option.
-- Artwork URLs: [`@open-music-sdk/util-artwork`](../../packages/util-artwork).
+  kept in the catalog and needs their token: [`@open-music-sdk/client-user`](../client-user/README.md).
+- Validators: [`@open-music-sdk/validate`](../../packages/validate/README.md), through the `schema` option.
+- Artwork URLs: [`@open-music-sdk/util-artwork`](../../packages/util-artwork/README.md).
 - Apple's endpoint for testing a connection, `v1/test`, which names no resource. `client.request("v1/test")`
   reaches it.

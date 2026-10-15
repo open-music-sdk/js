@@ -30,7 +30,7 @@ export { developerTokenFetcher } from "@open-music-sdk/developer-token/fetcher";
 export type { tDeveloperTokenProvider, tFetcherOptions } from "@open-music-sdk/developer-token/fetcher";
 export { validateUserToken } from "@open-music-sdk/user-token";
 export type { tValidateOptions } from "@open-music-sdk/user-token";
-export { artworkImage, artworkSrcSet, artworkUrl } from "@open-music-sdk/util-artwork";
+export { FORMATS, artworkImage, artworkSrcSet, artworkUrl } from "@open-music-sdk/util-artwork";
 export type { tArtworkFormat, tArtworkImage, tArtworkOptions, tArtworkSource, tArtworkSrcSetOptions } from "@open-music-sdk/util-artwork";
 export * from "@open-music-sdk/client-catalog";
 export * from "@open-music-sdk/client-user";

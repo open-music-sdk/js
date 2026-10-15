@@ -250,6 +250,19 @@ describe("acceptUserToken: what it is handed is checked before Apple is asked", 
     expect(calls).toHaveLength(0);
   });
 
+  test.each<[string, unknown]>([
+    ["null", null],
+    ["a string", "abort"],
+    ["an object that only looks like one", { aborted: false }],
+    ["a controller, where its signal belongs", new AbortController()],
+  ])("a signal that is %s is a TypeError that names acceptUserToken, and neither Apple nor the store hears of it", async (_name, signal) => {
+    const { error, calls, set } = await handed({ options: { signal } });
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error.message).toMatch(/^acceptUserToken: signal must be an AbortSignal; got /);
+    expect(calls).toHaveLength(0);
+    expect(set).not.toHaveBeenCalled();
+  });
+
   test("a mistake is a rejection, not a throw: the function is async all the way", () => {
     const { music } = apple();
     expect(() => void acceptUserToken(music, kept().store, "", "user-token").catch(() => undefined)).not.toThrow();

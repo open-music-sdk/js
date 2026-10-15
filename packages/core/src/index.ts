@@ -18,7 +18,10 @@ export type {
 export { endpoint, endpointNamespace, inStorefront, relationshipGetter, resourceGetter, resourceLister, resourcesFinder, resourcesGetter } from "./endpoint";
 export type {
   tAlso,
+  tAlsoGiven,
+  tBindable,
   tCollection,
+  tCollectionGiven,
   tEndpoint,
   tEndpointNamespace,
   tEndpointOptions,
@@ -26,6 +29,7 @@ export type {
   tLater,
   tNone,
   tPaged,
+  tPlan,
   tPlanned,
   tRelated,
   tRelationshipEndpoint,
@@ -42,7 +46,7 @@ export { got } from "./got";
 export { hostsOf, isOnHost } from "./hosts";
 export { withNamespaces } from "./namespaces";
 export type { tNamespaces, tWithNamespaces } from "./namespaces";
-export { initOf, walkOf } from "./options";
+export { initOf, signalOf, walkOf } from "./options";
 export type { tAlsoKind, tAlsoKinds, tReadOptions, tWalkOptions } from "./options";
 export { createRateLimiter } from "./rate-limit";
 export type { tRateLimiter } from "./rate-limit";

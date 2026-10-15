@@ -13,6 +13,7 @@ import { recordLabel } from "./record-label";
 import { song } from "./song";
 import { station } from "./station";
 
+/** Validates a `tSearchResponse`: the response to a search request. */
 export const searchResponse: r.tSchema<t.tSearchResponse> = r.object<t.tSearchResponse>(
   {
     results: r.lazy(() => searchResponseResults),
@@ -20,6 +21,7 @@ export const searchResponse: r.tSchema<t.tSearchResponse> = r.object<t.tSearchRe
   ["results"],
 );
 
+/** Validates a `tSearchResponseResults`: an object that represents the results of a catalog search query. */
 export const searchResponseResults: r.tSchema<t.tSearchResponseResults> = r.object<t.tSearchResponseResults>(
   {
     activities: r.lazy(() => searchResponseResultsActivitiesSearchResult),
@@ -37,6 +39,7 @@ export const searchResponseResults: r.tSchema<t.tSearchResponseResults> = r.obje
   [],
 );
 
+/** Validates a `tSearchResponseResultsActivitiesSearchResult`: an object containing an activities’ search result. */
 export const searchResponseResultsActivitiesSearchResult: r.tSchema<t.tSearchResponseResultsActivitiesSearchResult> = r.object<t.tSearchResponseResultsActivitiesSearchResult>(
   {
     data: r.array(r.lazy(() => activity)),
@@ -46,6 +49,7 @@ export const searchResponseResultsActivitiesSearchResult: r.tSchema<t.tSearchRes
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsAlbumsSearchResult`: an object containing an albums’ search result. */
 export const searchResponseResultsAlbumsSearchResult: r.tSchema<t.tSearchResponseResultsAlbumsSearchResult> = r.object<t.tSearchResponseResultsAlbumsSearchResult>(
   {
     data: r.array(r.lazy(() => album)),
@@ -55,6 +59,7 @@ export const searchResponseResultsAlbumsSearchResult: r.tSchema<t.tSearchRespons
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsAppleCuratorsSearchResult`: an object containing the Apple curators’ search result. */
 export const searchResponseResultsAppleCuratorsSearchResult: r.tSchema<t.tSearchResponseResultsAppleCuratorsSearchResult> = r.object<t.tSearchResponseResultsAppleCuratorsSearchResult>(
   {
     data: r.array(r.lazy(() => appleCurator)),
@@ -64,6 +69,7 @@ export const searchResponseResultsAppleCuratorsSearchResult: r.tSchema<t.tSearch
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsArtistsSearchResult`: an object containing an artists’ search result. */
 export const searchResponseResultsArtistsSearchResult: r.tSchema<t.tSearchResponseResultsArtistsSearchResult> = r.object<t.tSearchResponseResultsArtistsSearchResult>(
   {
     data: r.array(r.lazy(() => artist)),
@@ -73,6 +79,7 @@ export const searchResponseResultsArtistsSearchResult: r.tSchema<t.tSearchRespon
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsCuratorsSearchResult`: an object containing a curators’ search result. */
 export const searchResponseResultsCuratorsSearchResult: r.tSchema<t.tSearchResponseResultsCuratorsSearchResult> = r.object<t.tSearchResponseResultsCuratorsSearchResult>(
   {
     data: r.array(r.lazy(() => curator)),
@@ -82,6 +89,7 @@ export const searchResponseResultsCuratorsSearchResult: r.tSchema<t.tSearchRespo
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsMusicVideosSearchResult`: an object containing a music videos’ search result. */
 export const searchResponseResultsMusicVideosSearchResult: r.tSchema<t.tSearchResponseResultsMusicVideosSearchResult> = r.object<t.tSearchResponseResultsMusicVideosSearchResult>(
   {
     data: r.array(r.lazy(() => musicVideo)),
@@ -91,6 +99,7 @@ export const searchResponseResultsMusicVideosSearchResult: r.tSchema<t.tSearchRe
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsPlaylistsSearchResult`: an object containing a playlists’ search result. */
 export const searchResponseResultsPlaylistsSearchResult: r.tSchema<t.tSearchResponseResultsPlaylistsSearchResult> = r.object<t.tSearchResponseResultsPlaylistsSearchResult>(
   {
     data: r.array(r.lazy(() => playlist)),
@@ -100,6 +109,7 @@ export const searchResponseResultsPlaylistsSearchResult: r.tSchema<t.tSearchResp
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsRecordLabelsSearchResult`: an object containing a record labels’ search result. */
 export const searchResponseResultsRecordLabelsSearchResult: r.tSchema<t.tSearchResponseResultsRecordLabelsSearchResult> = r.object<t.tSearchResponseResultsRecordLabelsSearchResult>(
   {
     data: r.array(r.lazy(() => recordLabel)),
@@ -109,6 +119,7 @@ export const searchResponseResultsRecordLabelsSearchResult: r.tSchema<t.tSearchR
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsSongsSearchResult`: an object containing a songs’ search result. */
 export const searchResponseResultsSongsSearchResult: r.tSchema<t.tSearchResponseResultsSongsSearchResult> = r.object<t.tSearchResponseResultsSongsSearchResult>(
   {
     data: r.array(r.lazy(() => song)),
@@ -118,6 +129,7 @@ export const searchResponseResultsSongsSearchResult: r.tSchema<t.tSearchResponse
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsStationsSearchResult`: an object containing a stations’ search result. */
 export const searchResponseResultsStationsSearchResult: r.tSchema<t.tSearchResponseResultsStationsSearchResult> = r.object<t.tSearchResponseResultsStationsSearchResult>(
   {
     data: r.array(r.lazy(() => station)),
@@ -127,6 +139,7 @@ export const searchResponseResultsStationsSearchResult: r.tSchema<t.tSearchRespo
   ["data"],
 );
 
+/** Validates a `tSearchResponseResultsTopResultsSearchResult`: an object containing a top results’ search result. */
 export const searchResponseResultsTopResultsSearchResult: r.tSchema<t.tSearchResponseResultsTopResultsSearchResult> = r.object<t.tSearchResponseResultsTopResultsSearchResult>(
   {
     data: r.array(r.union(r.lazy(() => activity), r.lazy(() => album), r.lazy(() => appleCurator), r.lazy(() => artist), r.lazy(() => curator), r.lazy(() => musicVideo), r.lazy(() => playlist), r.lazy(() => recordLabel), r.lazy(() => song), r.lazy(() => station))),

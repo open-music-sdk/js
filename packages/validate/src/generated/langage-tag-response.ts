@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tLangageTagResponse`: the response to a language tag request. */
 export const langageTagResponse: r.tSchema<t.tLangageTagResponse> = r.object<t.tLangageTagResponse>(
   {
     results: r.lazy(() => langageTagResponseResults),
@@ -10,6 +11,7 @@ export const langageTagResponse: r.tSchema<t.tLangageTagResponse> = r.object<t.t
   ["results"],
 );
 
+/** Validates a `tLangageTagResponseResults`: Results included in the response for a storefront resource request. */
 export const langageTagResponseResults: r.tSchema<t.tLangageTagResponseResults> = r.object<t.tLangageTagResponseResults>(
   {
     tag: r.string,

@@ -5,6 +5,7 @@ import * as r from "../runtime";
 import { appleCurator } from "./apple-curator";
 import { artwork, editorialNotes, playParameters } from "./common";
 
+/** Validates a `tStation`: a resource object that represents a station. */
 export const station: r.tSchema<t.tStation> = r.object<t.tStation>(
   {
     id: r.string,
@@ -16,6 +17,7 @@ export const station: r.tSchema<t.tStation> = r.object<t.tStation>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tStationAttributes`: the attributes for a station resource. */
 export const stationAttributes: r.tSchema<t.tStationAttributes> = r.object<t.tStationAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -33,6 +35,7 @@ export const stationAttributes: r.tSchema<t.tStationAttributes> = r.object<t.tSt
   ["artwork", "isLive", "mediaKind", "name", "url"],
 );
 
+/** Validates a `tStationRelationships`: the name of the relationship you want to fetch for this resource. */
 export const stationRelationships: r.tSchema<t.tStationRelationships> = r.object<t.tStationRelationships>(
   {
     "radio-show": r.lazy(() => stationRelationshipsStationRadioShowRelationship),
@@ -40,6 +43,7 @@ export const stationRelationships: r.tSchema<t.tStationRelationships> = r.object
   [],
 );
 
+/** Validates a `tStationRelationshipsStationRadioShowRelationship`: For radio show episodes, this relationship is the Apple Curator that represents the radio show. */
 export const stationRelationshipsStationRadioShowRelationship: r.tSchema<t.tStationRelationshipsStationRadioShowRelationship> = r.object<t.tStationRelationshipsStationRadioShowRelationship>(
   {
     data: r.array(r.lazy(() => appleCurator)),
@@ -49,6 +53,7 @@ export const stationRelationshipsStationRadioShowRelationship: r.tSchema<t.tStat
   ["data"],
 );
 
+/** Validates a `tStationsResponse`: the response to a stations request. */
 export const stationsResponse: r.tSchema<t.tStationsResponse> = r.object<t.tStationsResponse>(
   {
     data: r.array(r.lazy(() => station)),

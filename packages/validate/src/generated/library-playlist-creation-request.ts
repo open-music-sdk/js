@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tLibraryPlaylistCreationRequest`: a request to create a new playlist in a user’s library. */
 export const libraryPlaylistCreationRequest: r.tSchema<t.tLibraryPlaylistCreationRequest> = r.object<t.tLibraryPlaylistCreationRequest>(
   {
     attributes: r.lazy(() => libraryPlaylistCreationRequestAttributes),
@@ -11,6 +12,7 @@ export const libraryPlaylistCreationRequest: r.tSchema<t.tLibraryPlaylistCreatio
   ["attributes"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestAttributes`: the attributes for a library playlist creation request object. */
 export const libraryPlaylistCreationRequestAttributes: r.tSchema<t.tLibraryPlaylistCreationRequestAttributes> = r.object<t.tLibraryPlaylistCreationRequestAttributes>(
   {
     description: r.string,
@@ -19,6 +21,7 @@ export const libraryPlaylistCreationRequestAttributes: r.tSchema<t.tLibraryPlayl
   ["name"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestRelationships`: the relationships for a library playlist creation request object. */
 export const libraryPlaylistCreationRequestRelationships: r.tSchema<t.tLibraryPlaylistCreationRequestRelationships> = r.object<t.tLibraryPlaylistCreationRequestRelationships>(
   {
     tracks: r.lazy(() => libraryPlaylistCreationRequestRelationshipsTracks),
@@ -27,6 +30,7 @@ export const libraryPlaylistCreationRequestRelationships: r.tSchema<t.tLibraryPl
   ["tracks", "parent"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestRelationshipsParent`: Library playlist folder which contains the playlist that the user creates. */
 export const libraryPlaylistCreationRequestRelationshipsParent: r.tSchema<t.tLibraryPlaylistCreationRequestRelationshipsParent> = r.object<t.tLibraryPlaylistCreationRequestRelationshipsParent>(
   {
     data: r.array(r.lazy(() => libraryPlaylistCreationRequestRelationshipsParentData)),
@@ -34,6 +38,7 @@ export const libraryPlaylistCreationRequestRelationshipsParent: r.tSchema<t.tLib
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestRelationshipsParentData`: Data of the library playlist folder which contains the created library playlist that the user creates. */
 export const libraryPlaylistCreationRequestRelationshipsParentData: r.tSchema<t.tLibraryPlaylistCreationRequestRelationshipsParentData> = r.object<t.tLibraryPlaylistCreationRequestRelationshipsParentData>(
   {
     id: r.string,
@@ -42,6 +47,7 @@ export const libraryPlaylistCreationRequestRelationshipsParentData: r.tSchema<t.
   ["id", "type"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestRelationshipsTracks`: the songs and music videos to add to the created playlist’s tracklist. */
 export const libraryPlaylistCreationRequestRelationshipsTracks: r.tSchema<t.tLibraryPlaylistCreationRequestRelationshipsTracks> = r.object<t.tLibraryPlaylistCreationRequestRelationshipsTracks>(
   {
     data: r.array(r.lazy(() => libraryPlaylistCreationRequestRelationshipsTracksData)),
@@ -49,6 +55,7 @@ export const libraryPlaylistCreationRequestRelationshipsTracks: r.tSchema<t.tLib
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistCreationRequestRelationshipsTracksData`: Data of the tracks too add to the created library playlist. */
 export const libraryPlaylistCreationRequestRelationshipsTracksData: r.tSchema<t.tLibraryPlaylistCreationRequestRelationshipsTracksData> = r.object<t.tLibraryPlaylistCreationRequestRelationshipsTracksData>(
   {
     id: r.string,

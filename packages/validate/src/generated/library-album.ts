@@ -8,6 +8,7 @@ import { libraryArtist } from "./library-artist";
 import { libraryMusicVideo } from "./library-music-video";
 import { librarySong } from "./library-song";
 
+/** Validates a `tLibraryAlbum`: a resource object that represents a library album. */
 export const libraryAlbum: r.tSchema<t.tLibraryAlbum> = r.object<t.tLibraryAlbum>(
   {
     id: r.string,
@@ -19,6 +20,7 @@ export const libraryAlbum: r.tSchema<t.tLibraryAlbum> = r.object<t.tLibraryAlbum
   ["id", "type", "href"],
 );
 
+/** Validates a `tLibraryAlbumAttributes`: the attributes for a library album resource. */
 export const libraryAlbumAttributes: r.tSchema<t.tLibraryAlbumAttributes> = r.object<t.tLibraryAlbumAttributes>(
   {
     artistName: r.string,
@@ -35,6 +37,7 @@ export const libraryAlbumAttributes: r.tSchema<t.tLibraryAlbumAttributes> = r.ob
   ["artistName", "artwork", "name", "trackCount", "genreNames"],
 );
 
+/** Validates a `tLibraryAlbumRelationships`: the relationships for a library album object. */
 export const libraryAlbumRelationships: r.tSchema<t.tLibraryAlbumRelationships> = r.object<t.tLibraryAlbumRelationships>(
   {
     artists: r.lazy(() => libraryAlbumRelationshipsLibraryAlbumArtistsRelationship),
@@ -44,6 +47,7 @@ export const libraryAlbumRelationships: r.tSchema<t.tLibraryAlbumRelationships> 
   [],
 );
 
+/** Validates a `tLibraryAlbumRelationshipsLibraryAlbumArtistsRelationship`: a relationship from the library album to its artist. */
 export const libraryAlbumRelationshipsLibraryAlbumArtistsRelationship: r.tSchema<t.tLibraryAlbumRelationshipsLibraryAlbumArtistsRelationship> = r.object<t.tLibraryAlbumRelationshipsLibraryAlbumArtistsRelationship>(
   {
     href: r.string,
@@ -53,6 +57,7 @@ export const libraryAlbumRelationshipsLibraryAlbumArtistsRelationship: r.tSchema
   ["data"],
 );
 
+/** Validates a `tLibraryAlbumRelationshipsLibraryAlbumCatalogRelationship`: a relationship from the library album to its associated catalog content. */
 export const libraryAlbumRelationshipsLibraryAlbumCatalogRelationship: r.tSchema<t.tLibraryAlbumRelationshipsLibraryAlbumCatalogRelationship> = r.object<t.tLibraryAlbumRelationshipsLibraryAlbumCatalogRelationship>(
   {
     href: r.string,
@@ -62,6 +67,7 @@ export const libraryAlbumRelationshipsLibraryAlbumCatalogRelationship: r.tSchema
   ["data"],
 );
 
+/** Validates a `tLibraryAlbumRelationshipsLibraryAlbumTracksRelationship`: a relationship from the library album to its tracks. */
 export const libraryAlbumRelationshipsLibraryAlbumTracksRelationship: r.tSchema<t.tLibraryAlbumRelationshipsLibraryAlbumTracksRelationship> = r.object<t.tLibraryAlbumRelationshipsLibraryAlbumTracksRelationship>(
   {
     href: r.string,
@@ -71,6 +77,7 @@ export const libraryAlbumRelationshipsLibraryAlbumTracksRelationship: r.tSchema<
   ["data"],
 );
 
+/** Validates a `tLibraryAlbumsResponse`: the response to a library albums request. */
 export const libraryAlbumsResponse: r.tSchema<t.tLibraryAlbumsResponse> = r.object<t.tLibraryAlbumsResponse>(
   {
     data: r.array(r.lazy(() => libraryAlbum)),

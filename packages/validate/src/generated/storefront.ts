@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tStorefront`: a resource object that represents a storefront, an Apple Music and iTunes Store territory that the content is available in. */
 export const storefront: r.tSchema<t.tStorefront> = r.object<t.tStorefront>(
   {
     id: r.string,
@@ -13,6 +14,7 @@ export const storefront: r.tSchema<t.tStorefront> = r.object<t.tStorefront>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tStorefrontAttributes`: the attributes for the storefronts resource. */
 export const storefrontAttributes: r.tSchema<t.tStorefrontAttributes> = r.object<t.tStorefrontAttributes>(
   {
     defaultLanguageTag: r.string,
@@ -23,6 +25,7 @@ export const storefrontAttributes: r.tSchema<t.tStorefrontAttributes> = r.object
   ["defaultLanguageTag", "explicitContentPolicy", "name", "supportedLanguageTags"],
 );
 
+/** Validates a `tStorefrontsResponse`: the response to a storefront request. */
 export const storefrontsResponse: r.tSchema<t.tStorefrontsResponse> = r.object<t.tStorefrontsResponse>(
   {
     data: r.array(r.lazy(() => storefront)),

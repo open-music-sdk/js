@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tLibraryPlaylistFolderCreationRequest`: Request object to create a new library playlist folder. */
 export const libraryPlaylistFolderCreationRequest: r.tSchema<t.tLibraryPlaylistFolderCreationRequest> = r.object<t.tLibraryPlaylistFolderCreationRequest>(
   {
     attributes: r.lazy(() => libraryPlaylistFolderCreationRequestAttributes),
@@ -11,6 +12,7 @@ export const libraryPlaylistFolderCreationRequest: r.tSchema<t.tLibraryPlaylistF
   ["attributes"],
 );
 
+/** Validates a `tLibraryPlaylistFolderCreationRequestAttributes`: the attributes for a library playlist folder creation request object. */
 export const libraryPlaylistFolderCreationRequestAttributes: r.tSchema<t.tLibraryPlaylistFolderCreationRequestAttributes> = r.object<t.tLibraryPlaylistFolderCreationRequestAttributes>(
   {
     name: r.string,
@@ -18,6 +20,7 @@ export const libraryPlaylistFolderCreationRequestAttributes: r.tSchema<t.tLibrar
   ["name"],
 );
 
+/** Validates a `tLibraryPlaylistFolderCreationRequestRelationships`: the relationships of the library playlist folder of the creation request. */
 export const libraryPlaylistFolderCreationRequestRelationships: r.tSchema<t.tLibraryPlaylistFolderCreationRequestRelationships> = r.object<t.tLibraryPlaylistFolderCreationRequestRelationships>(
   {
     parent: r.lazy(() => libraryPlaylistFolderCreationRequestRelationshipsParent),
@@ -25,6 +28,7 @@ export const libraryPlaylistFolderCreationRequestRelationships: r.tSchema<t.tLib
   ["parent"],
 );
 
+/** Validates a `tLibraryPlaylistFolderCreationRequestRelationshipsParent`: the parent of the playlist folder of the creation request. */
 export const libraryPlaylistFolderCreationRequestRelationshipsParent: r.tSchema<t.tLibraryPlaylistFolderCreationRequestRelationshipsParent> = r.object<t.tLibraryPlaylistFolderCreationRequestRelationshipsParent>(
   {
     data: r.array(r.lazy(() => libraryPlaylistFolderCreationRequestRelationshipsParentData)),
@@ -32,6 +36,7 @@ export const libraryPlaylistFolderCreationRequestRelationshipsParent: r.tSchema<
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistFolderCreationRequestRelationshipsParentData`: Data of the parent of the library playlist folder of the creation request. */
 export const libraryPlaylistFolderCreationRequestRelationshipsParentData: r.tSchema<t.tLibraryPlaylistFolderCreationRequestRelationshipsParentData> = r.object<t.tLibraryPlaylistFolderCreationRequestRelationshipsParentData>(
   {
     id: r.string,

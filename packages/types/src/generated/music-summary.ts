@@ -66,6 +66,7 @@ export interface tMusicSummaryViewsTopSongsView {
   next?: string;
 }
 
+/** The response to a music summaries request. */
 export interface tMusicSummariesResponse {
   /** The collection of MusicSummaries for the request. */
   data: tMusicSummary[];

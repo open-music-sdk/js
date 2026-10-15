@@ -3,6 +3,7 @@
 import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 
+/** Validates a `tRatingRequest`: a request containing the data for a rating. */
 export const ratingRequest: r.tSchema<t.tRatingRequest> = r.object<t.tRatingRequest>(
   {
     attributes: r.lazy(() => ratingRequestAttributes),
@@ -11,6 +12,7 @@ export const ratingRequest: r.tSchema<t.tRatingRequest> = r.object<t.tRatingRequ
   ["attributes", "type"],
 );
 
+/** Validates a `tRatingRequestAttributes`: the attributes for a rating request object. */
 export const ratingRequestAttributes: r.tSchema<t.tRatingRequestAttributes> = r.object<t.tRatingRequestAttributes>(
   {
     value: r.literal(-1, 1),

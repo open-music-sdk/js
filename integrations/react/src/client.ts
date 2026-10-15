@@ -31,9 +31,11 @@ const CLIENT = ["request", "paginate", "storefront", "as", "forUser", "developer
 /** A scope of its own, unique across pages and reloads: a UUID where the page has one, which a page that is not secure has not. */
 const scopeOf = (): string => (typeof crypto === "object" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
+/** What `MusicProvider` takes. */
 export interface tMusicProviderProps {
   /** The client from `createBrowserClient`, made once, outside the tree. */
   readonly music: tBrowserMusic;
+  /** The tree the hooks are used in. */
   readonly children?: ReactNode | undefined;
 }
 
@@ -42,6 +44,10 @@ export interface tMusicProviderProps {
  * token arrives as a prop, since a prop from a server component is written into the page; `useMusicUserToken` and
  * the sign-in hand it over. `useMusic` gives the client bound to it, derived once here, so every component shares
  * one client and one storefront lookup.
+ *
+ * @param props - The client, and the tree the hooks are used in.
+ * @returns The context's provider around `children`.
+ * @throws TypeError if `music` is not a client from `createBrowserClient`.
  */
 export function MusicProvider(props: tMusicProviderProps): ReactElement {
   const { music, children } = props;
@@ -76,7 +82,12 @@ function useHeld(fn: string): tHeld {
   return context;
 }
 
-/** The provider's client, bound to the listener while a token is held. One object for every component. */
+/**
+ * The provider's client, bound to the listener while a token is held. One object for every component.
+ *
+ * @returns The client: `music.as(token)` while a token is held, else `music` as it was handed to the provider.
+ * @throws TypeError if there is no `MusicProvider` above the component.
+ */
 export function useMusic(): tBrowserMusic {
   return useHeld("useMusic").music;
 }
@@ -84,19 +95,29 @@ export function useMusic(): tBrowserMusic {
 /**
  * The listener's token as the provider holds it, and the function that sets it: with a token, after your own sign-in
  * or an authenticated fetch of one your server stored; with `undefined`, to forget it, as after a `UserTokenInvalid`.
- * A value that is no token is a TypeError.
+ * The setter throws a `TypeError` for a value that is no token: printable characters with no spaces or line breaks
+ * inside.
+ *
+ * @returns The token, or `undefined` while none is held, and the setter, which keeps its identity.
+ * @throws TypeError if there is no `MusicProvider` above the component.
  */
 export function useMusicUserToken(): readonly [token: string | undefined, setToken: (token: string | undefined) => void] {
   const { token, setToken } = useHeld("useMusicUserToken");
   return useMemo(() => [token, setToken] as const, [token, setToken]);
 }
 
-/** `musicQueries` over the provider's client, in the provider's scope, made once per client and per sign-in. */
+/**
+ * `musicQueries` over the provider's client, in the provider's scope, made once per client and per sign-in.
+ *
+ * @returns The catalog's and the listener's read functions, each as its query.
+ * @throws TypeError if there is no `MusicProvider` above the component.
+ */
 export function useMusicQueries(): tMusicQueries {
   const { music, scope } = useHeld("useMusicQueries");
   return useMemo(() => musicQueries(music, scope), [music, scope]);
 }
 
+/** What `useConnect` gives: where the sign-in stands, and the two functions, each keeping its identity. */
 export interface tUseConnect {
   /** Whether Apple's script is loaded and configured: when the button can be enabled. */
   readonly isReady: boolean;
@@ -105,12 +126,15 @@ export interface tUseConnect {
   /**
    * Opens Apple's sign-in window, to be called inside the click, and resolves to the Music User Token, which the
    * provider now holds too, or to `undefined` when the script answered with nothing. After a `ready` that failed it
-   * loads and configures the script afresh.
+   * loads and configures the script afresh. Rejects with what the helper's `connect()` rejects with, after putting
+   * it in `error`; called before the component mounted or after it unmounted, it is a `TypeError`.
    */
   readonly connect: () => Promise<string | undefined>;
   /**
    * Signs out: Apple's own sign-out through the script, so a later page load restores nothing, and the provider
-   * forgets the token. Whether the script's sign-out also ends the token at Apple is a live check.
+   * forgets the token. Whether the script's sign-out also ends the token at Apple is a live check. Rejects with what
+   * the helper's `disconnect()` rejects with, and the token is then kept; called before the component mounted or
+   * after it unmounted, it is a `TypeError`.
    */
   readonly disconnect: () => Promise<void>;
 }
@@ -120,6 +144,12 @@ export interface tUseConnect {
  * client, and disposed when it unmounts. The token a returning listener's script restored goes to the provider,
  * unless the provider holds one already or the app has forgotten one; the token `connect()` gives always does. The
  * options are read on the first mount only, as the helper reads them once.
+ *
+ * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
+ * @returns Where the sign-in stands, and `connect` and `disconnect`, each keeping its identity.
+ * @throws TypeError if there is no `MusicProvider` above the component; what `createConnect` refuses in the
+ * options, a mount with no `document`, or a page whose script is configured for another app, is a `TypeError`
+ * thrown when the component mounts, from the effect, so it reaches the nearest error boundary rather than this call.
  */
 export function useConnect(options: tConnectOptions): tUseConnect {
   const { base, restorable, setToken } = useHeld("useConnect");
@@ -173,9 +203,16 @@ export function useConnect(options: tConnectOptions): tUseConnect {
   return useMemo(() => ({ isReady: state.isReady, error: state.error, connect, disconnect }), [state, connect, disconnect]);
 }
 
+/** What `usePreviewPlayer` takes: the player's options, with the element or a ref to it. */
 export interface tUsePreviewPlayerOptions extends Omit<tPreviewPlayerOptions, "audio"> {
   /** The element to play through, or a ref to one, read when the component mounts. Default: one made with `new Audio()`. */
-  readonly audio?: tPreviewAudio | { readonly current: tPreviewAudio | null } | undefined;
+  readonly audio?:
+    | tPreviewAudio
+    | {
+        /** The element the ref holds once it is rendered; `null` before, which the mount refuses. */
+        readonly current: tPreviewAudio | null;
+      }
+    | undefined;
 }
 
 type tVerb = (typeof VERBS)[number];
@@ -198,6 +235,11 @@ const isRef = (audio: unknown): audio is { readonly current: tPreviewAudio | nul
  * it unmounts. `state` is the player's own snapshot through `useSyncExternalStore`, and the idle one before that.
  * The verbs keep their identity, so one can go into an effect's dependencies; one called before the player exists,
  * which only a child's effect can do, is a TypeError. The options are read on the first mount only.
+ *
+ * @param options - The player's options, with the element to play through or a ref to it.
+ * @returns The player's state and its verbs; each verb throws and rejects as the player's own does.
+ * @throws TypeError if `audio` is a ref with nothing in it when the component mounts, or `previewPlayer` refuses an
+ * option: thrown then, from the effect, so it reaches the nearest error boundary rather than this call.
  */
 export function usePreviewPlayer<T extends tPreviewable = tPreviewable>(options?: tUsePreviewPlayerOptions): tUsePreviewPlayer<T> {
   const first = useRef(options);

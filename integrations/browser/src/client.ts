@@ -22,13 +22,44 @@ export interface tBrowserClientOptions extends Omit<tClientOptions, "developerTo
 const NAMESPACES = { catalog, user, playlists };
 
 /** Core's client with `catalog`, `user` and `playlists` on it, made for this client and for each one `as()` or `forUser()` gives. */
-export type tMusic = tWithNamespaces<typeof NAMESPACES>;
+export type tMusic = tWithNamespaces<{
+  /** `catalog` of `@open-music-sdk/client-catalog`. */
+  catalog: typeof catalog;
+  /** `user` of `@open-music-sdk/client-user`. */
+  user: typeof user;
+  /** `playlists` of `@open-music-sdk/lib-playlists`. */
+  playlists: typeof playlists;
+}>;
 
 /** The page's client: `tMusic` with the developer-token provider on it, which `createConnect` takes, and kept through `as()` and `forUser()`. */
 export interface tBrowserMusic extends Omit<tMusic, "as" | "forUser"> {
   /** The provider that fetches the token from `tokenUrl`: what Apple's script is configured with, by `createConnect`. */
   readonly developerToken: tDeveloperTokenProvider;
+  /** The catalog's functions, bound to this client: `catalog(client)` of `@open-music-sdk/client-catalog`. */
+  readonly catalog: tMusic["catalog"];
+  /** The listener's library and its functions, bound to this client: `user(client)` of `@open-music-sdk/client-user`. */
+  readonly user: tMusic["user"];
+  /** The playlist verbs, bound to this client: `playlists(client)` of `@open-music-sdk/lib-playlists`. */
+  readonly playlists: tMusic["playlists"];
+  /**
+   * A client for one listener: the same developer token, limiter, retry policy and hooks, with the namespaces made
+   * for it and the provider kept on it.
+   *
+   * @param userToken - The listener's Music User Token, or a provider that gives it.
+   * @returns The listener's client, frozen.
+   * @throws TypeError if `userToken` is neither a token nor a function. The three namespaces are fixed here, and
+   * each checks nothing but the client it is handed, which is one just made, so this is the whole list.
+   */
   as(userToken: string | tTokenProvider): tBrowserMusic;
+  /**
+   * `as()`, with the token looked up in the client's `userTokenStore` at each request; a listener the store has no
+   * token for is a `UserTokenInvalid` at the first request.
+   *
+   * @param userId - The id the store keeps the listener's token under.
+   * @returns The listener's client, frozen.
+   * @throws TypeError if the client was made without a `userTokenStore`. The three namespaces are fixed here, and
+   * each checks nothing but the client it is handed, which is one just made, so this is the whole list.
+   */
   forUser(userId: string): tBrowserMusic;
 }
 
@@ -62,6 +93,13 @@ function attached(music: tMusic, developerToken: tDeveloperTokenProvider): tBrow
  * its life, with the catalog, the listener's library and the playlist verbs on it. The options are checked and
  * taken here, once: what the fetcher checks it names itself, and so does `createClient`. Nothing is fetched until
  * a call.
+ *
+ * @param options - Where the token endpoint is, the endpoint's own options, and every option of core's client but
+ * the developer token.
+ * @returns The client, frozen, with the three namespaces and the provider on it.
+ * @throws TypeError if `options` is not a plain object, `tokenUrl` is neither a string nor a `URL`, `endpoint` is
+ * not a plain object, the URL is neither http nor https or carries a username or password, or a value is not what
+ * the fetcher or `createClient` takes.
  */
 export function createBrowserClient(options: tBrowserClientOptions): tBrowserMusic {
   if ((options as unknown) === undefined) throw new TypeError(`createBrowserClient: expected ${WHAT}; got undefined`);

@@ -3,7 +3,7 @@
 Artwork in the Apple Music API is not an image URL but a template for one:
 `https://…/{w}x{h}bb.jpg`, with the pixel size left for you to fill in. This package fills it in, and
 builds the `srcset` that gives a dense screen a sharper image. Strings and numbers in, strings and
-numbers out. Its one dependency is [`@open-music-sdk/core`](../core), for the check on where a URL
+numbers out. Its one dependency is [`@open-music-sdk/core`](../core/README.md), for the check on where a URL
 points, and that check is all of `core` an app carries because of this package.
 
 You probably want one of the integrations instead (`browser`, `react`). Use
@@ -197,8 +197,8 @@ work until they are filled in.
 ## Not here
 
 - **Getting the artwork.** It arrives on the resources that
-  [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
-  [`@open-music-sdk/client-user`](../../clients/client-user) fetch; this package only reads it.
+  [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
+  [`@open-music-sdk/client-user`](../../clients/client-user/README.md) fetch; this package only reads it.
 - **Screen density detection.** `srcset` is how a browser picks; nothing here reads `devicePixelRatio`.
 - **Width descriptors** (`300w` with `sizes`), for images whose shown width depends on the layout.
 - **Colours.** `bgColor` and `textColor1` to `textColor4` are hex without the `#`; prefix one and it

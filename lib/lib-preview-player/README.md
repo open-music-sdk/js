@@ -41,8 +41,8 @@ player.subscribe(() => {
 const state = useSyncExternalStore(player.subscribe, () => player.state);
 ```
 
-The songs can come from any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog),
-or from `resolve` in [`@open-music-sdk/lib-playlists`](../lib-playlists), which is used in the same
+The songs can come from any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md),
+or from `resolve` in [`@open-music-sdk/lib-playlists`](../lib-playlists/README.md), which is used in the same
 way as this package: one noun, an object of short verbs, and a list of tracks answered with
 `{ tracks, skipped }`.
 
@@ -163,8 +163,8 @@ URL, and the element will request it.
 | --- | --- |
 | `hosts` | Bare host names in small letters, 16 at most. With this, a track whose clip is not `https` on one of them or on a subdomain of one, with no port and no credentials, is skipped as `"host"`. |
 
-The check is the one [`@open-music-sdk/util-artwork`](../../packages/util-artwork) makes for an
-artwork, and both take it from [`@open-music-sdk/core`](../../packages/core). That check, and a
+The check is the one [`@open-music-sdk/util-artwork`](../../packages/util-artwork/README.md) makes for an
+artwork, and both take it from [`@open-music-sdk/core`](../../packages/core/README.md). That check, and a
 handful of others the player makes on what it is handed, are all of `core` an app carries because of
 this package: none of the client comes with it.
 
@@ -194,8 +194,8 @@ same element without a second click, and that an element says it has ended only 
 
 ## Not here
 
-Fetching the songs is [`@open-music-sdk/client-catalog`](../../clients/client-catalog). Finding songs
+Fetching the songs is [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md). Finding songs
 for tracks known from elsewhere, and putting them in a playlist, is
-[`@open-music-sdk/lib-playlists`](../lib-playlists). Artwork for the track that is playing is
-[`@open-music-sdk/util-artwork`](../../packages/util-artwork). Playing a whole song is not here: the
+[`@open-music-sdk/lib-playlists`](../lib-playlists/README.md). Artwork for the track that is playing is
+[`@open-music-sdk/util-artwork`](../../packages/util-artwork/README.md). Playing a whole song is not here: the
 API has no endpoint for it, and a preview is the one piece of audio it hands over.

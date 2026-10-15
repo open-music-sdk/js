@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { resource } from "./resource";
 
+/** Validates a `tPersonalRecommendation`: a resource object that represents recommended resources for a user calculated using their selected preferences. */
 export const personalRecommendation: r.tSchema<t.tPersonalRecommendation> = r.object<t.tPersonalRecommendation>(
   {
     id: r.string,
@@ -15,6 +16,7 @@ export const personalRecommendation: r.tSchema<t.tPersonalRecommendation> = r.ob
   ["id", "type", "href"],
 );
 
+/** Validates a `tPersonalRecommendationAttributes`: the attributes for a recommendation resource. */
 export const personalRecommendationAttributes: r.tSchema<t.tPersonalRecommendationAttributes> = r.object<t.tPersonalRecommendationAttributes>(
   {
     isGroupRecommendation: r.boolean,
@@ -27,6 +29,7 @@ export const personalRecommendationAttributes: r.tSchema<t.tPersonalRecommendati
   ["isGroupRecommendation", "kind", "nextUpdateDate", "resourceTypes"],
 );
 
+/** Validates a `tPersonalRecommendationAttributesReason`: an object that represents the reason for a personal recommendation. */
 export const personalRecommendationAttributesReason: r.tSchema<t.tPersonalRecommendationAttributesReason> = r.object<t.tPersonalRecommendationAttributesReason>(
   {
     stringForDisplay: r.string,
@@ -34,6 +37,7 @@ export const personalRecommendationAttributesReason: r.tSchema<t.tPersonalRecomm
   ["stringForDisplay"],
 );
 
+/** Validates a `tPersonalRecommendationAttributesTitle`: an object that represents the title of a personal recommendation. */
 export const personalRecommendationAttributesTitle: r.tSchema<t.tPersonalRecommendationAttributesTitle> = r.object<t.tPersonalRecommendationAttributesTitle>(
   {
     stringForDisplay: r.string,
@@ -41,6 +45,7 @@ export const personalRecommendationAttributesTitle: r.tSchema<t.tPersonalRecomme
   ["stringForDisplay"],
 );
 
+/** Validates a `tPersonalRecommendationRelationships`: the relationships for a recommendation resource. */
 export const personalRecommendationRelationships: r.tSchema<t.tPersonalRecommendationRelationships> = r.object<t.tPersonalRecommendationRelationships>(
   {
     contents: r.lazy(() => personalRecommendationRelationshipsPersonalRecommendationContentsRelationship),
@@ -48,6 +53,7 @@ export const personalRecommendationRelationships: r.tSchema<t.tPersonalRecommend
   [],
 );
 
+/** Validates a `tPersonalRecommendationRelationshipsPersonalRecommendationContentsRelationship`: a relationship from the recommendation to its recommended content. */
 export const personalRecommendationRelationshipsPersonalRecommendationContentsRelationship: r.tSchema<t.tPersonalRecommendationRelationshipsPersonalRecommendationContentsRelationship> = r.object<t.tPersonalRecommendationRelationshipsPersonalRecommendationContentsRelationship>(
   {
     href: r.string,
@@ -57,6 +63,7 @@ export const personalRecommendationRelationshipsPersonalRecommendationContentsRe
   ["data"],
 );
 
+/** Validates a `tPersonalRecommendationResponse`: the response to a request for personal recommendations. */
 export const personalRecommendationResponse: r.tSchema<t.tPersonalRecommendationResponse> = r.object<t.tPersonalRecommendationResponse>(
   {
     data: r.array(r.lazy(() => personalRecommendation)),

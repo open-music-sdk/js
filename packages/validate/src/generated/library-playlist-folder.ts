@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { libraryPlaylist } from "./library-playlist";
 
+/** Validates a `tLibraryPlaylistFolder`: a resource object that represents a library playlist folder. */
 export const libraryPlaylistFolder: r.tSchema<t.tLibraryPlaylistFolder> = r.object<t.tLibraryPlaylistFolder>(
   {
     id: r.string,
@@ -15,6 +16,7 @@ export const libraryPlaylistFolder: r.tSchema<t.tLibraryPlaylistFolder> = r.obje
   ["id", "type", "href"],
 );
 
+/** Validates a `tLibraryPlaylistFolderAttributes`: a resource object that represents the attributes for a library playlist folder. */
 export const libraryPlaylistFolderAttributes: r.tSchema<t.tLibraryPlaylistFolderAttributes> = r.object<t.tLibraryPlaylistFolderAttributes>(
   {
     dateAdded: r.string,
@@ -23,6 +25,7 @@ export const libraryPlaylistFolderAttributes: r.tSchema<t.tLibraryPlaylistFolder
   ["name"],
 );
 
+/** Validates a `tLibraryPlaylistFolderRelationships`: a resource Object that represents the relationships for a library playlist folder. */
 export const libraryPlaylistFolderRelationships: r.tSchema<t.tLibraryPlaylistFolderRelationships> = r.object<t.tLibraryPlaylistFolderRelationships>(
   {
     children: r.lazy(() => libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship),
@@ -31,6 +34,7 @@ export const libraryPlaylistFolderRelationships: r.tSchema<t.tLibraryPlaylistFol
   [],
 );
 
+/** Validates a `tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship`: a resource object that represents the children relationship of a library playlist folder. */
 export const libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship: r.tSchema<t.tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship> = r.object<t.tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship>(
   {
     href: r.string,
@@ -40,6 +44,7 @@ export const libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRela
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship`: a resource object that represents the parent relationship of a library playlist folder. */
 export const libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship: r.tSchema<t.tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship> = r.object<t.tLibraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship>(
   {
     href: r.string,
@@ -49,6 +54,7 @@ export const libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelati
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistFoldersResponse`: the response to a library playlist folders request. */
 export const libraryPlaylistFoldersResponse: r.tSchema<t.tLibraryPlaylistFoldersResponse> = r.object<t.tLibraryPlaylistFoldersResponse>(
   {
     data: r.array(r.lazy(() => libraryPlaylistFolder)),

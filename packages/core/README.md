@@ -58,8 +58,8 @@ try {
 
 The rows from `segmentOf` down are for packages that put names to endpoints; see
 [Declaring endpoints](#declaring-endpoints). An app has no need of them: the two that are made with
-them, [`@open-music-sdk/client-catalog`](../../clients/client-catalog) and
-[`@open-music-sdk/client-user`](../../clients/client-user), have a function for every endpoint, so
+them, [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
+[`@open-music-sdk/client-user`](../../clients/client-user/README.md), have a function for every endpoint, so
 that `request` is for the rare path neither names.
 
 `isAppleMusicError` and `instanceof AppleMusicError` go by shape, an `Error` named `AppleMusicError`
@@ -173,7 +173,7 @@ status of an answer, or one of its headers.
 ## Validation
 
 `request` accepts any [Standard Schema](https://standardschema.dev) as `schema`, including the
-generated validators in [`@open-music-sdk/validate`](../validate). A failure throws `ValidationError`
+generated validators in [`@open-music-sdk/validate`](../validate/README.md). A failure throws `ValidationError`
 with the issues attached. Nothing is validated unless a schema is passed.
 
 ## Declaring endpoints

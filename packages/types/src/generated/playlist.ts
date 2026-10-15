@@ -47,6 +47,7 @@ export interface tPlaylistAttributes {
   url: string;
   /** The resource types that are present in the tracks of the playlists. */
   trackTypes?: ("music-videos" | "songs")[];
+  /** Whether the playlist is among the listener's favorites. */
   inFavorites?: boolean;
 }
 

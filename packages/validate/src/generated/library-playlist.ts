@@ -7,6 +7,7 @@ import { libraryMusicVideo } from "./library-music-video";
 import { librarySong } from "./library-song";
 import { playlist } from "./playlist";
 
+/** Validates a `tLibraryPlaylist`: a resource object that represents a library playlist. */
 export const libraryPlaylist: r.tSchema<t.tLibraryPlaylist> = r.object<t.tLibraryPlaylist>(
   {
     id: r.string,
@@ -18,6 +19,7 @@ export const libraryPlaylist: r.tSchema<t.tLibraryPlaylist> = r.object<t.tLibrar
   ["id", "type", "href"],
 );
 
+/** Validates a `tLibraryPlaylistAttributes`: the attributes for a library playlist resource. */
 export const libraryPlaylistAttributes: r.tSchema<t.tLibraryPlaylistAttributes> = r.object<t.tLibraryPlaylistAttributes>(
   {
     artwork: r.lazy(() => artwork),
@@ -34,6 +36,7 @@ export const libraryPlaylistAttributes: r.tSchema<t.tLibraryPlaylistAttributes> 
   ["canEdit", "hasCatalog", "name", "isPublic"],
 );
 
+/** Validates a `tLibraryPlaylistRelationships`: the relationships for a library playlist resource. */
 export const libraryPlaylistRelationships: r.tSchema<t.tLibraryPlaylistRelationships> = r.object<t.tLibraryPlaylistRelationships>(
   {
     catalog: r.lazy(() => libraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship),
@@ -42,6 +45,7 @@ export const libraryPlaylistRelationships: r.tSchema<t.tLibraryPlaylistRelations
   [],
 );
 
+/** Validates a `tLibraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship`: a relationship from the playlist to its associated catalog content. */
 export const libraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship: r.tSchema<t.tLibraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship> = r.object<t.tLibraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship>(
   {
     href: r.string,
@@ -51,6 +55,7 @@ export const libraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship: r.t
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistRelationshipsLibraryPlaylistTracksRelationship`: a relationship from the playlist to its tracks. */
 export const libraryPlaylistRelationshipsLibraryPlaylistTracksRelationship: r.tSchema<t.tLibraryPlaylistRelationshipsLibraryPlaylistTracksRelationship> = r.object<t.tLibraryPlaylistRelationshipsLibraryPlaylistTracksRelationship>(
   {
     href: r.string,
@@ -60,6 +65,7 @@ export const libraryPlaylistRelationshipsLibraryPlaylistTracksRelationship: r.tS
   ["data"],
 );
 
+/** Validates a `tLibraryPlaylistsResponse`: the response to a library playlists request. */
 export const libraryPlaylistsResponse: r.tSchema<t.tLibraryPlaylistsResponse> = r.object<t.tLibraryPlaylistsResponse>(
   {
     data: r.array(r.lazy(() => libraryPlaylist)),

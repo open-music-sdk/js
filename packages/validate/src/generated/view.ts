@@ -4,6 +4,7 @@ import type * as t from "@open-music-sdk/types";
 import * as r from "../runtime";
 import { resource } from "./resource";
 
+/** Validates a `tView`: a to-one or to-many relationship view from one resource object to others representing interesting associations. */
 export const view: r.tSchema<t.tView> = r.object<t.tView>(
   {
     href: r.string,
@@ -15,6 +16,8 @@ export const view: r.tSchema<t.tView> = r.object<t.tView>(
   ["data"],
 );
 
+/** Validates a `tViewAttributes`: Attributes representing the metadata of the view. */
 export const viewAttributes: r.tSchema<t.tViewAttributes> = r.schema<t.tViewAttributes>(r.record);
 
+/** Validates a `tViewMeta`: Information about the request or response. */
 export const viewMeta: r.tSchema<t.tViewMeta> = r.schema<t.tViewMeta>(r.record);

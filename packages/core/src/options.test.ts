@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createClient, type tSchemaLike } from "./client";
 import { isAppleMusicError } from "./errors";
-import { initOf, walkOf, type tReadOptions } from "./options";
+import { initOf, signalOf, walkOf, type tReadOptions } from "./options";
 
 const SECRET = "s3cretT0ken";
 const noop = () => undefined;
@@ -19,6 +19,23 @@ const thrown = (fn: () => unknown): Error => {
 
 /** Options as a caller without the types could pass them. */
 const loose = (options: unknown) => options as tReadOptions;
+
+describe("signalOf: a signal is the one kind of thing fetch will take", () => {
+  test("no signal is no signal, and a signal is taken as it is", () => {
+    const { signal } = new AbortController();
+    expect(signalOf("request", undefined)).toBeUndefined();
+    expect(signalOf("request", signal)).toBe(signal);
+  });
+
+  test.each<[string, unknown]>([
+    ["a controller, which holds one", new AbortController()],
+    ["true", true],
+    ["an object that looks like one", { aborted: false, addEventListener: () => undefined }],
+    ["null", null],
+  ])("%s is refused, under the function's name, and the value is described, not repeated", (_name, value) => {
+    expect(() => signalOf("request", value)).toThrow(/^request: signal must be an AbortSignal; got (boolean|object|null)$/);
+  });
+});
 
 describe("initOf: with nothing given, nothing is sent", () => {
   test.each<[string, tReadOptions | undefined]>([

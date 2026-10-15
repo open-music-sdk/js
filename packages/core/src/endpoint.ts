@@ -17,7 +17,29 @@ export type tRequestPlan<R> = readonly [path: string, init?: tRequestInit<R> & t
  * how, and is on the function so that a reader of it, or anything built over it, can tell a write from a read.
  */
 export interface tEndpoint<A extends readonly unknown[], R, U, K extends tUnwrap = tUnwrap> {
+  /**
+   * Asks Apple, with `client`. Everything handed over is checked as the call is made, before Apple is asked, and a
+   * mistake is a TypeError naming the function. Which arguments there are is the function's own to say.
+   *
+   * @param client - The client to ask with.
+   * @param args - The function's own arguments, as it declares them: an id, a list of ids, a name, options.
+   * @returns What Apple answered, parsed, as the function's answer type says.
+   * @throws TypeError if `client` is no client, an argument is not what it should be, or the collection's path could
+   * not be asked for as written; before this endpoint is asked.
+   * @throws AppleMusicError as `client.request` rejects with, `_tag` says which; or as `client.storefront()` rejects
+   * with, where the collection asks it.
+   * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
+   */
   (client: tAppleMusicClient, ...args: A): Promise<R>;
+  /**
+   * The same call with the client fixed and the answer unwrapped as `unwrap` says. Binding checks the client and
+   * nothing else; the arguments are checked as the bound function is called. Beyond what the call throws, a
+   * `resource` or `resources` function rejects with an `ApiError` when a success is no object, or its `data` is
+   * there and is no list, and a `resource` function also when the success holds no resource; a `pages` function
+   * hands over an iterable that asks for nothing until a loop starts, and throws from the loop what
+   * `client.paginate` does, an `ApiError` for a page that is none among them.
+   */
   readonly bound: (client: tAppleMusicClient) => (...args: A) => U;
   /** The kind the function was declared with: what its bound form hands over. */
   readonly unwrap: K;
@@ -25,14 +47,23 @@ export interface tEndpoint<A extends readonly unknown[], R, U, K extends tUnwrap
 
 /** An answer whose resources are under `data`. */
 export interface tResources {
+  /** The resources Apple answered with. */
   readonly data: readonly unknown[];
 }
 
 /** What an answer holds under `data`, one at a time. */
-export type tItem<R> = R extends { readonly data?: readonly (infer T)[] | undefined } ? T : never;
+export type tItem<R> = R extends {
+  /** The items. */
+  readonly data?: readonly (infer T)[] | undefined;
+}
+  ? T
+  : never;
 
 /** An answer that may be one page of several: Apple documents the collection, and sends `next` when there is more. */
-export type tPaged<R> = R & { readonly next?: string | undefined };
+export type tPaged<R> = R & {
+  /** Where the next page is, when there is more. */
+  readonly next?: string | undefined;
+};
 
 /**
  * How a bound function hands the answer over: the one `resource` it holds, the `resources` it holds, every item
@@ -59,7 +90,8 @@ export type tLater<T> = () => T | Promise<T>;
 /** What a plan gives: the request, a promise of it, or the rest of the plan to run when the request is about to be made. */
 export type tPlanned<R> = tRequestPlan<R> | Promise<tRequestPlan<R>> | tLater<tRequestPlan<R>>;
 
-type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tPlanned<R>;
+/** What a declaration hands `endpoint`: from the client and the arguments of the call, the request to make, or a promise of it, or the rest of the plan. */
+export type tPlan<A extends readonly unknown[], R> = (client: tAppleMusicClient, ...args: A) => tPlanned<R>;
 
 const isWaited = (value: unknown): value is PromiseLike<unknown> => typeof (value as { then?: unknown } | null | undefined)?.then === "function";
 
@@ -162,12 +194,24 @@ function declare<A extends readonly unknown[], R, U, K extends tUnwrap>(builder:
  * and taken then: a mistake the plan throws is thrown from the call. Apple is asked for nothing until a loop
  * starts, and each loop over what the call gave asks afresh. A plan that has to ask the client for something gives
  * the rest of itself as a function, a `tLater`, which is what keeps that asking for the loop as well.
+ *
+ * `written` with a plan whose answer is `void` is for a write whose answer holds nothing, such as an add or a delete:
+ * bound, it resolves to `undefined`, and the write happened.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param unwrap - What the bound form hands over: the `resource`, the `resources`, every item of all its `pages`, what
+ * a write has `written`, or the `answer` as it is.
+ * @param plan - From the client and the arguments of a call, the request to make: `[path, init]`, a promise of it, or
+ * the rest of the plan as a function to call when the request is about to be made. It checks the arguments, and
+ * throws a TypeError for a mistake.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `unwrap` is none of the five kinds, or `plan` is no
+ * function.
  */
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resource", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>>, "resource">;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "resources", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R>[]>, "resources">;
 export function endpoint<A extends readonly unknown[], R extends tPage<unknown>>(fn: string, unwrap: "pages", plan: tPlan<A, R>): tEndpoint<A, R, AsyncIterable<tItem<R>>, "pages">;
 export function endpoint<A extends readonly unknown[], R extends tResources>(fn: string, unwrap: "written", plan: tPlan<A, R>): tEndpoint<A, R, Promise<tItem<R> | undefined>, "written">;
-/** A write whose answer holds nothing, such as an add or a delete: bound, it resolves to `undefined`, and the write happened. */
 export function endpoint<A extends readonly unknown[]>(fn: string, unwrap: "written", plan: tPlan<A, void>): tEndpoint<A, void, Promise<undefined>, "written">;
 export function endpoint<A extends readonly unknown[], R>(fn: string, unwrap: "answer", plan: tPlan<A, R>): tEndpoint<A, R, Promise<R>, "answer">;
 export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unknown>): tEndpoint<unknown[], unknown, unknown> {
@@ -189,6 +233,16 @@ export function endpoint(fn: string, unwrap: tUnwrap, plan: tPlan<unknown[], unk
  * collection that checks its own parts, with `segmentOf`, gets to name the option that was wrong.
  */
 export interface tCollection<C = tNone> {
+  /**
+   * The collection's path for one call. What it throws, the function throws as it is, from the call: a collection
+   * that reads an option should throw a TypeError naming `fn` for one that is not what it should be, as `segmentOf` does.
+   *
+   * @param fn - The name of the function the call was made to, for errors.
+   * @param client - The client the call is made with, for what only it can say, such as the listener's storefront.
+   * @param options - The options the call was given, read as the collection's own; the rest are checked elsewhere.
+   * @returns The path, such as `v1/catalog/us/songs`; a promise of it; or a function that gives either when the
+   * request is about to be made.
+   */
   (fn: string, client: tAppleMusicClient, options: C): string | Promise<string> | tLater<string>;
   /**
    * Whether what is asked of this collection carries the Music User Token. Left out, the client goes by the path,
@@ -214,11 +268,17 @@ export type tEndpointOptions<T, C = tNone, E = tNone> = tReadOptions<T> & C & E;
  */
 export type tAlso<E> = { readonly [K in keyof E]-?: NonNullable<E[K]> extends readonly unknown[] ? "list" : "name" };
 
-/** `also` as a declaration takes it: required when there are options to name, and not to be given when there are none. */
-type tAlsoGiven<E> = [keyof E] extends [never] ? [also?: undefined] : [also: tAlso<E>];
+/**
+ * The `also` argument as a declaration takes it: when `E` names options, one `tAlso<E>` that says what each is, and
+ * when it names none, nothing at all.
+ */
+export type tAlsoGiven<E> = [keyof E] extends [never] ? [also?: undefined] : [also: tAlso<E>];
 
-/** A collection as a declaration takes it. Left to be inferred, the answer's type would be `unknown`, so a declaration that does not say it has nothing it can pass here. */
-type tCollectionGiven<R, C> = [R] extends [never] ? never : tCollection<C>;
+/**
+ * The collection a declaration takes, once it has said `R`, the type of the answer. With `R` left to be inferred it
+ * is `never`: a declaration that does not say what Apple answers has nothing it can pass here, and the types refuse it.
+ */
+export type tCollectionGiven<R, C> = [R] extends [never] ? never : tCollection<C>;
 
 /** Longer than any collection's path, which is a handful of short segments. */
 const MAX_PATH = 256;
@@ -303,6 +363,15 @@ export interface tViewsOption<Views> {
  * not, the client has to say which it is, and may have to ask Apple for the listener's: that is left for when the
  * request is about to be made, so a walk nobody loops over asks for nothing. Either way the storefront is handed
  * over as one segment of a path, checked and encoded, so one from outside cannot move the request to another path.
+ *
+ * @param fn - The name of the function the call was made to, for the error.
+ * @param client - The client the call is made with, asked for its storefront when the call named none.
+ * @param storefront - The storefront the call named, or `undefined` for the client's.
+ * @param finish - What to make of the storefront as one encoded segment, such as the collection's path.
+ * @returns What `finish` gave, when the call named a storefront; otherwise a function that asks the client, checks
+ * its answer and gives what `finish` makes of it, for when the request is about to be made. That function rejects
+ * with what `client.storefront()` rejects with, and with a TypeError when the client's answer is no segment.
+ * @throws TypeError if `storefront` is given and is not one segment of a path, as `segmentOf` holds it to be.
  */
 export function inStorefront<T>(fn: string, client: tAppleMusicClient, storefront: unknown, finish: (storefront: string) => T): T | tLater<T> {
   const checked = (id: unknown) => finish(segmentOf(fn, "storefront", id));
@@ -316,6 +385,16 @@ const pinned = <I extends object>(init: I, user: boolean | undefined): I => (use
 /**
  * A function for the resource with one id in a collection: `GET {collection}/{id}`. `R` is the answer's type and has
  * to be said. `also` names the options of `E`, the ones the function takes beyond everyone's and the collection's.
+ *
+ * The function it gives takes an `id` and `options`, checks the id as one segment of a path and the options as
+ * `tEndpointOptions`, and throws and resolves as `tEndpoint` says. Bound, it hands over the one resource.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param collection - Where the resources are: the path with nothing after it, or how to ask the client for it.
+ * @param also - What each option of `E` is, a `"list"` or a `"name"`; left out when `E` names none.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `collection` is no function, its `user` is given
+ * and is no boolean, or `also` is not an object that says `"list"` or `"name"` for each option.
  */
 export function resourceGetter<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
@@ -352,7 +431,19 @@ function picked<R extends tResources, C extends object, E extends object>(
   });
 }
 
-/** A function for the resources with the ids given: `GET {collection}?ids=`. */
+/**
+ * A function for the resources with the ids given: `GET {collection}?ids=`.
+ *
+ * The function it gives takes `ids` and `options`, checks the ids as a list of 1 to 300 strings, as `listOf` does, and
+ * the options as `tEndpointOptions`, and throws and resolves as `tEndpoint` says. Bound, it hands over the list of resources.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param collection - Where the resources are: the path with nothing after it, or how to ask the client for it.
+ * @param also - What each option of `E` is, a `"list"` or a `"name"`; left out when `E` names none.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `collection` is no function, its `user` is given
+ * and is no boolean, or `also` is not an object that says `"list"` or `"name"` for each option.
+ */
 export function resourcesGetter<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
   collection: tCollectionGiven<R, C>,
@@ -365,6 +456,19 @@ export function resourcesGetter<R extends tResources = never, C extends object =
  * A function for the resources a filter picks out of a collection: `GET {collection}?filter[{filter}]=`. `filter`
  * is the filter's name as Apple writes it, such as `isrc`, and the function takes the values to look for, which a
  * mistake in them calls `values`, as the function's own signature does.
+ *
+ * The function it gives takes `values` and `options`, checks the values as a list of 1 to 300 strings, as `listOf`
+ * does, and the options as `tEndpointOptions`, and throws and resolves as `tEndpoint` says. Bound, it hands over the
+ * list of resources.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param filter - The filter's name as Apple writes it, lowercase words with hyphens between, such as `isrc`.
+ * @param collection - Where the resources are: the path with nothing after it, or how to ask the client for it.
+ * @param also - What each option of `E` is, a `"list"` or a `"name"`; left out when `E` names none.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `filter` is not lowercase words with hyphens
+ * between of at most 64 characters, `collection` is no function, its `user` is given and is no boolean, or `also` is
+ * not an object that says `"list"` or `"name"` for each option.
  */
 export function resourcesFinder<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
@@ -377,7 +481,20 @@ export function resourcesFinder<R extends tResources = never, C extends object =
   return picked("resourcesFinder", fn, `filter[${filter}]`, "values", collection, (also as readonly unknown[])[0]);
 }
 
-/** A function for a whole collection, a page at a time: `GET {collection}`. */
+/**
+ * A function for a whole collection, a page at a time: `GET {collection}`.
+ *
+ * The function it gives takes `options` alone, checks them as `tEndpointOptions` with `maxPages`, and throws and
+ * resolves as `tEndpoint` says: called with a client, to the one page Apple answers with. Bound, it walks every page
+ * and hands over each item, as `tEndpoint` says of `pages`.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param collection - Where the resources are: the path with nothing after it, or how to ask the client for it.
+ * @param also - What each option of `E` is, a `"list"` or a `"name"`; left out when `E` names none.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `collection` is no function, its `user` is given
+ * and is no boolean, or `also` is not an object that says `"list"` or `"name"` for each option.
+ */
 export function resourceLister<R extends tResources = never, C extends object = tNone, E extends object = tNone>(
   fn: string,
   collection: tCollectionGiven<R, C>,
@@ -396,7 +513,10 @@ export function resourceLister<R extends tResources = never, C extends object = 
 export type tRelated<Rels, K extends keyof Rels> = tItem<NonNullable<Rels[K]>>;
 
 /** What Apple answers when a relationship is asked for by name: a page of what it holds. */
-export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipResponse, "data"> & { data: tRelated<Rels, K>[] };
+export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipResponse, "data"> & {
+  /** The resources the relationship holds, of the kind the name asked for. */
+  data: tRelated<Rels, K>[];
+};
 
 /**
  * A function for a resource's relationships: `GET {collection}/{id}/{name}`. `Rels` is the resource's relationships
@@ -404,14 +524,47 @@ export type tRelationshipPage<Rels, K extends keyof Rels> = Omit<tRelationshipRe
  * and the name asked for decides what comes back, and so what a `schema` for it has to be a schema of.
  */
 export interface tRelationshipEndpoint<Rels, C = tNone> {
+  /**
+   * One page of the relationship, as Apple answers it. `id` and `name` are each checked as one segment of a path, and
+   * `options` as `tEndpointOptions`, before Apple is asked.
+   *
+   * @param client - The client to ask with.
+   * @param id - The resource's id.
+   * @param name - The relationship's name, one of the keys of `Rels`, such as `"albums"`.
+   * @param options - What everyone's options are, the collection's, and `maxPages`, which this call has no use for.
+   * @returns What Apple answered: the first page of the relationship, with `next` when there is more.
+   * @throws TypeError if `client` is no client, `id` or `name` is not one segment of a path, an option is not what it
+   * should be, or the collection's path could not be asked for as written; before this endpoint is asked.
+   * @throws AppleMusicError as `client.request` rejects with, `_tag` says which; or as `client.storefront()` rejects
+   * with, where the collection asks it.
+   * @throws The reason `options.signal` aborted with, when it does.
+   * @throws Whatever a token provider, store, schema, hook or rate limiter throws, as `client.request` passes it on.
+   */
   <K extends keyof Rels & string>(client: tAppleMusicClient, id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions): Promise<tRelationshipPage<Rels, K>>;
+  /**
+   * The same call with the client fixed, walking every page: the resources the relationship holds, one at a time,
+   * for as many pages as `maxPages` allows. Binding checks the client; the arguments are checked as the bound
+   * function is called, and a mistake is thrown from the call. Apple is asked for nothing until a loop starts, and
+   * the loop throws what `client.paginate` does.
+   */
   readonly bound: (
     client: tAppleMusicClient,
   ) => <K extends keyof Rels & string>(id: string, name: K, options?: tEndpointOptions<tRelationshipPage<Rels, K>, C> & tWalkOptions) => AsyncIterable<tRelated<Rels, K>>;
+  /** Always `"pages"`: the bound form walks them. */
   readonly unwrap: "pages";
 }
 
-/** The names are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there is such a relationship. */
+/**
+ * A function for a resource's relationships, each a collection of its own: `GET {collection}/{id}/{name}`. The names
+ * are held to `Rels` by the types alone: at runtime a name is any one segment of a path, and Apple says whether there
+ * is such a relationship. The function it gives is a `tRelationshipEndpoint`, and throws and resolves as that says.
+ *
+ * @param fn - The function's name, as its errors say it.
+ * @param collection - Where the resources are: the path with nothing after it, or how to ask the client for it.
+ * @returns The function, frozen, with `bound` and `unwrap` on it.
+ * @throws TypeError if `fn` is not a string with something in it, `collection` is no function, or its `user` is
+ * given and is no boolean.
+ */
 export function relationshipGetter<Rels = never, C extends object = tNone>(fn: string, collection: tCollectionGiven<Rels, C>): tRelationshipEndpoint<Rels, C> {
   named("relationshipGetter", fn);
   const [locate, , user] = given<C>("relationshipGetter", collection, undefined);
@@ -426,14 +579,22 @@ export function relationshipGetter<Rels = never, C extends object = tNone>(fn: s
 }
 
 /** What makes a value a function for an endpoint, to the types as to the code below: a function, with a `bound` function on it. */
-type tBindable = ((...args: never[]) => unknown) & { readonly bound: (client: tAppleMusicClient) => unknown };
+export type tBindable = ((...args: never[]) => unknown) & {
+  /** The function with a client fixed. */
+  readonly bound: (client: tAppleMusicClient) => unknown;
+};
 
 /**
  * Each function of `F` bound to one client, under its own name. Whatever in `F` is not a function for an endpoint
  * is left out, and one that `F` may or may not hold is one the namespace may or may not hold.
  */
 export type tEndpointNamespace<F> = {
-  readonly [K in keyof F as NonNullable<F[K]> extends tBindable ? K : never]: NonNullable<F[K]> extends { readonly bound: (client: tAppleMusicClient) => infer B } ? B : never;
+  readonly [K in keyof F as NonNullable<F[K]> extends tBindable ? K : never]: NonNullable<F[K]> extends {
+    /** The function with a client fixed. */
+    readonly bound: (client: tAppleMusicClient) => infer B;
+  }
+    ? B
+    : never;
 };
 
 const isEndpoint = (value: unknown): value is tBindable => typeof value === "function" && typeof (value as { bound?: unknown }).bound === "function";
@@ -442,6 +603,12 @@ const isEndpoint = (value: unknown): value is tBindable => typeof value === "fun
  * Binds every function in `endpoints` to `client`: `{ getSong, getSongs }` becomes an object whose `getSong(id)`
  * and `getSongs(ids)` need no client and hand over what the answer holds. `endpoints` is an object of functions
  * made here, such as a module of them; it is read once, and the namespace it gives cannot be changed.
+ *
+ * @param fn - The name of the function that is binding, for the errors, such as `"catalog"`.
+ * @param client - The client to bind to, from `createClient` or anything with `request`, `paginate` and `storefront`.
+ * @param endpoints - The functions to bind, by name; whatever is no function with a `bound` on it is left out.
+ * @returns A frozen object with no prototype, holding each bound function under its name.
+ * @throws TypeError if `client` is no client, or `endpoints` is no object.
  */
 export function endpointNamespace<F extends object>(fn: string, client: tAppleMusicClient, endpoints: F): tEndpointNamespace<F> {
   const music = clientOf(fn, client, METHODS);

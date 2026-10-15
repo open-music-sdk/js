@@ -11,8 +11,8 @@ pnpm add @open-music-sdk/browser
 ```
 
 **Runs in a page.** The developer token comes from an endpoint your server hosts:
-[`tokenEndpoint`](../server) of `@open-music-sdk/server` is that endpoint. For a React app, use
-[`@open-music-sdk/react`](../react), which is this package with a provider and hooks.
+[`tokenEndpoint`](../server/README.md) of `@open-music-sdk/server` is that endpoint. For a React app, use
+[`@open-music-sdk/react`](../react/README.md), which is this package with a provider and hooks.
 
 ```ts
 import { createBrowserClient, createConnect, previewPlayer } from "@open-music-sdk/browser";
@@ -66,12 +66,12 @@ playButton.onclick = () => void player.play().catch(showWhyNot); // sound starts
 ## The client
 
 `createBrowserClient` takes where the token endpoint is, and every option of
-[`createClient`](../../packages/core) but the developer token, which the endpoint provides:
+[`createClient`](../../packages/core/README.md) but the developer token, which the endpoint provides:
 
 | Option | |
 | --- | --- |
 | `tokenUrl` | Where `tokenEndpoint` is mounted. Required. A relative URL resolves against the page as it is when the client is made, and stays there: a route the page moves to later, a `<base>` put into it later, or a `URL` changed later moves nothing. |
-| `endpoint` | The endpoint's own options, as [`developerTokenFetcher`](../../packages/developer-token) takes them: a `fetch` for it, with the credentials or headers it needs; `timeoutMs`; `refreshAheadSeconds`. |
+| `endpoint` | The endpoint's own options, as [`developerTokenFetcher`](../../packages/developer-token/README.md) takes them: a `fetch` for it, with the credentials or headers it needs; `timeoutMs`; `refreshAheadSeconds`. |
 | `userToken`, `userTokenStore` | One listener's token, or a store `forUser(userId)` reads. A page usually has neither, and binds a client with `as(token)` once the listener signed in. |
 | `storefront`, `fetch`, `retry`, `rateLimit`, `onRequest`, `onResponse` | As `createClient` takes them. |
 
@@ -79,9 +79,9 @@ The client's `fetch` is for Apple, and the endpoint's is for the endpoint: a hea
 never reaches the other.
 
 What it gives is core's client, `request`, `paginate`, `storefront`, `as` and `forUser`, with three
-namespaces on it: `catalog` is [`catalog(client)`](../../clients/client-catalog), `user` is
-[`user(client)`](../../clients/client-user), and `playlists` is
-[`playlists(client)`](../../lib/lib-playlists), each made for this client; and `developerToken`, the
+namespaces on it: `catalog` is [`catalog(client)`](../../clients/client-catalog/README.md), `user` is
+[`user(client)`](../../clients/client-user/README.md), and `playlists` is
+[`playlists(client)`](../../lib/lib-playlists/README.md), each made for this client; and `developerToken`, the
 provider the endpoint is fetched through, which `createConnect` takes. `as(token)` and
 `forUser(userId)` give a listener's client with all of that made for it. The object is frozen,
 inherits nothing, and each of its functions can be handed on by itself.
@@ -170,20 +170,20 @@ enough:
 
 | From | Names |
 | --- | --- |
-| [`core`](../../packages/core) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with. |
-| [`developer-token`](../../packages/developer-token) | `developerTokenFetcher`, from the entry with no signing code. Not the minter. |
-| [`user-token`](../../packages/user-token) | `validateUserToken`, for a page that holds the token itself. Not the stores and the intake, which are a server's. |
-| [`util-artwork`](../../packages/util-artwork) | `artworkImage`, `artworkUrl`, `artworkSrcSet` |
-| [`client-catalog`](../../clients/client-catalog), [`client-user`](../../clients/client-user) | Every function, and `catalog` and `user` |
-| [`lib-playlists`](../../lib/lib-playlists) | `playlists` |
-| [`lib-preview-player`](../../lib/lib-preview-player) | `previewPlayer` |
-| [`validate`](../../packages/validate) | Every validator, under `schemas`: `schemas.song`, `schemas.libraryPlaylist`, to pass as `schema` |
-| [`types`](../../packages/types) | Every generated type: `tSong`, `tAlbum`, `tLibraryPlaylist` |
+| [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types. Not `createClient`, nor the builders and checks the clients are declared with. |
+| [`developer-token`](../../packages/developer-token/README.md) | `developerTokenFetcher`, from the entry with no signing code. Not the minter. |
+| [`user-token`](../../packages/user-token/README.md) | `validateUserToken`, for a page that holds the token itself. Not the stores and the intake, which are a server's. |
+| [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet`, `FORMATS` |
+| [`client-catalog`](../../clients/client-catalog/README.md), [`client-user`](../../clients/client-user/README.md) | Every function, and `catalog` and `user` |
+| [`lib-playlists`](../../lib/lib-playlists/README.md) | `playlists` |
+| [`lib-preview-player`](../../lib/lib-preview-player/README.md) | `previewPlayer` |
+| [`validate`](../../packages/validate/README.md) | Every validator, under `schemas`: `schemas.song`, `schemas.libraryPlaylist`, to pass as `schema` |
+| [`types`](../../packages/types/README.md) | Every generated type: `tSong`, `tAlbum`, `tLibraryPlaylist` |
 
 A bundle made from this package holds no signing code, no key, and no reach into the page's storage; a
 test holds it to that.
 
 ## Not here
 
-The private key, and the endpoint that hands a page its token: [`@open-music-sdk/server`](../server).
-A provider and hooks for React: [`@open-music-sdk/react`](../react).
+The private key, and the endpoint that hands a page its token: [`@open-music-sdk/server`](../server/README.md).
+A provider and hooks for React: [`@open-music-sdk/react`](../react/README.md).

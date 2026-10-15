@@ -10,6 +10,7 @@ import { librarySong } from "./library-song";
 import { musicVideo } from "./music-video";
 import { station } from "./station";
 
+/** Validates a `tSong`: a resource object that represents a song. */
 export const song: r.tSchema<t.tSong> = r.object<t.tSong>(
   {
     id: r.string,
@@ -21,6 +22,7 @@ export const song: r.tSchema<t.tSong> = r.object<t.tSong>(
   ["id", "type", "href"],
 );
 
+/** Validates a `tSongAttributes`: the attributes for a song resource. */
 export const songAttributes: r.tSchema<t.tSongAttributes> = r.object<t.tSongAttributes>(
   {
     albumName: r.string,
@@ -53,6 +55,7 @@ export const songAttributes: r.tSchema<t.tSongAttributes> = r.object<t.tSongAttr
   ["albumName", "artistName", "artwork", "durationInMillis", "genreNames", "hasLyrics", "isAppleDigitalMaster", "name", "previews", "url"],
 );
 
+/** Validates a `tSongRelationships`: the relationships for a song resource. */
 export const songRelationships: r.tSchema<t.tSongRelationships> = r.object<t.tSongRelationships>(
   {
     albums: r.lazy(() => songRelationshipsSongAlbumsRelationship),
@@ -66,6 +69,7 @@ export const songRelationships: r.tSchema<t.tSongRelationships> = r.object<t.tSo
   [],
 );
 
+/** Validates a `tSongRelationshipsSongAlbumsRelationship`: a relationship from the song to its albums. */
 export const songRelationshipsSongAlbumsRelationship: r.tSchema<t.tSongRelationshipsSongAlbumsRelationship> = r.object<t.tSongRelationshipsSongAlbumsRelationship>(
   {
     href: r.string,
@@ -75,6 +79,7 @@ export const songRelationshipsSongAlbumsRelationship: r.tSchema<t.tSongRelations
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongArtistsRelationship`: a relationship from the song to its artists. */
 export const songRelationshipsSongArtistsRelationship: r.tSchema<t.tSongRelationshipsSongArtistsRelationship> = r.object<t.tSongRelationshipsSongArtistsRelationship>(
   {
     href: r.string,
@@ -84,6 +89,7 @@ export const songRelationshipsSongArtistsRelationship: r.tSchema<t.tSongRelation
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongComposersRelationship`: a relationship from the song to its composers. */
 export const songRelationshipsSongComposersRelationship: r.tSchema<t.tSongRelationshipsSongComposersRelationship> = r.object<t.tSongRelationshipsSongComposersRelationship>(
   {
     href: r.string,
@@ -93,6 +99,7 @@ export const songRelationshipsSongComposersRelationship: r.tSchema<t.tSongRelati
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongGenresRelationship`: a relationship from the song to its genres. */
 export const songRelationshipsSongGenresRelationship: r.tSchema<t.tSongRelationshipsSongGenresRelationship> = r.object<t.tSongRelationshipsSongGenresRelationship>(
   {
     href: r.string,
@@ -102,6 +109,7 @@ export const songRelationshipsSongGenresRelationship: r.tSchema<t.tSongRelations
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongLibraryRelationship`: a relationship from the song to its library. */
 export const songRelationshipsSongLibraryRelationship: r.tSchema<t.tSongRelationshipsSongLibraryRelationship> = r.object<t.tSongRelationshipsSongLibraryRelationship>(
   {
     href: r.string,
@@ -111,6 +119,7 @@ export const songRelationshipsSongLibraryRelationship: r.tSchema<t.tSongRelation
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongMusicVideosRelationship`: a relationship from the song to its music videos. */
 export const songRelationshipsSongMusicVideosRelationship: r.tSchema<t.tSongRelationshipsSongMusicVideosRelationship> = r.object<t.tSongRelationshipsSongMusicVideosRelationship>(
   {
     href: r.string,
@@ -120,6 +129,7 @@ export const songRelationshipsSongMusicVideosRelationship: r.tSchema<t.tSongRela
   ["data"],
 );
 
+/** Validates a `tSongRelationshipsSongStationRelationship`: a relationship from the song to its station. */
 export const songRelationshipsSongStationRelationship: r.tSchema<t.tSongRelationshipsSongStationRelationship> = r.object<t.tSongRelationshipsSongStationRelationship>(
   {
     href: r.string,
@@ -129,6 +139,7 @@ export const songRelationshipsSongStationRelationship: r.tSchema<t.tSongRelation
   ["data"],
 );
 
+/** Validates a `tSongsResponse`: the response to a songs request. */
 export const songsResponse: r.tSchema<t.tSongsResponse> = r.object<t.tSongsResponse>(
   {
     data: r.array(r.lazy(() => song)),

@@ -7,6 +7,7 @@ import { libraryAlbum } from "./library-album";
 import { libraryArtist } from "./library-artist";
 import { musicVideo } from "./music-video";
 
+/** Validates a `tLibraryMusicVideo`: a resource object that represents a library music video. */
 export const libraryMusicVideo: r.tSchema<t.tLibraryMusicVideo> = r.object<t.tLibraryMusicVideo>(
   {
     id: r.string,
@@ -18,6 +19,7 @@ export const libraryMusicVideo: r.tSchema<t.tLibraryMusicVideo> = r.object<t.tLi
   ["id", "type", "href"],
 );
 
+/** Validates a `tLibraryMusicVideoAttributes`: the attributes for the library music videos resource type. */
 export const libraryMusicVideoAttributes: r.tSchema<t.tLibraryMusicVideoAttributes> = r.object<t.tLibraryMusicVideoAttributes>(
   {
     albumName: r.string,
@@ -35,6 +37,7 @@ export const libraryMusicVideoAttributes: r.tSchema<t.tLibraryMusicVideoAttribut
   ["artistName", "artwork", "durationInMillis", "genreNames", "name"],
 );
 
+/** Validates a `tLibraryMusicVideoRelationships`: the relationships from library music videos to other resources. */
 export const libraryMusicVideoRelationships: r.tSchema<t.tLibraryMusicVideoRelationships> = r.object<t.tLibraryMusicVideoRelationships>(
   {
     albums: r.lazy(() => libraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship),
@@ -44,6 +47,7 @@ export const libraryMusicVideoRelationships: r.tSchema<t.tLibraryMusicVideoRelat
   [],
 );
 
+/** Validates a `tLibraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship`: a relationship from the library music video to its albums in the library. */
 export const libraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship: r.tSchema<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship> = r.object<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship>(
   {
     href: r.string,
@@ -53,6 +57,7 @@ export const libraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship: 
   ["data"],
 );
 
+/** Validates a `tLibraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship`: a relationship from the library music video to its artists in the library. */
 export const libraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship: r.tSchema<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship> = r.object<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship>(
   {
     href: r.string,
@@ -62,6 +67,7 @@ export const libraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship:
   ["data"],
 );
 
+/** Validates a `tLibraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship`: a relationship from the library music video to its associated catalog content. */
 export const libraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship: r.tSchema<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship> = r.object<t.tLibraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship>(
   {
     href: r.string,
@@ -71,6 +77,7 @@ export const libraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship:
   ["data"],
 );
 
+/** Validates a `tLibraryMusicVideosResponse`: the response to a library music videos request. */
 export const libraryMusicVideosResponse: r.tSchema<t.tLibraryMusicVideosResponse> = r.object<t.tLibraryMusicVideosResponse>(
   {
     data: r.array(r.lazy(() => libraryMusicVideo)),
