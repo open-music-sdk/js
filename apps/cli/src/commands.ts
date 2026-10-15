@@ -39,6 +39,24 @@ const paths = (env: tEnv) => {
   return { config: join(dir, CONFIG_FILE), tokens: join(dir, TOKEN_FILE) };
 };
 
+/** Text from Apple or the network, without the control characters a terminal would act on rather than show. */
+export const printable = (text: string): string =>
+  Array.from(text)
+    .filter((c) => {
+      const code = c.codePointAt(0) ?? 0;
+      return code > 0x1f && (code < 0x7f || code > 0x9f);
+    })
+    .join("");
+
+/** The system's own code for why a request failed, such as `ENOTFOUND` or a certificate's, from down the error's causes. */
+function codeOf(e: unknown): string | undefined {
+  for (let cause = (e as { cause?: unknown }).cause; typeof cause === "object" && cause !== null; cause = (cause as { cause?: unknown }).cause) {
+    const { code } = cause as { code?: unknown };
+    if (typeof code === "string") return printable(code);
+  }
+  return undefined;
+}
+
 /** What went wrong in asking Apple, worded for the person running the CLI; undefined for anything else. */
 export function describe(e: unknown): string | undefined {
   if (e instanceof DOMException && e.name === "TimeoutError") return `Apple did not answer within ${String(TIMEOUT_MS / 1000)} seconds. Check your connection and try again.`;
@@ -50,10 +68,12 @@ export function describe(e: unknown): string | undefined {
       return `Apple refused the Music User Token: it has expired or been revoked, or the account has no Apple Music subscription. Run '${NAME} login' for a new one.`;
     case "RateLimited":
       return "Apple is limiting requests for this key. Wait a minute and try again.";
-    case "NetworkError":
-      return `Apple could not be reached: ${e.message}`;
+    case "NetworkError": {
+      const code = codeOf(e);
+      return `Apple could not be reached: ${printable(e.message)}${code === undefined ? "" : ` (${code})`}`;
+    }
     default:
-      return `Apple answered${e.status === undefined ? "" : ` ${String(e.status)}`}: ${e.message}`;
+      return `Apple answered${e.status === undefined ? "" : ` ${String(e.status)}`}: ${printable(e.message)}`;
   }
 }
 
@@ -140,7 +160,7 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
     process.off("SIGINT", interrupt);
   }
   await saveKey(files.config, key);
-  say(`${paint(ctx, "green", "Signed in", process.stderr)}${storefront === undefined ? "" : `, storefront ${storefront}`}. The token is kept in ${files.tokens}, readable by you alone.`);
+  say(`${paint(ctx, "green", "Signed in", process.stderr)}${storefront === undefined ? "" : `, storefront ${printable(storefront)}`}. The token is kept in ${files.tokens}, readable by you alone.`);
   say(`Next: '${NAME} token' prints it, and '${NAME} doctor' asks Apple whether it still works.`);
   return 0;
 }
@@ -172,7 +192,7 @@ export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
   }
   try {
     const storefront = await validateUserToken(music, token, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-    pass(`Music User Token: Apple takes it, for storefront ${storefront}.`);
+    pass(`Music User Token: Apple takes it, for storefront ${printable(storefront)}.`);
     return 0;
   } catch (e) {
     const why = describe(e);

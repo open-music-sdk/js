@@ -15,7 +15,11 @@ const realFetch = globalThis.fetch;
 
 /** How the fake Apple answers each path, with a status or `HANG` for no answer until the request is aborted, and every request it was asked. */
 const HANG = 0;
+/** A fetch that fails as undici does when the name does not resolve. */
+const UNREACHABLE = -1;
 let apple: Record<string, number> = {};
+/** The storefront the fake Apple names. */
+let storefrontId = "gb";
 let asked: Request[] = [];
 const responses: Response[] = [];
 
@@ -29,6 +33,7 @@ beforeEach(async () => {
   keyPath = join(dir, `AuthKey_${KEY_ID}.p8`);
   await writeFile(keyPath, PEM);
   apple = { "/v1/test": 200, "/v1/me/storefront": 200 };
+  storefrontId = "gb";
   asked = [];
   stdout = "";
   stderr = "";
@@ -45,6 +50,7 @@ beforeEach(async () => {
     if (url.origin !== "https://api.music.apple.com") return realFetch(input, init);
     asked.push(req);
     const status = apple[url.pathname] ?? 404;
+    if (status === UNREACHABLE) return Promise.reject(new TypeError("fetch failed", { cause: Object.assign(new Error("getaddrinfo ENOTFOUND api.music.apple.com"), { code: "ENOTFOUND" }) }));
     if (status === HANG)
       return new Promise((_resolve, reject) => {
         req.signal.addEventListener("abort", () => {
@@ -56,7 +62,7 @@ beforeEach(async () => {
         ? Response.json({ errors: [{ status: String(status), title: "Refused", detail: "apple-detail" }] }, { status })
         : url.pathname === "/v1/test"
           ? new Response(null, { status: 200 })
-          : Response.json({ data: [{ id: "gb", type: "storefronts" }] });
+          : Response.json({ data: [{ id: storefrontId, type: "storefronts" }] });
     responses.push(res);
     return Promise.resolve(res);
   });
@@ -236,6 +242,22 @@ describe("doctor: the key, then the token, asked of Apple", () => {
     expect(stdout).toMatch(/✓ Key/);
     expect(stdout).toMatch(/✗ Music User Token: Apple refused the Music User Token.*open-music-sdk login/);
     expect(stdout + stderr).not.toContain("apple-detail");
+  });
+
+  test("Apple out of reach is named by the system's own reason, not only fetch's", async () => {
+    apple["/v1/test"] = UNREACHABLE;
+    expect(await main(["doctor", "--key", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stdout).toMatch(/✗ Key: Apple could not be reached: .*\(ENOTFOUND\)/);
+  });
+
+  test("what Apple sends reaches the terminal without the control characters a terminal would act on", async () => {
+    await kept();
+    const escape = String.fromCharCode(27);
+    storefrontId = `gb${escape}[2J${escape}]0;owned${String.fromCharCode(7)}`;
+    expect(await main(["doctor", "--key", keyPath, "--team-id", TEAM])).toBe(0);
+    expect(stdout).toContain("storefront gb[2J]0;owned.");
+    expect(stdout).not.toContain(escape);
+    expect(stdout).not.toContain(String.fromCharCode(7));
   });
 
   test("no token kept fails, and says how to get one", async () => {
