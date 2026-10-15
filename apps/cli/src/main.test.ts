@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -245,6 +245,23 @@ describe("doctor: the key, then the token, asked of Apple", () => {
 });
 
 describe("login: Apple's sign-in on a page served on localhost", () => {
+  test("a token file the store cannot write over fails before Apple is asked or a page is served, not after the sign-in", async () => {
+    await mkdir(join(dir, "open-music-sdk"), { recursive: true });
+    await writeFile(tokenFile(), "not json");
+    expect(await main(["login", "--no-browser", "--key", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stderr).toContain(tokenFile());
+    expect(stderr).not.toContain("http://localhost");
+    expect(asked).toEqual([]);
+  });
+
+  test("a kept config file that cannot be read stands in the way of no command whose flags say it all", async () => {
+    await mkdir(join(dir, "open-music-sdk"), { recursive: true });
+    await writeFile(configFile(), "not json");
+    expect(await main(["token", "--developer", "--key", keyPath, "--team-id", TEAM])).toBe(0);
+    expect(await main(["token", "--developer"])).toBe(1);
+    expect(stderr).toContain(configFile());
+  });
+
   test("a key Apple refuses fails before any page is served", async () => {
     apple["/v1/test"] = 401;
     expect(await main(["login", "--no-browser", "--key", keyPath, "--team-id", TEAM])).toBe(1);

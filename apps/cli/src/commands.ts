@@ -101,7 +101,10 @@ async function waitFor(stored: Promise<void>): Promise<void> {
 export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   const port = portOf(flags.port);
   const files = paths(ctx.env);
-  const key = await loadKey(flags, ctx.env, await readSavedKey(files.config));
+  const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
+  // Read once before the sign-in, so a token file the store cannot write over is found now, not after Apple's yes.
+  const store = new FileUserTokenStore(files.tokens);
+  await store.get(USER_ID);
   // The intake resolves to nothing; the storefront it was told is read off the answer it got.
   let storefront: string | undefined;
   const music = serverClient(key, (_res, req, { body, error }) => {
@@ -112,7 +115,6 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
 
   say(`Asking Apple about key ${key.keyId} of team ${key.teamId}…`);
   await askKey(music);
-  const store = new FileUserTokenStore(files.tokens);
   const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url), timeoutMs: TIMEOUT_MS });
   try {
     say(`Sign in at Apple on this page:\n\n  ${loopback.url}\n`);
@@ -134,7 +136,7 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
 /** Asks Apple whether the key works, and then whether the kept token does, which tells the two causes of a 401 apart. */
 export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
   const files = paths(ctx.env);
-  const key = await loadKey(flags, ctx.env, await readSavedKey(files.config));
+  const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
   const music = serverClient(key);
   const pass = (line: string) => out(`${paint(ctx, "green", "✓", process.stdout)} ${line}`);
   const fail = (line: string) => out(`${paint(ctx, "red", "✗", process.stdout)} ${line}`);
@@ -172,7 +174,7 @@ export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
 export async function token(flags: tFlags, ctx: tContext): Promise<number> {
   const files = paths(ctx.env);
   if (flags.developer === true) {
-    const key = await loadKey(flags, ctx.env, await readSavedKey(files.config));
+    const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
     out(await mintDeveloperToken({ pem: key.pem, teamId: key.teamId, keyId: key.keyId }));
     return 0;
   }

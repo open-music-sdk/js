@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { CliError, FileUserTokenStore, configDir, loadKey, readSavedKey, saveKey, type tKey } from "./files";
+import { CliError, FileUserTokenStore, configDir, loadKey, readSavedKey, saveKey, type tKey, type tSavedKey } from "./files";
 
 /* eslint-disable @typescript-eslint/naming-convention -- environment variables are named as the system names them */
 
@@ -15,6 +15,9 @@ const pemOf = (options: Parameters<typeof generateKeyPairSync>[1]) => {
   return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 };
 const PEM = pemOf({ namedCurve: "P-256" });
+/** What the last login kept, as loadKey reads it: `none` for nothing kept. */
+const of = (saved: tSavedKey) => () => Promise.resolve(saved);
+const none = of({});
 
 let dir: string;
 beforeEach(async () => {
@@ -152,6 +155,12 @@ describe("saveKey and readSavedKey: the key's path and ids, never its contents",
     expect(written).not.toContain(PEM.split("\n")[1]);
   });
 
+  test("a file an editor saved with a byte order mark is read as the JSON it is", async () => {
+    const path = join(dir, "config.json");
+    await writeFile(path, String.fromCharCode(0xfeff) + JSON.stringify({ keyPath: key.keyPath, teamId: TEAM, keyId: KEY_ID }));
+    expect(await readSavedKey(path)).toEqual({ keyPath: key.keyPath, teamId: TEAM, keyId: KEY_ID });
+  });
+
   test("nothing saved is nothing, and a field that is no string is not taken", async () => {
     expect(await readSavedKey(join(dir, "none.json"))).toEqual({ keyPath: undefined, teamId: undefined, keyId: undefined });
     const path = join(dir, "config.json");
@@ -168,7 +177,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
   });
 
   test("from the flags, with the key ID read from the file's name, and the path made absolute", async () => {
-    const key = await loadKey({ key: keyPath, "team-id": TEAM }, {}, {});
+    const key = await loadKey({ key: keyPath, "team-id": TEAM }, {}, none);
     expect(key).toEqual({ pem: PEM, teamId: TEAM, keyId: KEY_ID, keyPath: resolve(keyPath) });
   });
 
@@ -177,31 +186,38 @@ describe("loadKey: from the flags, else the environment, else the last login", (
     await writeFile(other, PEM);
     const env = { APPLE_MUSIC_KEY_PATH: other, APPLE_MUSIC_TEAM_ID: "ENV0000000", APPLE_MUSIC_KEY_ID: "ENVKEY0000" };
     const saved = { keyPath: "/saved.p8", teamId: "SAVED00000", keyId: "SAVEDKEY00" };
-    expect(await loadKey({ key: keyPath, "team-id": TEAM, "key-id": "FLAGKEY000" }, env, saved)).toMatchObject({ keyPath: resolve(keyPath), teamId: TEAM, keyId: "FLAGKEY000" });
-    expect(await loadKey({}, env, saved)).toMatchObject({ keyPath: resolve(other), teamId: "ENV0000000", keyId: "ENVKEY0000" });
-    expect(await loadKey({}, {}, { ...saved, keyPath })).toMatchObject({ keyPath: resolve(keyPath), teamId: "SAVED00000", keyId: KEY_ID });
+    expect(await loadKey({ key: keyPath, "team-id": TEAM, "key-id": "FLAGKEY000" }, env, of(saved))).toMatchObject({ keyPath: resolve(keyPath), teamId: TEAM, keyId: "FLAGKEY000" });
+    expect(await loadKey({}, env, of(saved))).toMatchObject({ keyPath: resolve(other), teamId: "ENV0000000", keyId: "ENVKEY0000" });
+    expect(await loadKey({}, {}, of({ ...saved, keyPath }))).toMatchObject({ keyPath: resolve(keyPath), teamId: "SAVED00000", keyId: KEY_ID });
   });
 
   test("the key ID in the file's name wins over a saved one, which may be another key's", async () => {
-    expect(await loadKey({ key: keyPath }, {}, { teamId: TEAM, keyId: "OLDKEY0000" })).toMatchObject({ keyId: KEY_ID });
+    expect(await loadKey({ key: keyPath }, {}, of({ teamId: TEAM, keyId: "OLDKEY0000" }))).toMatchObject({ keyId: KEY_ID });
   });
 
   test("a saved key ID serves a file whose name does not carry one", async () => {
     const renamed = join(dir, "musickit.p8");
     await writeFile(renamed, PEM);
-    expect(await loadKey({ key: renamed }, {}, { teamId: TEAM, keyId: KEY_ID })).toMatchObject({ keyId: KEY_ID });
+    expect(await loadKey({ key: renamed }, {}, of({ teamId: TEAM, keyId: KEY_ID }))).toMatchObject({ keyId: KEY_ID });
+  });
+
+  test("what the last login kept is read only when the flags and the environment leave something out", async () => {
+    const unreadable = () => Promise.reject(new CliError("config.json is not what the CLI writes"));
+    expect(await loadKey({ key: keyPath, "team-id": TEAM }, {}, unreadable)).toMatchObject({ keyId: KEY_ID });
+    expect(await loadKey({}, { APPLE_MUSIC_KEY_PATH: keyPath, APPLE_MUSIC_TEAM_ID: TEAM }, unreadable)).toMatchObject({ keyId: KEY_ID });
+    await expect(loadKey({ key: keyPath }, {}, unreadable)).rejects.toThrow("config.json is not what the CLI writes");
   });
 
   test("a variable set to nothing is taken as not set", async () => {
-    expect(await loadKey({}, { APPLE_MUSIC_KEY_PATH: "", APPLE_MUSIC_TEAM_ID: "", APPLE_MUSIC_KEY_ID: "" }, { keyPath, teamId: TEAM })).toMatchObject({ keyId: KEY_ID, teamId: TEAM });
+    expect(await loadKey({}, { APPLE_MUSIC_KEY_PATH: "", APPLE_MUSIC_TEAM_ID: "", APPLE_MUSIC_KEY_ID: "" }, of({ keyPath, teamId: TEAM }))).toMatchObject({ keyId: KEY_ID, teamId: TEAM });
   });
 
   test("each missing piece is a mistake in how the CLI was run, named with where it can come from", async () => {
-    expect(await thrown(() => loadKey({}, {}, {}))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--key.*APPLE_MUSIC_KEY_PATH/) as unknown });
-    expect(await thrown(() => loadKey({ key: keyPath }, {}, {}))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--team-id.*APPLE_MUSIC_TEAM_ID/) as unknown });
+    expect(await thrown(() => loadKey({}, {}, none))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--key.*APPLE_MUSIC_KEY_PATH/) as unknown });
+    expect(await thrown(() => loadKey({ key: keyPath }, {}, none))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--team-id.*APPLE_MUSIC_TEAM_ID/) as unknown });
     const renamed = join(dir, "musickit.p8");
     await writeFile(renamed, PEM);
-    expect(await thrown(() => loadKey({ key: renamed, "team-id": TEAM }, {}, {}))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--key-id.*APPLE_MUSIC_KEY_ID/) as unknown });
+    expect(await thrown(() => loadKey({ key: renamed, "team-id": TEAM }, {}, none))).toMatchObject({ exitCode: 2, message: expect.stringMatching(/--key-id.*APPLE_MUSIC_KEY_ID/) as unknown });
   });
 
   test("an ID that is not ten capital letters and digits is refused before the file is read, by its length and not its value", async () => {
@@ -210,7 +226,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
       [{ key: keyPath, "team-id": "TOOSHORT" }, "team ID"],
       [{ key: keyPath, "team-id": TEAM, "key-id": "ABC123DEFG1" }, "key ID"],
     ] as const) {
-      const e = await thrown(() => loadKey(flags, {}, {}));
+      const e = await thrown(() => loadKey(flags, {}, none));
       expect(e.exitCode).toBe(2);
       expect(e.message).toContain(what);
       expect(e.message).not.toContain(flags["team-id"] === TEAM ? "ABC123DEFG1" : flags["team-id"]);
@@ -219,7 +235,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
 
   test("a file that cannot be read is named by its path and where the path came from", async () => {
     const missing = join(dir, "AuthKey_MISSING000.p8");
-    const e = await thrown(() => loadKey({}, { APPLE_MUSIC_KEY_PATH: missing, APPLE_MUSIC_TEAM_ID: TEAM }, {}));
+    const e = await thrown(() => loadKey({}, { APPLE_MUSIC_KEY_PATH: missing, APPLE_MUSIC_TEAM_ID: TEAM }, none));
     expect(e).toMatchObject({ exitCode: 2 });
     expect(e.message).toContain(missing);
     expect(e.message).toContain("APPLE_MUSIC_KEY_PATH");
@@ -239,7 +255,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
       ["a developer token", { key: developerToken }, {}],
     ];
     for (const [name, flags, env] of cases) {
-      const e = await thrown(() => loadKey({ ...flags, "team-id": TEAM, "key-id": KEY_ID }, env, {}));
+      const e = await thrown(() => loadKey({ ...flags, "team-id": TEAM, "key-id": KEY_ID }, env, none));
       expect(e.exitCode, name).toBe(2);
       expect(e.message, name).toContain("not repeated");
       for (const secret of [body.slice(0, 20), body.slice(-20), musicUserToken.slice(10, 40), developerToken.slice(30, 60)]) expect(e.message, name).not.toContain(secret);
@@ -248,7 +264,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
 
   test("a path mistyped in a folder that exists is repeated, so the mistake can be seen", async () => {
     const typo = join(dir, "AuthKey_ABC123DEFH.p8");
-    const e = await thrown(() => loadKey({ key: typo, "team-id": TEAM }, {}, {}));
+    const e = await thrown(() => loadKey({ key: typo, "team-id": TEAM }, {}, none));
     expect(e.message).toContain(typo);
     expect(e.message).toContain("ENOENT");
   });
@@ -256,7 +272,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
   test("a P-256 key in another form than Apple's, such as SEC1, is taken, and handed on in the form the minter takes", async () => {
     const sec1 = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
     await writeFile(keyPath, sec1.export({ type: "sec1", format: "pem" }).toString());
-    const key = await loadKey({ key: keyPath, "team-id": TEAM }, {}, {});
+    const key = await loadKey({ key: keyPath, "team-id": TEAM }, {}, none);
     expect(key.pem).toBe(sec1.export({ type: "pkcs8", format: "pem" }).toString());
     expect(key.pem).toMatch(/^-----BEGIN PRIVATE KEY-----/);
   });
@@ -271,7 +287,7 @@ describe("loadKey: from the flags, else the environment, else the last login", (
     for (const [name, contents] of Object.entries(cases)) {
       const path = join(dir, `AuthKey_${KEY_ID}.p8`);
       await writeFile(path, contents);
-      const e = await thrown(() => loadKey({ key: path, "team-id": TEAM }, {}, {}));
+      const e = await thrown(() => loadKey({ key: path, "team-id": TEAM }, {}, none));
       expect(e.exitCode, name).toBe(2);
       expect(e.message, name).toContain(path);
       expect(e.message, name).toContain("not a MusicKit private key");

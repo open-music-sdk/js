@@ -80,7 +80,8 @@ async function readObject(path: string): Promise<Record<string, unknown>> {
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    // Without the byte order mark an editor such as Notepad may put at the start.
+    parsed = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
   } catch {
     parsed = undefined;
   }
@@ -181,22 +182,27 @@ const ID = /^[A-Z0-9]{10}$/;
 
 /**
  * The key, from the flags, else the environment, else what the last `login` kept; the key ID defaults to the one in
- * the file's name, `AuthKey_<key id>.p8`. The file is read and checked to be a P-256 private key, so a wrong file
- * fails here, by its path, and not as a 401 from Apple. Nothing in any error quotes the file.
+ * the file's name, `AuthKey_<key id>.p8`. What was kept is read only when something is missing, so a kept file that
+ * cannot be read does not stand in the way of flags that say it all. The key's file is read and checked to be a
+ * P-256 private key, so a wrong file fails here, by its path, and not as a 401 from Apple. Nothing in any error
+ * quotes the file.
  *
+ * @param readSaved - Reads what the last `login` kept.
  * @throws CliError with exit status 2 when something is missing, is not what Apple issues, or cannot be read.
  */
-export async function loadKey(flags: tKeyFlags, env: tEnv, saved: tSavedKey): Promise<tKey> {
+export async function loadKey(flags: tKeyFlags, env: tEnv, readSaved: () => Promise<tSavedKey>): Promise<tKey> {
   // A variable set to nothing is taken as not set, as a shell's `VAR= command` means it.
   const fromEnv = (name: string) => (env[name] === "" ? undefined : env[name]);
+  let kept: tSavedKey | undefined;
+  const saved = async () => (kept ??= await readSaved());
   const envPath = fromEnv("APPLE_MUSIC_KEY_PATH");
-  const [keyPath, from] = flags.key !== undefined ? [flags.key, "--key"] : envPath !== undefined ? [envPath, "APPLE_MUSIC_KEY_PATH"] : [saved.keyPath, "the last login"];
+  const [keyPath, from] = flags.key !== undefined ? [flags.key, "--key"] : envPath !== undefined ? [envPath, "APPLE_MUSIC_KEY_PATH"] : [(await saved()).keyPath, "the last login"];
   if (keyPath === undefined || keyPath === "") throw usage("No key: pass --key with the path to your AuthKey_XXXXXXXXXX.p8, or set APPLE_MUSIC_KEY_PATH.");
-  const teamId = flags["team-id"] ?? fromEnv("APPLE_MUSIC_TEAM_ID") ?? saved.teamId;
+  const teamId = flags["team-id"] ?? fromEnv("APPLE_MUSIC_TEAM_ID") ?? (await saved()).teamId;
   if (teamId === undefined || teamId === "") throw usage("No team ID: pass --team-id, or set APPLE_MUSIC_TEAM_ID. It is on your membership page at developer.apple.com/account.");
   if (!ID.test(teamId)) throw usage(`The team ID must be ten capital letters and digits, as Apple issues it; got ${String(teamId.length)} characters.`);
   const named = /^AuthKey_([A-Z0-9]{10})\.p8$/.exec(basename(keyPath))?.[1];
-  const keyId = flags["key-id"] ?? fromEnv("APPLE_MUSIC_KEY_ID") ?? named ?? saved.keyId;
+  const keyId = flags["key-id"] ?? fromEnv("APPLE_MUSIC_KEY_ID") ?? named ?? (await saved()).keyId;
   if (keyId === undefined || keyId === "") throw usage("No key ID: pass --key-id, set APPLE_MUSIC_KEY_ID, or keep the file's name as Apple gave it, AuthKey_<key id>.p8.");
   if (!ID.test(keyId)) throw usage(`The key ID must be ten capital letters and digits, as Apple issues it; got ${String(keyId.length)} characters.`);
 
