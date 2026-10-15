@@ -52,8 +52,9 @@ is asked of Apple, and no message ever quotes it.
 
 ## What it keeps
 
-Two files, in `%APPDATA%\open-music-sdk` on Windows, and in `$XDG_CONFIG_HOME/open-music-sdk`, or
-`~/.config/open-music-sdk`, elsewhere. `open-music-sdk --help` prints the folder.
+Two files, in `%LOCALAPPDATA%\open-music-sdk` on Windows, and in `$XDG_CONFIG_HOME/open-music-sdk`, or
+`~/.config/open-music-sdk`, elsewhere. `open-music-sdk --help` prints the folder. On Windows it is not the
+roaming `%APPDATA%`, which a domain copies to its servers and to your other machines.
 
 | File | Holds |
 | --- | --- |

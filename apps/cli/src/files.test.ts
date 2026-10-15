@@ -39,21 +39,23 @@ async function thrown(fn: () => Promise<unknown>): Promise<CliError> {
 }
 
 describe("configDir: where the CLI keeps what it keeps", () => {
-  test("on Windows, a folder of its own in %APPDATA%", () => {
-    expect(configDir({ APPDATA: "C:\\Users\\a\\AppData\\Roaming" }, "win32")).toBe(join("C:\\Users\\a\\AppData\\Roaming", "open-music-sdk"));
+  test("on Windows, a folder of its own in %LOCALAPPDATA%, which stays on this machine, and not the roaming %APPDATA%", () => {
+    const env = { LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local", APPDATA: "C:\\Users\\a\\AppData\\Roaming" };
+    expect(configDir(env, "win32")).toBe(join("C:\\Users\\a\\AppData\\Local", "open-music-sdk"));
+    expect(configDir({ APPDATA: env.APPDATA }, "win32")).toBe(join(homedir(), ".config", "open-music-sdk"));
   });
 
   test("elsewhere, in $XDG_CONFIG_HOME, or in ~/.config without it", () => {
     expect(configDir({ XDG_CONFIG_HOME: "/xdg" }, "linux")).toBe(join("/xdg", "open-music-sdk"));
     expect(configDir({}, "darwin")).toBe(join(homedir(), ".config", "open-music-sdk"));
-    // %APPDATA% is Windows's alone, wherever it happens to be set.
-    expect(configDir({ APPDATA: "/appdata" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    // %LOCALAPPDATA% is Windows's alone, wherever it happens to be set.
+    expect(configDir({ LOCALAPPDATA: "/appdata" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
   });
 
   test("a relative or empty location is ignored, as the XDG spec says to, so a file never lands under whatever folder the CLI was run from", () => {
     expect(configDir({ XDG_CONFIG_HOME: "relative/dir" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
     expect(configDir({ XDG_CONFIG_HOME: "" }, "linux")).toBe(join(homedir(), ".config", "open-music-sdk"));
-    expect(configDir({ APPDATA: "relative" }, "win32")).toBe(join(homedir(), ".config", "open-music-sdk"));
+    expect(configDir({ LOCALAPPDATA: "relative" }, "win32")).toBe(join(homedir(), ".config", "open-music-sdk"));
   });
 });
 

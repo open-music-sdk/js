@@ -25,12 +25,13 @@ export const usage = (message: string): CliError => new CliError(message, 2);
 export type tEnv = Readonly<Record<string, string | undefined>>;
 
 /**
- * Where the CLI keeps what it keeps: `%APPDATA%\open-music-sdk` on Windows, and `$XDG_CONFIG_HOME/open-music-sdk`,
- * or `~/.config/open-music-sdk`, elsewhere. A relative `XDG_CONFIG_HOME` is ignored, as the XDG spec says to.
+ * Where the CLI keeps what it keeps: `%LOCALAPPDATA%\open-music-sdk` on Windows, and `$XDG_CONFIG_HOME/open-music-sdk`,
+ * or `~/.config/open-music-sdk`, elsewhere. Not the roaming `%APPDATA%`, which a domain copies to its servers and to
+ * the user's other machines: what is kept here includes a token. A relative location is ignored, as the XDG spec says.
  */
 export function configDir(env: tEnv, platform: NodeJS.Platform = process.platform): string {
-  const appData = env.APPDATA;
-  if (platform === "win32" && appData !== undefined && isAbsolute(appData)) return join(appData, "open-music-sdk");
+  const local = env.LOCALAPPDATA;
+  if (platform === "win32" && local !== undefined && isAbsolute(local)) return join(local, "open-music-sdk");
   const xdg = env.XDG_CONFIG_HOME;
   return join(xdg !== undefined && isAbsolute(xdg) ? xdg : join(homedir(), ".config"), "open-music-sdk");
 }

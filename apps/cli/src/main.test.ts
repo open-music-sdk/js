@@ -33,7 +33,7 @@ beforeEach(async () => {
   stderr = "";
   for (const name of ["APPLE_MUSIC_KEY_PATH", "APPLE_MUSIC_TEAM_ID", "APPLE_MUSIC_KEY_ID"]) vi.stubEnv(name, undefined);
   // Wherever the tests run, the files go to this test's folder.
-  vi.stubEnv("APPDATA", dir);
+  vi.stubEnv("LOCALAPPDATA", dir);
   vi.stubEnv("XDG_CONFIG_HOME", dir);
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => ((stdout += String(chunk)), true));
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => ((stderr += String(chunk)), true));
