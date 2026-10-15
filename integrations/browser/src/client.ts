@@ -9,11 +9,17 @@ import { playlists } from "@open-music-sdk/lib-playlists";
 
 /** Invalid values throw a TypeError when the client is made. */
 export interface tBrowserClientOptions extends Omit<tClientOptions, "developerToken"> {
-  /** Where `tokenEndpoint` of `@open-music-sdk/server` is mounted. A relative URL resolves against the page, as `fetch` resolves it. */
+  /**
+   * Where `tokenEndpoint` of `@open-music-sdk/server` is mounted. A relative URL resolves against the page's address
+   * when the client is made, and stays there: a route the page moves to later, a `<base>` put into it later, or a
+   * change to the `URL` object later, moves nothing. Where there is no page, as in a server render, a relative URL is
+   * left to resolve at the first fetch, which rejects with a `TypeError` where there is still no page.
+   */
   readonly tokenUrl: string | URL;
   /**
    * The endpoint's own options: a `fetch` for it, with the credentials or headers it needs, `timeoutMs`, and
-   * `refreshAheadSeconds`. The client's own `fetch` is for Apple, and never reaches the endpoint.
+   * `refreshAheadSeconds`. The client's own `fetch` is for Apple, and never reaches the endpoint; this one is for the
+   * endpoint, and never reaches Apple.
    */
   readonly endpoint?: tFetcherOptions | undefined;
 }
@@ -31,7 +37,10 @@ export type tMusic = tWithNamespaces<{
   playlists: typeof playlists;
 }>;
 
-/** The page's client: `tMusic` with the developer-token provider on it, which `createConnect` takes, and kept through `as()` and `forUser()`. */
+/**
+ * The page's client: `tMusic` with the developer-token provider on it, which `createConnect` takes, and kept through
+ * `as()` and `forUser()`. It is frozen and inherits nothing, and each of its functions can be handed on by itself.
+ */
 export interface tBrowserMusic extends Omit<tMusic, "as" | "forUser"> {
   /** The provider that fetches the token from `tokenUrl`: what Apple's script is configured with, by `createConnect`. */
   readonly developerToken: tDeveloperTokenProvider;
@@ -90,9 +99,10 @@ function attached(music: tMusic, developerToken: tDeveloperTokenProvider): tBrow
 
 /**
  * A client that fetches its developer token from `tokenUrl`, reused and replaced in the background halfway through
- * its life, with the catalog, the listener's library and the playlist verbs on it. The options are checked and
- * taken here, once: what the fetcher checks it names itself, and so does `createClient`. Nothing is fetched until
- * a call.
+ * its life, and fetched again when Apple rejects it, with the catalog, the listener's library and the playlist verbs
+ * on it. Whatever goes wrong at the endpoint is a `DeveloperTokenUnavailable`, never taken for Apple's answer. The
+ * options are checked and taken here, once: what the fetcher checks it names itself, and so does `createClient`.
+ * Nothing is fetched until a call.
  *
  * @param options - Where the token endpoint is, the endpoint's own options, and every option of core's client but
  * the developer token.

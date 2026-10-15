@@ -1,7 +1,7 @@
 // Sign-in for a Music User Token: Apple's own script, loaded from Apple's CDN when a page asks for it, configured
 // with the page's developer token, and asked to authorize inside the listener's click. The SDK issues no token and
 // runs no sign-in of its own, and this helper stores nothing: Apple's script keeps a copy of the token of its own,
-// which is written down in the README.
+// which the docs' security model describes.
 import { AppleMusicError, got, has, optionsOf, ownOf, parseToken, type tTokenProvider } from "@open-music-sdk/core";
 
 /** Apple's script, as the helper uses it: the global it defines, `MusicKit`. */
@@ -107,7 +107,11 @@ interface tPageState {
   configured?: { readonly app: string; readonly token: { current: string }; readonly instance: Promise<tMusicKitInstance> } | undefined;
 }
 
-/** Apple's one unversioned URL for the script. It cannot be pinned, bundled or re-hosted: see the README. */
+/**
+ * Where Apple serves its MusicKit on the Web script, for your content security policy's `script-src`. It is one URL
+ * with no version in it, and the script cannot be pinned, bundled or re-hosted: Apple serves no other, and its
+ * licence forbids the rest.
+ */
 export const MUSICKIT_SCRIPT = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 /** The timer waits at most this long, and asks again when it fires: a longer wait is kept as several. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -188,7 +192,10 @@ function appOf(app: unknown): tConnectApp {
  * The sign-in helper for a page: makes it where the connect button is shown, so that Apple's script is loaded and
  * configured before the click, and the window opens inside it. `music` is the client from `createBrowserClient`,
  * or anything with a `developerToken` provider. Apple's script is one per page, so a second helper on a page
- * already configured for another app is a TypeError. While the helper lives it keeps the developer token fresh,
+ * already configured for another app is a TypeError, and a second helper for the same app shares the first's load
+ * and configuration. A page that makes no helper never fetches the script. A global named `MusicKit` that cannot
+ * configure, such as an element with that id in content the page shows, is passed over and the script loaded.
+ * While the helper lives it keeps the developer token fresh,
  * at the token's half-life and when the tab comes back, so that `connect()` waits on no network inside the click.
  * What loading and configuring the script fails with is nobody's unhandled rejection: it waits for whoever awaits
  * `ready` or `connect()`.
