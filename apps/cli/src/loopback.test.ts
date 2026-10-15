@@ -116,7 +116,8 @@ describe("startLoopback: the page and its address", () => {
 
   test("the page and the token need this run's state; anything else is not here", async () => {
     const { port, state } = await start();
-    for (const path of ["/", "/?state=", `/?state=${state}x`, `/?state=${state.slice(1)}`, "/token", `/token?state=${state.slice(0, -1)}A`, "/favicon.ico", "/user-token/x", `/page.js/x`]) {
+    const changed = state.slice(0, -1) + (state.endsWith("A") ? "B" : "A");
+    for (const path of ["/", "/?state=", `/?state=${state}x`, `/?state=${state.slice(1)}`, `/?state=${changed}`, "/token", `/token?state=${changed}`, "/favicon.ico", "/user-token/x", `/page.js/x`]) {
       expect((await send(port, path)).status, path).toBe(404);
     }
   });
@@ -137,6 +138,15 @@ describe("startLoopback: the page and its address", () => {
     const { port, state } = await start();
     expect((await send(port, `http://evil.example/?state=${state}`)).status).toBe(400);
     expect((await send(port, `//evil.example/?state=${state}`)).status).toBe(404);
+  });
+
+  test("a request node:http takes and fetch does not, from anyone on this machine, is refused and leaves the server running", async () => {
+    const { port, state } = await start();
+    for (const method of ["TRACE", "TRACK", "CONNECT"]) {
+      const answered = await send(port, method === "CONNECT" ? `localhost:${String(port)}` : "/", { method }).catch((e: unknown) => e);
+      if (!(answered instanceof Error)) expect(answered.status, method).toBe(400);
+    }
+    expect((await send(port, `/?state=${state}`)).status).toBe(200);
   });
 
   test("a port that is taken is a mistake in how the CLI was run", async () => {

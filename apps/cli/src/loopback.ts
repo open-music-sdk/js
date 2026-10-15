@@ -187,8 +187,8 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
 
 /**
  * The web-standard Request for what node:http hands over, aborted when the connection closes before the answer is
- * sent, or undefined when its target is not a path on this server. What is left of a body the intake stops reading
- * is let go by, so its answer can still be written.
+ * sent, or undefined when its target is not a path on this server or fetch takes no request like it. What is left of
+ * a body the intake stops reading is let go by, so its answer can still be written.
  */
 function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): Request | undefined {
   // The URL is this server's own origin and the target as sent, never the Host header, which is checked by itself:
@@ -226,7 +226,13 @@ function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): R
   });
   const method = req.method ?? "GET";
   const sends = method !== "GET" && method !== "HEAD";
-  return new Request(url, { method, headers, body: sends ? body : null, signal: controller.signal, duplex: "half" } as RequestInit);
+  // node:http takes methods that fetch's Request refuses, such as TRACE: a request like that is refused, not thrown
+  // where nothing catches it.
+  try {
+    return new Request(url, { method, headers, body: sends ? body : null, signal: controller.signal, duplex: "half" } as RequestInit);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Opens `url` in the default browser with the system's own command. Whether it opens or not, `login` has printed the URL. */
