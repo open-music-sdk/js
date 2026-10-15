@@ -29,7 +29,8 @@ export interface tSearchCatalogOptions extends tReadOptions<tSearchResponse>, tS
 
 /**
  * Searches the catalog for a term, and resolves to the results by type, each one a first page. `limit` and
- * `offset` apply to every type asked for.
+ * `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with a
+ * page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
  *
  * @function
  * @param client - The client to ask with.
@@ -118,7 +119,8 @@ export interface tChartsOptions extends tReadOptions<tChartResponse>, tStorefron
 }
 
 /**
- * The charts of a storefront, by type of resource, each one a first page. `limit` and `offset` apply to every chart.
+ * The charts of a storefront, by type of resource, each one a first page. Each type is a list of charts, since one
+ * type can have several. `limit` and `offset` apply to every chart.
  *
  * @function
  * @param client - The client to ask with.
