@@ -43,7 +43,7 @@ function restore(): void {
     if (was === value) continue;
     if (was !== undefined) document.cookie = `${name}=${was}; path=/`;
     // Deleted with the domain and without it, whichever way it was set.
-    else for (const domain of ["", `; domain=${location.hostname}`]) document.cookie = `${name}=; max-age=0; path=/${domain}`;
+    else for (const domain of ["", `; domain=${location.hostname}`]) document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domain}`;
   }
   for (const [storage, held] of [
     [localStorage, before.local],

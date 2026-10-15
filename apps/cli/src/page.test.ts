@@ -70,7 +70,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const name of ["media-user-token", "other-app-session", "shared-name"]) document.cookie = `${name}=; max-age=0; path=/`;
+  for (const name of ["media-user-token", "other-app-session", "shared-name"]) document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
   localStorage.clear();
   sessionStorage.clear();
 });
