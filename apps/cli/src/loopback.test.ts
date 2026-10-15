@@ -19,13 +19,19 @@ const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const KEY: tKey = { pem: privateKey.export({ type: "pkcs8", format: "pem" }).toString(), teamId: TEAM, keyId: KEY_ID, keyPath: "/keys/AuthKey_ABC123DEFG.p8" };
 const SCRIPT = "/* the page's script */";
 
-/** What the fake Apple answers /v1/me/storefront with, and every request it was asked. */
-let appleStatus = 200;
+/** What the fake Apple answers /v1/me/storefront with, or `"hang"` for no answer until the request is aborted, and every request it was asked. */
+let appleStatus: number | "hang" = 200;
 let asked: Request[] = [];
 const responses: Response[] = [];
 const appleFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const req = new Request(input, init);
   asked.push(req);
+  if (appleStatus === "hang")
+    return new Promise((_resolve, reject) => {
+      req.signal.addEventListener("abort", () => {
+        reject(req.signal.reason as Error);
+      });
+    });
   const res =
     appleStatus === 200
       ? Response.json({ data: [{ id: "gb", type: "storefronts" }] })
@@ -53,9 +59,17 @@ afterEach(async () => {
   for (const res of responses.splice(0)) expect(res.bodyUsed).toBe(true);
 });
 
-async function start(overrides: { store?: tUserTokenStore; port?: number } = {}): Promise<{ loopback: tLoopback; port: number; state: string }> {
+async function start(overrides: { store?: tUserTokenStore; port?: number; timeoutMs?: number } = {}): Promise<{ loopback: tLoopback; port: number; state: string }> {
   const music = createServerClient({ pem: KEY.pem, teamId: TEAM, keyId: KEY_ID, fetch: appleFetch, retry: false });
-  loopback = await startLoopback({ key: KEY, music, store: overrides.store ?? store, userId: "default", port: overrides.port ?? 0, script: pathToFileURL(join(dir, "page.js")) });
+  loopback = await startLoopback({
+    key: KEY,
+    music,
+    store: overrides.store ?? store,
+    userId: "default",
+    port: overrides.port ?? 0,
+    script: pathToFileURL(join(dir, "page.js")),
+    timeoutMs: overrides.timeoutMs ?? 10_000,
+  });
   const url = new URL(loopback.url);
   return { loopback, port: Number(url.port), state: url.searchParams.get("state") ?? "" };
 }
@@ -298,6 +312,20 @@ describe("startLoopback: the intake, which asks Apple before it stores", () => {
     expect(settled).toBe("waiting");
   });
 
+  test("an Apple that does not answer is given up on in time: the page is answered 504, nothing is stored, and login goes on waiting", async () => {
+    appleStatus = "hang";
+    const { loopback: running, port, state } = await start({ timeoutMs: 200 });
+    const answer = await postToken(port, state);
+    expect(answer.status).toBe(504);
+    expect(asked[0]?.signal.aborted).toBe(true);
+    expect(await store.get("default")).toBeUndefined();
+    const settled = await Promise.race([running.stored.then(() => "stored", () => "rejected"), new Promise((resolve) => setTimeout(resolve, 50, "waiting"))]);
+    expect(settled).toBe("waiting");
+    // A later post, once Apple answers, is taken.
+    appleStatus = 200;
+    expect((await postToken(port, state)).status).toBe(204);
+  });
+
   test("a store that fails is the run's to hear about: the page is answered 500, and login's wait rejects with it", async () => {
     const failure = new Error("disk full");
     const failing: tUserTokenStore = { get: () => Promise.resolve(undefined), delete: () => Promise.resolve(), set: () => Promise.reject(failure) };
@@ -323,7 +351,7 @@ describe("toRequest: node:http's request as a web-standard one", () => {
     // A handler that holds the request and does nothing with it, as a slow one would.
     const held: Request[] = [];
     const server = createServer((req, res) => {
-      const request = toRequest(req, res, "http://localhost");
+      const request = toRequest(req, res, "http://localhost", 30_000);
       if (request !== undefined) held.push(request);
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

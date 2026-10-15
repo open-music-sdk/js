@@ -47,6 +47,7 @@ const REFUSED: Record<number, string> = {
   409: "The terminal has taken a token already, from this page or another. You can close this tab.",
   422: "Apple would not take this account's token: the account may have no Apple Music subscription.",
   502: "Apple could not be asked about the token. Try again.",
+  504: "Apple did not answer about the token in time. Try again.",
 };
 
 button.addEventListener("click", () => {

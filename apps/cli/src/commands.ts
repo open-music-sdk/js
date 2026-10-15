@@ -113,7 +113,7 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   say(`Asking Apple about key ${key.keyId} of team ${key.teamId}…`);
   await askKey(music);
   const store = new FileUserTokenStore(files.tokens);
-  const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url) });
+  const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url), timeoutMs: TIMEOUT_MS });
   try {
     say(`Sign in at Apple on this page:\n\n  ${loopback.url}\n`);
     if (flags.browser !== false) {

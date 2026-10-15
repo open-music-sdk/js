@@ -21,6 +21,8 @@ export interface tLoopbackOptions {
   readonly port: number;
   /** The page's script, read when the page asks for it. */
   readonly script: URL;
+  /** How long a request may take, asking Apple about a posted token included. */
+  readonly timeoutMs: number;
 }
 
 export interface tLoopback {
@@ -156,7 +158,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
   };
 
   server.on("request", (req: IncomingMessage, res: ServerResponse) => {
-    const request = toRequest(req, res, origin);
+    const request = toRequest(req, res, origin, options.timeoutMs);
     if (request === undefined) {
       res.writeHead(400, { "cache-control": "no-store" }).end();
       return;
@@ -173,8 +175,10 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
         res.end(Buffer.from(await response.arrayBuffer()));
       },
       (e: unknown) => {
-        res.writeHead(500, { "cache-control": "no-store" }).end();
-        // A browser that went away aborts its own request; anything else is the run's to hear about.
+        // A request that ran out of time is answered 504, for the page to try again. A browser that went away aborts
+        // its own request too; anything else is the run's to hear about.
+        const late = request.signal.reason instanceof DOMException && request.signal.reason.name === "TimeoutError";
+        res.writeHead(late ? 504 : 500, { "cache-control": "no-store" }).end();
         if (!request.signal.aborted) rejectStored(e);
       },
     );
@@ -195,10 +199,10 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
 
 /**
  * The web-standard Request for what node:http hands over, aborted when the connection closes before the answer is
- * sent, or undefined when its target is not a path on this server or fetch takes no request like it. What is left of
- * a body the intake stops reading is let go by, so its answer can still be written.
+ * sent or after `timeoutMs`, or undefined when its target is not a path on this server or fetch takes no request like
+ * it. What is left of a body the intake stops reading is let go by, so its answer can still be written.
  */
-export function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): Request | undefined {
+export function toRequest(req: IncomingMessage, res: ServerResponse, origin: string, timeoutMs: number): Request | undefined {
   // The URL is this server's own origin and the target as sent, never the Host header, which is checked by itself:
   // a target that is not a path, such as `http://elsewhere/`, makes no URL here.
   let url: URL;
@@ -244,7 +248,8 @@ export function toRequest(req: IncomingMessage, res: ServerResponse, origin: str
   // node:http takes methods that fetch's Request refuses, such as TRACE: a request like that is refused, not thrown
   // where nothing catches it.
   try {
-    return new Request(url, { method, headers, body: sends ? body : null, signal: controller.signal, duplex: "half" } as RequestInit);
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeoutMs)]);
+    return new Request(url, { method, headers, body: sends ? body : null, signal, duplex: "half" } as RequestInit);
   } catch {
     return undefined;
   }
