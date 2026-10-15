@@ -2,11 +2,18 @@ import { hostsOf, isOnHost } from "@open-music-sdk/core";
 
 /** What is read from an artwork object. Any `tArtwork` from `@open-music-sdk/types` fits. */
 export interface tArtworkSource {
-  /** The URL template. `{w}` and `{h}` stand for the pixel size. */
+  /**
+   * The URL template. `{w}` and `{h}` stand for the pixel size. A template that has been through a URL parser on its
+   * way to you, with `%7Bw%7D` for `{w}`, is the same template, and is filled in.
+   */
   readonly url: string;
-  /** The widest the image comes, in pixels. No image larger than it comes is asked for. */
+  /**
+   * The widest the image comes, in pixels. No image larger than it comes is asked for. This is data, never an error:
+   * a value that is no size, such as `null`, zero or text, is taken as not given. Artwork that gives only one of
+   * `width` and `height` is held to that one, and artwork that gives neither is taken to be square.
+   */
   readonly width?: number | null | undefined;
-  /** The tallest the image comes, in pixels. */
+  /** The tallest the image comes, in pixels. Read as `width` is. */
   readonly height?: number | null | undefined;
 }
 
@@ -28,6 +35,11 @@ export interface tArtworkOptions {
   /**
    * Apple's code for how the image is cut to the box, such as `"bb"`, the whole image fitted inside it, or
    * `"sr"`, the box filled. Default: the one the template names, or `"bb"` where it leaves that open as `{c}`.
+   *
+   * Apple does not document the codes, so any code of the right shape is taken, its case kept: at most 32 letters
+   * and digits, with single dots or hyphens between them, as in `bb-60` or `SC.DN01`, which comes with some
+   * editorial artwork. A code that is neither `bb` nor `cc`, with or without a hyphen and more after it, is taken to
+   * fill the box exactly, as every other code tried did; if yours does not, lay the image out yourself.
    */
   readonly crop?: string | undefined;
   /**
@@ -268,6 +280,23 @@ export function normalise(url: string): string {
  *
  * The image keeps the artwork's own shape unless `height` says otherwise, and is never asked for larger than
  * the artwork comes. The URL is the one the API gave, spelled as a browser would read it, with numbers put in.
+ *
+ * How the size is chosen:
+ *
+ * - A box that asks for more than the artwork has is shrunk in its own shape, as near as whole pixels allow. No
+ *   side is asked for past 10,000 pixels, where Apple's image server stops.
+ * - With a `height`, what "more" means depends on the crop. A crop that fills the box needs the artwork to cover it
+ *   both ways. `bb` stands the whole image inside the box, so the box is shrunk only once the image inside it would
+ *   be larger than the artwork: a 1500 pixel cover in a 1200 by 300 slot is offered boxes up to `6000x1500`. `cc`
+ *   makes a square of the box's longer side, so that square is asked for, no longer than the artwork's shorter side.
+ * - Sizes are rounded, and never below one pixel a side, so a box shrunk very far ends squarer than it began. A
+ *   height that follows from the width is rounded up, so the image comes back the full width asked for.
+ *
+ * How the URL is spelled: white space is dropped from its ends, tabs and line breaks from anywhere, and a space
+ * inside is written `%20`, as a browser reads a `src`. A comma at either end, which a `srcset` would take for a
+ * separator, is kept by writing `./` before it or an empty `#` after it, or `%2C` where it is in the fragment
+ * already. None of this changes what is requested, so all three functions give the same URL, and a check you make
+ * on this one holds for the `srcset` too.
  *
  * Where it points is not checked unless `hosts` says where it may: artwork that did not come straight from
  * Apple's API can hold any URL, which an `<img>` will request, a link will run if it is `javascript:`, and a
