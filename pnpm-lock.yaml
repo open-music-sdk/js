@@ -244,13 +244,16 @@ importers:
 
   apps/cli:
     dependencies:
-      '@open-music-sdk/server':
-        specifier: workspace:^
-        version: link:../../integrations/server
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
     devDependencies:
       '@open-music-sdk/browser':
         specifier: workspace:*
         version: link:../../integrations/browser
+      '@open-music-sdk/server':
+        specifier: workspace:*
+        version: link:../../integrations/server
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

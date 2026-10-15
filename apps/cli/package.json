@@ -36,10 +36,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@open-music-sdk/server": "workspace:^"
+    "jose": "catalog:"
   },
   "devDependencies": {
     "@open-music-sdk/browser": "workspace:*",
+    "@open-music-sdk/server": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "happy-dom": "catalog:",

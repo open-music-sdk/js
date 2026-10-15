@@ -1,14 +1,15 @@
 import { defineConfig } from "tsdown";
 
-// Two builds into one folder: the command for Node, which loads the family from `@open-music-sdk/server` at run
-// time, and the sign-in page, with `@open-music-sdk/browser` bundled into it so the page needs nothing but itself
-// and Apple's script. `bin.js` reads `page.js` from beside it.
+// Two builds into one folder: the command for Node, and the sign-in page, which `bin.js` reads from beside it. The
+// family is bundled into both: into the page so it needs nothing but itself and Apple's script, and into the command
+// so that `npx @open-music-sdk/cli@<version>` runs exactly the packages that version was built with, the key in
+// reach of none that came later. jose, which is not the family's, stays a dependency.
 export default defineConfig([
   {
     entry: { bin: "src/bin.ts" },
     format: ["esm"],
     platform: "node",
-    deps: { neverBundle: [/^@open-music-sdk\//] },
+    deps: { alwaysBundle: [/^@open-music-sdk\//], neverBundle: ["jose"] },
     fixedExtension: false,
     dts: false,
   },
