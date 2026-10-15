@@ -26,22 +26,26 @@ relative link and checks like any other.
 
 | Task | What it does |
 | --- | --- |
-| `pnpm --filter docs dev` | Writes the reference, then serves the site with live reload |
-| `pnpm --filter docs build` | Writes the reference, then builds the site to `dist` |
-| `pnpm --filter docs check` | `typedoc --emit none`: the reference's checks, without writing it |
+| `pnpm --filter docs dev` | Writes the reference once, then serves the site. A page you edit reloads; a doc comment you change needs a restart. |
+| `pnpm --filter docs build` | Writes the reference, builds the site to `dist`, and checks its anchors |
+| `pnpm --filter docs check` | `typedoc --emit none`: the reference's checks alone, without writing anything |
 
-CI runs `build` and `check` on every pull request that changes the docs or a package. `build` fails on a link to a
-page that is not there. `check` fails on a comment that links to something that is not there, a name the reference
-refers to that is not exported, an export with no comment, and a function or method that leaves out an argument or
-what it returns. The first three are TypeDoc's own validation; the last is [the plugin](./typedoc.plugin.mjs).
+CI runs `build` on every pull request that changes the docs or a package, and it fails on any of these:
 
-The plugin does three more things:
+- a comment that links to something that is not there, a name the reference refers to that is not exported, an
+  export or namespace with no comment (TypeDoc's own validation);
+- a function or method that leaves out an argument or what it returns, and a re-exported name that no package
+  documents ([the plugin](./typedoc.plugin.mjs));
+- a link to a page that is not there (VitePress);
+- a link to an `#anchor` that names nothing on its page ([check-anchors.mjs](./check-anchors.mjs)).
 
-- It shows a function built by one of core's builders with its arguments one by one, instead of as one rest tuple,
-  and with the comment written on it rather than the one on core's call signature.
-- It documents each name once, in the package that declares it. `server`, `browser` and `react` re-export most of
-  the family, and without this every type would have a page under each of them.
-- It reads functions and methods only. A member of a namespace interface, such as `music.catalog.getSong`, is a
+The plugin also:
+
+- shows a function built by one of core's builders with its arguments one by one, instead of as one rest tuple,
+  and with the comment written on it rather than the one on core's call signature;
+- documents each name once, in the package that declares it. `server`, `browser` and `react` re-export most of the
+  family, and without this every type would have a page under each of them;
+- reads functions and methods only. A member of a namespace interface, such as `music.catalog.getSong`, is a
   property, and each client's tests hold its tags to its function's instead.
 
 Packages are read from their source through TypeScript `paths`, so a link from one package to another resolves

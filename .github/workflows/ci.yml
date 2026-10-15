@@ -22,7 +22,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run build typecheck lint test check --affected
+      # The docs build runs TypeDoc's checks and fails on a dead link or anchor, so `check`, the same checks without
+      # the site, is left for local use.
+      - run: pnpm turbo run build typecheck lint test --affected
       # Test coverage is for the whole repo, so this run is not --affected.
       - if: github.ref == 'refs/heads/main'
         run: pnpm turbo run test -- --coverage
