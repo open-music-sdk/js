@@ -10,12 +10,13 @@
 
 > Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
-An open, community-led TypeScript SDK for the Apple Music API. It gives you a typed function for every endpoint,
-tokens that look after themselves, and packages for servers, web pages and React: an ESM-only alternative to
-Apple's MusicKit on the Web.
+An open, community-led TypeScript SDK for the Apple Music API. It gives you a typed function for nearly every
+endpoint, tokens that look after themselves, and ESM-only packages for servers, web pages and React. It uses
+Apple's MusicKit on the Web for one thing: signing a listener in.
 
 > **🚧 Under construction.** Nothing is published to npm yet, and nothing has been run against the live Apple
-> Music API. See [Status and roadmap](https://open-music-sdk.github.io/js/status) for what exists.
+> Music API, in a browser, or in a React app outside its tests. See
+> [Status and roadmap](https://open-music-sdk.github.io/js/status) for what exists.
 
 **Documentation: [open-music-sdk.github.io/js](https://open-music-sdk.github.io/js/)**
 

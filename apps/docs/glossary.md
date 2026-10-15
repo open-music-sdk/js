@@ -30,6 +30,12 @@ A JSON Web Token ([JWT](#jwt)) you sign with your [MusicKit private key](#musick
 request comes from a registered developer, and every request needs one. See
 [Developer tokens and Music User Tokens](./concepts/tokens).
 
+### Intake
+
+The route on your server that takes a [Music User Token](#music-user-token) from a page, checks it with Apple and
+stores it: `userTokenIntake` in `user-token`, which `server` re-exports. See
+[Keep a listener's token on your server](./guides/store-user-tokens).
+
 ### Integration
 
 One of the three packages an app installs: `server`, `browser` or `react`. Each gives you a ready-made client and
@@ -65,8 +71,9 @@ your app read and change their [library](#library).
 ### Music User Token
 
 A token Apple issues after a listener signs in, which lets your app act for them. Requests for their library,
-ratings, recommendations and history (paths under `/v1/me`) need it, as well as a developer token. Only Apple can
-issue one. See [Developer tokens and Music User Tokens](./concepts/tokens).
+ratings, recommendations and history (paths under `/v1/me`), their personal station and a catalog resource's
+`library` relationship need it, as well as a developer token. Only Apple can issue one. See
+[Developer tokens and Music User Tokens](./concepts/tokens).
 
 ### MusicKit on the Web
 
@@ -78,6 +85,13 @@ listener in. See [Sign a listener in](./guides/sign-in).
 The `.p8` file you download from your Apple Developer account, which signs developer tokens. Apple lets you
 download it once. Keep it out of your repository and out of anything a browser loads. See
 [Set up your MusicKit key](./guides/musickit-key).
+
+### Namespace
+
+A set of functions on a [client](#client) under one name: `catalog`, `user` or `playlists`. Each function is bound
+to the client, so you don't pass it one. Those of `catalog` and `user` hand over what Apple's answer holds rather
+than the whole answer: a song, say, rather than `{ data: [song] }`. See
+[What an integration gives you](./concepts/packages#what-an-integration-gives-you).
 
 ### Page, `next` link
 

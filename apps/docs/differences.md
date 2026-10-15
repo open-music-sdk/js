@@ -19,7 +19,11 @@ None of this has met Apple's live script yet. The first live sign-in has to sett
   every browser, Safari first;
 - whether a listener who declines is the script answering with nothing, or a rejection, and with what;
 - what a configured instance holds for a returning listener, and whether it takes a new developer token;
-- whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event.
+- whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event;
+- which of Apple's hosts a strict `connect-src` has to allow, and whether a `Cross-Origin-Opener-Policy` of
+  `same-origin` cuts the sign-in window off, as expected, where `same-origin-allow-popups` keeps it;
+- whether `disconnect()`, which runs the script's own sign-out, also ends the token at Apple, and with it a copy
+  your server stored.
 
 ## [client-catalog](./reference/@open-music-sdk/client-catalog/)
 

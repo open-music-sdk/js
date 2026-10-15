@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Open Music SDK
   text: The Apple Music API for JavaScript and TypeScript
-  tagline: Open and community-led. A typed function for every endpoint, tokens that look after themselves, and packages for servers, web pages and React.
+  tagline: Open and community-led. A typed function for nearly every endpoint, tokens that look after themselves, and packages for servers, web pages and React.
   image:
     src: /logo.svg
     alt: Open Music SDK logo
@@ -32,8 +32,8 @@ features:
 ---
 
 ::: warning Under construction
-Nothing is published to npm yet, and nothing has been run against the live Apple Music API. See
-[Status and roadmap](./status) for what exists.
+Nothing is published to npm yet, and nothing has been run against the live Apple Music API, in a browser, or in
+a React app outside its tests. See [Status and roadmap](./status) for what exists.
 :::
 
 ## Where to start
