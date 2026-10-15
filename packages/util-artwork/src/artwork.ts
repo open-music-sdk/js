@@ -36,10 +36,11 @@ export interface tArtworkOptions {
    * Apple's code for how the image is cut to the box, such as `"bb"`, the whole image fitted inside it, or
    * `"sr"`, the box filled. Default: the one the template names, or `"bb"` where it leaves that open as `{c}`.
    *
-   * Apple does not document the codes, so any code of the right shape is taken, its case kept: at most 32 letters
-   * and digits, with single dots or hyphens between them, as in `bb-60` or `SC.DN01`, which comes with some
-   * editorial artwork. A code that is neither `bb` nor `cc`, with or without a hyphen and more after it, is taken to
-   * fill the box exactly, as every other code tried did; if yours does not, lay the image out yourself.
+   * Apple does not document the codes, so any code of the right shape is taken, its case kept: letters and digits,
+   * with single dots or hyphens between them, 32 characters at most, the dots and hyphens included, as in `bb-60`
+   * or `SC.DN01`, which comes with some editorial artwork. A code that is neither `bb` nor `cc`, with or without a
+   * hyphen and more after it, is taken to fill the box exactly, as every other code tried did; if yours does not,
+   * lay the image out yourself.
    */
   readonly crop?: string | undefined;
   /**
@@ -95,7 +96,7 @@ function formatOf(value: unknown): tArtworkFormat | undefined {
  */
 function cropOf(value: unknown): string | undefined {
   if (value === undefined || (typeof value === "string" && value.length <= MAX_CROP_LENGTH && /^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*$/.test(value))) return value;
-  throw new TypeError(`artwork: crop must be a crop code: at most ${String(MAX_CROP_LENGTH)} letters and digits, with single dots or hyphens between them`);
+  throw new TypeError(`artwork: crop must be a crop code: at most ${String(MAX_CROP_LENGTH)} characters, letters and digits with single dots or hyphens between them`);
 }
 
 /**
