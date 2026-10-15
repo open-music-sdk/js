@@ -61,10 +61,12 @@ roaming `%APPDATA%`, which a domain copies to its servers and to your other mach
 | `user-token.json` | The Music User Token. Only `token` prints it. |
 | `config.json` | The key's path and its two IDs, which `login` keeps so the commands after it need no flags. Never the key itself. |
 
-Each is written to a temporary file and renamed, so you never find half of one. On macOS and Linux both are
-readable by you alone (mode `600`, in a folder of mode `700`). On Windows they sit in your own profile,
-which other users cannot read. The system's keychain is not used: that needs a native module, or a
-different command on each system, and waits until someone asks for it.
+Each is written to a temporary file and renamed, so you never find half of one; on Windows, where a rename is
+refused while another program has the file open, it is tried again for a couple of seconds. On macOS and
+Linux both files are readable by you alone (mode `600`), and a folder the CLI makes is mode `700`; one that
+was already there keeps its mode. On Windows they sit in your own profile, which other users cannot read.
+The system's keychain is not used: that needs a native module, or a different command on each system, and
+waits until someone asks for it.
 
 The token file is kept by `FileUserTokenStore`: core's `tUserTokenStore`, the three methods that
 `forUser()` and the [intake](../../packages/user-token/README.md) call, over one JSON file. A store of your
@@ -74,41 +76,57 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
 
 ## How `login` works
 
-1. Your key is loaded, and Apple is asked `GET /v1/test`, so a bad key fails before a browser opens.
-2. A server listens on `127.0.0.1`, on a port the system picks unless you give `--port`. Its page is
-   `http://localhost:<port>/?state=<state>`, with a fresh random state each run. Apple registers no
-   address, so a new port each time costs nothing.
-3. The page is the browser package's `createBrowserClient` and `createConnect`. Its developer token comes
-   from the server package's `tokenEndpoint`, at `/token?state=<state>`, which mints fifteen-minute
+1. Your key is loaded, and the token file read, so a bad key or a file the CLI cannot write fails before a
+   browser opens. Apple is asked `GET /v1/test`.
+2. A server listens on both loopback addresses, `127.0.0.1` and `::1`, on one port the system picks unless
+   you give `--port`. Its page is `http://localhost:<port>/?state=<ticket>`, with a fresh random ticket each
+   run. Apple registers no address, so a new port each time costs nothing.
+3. The ticket opens the page once. The page carries a second secret, which its script sends to the two
+   routes below.
+4. The page is the browser package's `createBrowserClient` and `createConnect`. Its developer token comes
+   from the server package's `tokenEndpoint`, at `/token?state=<secret>`, which mints fifteen-minute
    tokens bound to the page's origin. Its button runs Apple's sign-in inside your click.
-4. The page posts the token to the server package's `userTokenIntake`, at `/user-token`, with the state in
-   an `x-login-state` header. The intake asks Apple about the token and only then keeps it.
-5. Once the page has been told, the server closes and the terminal says which storefront the account is
-   in. The page clears what Apple's script kept on its origin, and says you can close the tab.
-6. Five minutes without a token, or Ctrl+C, closes it too, and nothing is kept.
+5. The page posts the token to the server package's `userTokenIntake`, at `/user-token`, with the secret in
+   an `x-login-state` header. The intake asks Apple about the token, for up to 30 seconds, and only then
+   keeps it. One token is taken: a second post is turned away.
+6. Once the page has been told, the server closes and the terminal says which storefront the account is
+   in. The page puts its origin back as it was before Apple's script ran, and says you can close the tab.
+7. Five minutes without a token, or Ctrl+C at any point, closes it too, and nothing is kept.
 
 ## What it holds to
 
-- **Loopback, and its own page only.** The server listens on a loopback address and answers only requests
-  whose `Host` is `localhost:<port>`, so a name rebound to that address reaches nothing. The page and the
-  token route need the state; anything else is a 404.
+- **Loopback, both addresses, and its own page only.** `localhost` can mean `127.0.0.1` or `::1`, and a
+  browser may try either first. The server holds the port on both, so no other program can take the one it
+  left free and, with it, the page and the token. It answers only requests whose `Host` is
+  `localhost:<port>`, so a name rebound to that address reaches nothing, and refuses any request whose
+  `Origin` is another page's.
+- **An address that works once.** The address is handed to the browser in a command line, which other
+  users of the machine may be able to read. Its ticket is used up when the page opens, and a second
+  opening is told the page is open already and to press Ctrl+C if that was not you. The routes the page
+  talks to need the page's own secret, which is never in an address or a command line.
 - **Another site cannot post a token.** The post needs a JSON body and the `x-login-state` header, so a
-  browser asks first, and nothing here answers that asking. A post without the state is refused before
-  Apple is asked.
-- **A dispenser only while it waits.** The token route exists while `login` waits, needs the state, and
+  browser asks first, and nothing here answers that asking. A post without the secret is refused before
+  Apple is asked, and once a token is kept no other is taken.
+- **A dispenser only while it waits.** The token route exists while `login` waits, needs the secret, and
   its tokens live fifteen minutes and are bound to the page's origin.
 - **Apple's copy does not outlive the page.** A cookie set on `localhost` is shared by every port, so a
-  copy Apple's script left there would reach every server you run on this machine. Once the token is
-  posted, the page deletes the cookies and storage entries that appeared while it was open, and leaves
-  what was there before. `disconnect()` is not used: whether it ends the token at Apple is not yet known.
+  copy Apple's script left there would reach every server you run on this machine. After every try, and
+  when the tab is closed, the page deletes the cookies and storage entries Apple's script added and gives
+  the ones it wrote over their old values. `disconnect()` is not used: whether it ends the token at Apple
+  is not yet known.
 - **The page's headers.** `cache-control: no-store`, `x-content-type-options: nosniff`, and a CSP that
-  lets in Apple's script from `js-cdn.music.apple.com` and Apple's hosts. No `Referrer-Policy:
-  no-referrer`, which developers report breaks Apple's sign-in, and no `Cross-Origin-Opener-Policy`, since
-  the sign-in window talks back to the page that opened it.
+  lets in Apple's script from `js-cdn.music.apple.com` and nothing but Apple's hosts. No
+  `Referrer-Policy: no-referrer`, which developers report breaks Apple's sign-in, and no
+  `Cross-Origin-Opener-Policy`, since the sign-in window talks back to the page that opened it.
 - **No secret in a message.** Only `token` prints the token. An argument that looks like neither a command
-  nor a flag is not repeated in an error, in case it is a token pasted in the wrong place.
-- **The page has no signing code.** The browser package is bundled into it when the CLI is built, and a
-  test bundles it and finds none of `jose` in it.
+  nor a flag is not repeated in an error, in case it is a token pasted in the wrong place, and neither is a
+  key path that names no file unless it looks like a path. Text from Apple is printed without control
+  characters.
+- **A pinned version is all pinned.** The family is bundled into the command when it is built, so
+  `npx @open-music-sdk/cli@<version>` runs exactly the packages that version was made with. `jose` is its
+  one dependency.
+- **The page has no signing code.** The browser package is bundled into it, and a test reads what the
+  build makes and finds none of `jose` in it.
 
 ## Exit status
 
@@ -125,12 +143,15 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
 Apple yet. These are open until the first live run:
 
 - Whether Apple's sign-in takes a page on `http://localhost`, and honours the `origin` claim from it.
-- Whether `localhost` reaches `127.0.0.1` in every browser and system.
 - Which hosts Apple's script reaches, and so whether the page's CSP lets them all in.
-- Where Apple's script keeps its copy of the token: the page clears cookies, `localStorage` and
+- Where Apple's script keeps its copy of the token: the page puts back cookies, `localStorage` and
   `sessionStorage`, not IndexedDB.
 - What a decline gives, and, with `--port` fixed and a second `login`, what the page restores for a
   returning listener.
+- Whether, after a token Apple would not take, a second try in the same tab asks Apple's sign-in again or
+  hands back the same token from memory.
+- Whether a browser ever asks for the page twice of its own accord, which the one-time address would turn
+  away.
 
 ## Development
 
@@ -139,10 +160,10 @@ pnpm --filter @open-music-sdk/cli... build
 node apps/cli/dist/bin.js --help
 ```
 
-`build` makes `dist/bin.js`, the command, which loads `@open-music-sdk/server` at run time, and
-`dist/page.js`, the sign-in page with `@open-music-sdk/browser` bundled into it. The tests run against fakes
-of Apple: the argument handling, the file store, the loopback server over `node:http`, the page in
-happy-dom, and the commands end to end.
+`build` makes `dist/bin.js`, the command, with `@open-music-sdk/server` bundled into it, and `dist/page.js`,
+the sign-in page with `@open-music-sdk/browser` bundled into it. The tests run against fakes of Apple: the
+argument handling, the file store, the loopback server over `node:http`, the page in happy-dom, the
+commands end to end, and what the build makes.
 
 ## Not here
 
