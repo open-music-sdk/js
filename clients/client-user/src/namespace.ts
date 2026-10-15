@@ -259,8 +259,8 @@ export interface tUserFunctions {
    * Makes a playlist in the listener's library: `{ attributes: { name } }`, with its tracks and the folder to put it
    * in under `relationships`. Resolves to the answer that holds the new playlist. Bound, it gives the playlist, or
    * `undefined` if Apple's answer holds none: the playlist was made either way. The playlist has to be a plain object,
-   * and still one once made into JSON. It is copied as the call is made and sent as it is: what it holds, and how
-   * much, is Apple's to judge.
+   * and still one once made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to
+   * judge, and nothing here limits its size, so limit it yourself if it comes from outside your app.
    *
    * @param playlist - The playlist to make: its name under `attributes`, and its tracks and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
@@ -312,8 +312,8 @@ export interface tUserFunctions {
    * Makes a playlist folder in the listener's library: `{ attributes: { name } }`, with the folder to put it in under
    * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
    * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
-   * made into JSON. It is copied as the call is made and sent as it is: what it holds, and how much, is Apple's to
-   * judge.
+   * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
+   * here limits its size, so limit it yourself if it comes from outside your app.
    *
    * @param folder - The folder to make: its name under `attributes`, and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
