@@ -77,6 +77,18 @@ const concepts = [
   },
 ];
 
+// A package README links to the site by its full URL, so the link works on GitHub and npm too. On the site it is
+// made relative, which keeps it in the same tab and puts it under VitePress's check for dead links.
+const site = "https://open-music-sdk.github.io/js/";
+const siteLinks = (md) =>
+  md.core.ruler.after("inline", "site-links", (state) => {
+    for (const token of state.tokens)
+      for (const child of token.children ?? []) {
+        const href = child.type === "link_open" ? child.attrGet("href") : null;
+        if (href?.startsWith(site)) child.attrSet("href", `/${href.slice(site.length)}`);
+      }
+  });
+
 export default defineConfig({
   title: "Open Music SDK",
   description: "An open, community-led TypeScript SDK for the Apple Music API.",
@@ -91,6 +103,7 @@ export default defineConfig({
   head: [["link", { rel: "icon", href: "/js/logo.svg" }]],
   // The one chunk past Vite's 500 kB warning is the search index, about 2.5 MB, which loads when the search box opens.
   vite: { build: { chunkSizeWarningLimit: 4000 } },
+  markdown: { config: siteLinks },
   themeConfig: {
     logo: "/logo.svg",
     nav: [
