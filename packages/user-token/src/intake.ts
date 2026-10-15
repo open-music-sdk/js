@@ -13,7 +13,8 @@ export interface tIntakeOptions {
   readonly store: tUserTokenStore;
   /**
    * The signed-in user this request belongs to, from your own session; the token is stored under it.
-   * Resolve to nothing when there is no session and the request is answered 401.
+   * Resolve to nothing when there is no session and the request is answered 401. This is the authentication:
+   * whoever it returns, the posted token is stored as theirs, so return the signed-in user from your own session.
    */
   readonly userId: (req: Request) => string | null | undefined | Promise<string | null | undefined>;
 }
@@ -46,6 +47,12 @@ export const isJson = (contentType: string | null): boolean => /^application\/js
  *
  * What it is handed is checked and taken here, once: a mistake is a TypeError now and not on the first request,
  * and nothing done to the options object afterwards changes where a token goes or whose it is.
+ *
+ * `userId` is the authentication: it must return the signed-in user from your own session. Requiring
+ * `application/json` is the cross-site defence, since a form or a `no-cors` fetch on another site cannot send it;
+ * that holds only while your CORS policy does not let other origins send that header with credentials. Each token
+ * that reaches Apple costs a request against your developer token, and a 401 one more: rate-limit the route as you
+ * would a login.
  *
  * Every answer is `Cache-Control: no-store`:
  *
