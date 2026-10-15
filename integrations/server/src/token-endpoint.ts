@@ -35,7 +35,14 @@ const WHAT = "an options object with pem, teamId, keyId and origin";
  * origins given and replaced in the background halfway through its life, so page loads within that life share one
  * signature. A request whose `Origin` header is one of the origins is answered with `access-control-allow-origin`
  * for it; no other request gets a CORS header, and no answer carries credentials. Every answer says `vary: origin`
- * and `cache-control: no-store`. `OPTIONS` is answered `204` the same way, and any other method `405`.
+ * and `cache-control: no-store`. `OPTIONS` is answered `204` the same way, with `allow: GET` and
+ * `access-control-allow-methods: GET`, and any other method `405` with `allow: GET`. A request the page aborted is
+ * answered all the same: the mint is one flight shared by every request.
+ *
+ * It is a public dispenser. Browsers honour the `origin` claim, but a script can send any `Origin`, so anyone can
+ * fetch a token here and spend your rate limit with it until it expires. Keep the token short-lived, rate-limit the
+ * route, and make one endpoint per deployment, listing that deployment's origins alone: every token names every
+ * origin in the list, for anyone who decodes it to read.
  *
  * It catches nothing. A `pem` that is a string but no key fails at the first mint, inside the request, with the
  * TypeError the minter throws; the framework logs it, and the developer finds it there. The options are checked
