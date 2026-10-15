@@ -200,6 +200,9 @@ function appOf(app: unknown): tConnectApp {
  * What loading and configuring the script fails with is nobody's unhandled rejection: it waits for whoever awaits
  * `ready` or `connect()`.
  *
+ * The helper stores nothing, but Apple's script keeps its own copy of the listener's token in browser storage, where
+ * any script on your origin can read it: a cross-site scripting hole exposes the token on later visits too.
+ *
  * @param music - The client from `createBrowserClient`, or anything with a `developerToken` provider on it.
  * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
  * @returns The helper, frozen: `ready`, `connect`, `disconnect` and `dispose`.
