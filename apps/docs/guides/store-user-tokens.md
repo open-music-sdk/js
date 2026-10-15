@@ -64,24 +64,21 @@ whether the token works, stores it only if Apple accepts it, and answers:
 | 422 | `{ "error": "UserTokenInvalid" }` | What was posted isn't a token, or Apple refused it. Nothing is stored. |
 | 502 | `{ "error": "<tag>" }` | Apple didn't confirm the token: the tag is `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `RateLimited`, `ApiError` or `NetworkError`. Nothing is stored. |
 
-Every answer says `Cache-Control: no-store`, and none carries the token or Apple's error text.
-
 Anything else that fails rejects the handler, and is yours to answer: `userId` or the store throwing, a body
 something else has already read, a request aborted part way.
 
-The route waits for Apple as the client's `retry` option says. By default it tries a failure once more, and waits
-out a `429` for a `Retry-After` of up to 60 seconds before it answers. If a page waits on this route, give it a
-client with a shorter wait, or put your own timeout around the handler. [Handle errors](./errors) shows how to
-set the client's `retry`.
+The route waits for Apple as long as the client's `retry` option lets it. If a page waits on this route, give the
+route a client with a shorter wait, or put your own timeout around the handler. [Handle errors](./errors) shows
+how to set `retry`.
 
 ::: warning Who can post a token
-- `userId` is the authentication. It must return the signed-in user from your own session, and nothing when
-  there's none. The body can't name a user.
-- Requiring JSON is the cross-site defence. A form or a `no-cors` fetch on another site can't send
-  `application/json`, so it can't bind its own token to your visitor. That holds only while your CORS policy
-  doesn't let other origins send that header with credentials.
-- Every token the route checks costs a request to Apple against your developer token, and a `401` costs one more
-  to find out whose it was. Rate-limit the route as you would a login.
+- Have `userId` return the user from your own session, and nothing when there's none. It's the route's only
+  authentication.
+- Don't let your CORS policy allow other origins to send `Content-Type: application/json` with credentials.
+  Requiring JSON is what stops another site from posting its own token for your visitor.
+- Rate-limit the route as you would a login. Every token it checks costs at least one request to Apple.
+
+The [security model](../concepts/security#on-your-server) explains each of these, and what the route sends back.
 :::
 
 ## 3. Post the token from the page
@@ -127,7 +124,12 @@ try {
 ```
 
 A listener the store has no token for gets a `UserTokenInvalid` error from the first request, as one whose token
-Apple refused does.
+Apple answers `403` to does.
+
+A listener who isn't signed in to Apple Music, or has no subscription, can get a `401` instead. That arrives as
+`DeveloperTokenInvalid`, as a developer token Apple refuses does, so the example above lets it through.
+`validateUserToken` tells the two apart: it rejects with `UserTokenInvalid` when the listener is the cause. See
+[Handle errors](./errors).
 
 When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`.
 
@@ -147,6 +149,7 @@ import { music, store } from "./music";
 const app = express();
 
 app.post("/api/music/user-token", express.json(), async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const userId = sessionUserId(req);
   if (!userId) return void res.status(401).end();
   const token: unknown = req.body?.token;
@@ -155,18 +158,21 @@ app.post("/api/music/user-token", express.json(), async (req, res) => {
     await acceptUserToken(music, store, userId, token);
     res.status(204).end();
   } catch (e) {
-    if (isAppleMusicError(e, "UserTokenInvalid")) res.status(422).end();
-    else throw e;
+    // A string that isn't a token is a TypeError, before Apple is asked.
+    if (e instanceof TypeError || isAppleMusicError(e, "UserTokenInvalid")) return void res.status(422).end();
+    // Apple didn't confirm the token.
+    if (isAppleMusicError(e)) return void res.status(502).end();
+    throw e;
   }
 });
 ```
 
-Check the session and require JSON here too, for the reasons in step 2. `express.json()` reads a body only when
-its content type is JSON.
+It answers a token as the intake route does: `422` when it's no good, `502` when Apple didn't confirm it, and
+`Cache-Control: no-store` on every answer. Check the session and require JSON here too, for the reasons in step 2.
+`express.json()` reads a body only when its content type is JSON.
 
-`acceptUserToken` throws a `TypeError` for a string that isn't a token, such as one with a space inside, before
-Apple is asked; the intake route answers that with `422`. Any other `AppleMusicError` means Apple didn't confirm
-the token, which the intake route answers with `502`.
+`acceptUserToken` also throws a `TypeError` for a `userId` that isn't a string, which this example would answer
+with `422` too. Make sure your session lookup returns a string.
 
 ## Choose a store
 
@@ -187,8 +193,7 @@ import { KvUserTokenStore } from "@open-music-sdk/server";
 const store = new KvUserTokenStore(env.MUSIC_TOKENS, { prefix: "apple-music:" });
 ```
 
-Workers KV is eventually consistent. A token just stored or just deleted can take up to a minute to look that
-way elsewhere, and Apple's `403` stays the final word on whether a token works. See
+Workers KV is eventually consistent, which the [security model](../concepts/security#on-your-server) covers. See
 [Cloudflare Workers](./cloudflare-workers) for where to create the store in a Worker.
 
 For anything else, write a store of your own: an object with the three methods `forUser` and the intake need.
@@ -211,9 +216,8 @@ const store: tUserTokenStore = {
 `get` resolves to `undefined` when there's no token for the user.
 
 ::: warning Neither store encrypts
-`KvUserTokenStore` writes the token as it's given, so whoever can read the namespace can read the token. Wrap
-the namespace if you need more than your platform provides. A Music User Token is as sensitive as a session
-cookie: keep it out of logs, URLs and browser storage. See the [security model](../concepts/security).
+Whoever can read your KV namespace can read the tokens in it. Wrap the namespace if you need more than your
+platform provides, and keep tokens out of logs, URLs and browser storage. See the [security model](../concepts/security#on-your-server).
 :::
 
 ## Next steps

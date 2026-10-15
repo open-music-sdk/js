@@ -62,8 +62,11 @@ const page = await listener.request<tAlbumRelationshipsAlbumLibraryRelationship>
 Apple for once.
 
 Build a path from values you trust. A value from outside your app, such as an id from a URL, can hold `../` and
-point the request somewhere else on Apple's API, where it carries the listener's token. `segmentOf` from
-`@open-music-sdk/core` checks a value as one segment of a path, as the clients check every id:
+point the request somewhere else on Apple's API, where it carries the listener's token. `segmentOf` checks a
+value as one segment of a path, as the clients check every id.
+
+`segmentOf` comes from `@open-music-sdk/core`, which the integrations don't re-export. Install `core` beside your
+integration, on [the same version](../concepts/packages#one-version-for-every-package):
 
 ```ts
 import { segmentOf } from "@open-music-sdk/core";
@@ -95,6 +98,12 @@ It's called once for each answer, after the client has read the body and decided
 request that's retried calls it more than once. Its third argument holds the parsed body as `body`, and the error
 the answer made, if any, as `error`. Read the body from there, not from `res.json()`, because the body has
 already been read. In a page, the browser lets you read only the headers Apple's answer exposes to other origins.
+
+::: warning Never print the request
+`onResponse`, like the client's `onRequest`, is handed the request as its second argument, with the developer token
+in its `Authorization` header and, where it's sent, the Music User Token in `Music-User-Token`. A hook that prints
+requests prints both tokens.
+:::
 
 ## 4. Walk pages
 

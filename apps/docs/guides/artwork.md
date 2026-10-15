@@ -120,18 +120,9 @@ artworkUrl(artwork, 300, { format: "webp" }); // https://…/300x300bb.webp
 `format` is one of `"jpg"`, `"jpeg"`, `"png"`, `"webp"`, `"heic"` or `"heif"`, the formats Apple's image server
 was seen to convert to. For the one cover measured, WebP was a third of the JPEG's bytes.
 
-`crop` is Apple's code for how the image is cut to the box. Apple doesn't document the codes, so any code of the
-right shape is accepted: letters and digits, with single dots or hyphens between them. The ones seen:
-
-| `crop` | What comes back |
-| --- | --- |
-| `bb` | The whole image, fitted inside the box and never enlarged. Most templates name it. |
-| `cc` | A square as long as the box's longer side, whatever the box's shape |
-| `sr` | The box, filled exactly |
-| `bb-60` | `bb` at a lower JPEG quality |
-
-Every code but `bb` that was tried enlarged the image when asked for more than there was. A code the SDK doesn't
-know is taken to fill the box exactly.
+`crop` is Apple's code for how the image is cut to the box, such as the `bb` most templates name. Apple doesn't
+document the codes, so any code of the right shape is accepted: see
+[`tArtworkOptions`](../reference/@open-music-sdk/util-artwork/interfaces/tArtworkOptions).
 
 To fit artwork into a box of another shape, pass `height` as well:
 
@@ -141,62 +132,49 @@ const image = artworkImage(artwork, 1200, { height: 300 });
 
 What you get depends on the crop:
 
-- With `bb`, the image stands inside the box. A square cover in a 1200 by 300 slot is laid out 300 by 300.
-  Don't set the box's own size on the `<img>`, or the image is stretched.
-- With a crop that fills the box, such as `sr`, the image is the box.
-- With `cc`, it's a square as long as the longer of the two sides.
+- With `bb`, the whole image stands inside the box, never enlarged. A square cover in a 1200 by 300 slot is laid
+  out 300 by 300. Don't set the box's own size on the `<img>`, or the image is stretched.
+- With `sr`, the image fills the box exactly, enlarged if it must be. A code the SDK doesn't know is taken to do
+  the same.
+- With `cc`, it's a square as long as the longer of the two sides, enlarged if it must be.
 
 Some templates leave the crop and the format open, as `{c}` and `{f}`. They're filled in the same way, with `bb`
 and `jpg` if you don't say. A URL that isn't a template of this form, such as a fixed URL for a listener's own
 playlist artwork, is returned as it is.
 
-Apple documents `{w}x{h}` and nothing else. `{c}`, `{f}`, the formats, the crop codes and the 10,000-pixel limit
-are what Apple's image server was seen to do when the SDK was written.
+Apple documents `{w}x{h}` and nothing else. The rest is what its image server was seen to do: see
+[Differences from Apple's documentation](../differences#util-artwork).
 
 ## 6. Check where the URL points
 
-The functions fill in the URL the API gave. Unless you ask, they don't look at where it points: not its scheme,
-not its host, not whether it's a URL at all. That is enough for artwork that came from Apple's API a moment ago.
+The functions fill in the URL the API gave, and don't look at where it points unless you ask. That is enough for
+artwork that came from Apple's API a moment ago.
 
 ::: warning Artwork from anywhere else can point anywhere
 Artwork from a cache, a database that others can write to, a shared link or another service can hold any URL.
-What a bad URL can do depends on where you put it:
-
-- In an `<img>`, no script runs, but the browser requests the URL. Someone else's host learns your visitor was
-  there, or a URL with no host is requested from your own site, with your visitor's cookies.
-- In a link, `window.open` or `location`, as for "open the artwork full size", a `javascript:` URL runs.
-- In a request your server makes, as in an image proxy or a link preview, the request goes wherever the URL says,
-  from inside your network.
+Pass `hosts` for it. [URLs in Apple's answers](../concepts/security#urls-in-apple-s-answers) says what a bad URL
+can do.
 :::
 
-For artwork like that, pass `hosts`:
+Anywhere, pass the hosts the artwork may come from:
 
 ```ts
 artworkImage(artwork, 300, { hosts: ["mzstatic.com"] });
 ```
 
-With `hosts`, a URL that isn't `https` on one of those hosts or a subdomain of one, with no port and no
-credentials, is a `TypeError`, and no URL is returned. `hosts` takes 1 to 16 bare host names, in lowercase. The check is made on
-the URL as it is returned, read by the same parser a browser uses.
-
-Apple serves catalog artwork from `is1-ssl.mzstatic.com` and its numbered siblings. Artwork a listener gave a
-playlist of their own may come from elsewhere, so look at what your app receives before you settle the list.
+With `hosts`, a URL that isn't `https` on one of those hosts or a subdomain of one is a `TypeError`, and no URL is
+returned. Apple serves catalog artwork from `is1-ssl.mzstatic.com` and its numbered siblings. Artwork a listener
+gave a playlist of their own may come from elsewhere, so look at what your app receives before you settle the
+list.
 
 What comes back is a URL, not markup. Assigned to an element, or given to React, it's escaped for you. Written
-into HTML by hand, it needs escaping like any other attribute value, and it isn't safe to put inside a CSS
-`url(…)` as it is.
+into HTML by hand, escape it like any other attribute value, and don't put it inside a CSS `url(…)` as it is.
 
 ## When something goes wrong
 
-Each of these is a `TypeError`:
-
-- an `artwork` that isn't an object with a `url`;
-- a `width`, `height` or density that isn't a number above 0 and at most `Number.MAX_SAFE_INTEGER`;
-- a `format` that isn't one of the six, or a `crop` that isn't shaped like a crop code;
-- `densities` that isn't a list of 1 to 16 numbers, or `hosts` that isn't a list of host names;
-- with `hosts`, an artwork whose URL isn't on one of them.
-
-No error shows the URL. The message says which argument was wrong, and for a number, what it was.
+An argument that isn't what the function takes is a `TypeError`, and so, with `hosts`, is an artwork whose URL
+isn't on one of them. The message says which argument was wrong, and for a number, what it was. No error shows
+the URL. Each function's reference, linked below, lists every case.
 
 ## Next steps
 

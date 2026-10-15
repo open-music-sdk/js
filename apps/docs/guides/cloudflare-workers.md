@@ -142,12 +142,20 @@ routes them by path alone.
 the token route. [Keep a listener's token on your server](./store-user-tokens) covers what the user-token route
 answers, and what the page posts to it.
 
+::: warning Who can post a token
+Read the warnings in [Mount the intake route](./store-user-tokens#_2-mount-the-intake-route) before you deploy
+the user-token route: on `userId`, on your CORS policy, and on rate-limiting it.
+:::
+
 ### Acting for a listener
 
 `music.forUser(userId)` gives a client for one listener. At each request it reads that listener's token from
 the store. A listener the store has no token for gets a `UserTokenInvalid` error, as does one whose token Apple
-refuses. The Worker answers `422` then, and your page asks the listener to sign in again. See
-[Handle errors](./errors).
+answers `403` to. The Worker answers `422` then, and your page asks the listener to sign in again.
+
+A listener who isn't signed in to Apple Music, or has no subscription, can get a `401` instead, which arrives as
+`DeveloperTokenInvalid` and which this Worker rethrows. `validateUserToken` tells it apart from a developer token
+Apple refuses. See [Handle errors](./errors).
 
 ## 4. Keep listeners' tokens in Workers KV
 

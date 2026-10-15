@@ -59,7 +59,7 @@ export function Library() {
     ...queries.user.listLibraryPlaylists(),
     enabled: token !== undefined,
   });
-  const playlists = data?.pages.flatMap((page): tLibraryPlaylist[] => page.data) ?? [];
+  const playlists = data?.pages.flatMap((page): tLibraryPlaylist[] => page.data ?? []) ?? [];
   return (
     <>
       <ul>
@@ -150,7 +150,8 @@ Every key has this shape:
 ["open-music-sdk", 0, "catalog", "getAlbum", "1613600183"]
 ```
 
-- An option object is keyed by what it holds. A function or a signal among the arguments is left out.
+- An option object is keyed by what it holds, and a function or a signal in it is left out. A function or a
+  signal passed as an argument of its own keeps its place in the key, as `undefined`.
 - A `schema` is keyed as the string `"schema"`, so two calls that differ only in their schema share a key.
 - A token is never part of a key.
 

@@ -20,9 +20,7 @@ Install `core`, `developer-token`, and the packages whose functions you call:
 pnpm add @open-music-sdk/core @open-music-sdk/developer-token @open-music-sdk/client-catalog
 ```
 
-Keep every package on the same version as `core`. If your app ends up with two copies of `core` anyway, nothing
-breaks: a client from one is a client to the other, and an error from one is recognised by the other. But your
-app then carries both.
+Keep every package on [the same version as `core`](../concepts/packages#one-version-for-every-package).
 
 ## 2. Create the client
 
@@ -54,8 +52,11 @@ const developerToken = developerTokenFetcher("/api/music/token");
 const music = createClient({ developerToken, storefront: "us" });
 ```
 
-Both providers reuse a token and replace it before it expires. A relative URL is resolved against the page each
-time a token is fetched, so outside a browser, pass an absolute one.
+Both providers reuse a token and replace it before it expires.
+
+The fetcher resolves a relative URL against the document's base URL each time it fetches a token, so outside a
+browser, pass an absolute one. In a page, a `<base>` element put into it later would move where the token comes
+from: set `base-uri 'self'` in your content security policy. See the [security model](../concepts/security).
 
 `createClient` also takes the options an integration passes on to it, such as `userTokenStore`, `retry`,
 `rateLimit` and the hooks. It checks them when you call it, so a mistake is a `TypeError` there.
@@ -99,14 +100,9 @@ const album = await store.getAlbum("1613600183"); // the album itself
 for await (const track of store.getAlbumRelationship("1613600183", "tracks")) console.log(track.attributes?.name);
 ```
 
-| The function | Called with the client | Bound |
-| --- | --- | --- |
-| One resource, such as `getAlbum` | Apple's answer, `{ data: [album] }` | The resource. An answer that holds none is an `ApiError`. |
-| Several, such as `getSongs` | Apple's answer, `{ data: [...] }` | The list, empty when Apple sent none |
-| A collection, a relationship or a view, such as `listLibraryPlaylists` | The first page, `{ data, next }` | Every item of every page, as an `AsyncIterable` |
-| A write that answers with a resource, such as `createLibraryPlaylist` | Apple's answer | The resource, or `undefined` when the answer holds none |
-| A write that answers with nothing, such as `addToLibrary` | Nothing | Nothing |
-| A search, the charts, `getLanguageTag` | Apple's answer | The same answer |
+What each kind of function gives, called with the client and bound, is under "Two ways to call" in the reference
+for [`client-catalog`](../reference/@open-music-sdk/client-catalog/#two-ways-to-call) and
+[`client-user`](../reference/@open-music-sdk/client-user/#two-ways-to-call).
 
 A bound namespace holds every function of its package, so your bundle holds them all. To keep a bundle small,
 call the functions you import with the client instead.

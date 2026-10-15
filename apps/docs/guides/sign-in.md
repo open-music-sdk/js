@@ -40,15 +40,12 @@ const signIn = createConnect(music, { app: { name: "Crate Digger" } });
 
 `app.name` is what Apple's sign-in window shows of your app. You can add `app.build`, your app's version.
 
-The script is one download from Apple, about 140 kB compressed as measured on 10 October 2026. A page that never
-creates the helper never downloads it, and a page downloads it once however many helpers it creates. You can't
-pin it to a version, because Apple serves it from one unversioned URL, and Apple's licence doesn't let you bundle
-it or host it yourself. As on every site that uses MusicKit, the script runs with your page's access.
+The script is one download from Apple, about 140 kB compressed as measured on 10 October 2026, made only by a
+page that creates the helper. It runs with your page's access, and you can't pin it, bundle it or host it
+yourself: see [Apple's script](../concepts/security#apple-s-script) in the security model.
 
 Create one helper per page. A second helper for the same app shares the first one's script and configuration. A
-second helper for a different `app` is a `TypeError`, because Apple's script is one global and the second app
-would silently replace the first. An element in your page whose id is `MusicKit` is passed over, and the script
-is loaded anyway.
+second helper for a different `app` is a `TypeError`.
 
 ## 3. Enable the button on `ready`
 
@@ -72,8 +69,10 @@ Otherwise it resolves to `undefined`.
 when the developer token can't be fetched from your route. After a failure, the next `connect()` loads and
 configures the script again before it opens the window.
 
-While the helper lives, it keeps the developer token fresh. It fetches a new one halfway through the token's life
-and when the tab comes back, and gives it to Apple's script, so `connect()` has nothing to wait for at the click.
+While the helper lives, it keeps Apple's script supplied with a current developer token, so `connect()` has
+nothing to wait for at the click. It asks the client's token provider again halfway through the token's life and
+when the tab comes back, and gives Apple's script any token that changed. The provider hands back the token it
+holds until that one is due to be replaced.
 
 ## 4. Call `connect()` inside the click
 
@@ -106,6 +105,9 @@ signOutButton.onclick = () => void signIn.disconnect().catch(showWhyNot);
 the token the script kept, so the next page load restores nothing. Forgetting the token in your page alone isn't
 a sign-out: the script would restore it on the next visit.
 
+`disconnect()` does nothing where Apple's script has no sign-out function, or where the page holds no
+configuration, as after a `ready` that failed.
+
 When you no longer need the helper, call `signIn.dispose()`. It stops keeping the developer token fresh, and
 leaves Apple's script in the page.
 
@@ -113,31 +115,23 @@ leaves Apple's script in the page.
 
 Apple's script is loaded from `MUSICKIT_SCRIPT`, which the package exports: a URL on
 `https://js-cdn.music.apple.com`. If your site sends a content security policy, allow that host in `script-src`,
-and set `base-uri 'self'` so that no `<base>` element put into your page can move where anything is fetched
-from. A page that calls Apple also needs `https://api.music.apple.com` in `connect-src`:
+set `base-uri 'self'`, and, in a page that calls Apple, allow `https://api.music.apple.com` in `connect-src`.
+Send a `Cross-Origin-Opener-Policy` of `same-origin-allow-popups`, not `same-origin`, which is expected to cut
+your page off from the sign-in window:
 
 ```http
 Content-Security-Policy: script-src 'self' https://js-cdn.music.apple.com; connect-src 'self' https://api.music.apple.com; base-uri 'self'
 Cross-Origin-Opener-Policy: same-origin-allow-popups
 ```
 
-A `Cross-Origin-Opener-Policy` of `same-origin` is expected to cut your page off from the sign-in window, and
-`same-origin-allow-popups` to keep it.
-
 If your policy uses a nonce or Trusted Types, load Apple's script yourself, and pass its `MusicKit` global as the
 `musicKit` option of `createConnect`.
 
-::: info Not yet run against the live API
-No sign-in has run against Apple's live script yet. The first one has to settle:
+[Apple's script](../concepts/security#apple-s-script) in the security model says what each header guards against.
 
-- whether loading and configuring the script before the click keeps the window inside the click in every
-  browser, Safari first.
-- whether a decline is the script answering with nothing, or a rejection, and with what.
-- what a configured script holds for a returning listener, and whether it takes a new developer token.
-- whether a `MusicKit` global your page loaded itself can be configured before its `musickitloaded` event.
-- which of Apple's hosts a strict `connect-src` needs, and what each `Cross-Origin-Opener-Policy` does to the
-  sign-in window.
-- whether `disconnect()` also ends the token at Apple, and with it a copy your server stored.
+::: info Not yet run against the live API
+No sign-in has run against Apple's live script yet: [Differences from Apple's documentation](../differences#browser)
+lists what the first one has to settle.
 :::
 
 ## 7. Decide where the token goes
@@ -160,8 +154,11 @@ Hybrid: the page posts the token to your server, which stores it and calls Apple
 [Keep a listener's token on your server](./store-user-tokens). When the listener signs out, also have your server
 delete the token it stored.
 
+::: warning Apple's script keeps a copy of the token
 Apple's script keeps its own copy of the token in the browser's storage, which is how a returning listener is
-still signed in. The [security model](../concepts/security) explains what that exposes.
+still signed in, so a cross-site scripting hole on your origin exposes the token on any later visit. See
+[In a page](../concepts/security#in-a-page) in the security model.
+:::
 
 ## In React
 

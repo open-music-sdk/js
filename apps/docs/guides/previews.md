@@ -10,8 +10,9 @@ Before you start, you need:
   developer token from.
 
 No listener has to sign in. The player asks Apple for nothing: it plays the clips of tracks you already fetched.
-It runs in a page only, because it needs an audio element. The API hands over no audio but previews, so there is
-no way to play a whole song.
+It runs in a page only, because it needs an audio element. The API hands over no audio but previews, so this SDK
+has no way to play a whole song. [MusicKit on the Web](../glossary#musickit-on-the-web) plays whole songs for a
+listener with an Apple Music subscription.
 
 ## 1. Get the tracks from the catalog
 
@@ -43,13 +44,9 @@ const { tracks: queue, skipped } = player.load(tracks);
 of track you feed it, and is what `player.state.track` is typed as.
 
 `load` replaces the queue with the tracks that have a clip, in the order you gave them, and plays nothing. Each
-entry of `skipped` is a track it left out:
-
-| Field | What it holds |
-| --- | --- |
-| `index` | Where the track was in the list you gave `load`, counted from 0 |
-| `track` | The track, as you gave it |
-| `reason` | `"no-preview"`: it has no clip. `"host"`: its clip isn't on a host you allow (see step 7). |
+entry of `skipped` is a track it left out, with its `index` in your list and a `reason`: `"no-preview"` for a track
+with no clip, `"host"` for a clip on a host you don't allow (see step 7). See
+[`tSkippedPreview`](../reference/@open-music-sdk/lib-preview-player/interfaces/tSkippedPreview).
 
 A track without a clip is never an error, so you can draw it with its play button turned off.
 
@@ -83,9 +80,9 @@ The buttons and `showWhyNot` stand for your own code.
   later call's, so catch the error and carry on.
 
 ::: info Not yet run against the live API
-The player hasn't been run in a browser against a clip from the live API. It takes on trust how browsers behave:
-that the first sound may follow a click, that one clip may follow another on the same element without a second
-click, and that an element says it has ended only after it has paused.
+Don't count on the next clip starting without a second click until you've tried it in the browsers you support:
+the player hasn't played a clip from the live API in a browser yet. See
+[Differences from Apple's documentation](../differences#lib-preview-player) for what it takes on trust.
 :::
 
 ## 4. Draw the player's state
@@ -104,24 +101,13 @@ player.subscribe(() => {
 `subscribe` calls your listener after each change and returns the function that stops it. While a clip plays,
 `position` changes several times a second.
 
-`player.state` is a frozen snapshot, and stays the same object until something changes. It holds:
+`player.state` is a frozen snapshot, and stays the same object until something changes. It holds the `status`,
+the queue as `tracks`, the current `index` and `track`, the clip's `position` and `duration`, and the `volume`. See
+[`tPreviewPlayerState`](../reference/@open-music-sdk/lib-preview-player/interfaces/tPreviewPlayerState).
 
-| Field | What it holds |
-| --- | --- |
-| `status` | Where the player stands: see the next table |
-| `tracks` | The queue |
-| `index`, `track` | The current track's place in the queue, and the track. `-1` and `undefined` when none is current. |
-| `position`, `duration` | How far into the current clip the element is, and how long the clip is, in seconds. `duration` is 0 until the element knows it. |
-| `volume` | The element's volume, from 0 to 1 |
-
-| `status` | Means |
-| --- | --- |
-| `idle` | No track is current: nothing has played yet, or a queue was just loaded |
-| `loading` | A clip was asked for and hasn't begun, or has stopped to wait for more of itself |
-| `playing` | A clip is playing |
-| `paused` | A clip is current and isn't playing |
-| `ended` | The last clip of the queue ran out |
-| `error` | The element couldn't play the current clip. `next()` moves on, and `play()` asks for the same clip again. |
+`status` is one of `idle`, `loading`, `playing`, `paused`, `ended` and `error`, which
+[`tPreviewStatus`](../reference/@open-music-sdk/lib-preview-player/type-aliases/tPreviewStatus) explains. After an
+`error`, `next()` moves on, and `play()` asks for the same clip again.
 
 A listener may call the player back, for example to pause or load another queue, and what it does stands. A
 listener that throws stops neither the player nor the other listeners. The first error is then thrown to
@@ -199,9 +185,10 @@ the element shows as the state's volume.
 
 When you're done with a player you made with `previewPlayer`, call `player.dispose()`. It pauses, takes the clip
 and the player's listeners off the element, and forgets the queue and your subscribers. The element is yours
-again. After that, every other function of the player throws a `TypeError`. Where the runtime has
-`Symbol.asyncDispose`, `await using player = previewPlayer()` disposes it for you; in a browser without it, call
-`dispose()`. In React, the hook disposes the player for you.
+again. After that, `play`, `next` and `previous` reject with a `TypeError`, `load`, `pause`, `seek`, `setVolume`
+and `subscribe` throw one, and `dispose()` again does nothing. Where the runtime has `Symbol.asyncDispose`,
+`await using player = previewPlayer()` disposes it for you; in a browser without it, call `dispose()`. In React,
+the hook disposes the player for you.
 
 ## 7. Check where clips point
 
@@ -210,7 +197,7 @@ is.
 
 ::: warning A stored track can point anywhere
 A track from a cache, a database that others can write to, or a shared link can hold any URL, and the audio
-element will request it.
+element will request it. See [URLs in Apple's answers](../concepts/security#urls-in-apple-s-answers).
 :::
 
 For tracks like those, pass `hosts` when you make the player:
@@ -223,11 +210,8 @@ const player = previewPlayer<tSong>({ hosts: ["itunes.apple.com"] });
 hosts or a subdomain of one, with no port and no credentials, is skipped with the reason `"host"`. Without it,
 where a clip points isn't checked at all.
 
-::: info Not yet run against the live API
-Apple doesn't document which host serves preview clips. `itunes.apple.com` is a guess, from clips seen elsewhere
-on `audio-ssl.itunes.apple.com`, and hasn't been checked against the live API. Look at what your own answers
-hold before you set `hosts`.
-:::
+Apple doesn't document which host serves the clips, so `itunes.apple.com` is
+[a guess](../differences#lib-preview-player). Look at what your own answers hold before you set `hosts`.
 
 `previewPlayer` checks `audio` and `hosts` when it makes the player, so a mistake in either is a `TypeError`
 then, not on the first click. Changing your options object afterwards changes nothing.

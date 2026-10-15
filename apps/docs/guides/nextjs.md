@@ -100,6 +100,11 @@ export const POST = userTokenIntake(music, { store, userId: (req) => sessionUser
 when there is none. [Keep a listener's token on your server](./store-user-tokens) covers what the route answers
 and what the page sends.
 
+::: warning Who can post a token
+Read the warnings in [Mount the intake route](./store-user-tokens#_2-mount-the-intake-route) before you deploy
+this route: on `userId`, on your CORS policy, and on rate-limiting it.
+:::
+
 ## 5. Wrap the app in `MusicProvider`
 
 Client components get their client from `MusicProvider`. Make the page's client once, outside the tree, in a
@@ -176,8 +181,11 @@ export async function addToLibrary(songId: string): Promise<"added" | "sign-in-a
 ```
 
 The client looks the token up in the store at each request. A listener the store has no token for gets a
-`UserTokenInvalid` error, as does one whose token Apple refuses. Either way, ask them to sign in again. See
-[Handle errors](./errors).
+`UserTokenInvalid` error, as does one whose token Apple answers `403` to. Either way, ask them to sign in again.
+
+A listener who isn't signed in to Apple Music, or has no subscription, can get a `401` instead, which arrives as
+`DeveloperTokenInvalid` and which this action rethrows. `validateUserToken` tells it apart from a developer token
+Apple refuses. See [Handle errors](./errors).
 
 ## 8. Cache catalog reads
 

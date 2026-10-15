@@ -43,9 +43,11 @@ In your page, give the route's URL to `createBrowserClient`:
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
 const album = await music.catalog.getAlbum("1613600183");
 ```
+
+`storefront` is the [storefront](../glossary#storefront) the catalog is read in.
 
 The client fetches a token the first time a request needs one and replaces it in the background before it
 expires. A relative URL is resolved against the page's address when you create the client.

@@ -58,11 +58,15 @@ from a function on `music.catalog` or `music.user` that hands over one resource,
 
 ### Writes that may have happened
 
-The client sends a `POST` again only after a `429`, or when there was no developer token to send it with. Those
-two failures mean Apple didn't carry it out. After a `5xx` or a `NetworkError`, Apple may have carried it out
-before the answer was lost, so the error reaches you at once.
+The client sends a `POST`, such as `addToLibrary` or `createLibraryPlaylist`, again only after a `429`, when
+there was no developer token to send it with, or once after a `401`, when its provider gives a fresh developer
+token. Those failures mean Apple didn't carry it out. After a `5xx` or a `NetworkError`, Apple may have carried it
+out before the answer was lost, so the error reaches you at once.
 
-Before you try such a write again, check whether it happened. For example, read the playlist before you add the
+Only a `POST` is held back. A `PUT` or a `DELETE`, such as `setSongRating` or `deleteSongRating`, is retried after
+a `5xx` or a `NetworkError` like any other request.
+
+Before you try a `POST` again, check whether it happened. For example, read the playlist before you add the
 same tracks again.
 
 ## 3. Let a `TypeError` and an abort through
