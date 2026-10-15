@@ -1,10 +1,15 @@
+import { spawn } from "node:child_process";
 import { generateKeyPairSync } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { FileUserTokenStore } from "./files";
 import { main } from "./main";
+
+// No browser is opened by these tests: what login asks the system to run is recorded instead.
+vi.mock("node:child_process", () => ({ spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) }));
 
 const TEAM = "DEF123GHIJ";
 const KEY_ID = "ABC123DEFG";
@@ -322,6 +327,39 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(stderr).toContain("open-music-sdk token");
     expect(stdout).toBe("");
     expect(stderr).not.toContain(TOKEN);
+  });
+
+  test("the browser is opened with the system's own command, the address one argument of it and no shell between", async () => {
+    vi.mocked(spawn).mockClear();
+    const { status } = await signIn(["login", "--key", keyPath, "--team-id", TEAM]);
+    expect(status).toBe(0);
+    expect(spawn).toHaveBeenCalledTimes(1);
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] ?? [];
+    expect(command).toBe(process.platform === "win32" ? "explorer.exe" : process.platform === "darwin" ? "open" : "xdg-open");
+    expect(args).toEqual([expect.stringMatching(/^http:\/\/localhost:\d+\/\?state=[\w-]{43}$/)]);
+    expect(options).toEqual({ stdio: "ignore", detached: true });
+    // The address is printed as well, whether or not a browser opens.
+    expect(stderr).toContain((args as string[])[0]);
+  });
+
+  test("--no-browser opens nothing and prints the address", async () => {
+    vi.mocked(spawn).mockClear();
+    expect((await signIn(["login", "--no-browser", "--key", keyPath, "--team-id", TEAM])).status).toBe(0);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  test("--port is the port the page is served on", async () => {
+    const probe = createServer();
+    const port = await new Promise<number>((resolve) => {
+      probe.listen(0, "127.0.0.1", () => {
+        const address = probe.address();
+        resolve(typeof address === "object" && address !== null ? address.port : 0);
+      });
+    });
+    await new Promise((resolve) => probe.close(resolve));
+    const { status } = await signIn(["login", "--no-browser", "--port", String(port), "--key", keyPath, "--team-id", TEAM]);
+    expect(status).toBe(0);
+    expect(stderr).toContain(`http://localhost:${String(port)}/?state=`);
   });
 
   test("after it, the other commands need no flags", async () => {
