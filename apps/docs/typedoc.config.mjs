@@ -22,14 +22,17 @@ for (const dir of packages) {
 }
 
 const validation = { notExported: true, invalidLink: true, rewrittenLink: true, notDocumented: true };
+// TypeDoc's own list, and a namespace such as `schemas`, which it does not ask a comment of by default.
+const requiredToBeDocumented = ["Enum", "EnumMember", "Variable", "Function", "Class", "Interface", "Property", "Method", "Accessor", "TypeAlias", "Namespace"];
 
 export default {
   name: "Reference",
   readme: "none",
   entryPointStrategy: "packages",
   entryPoints: packages.map((dir) => join(root, dir)),
-  packageOptions: { entryPoints: ["src/index.ts"], compilerOptions: { paths }, validation },
+  packageOptions: { entryPoints: ["src/index.ts"], compilerOptions: { paths }, validation, requiredToBeDocumented },
   validation,
+  requiredToBeDocumented,
   plugin: ["typedoc-plugin-markdown", "typedoc-vitepress-theme", "./typedoc.plugin.mjs"],
   out: "reference",
   // Each package's README opens its page, rather than sitting on a page of its own.
