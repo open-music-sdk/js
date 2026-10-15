@@ -1,71 +1,78 @@
 # @open-music-sdk/validate
 
-Runtime validators for Apple Music API responses, generated from Apple's documentation. One validator
-per object, each implementing [Standard Schema](https://standardschema.dev), so they plug into TanStack,
-tRPC, and anything else that accepts a Standard Schema. Opt-in: nothing in the SDK validates unless you
-ask it to.
+Runtime validators for the Apple Music API's answers, generated from Apple's documentation: one for each object,
+each a [Standard Schema](https://open-music-sdk.github.io/js/glossary#standard-schema), so they also work with
+TanStack, tRPC and anything else that takes one. Nothing in the SDK validates unless you pass one.
+
+Most apps install [`server`](../../integrations/server/README.md), [`browser`](../../integrations/browser/README.md)
+or [`react`](../../integrations/react/README.md) instead, which re-export every validator under `schemas`, such as
+`schemas.song`. Use this one to build your own client.
 
 ```
 pnpm add @open-music-sdk/validate
 ```
 
-```ts
-import { song, anyResource } from "@open-music-sdk/validate";
+## Example
 
-const result = song["~standard"].validate(await res.json());
-if (result.issues) {
-  // [{ message: "required", path: ["href"] }, { message: "expected string", path: ["attributes", "name"] }]
-} else {
-  result.value; // typed as tSong from @open-music-sdk/types
-}
-```
-
-Validation is synchronous, so `result` never needs awaiting.
-
-Within the SDK a validator is passed as `schema`: to `request` in [`@open-music-sdk/core`](../core/README.md),
-or to any function of [`@open-music-sdk/client-catalog`](../../clients/client-catalog/README.md) and
-[`@open-music-sdk/client-user`](../../clients/client-user/README.md). A failure there is a `ValidationError`
-with the issues attached.
+Anywhere. `music` is a client from `createClient`, and `value` is a value you got some other way:
 
 ```ts
 import { getSong } from "@open-music-sdk/client-catalog";
-import { songsResponse } from "@open-music-sdk/validate";
+import { song, songsResponse } from "@open-music-sdk/validate";
 
+// As a schema: a mismatch is an AppleMusicError tagged ValidationError, with the issues attached.
 const { data } = await getSong(music, "1613600188", { schema: songsResponse });
+
+// On its own: the check is synchronous, so the result never needs awaiting.
+const result = song["~standard"].validate(value);
+if (result.issues) console.warn(result.issues); // [{ message: "required", path: ["href"] }, ...]
+else console.log(result.value.attributes?.name); // result.value is a tSong
 ```
 
-## What is in it
+A validator is taken as `schema` by `core`'s `request` and by every function of `client-catalog` and
+`client-user`.
 
-| Export                                  | Validates                                     |
-| --------------------------------------- | --------------------------------------------- |
-| `song`, `album`, `playlist`, ...        | One resource object                           |
-| `songAttributes`, `artwork`, ...        | Any dictionary from the docs, by its camelCase name |
-| `songsResponse`, `errorsResponse`, ...  | Response envelopes                            |
-| `anyResource`                           | Any resource, discriminated by `type`         |
-| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult`, `tCheck` | Types for writing code against validators, and the raw check a validator is composed from |
+## What's in it
 
-Names are the dictionary names from Apple's docs with dots removed, the first letter lowercased, and
-the prefix singularized where the object is a single thing: `Songs.Attributes` is `songAttributes`,
-and its output type is `tSongAttributes` from [`@open-music-sdk/types`](../types/README.md). Collections keep
-their plural (`songsResponse`).
+| Export | What it validates |
+| --- | --- |
+| `song`, `album`, `playlist`, ... | One resource object |
+| `songAttributes`, `artwork`, ... | Any dictionary in Apple's documentation |
+| `songsResponse`, `errorsResponse`, ... | Response envelopes |
+| `anyResource` | Any resource, told apart by `type` |
+| `tSchema<T>`, `tStandardSchemaV1`, `tIssue`, `tResult`, `tCheck` | Types for code that works with validators, and the raw check a validator is built from |
 
-## What a validator checks
+The validators are plain constants, over a runtime of a handful of small functions, so a bundler keeps only the
+ones you import and what they refer to.
 
-- Required properties are present; optional ones are checked only when present.
-- Scalars have the documented type; `allowedValues` are enforced as literals.
-- Arrays, nested dictionaries, and unions (`[*]` in the docs) are checked recursively.
-- Unknown keys are allowed. Apple adds attributes without notice and that should not break a client.
+### Names
 
-Issues carry a `path` from the root of the value, so a bad field deep in a response is easy to find.
+A name is the dictionary's name in Apple's documentation with the dots removed, the first letter in lower case, and
+in the singular where the object is a single thing: `Songs.Attributes` is `songAttributes`, and what it gives is a
+`tSongAttributes` from [`@open-music-sdk/types`](../types/README.md). A collection keeps the plural:
+`songsResponse`.
 
-## Size
+### What a validator checks
 
-The runtime is a handful of combinators in about 100 lines. Validators are plain constants, so a bundler
-keeps only the ones you import plus what they reference.
+- A required property is there. An optional one is checked only when it's there.
+- A scalar has the type Apple documents. A property with an `allowedValues` list holds one of them.
+- Lists, nested dictionaries and unions (`[*]` in the documentation) are checked all the way down.
+- A key Apple doesn't document is allowed. Apple adds attributes without notice, and that shouldn't break your app.
 
-## Regenerating
+Each issue carries a `path` from the top of the value, so a bad field deep in an answer is easy to find.
 
-Everything under `src/generated/` and `src/index.ts` is written by
-[`codegen`](https://github.com/open-music-sdk/js/tree/main/codegen#readme), one file per resource family mirroring `@open-music-sdk/types`;
-`src/runtime.ts` is the hand-written part. Do not edit the generated files; re-run the crawl and the
-emitter instead.
+### Regenerating
+
+Everything under `src/generated/`, and `src/index.ts`, is written by
+[`codegen`](https://github.com/open-music-sdk/js/blob/main/codegen/README.md), one file per resource family, as in
+`@open-music-sdk/types`. `src/runtime.ts` is written by hand. Don't edit the generated files: run the crawl and the
+emitter again instead.
+
+## Learn more
+
+- [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation), with the validators for
+  relationships and views, and a schema of your own
+- [Errors](https://open-music-sdk.github.io/js/concepts/errors), for `ValidationError`
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#validate)
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/validate/), with every
+  validator's name
