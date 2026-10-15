@@ -12,7 +12,8 @@ import { got, type tTokenContext } from "@open-music-sdk/core";
  * While it holds a token that has not expired, it asks its source at most once a minute:
  *
  * - A token Apple answers 401 to within a minute of its being issued is handed back, not replaced: the same key or
- *   endpoint would only give the same again.
+ *   endpoint would only give the same again. So is one whose 401 is really about the listener, signed out or not
+ *   subscribed, which a new token would not fix.
  * - When a replacement cannot be had, the held token stays in service.
  * - A token that looks expired when it arrives, as every token does to a browser whose clock runs fast, is used for
  *   a minute rather than fetched again for every request.

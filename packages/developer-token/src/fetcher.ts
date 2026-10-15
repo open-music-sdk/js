@@ -68,7 +68,8 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * | answers 2xx without a JWT that has an `exp`, or with more than 16 KB | the endpoint's | No |
  *
  * @param url - The endpoint: `http` or `https`, with no username or password in it. Absolute, or relative to the
- *   page in a browser.
+ *   document's base URL in a browser, resolved again each time a token is fetched, so a `<base>` element added to
+ *   the page later changes where the token is fetched from.
  * @param options - The fetch to use, how far ahead of `exp` the next token is fetched, and how long to wait for one.
  * @returns A provider to pass as `developerToken`. While it holds no usable token it rejects with what went wrong
  *   at the endpoint, as `DeveloperTokenUnavailable`; with a `TypeError` when `url` is relative and there is no
