@@ -3,8 +3,23 @@ import { got, type tTokenContext } from "@open-music-sdk/core";
 /**
  * A core `tTokenProvider` that always answers with a promise and needs no context, so it is easy to call directly.
  *
+ * It gets a token on first use and reuses it. Halfway through the life the token had left when it arrived, or
+ * `refreshAheadSeconds` before its `exp` if that is later, it gets a replacement in the background: callers keep
+ * getting the held token, nobody waits, and a replacement that fails is tried again a minute later. Only when no
+ * usable token is held does a caller wait for one, or see the failure to get one; the next call then tries again.
+ * Concurrent calls share one mint or fetch.
+ *
+ * While it holds a token that has not expired, it asks its source at most once a minute:
+ *
+ * - A token Apple answers 401 to within a minute of its being issued is handed back, not replaced: the same key or
+ *   endpoint would only give the same again.
+ * - When a replacement cannot be had, the held token stays in service.
+ * - A token that looks expired when it arrives, as every token does to a browser whose clock runs fast, is used for
+ *   a minute rather than fetched again for every request.
+ *
  * @param ctx - What core's client passes: a `signal` to stop waiting on, and under `rejected` the token Apple just
- *   answered 401 to, which asks for a replacement.
+ *   answered 401 to, which asks for a replacement. An abort ends this call's wait alone; a mint or fetch that other
+ *   calls share goes on.
  * @returns The token held, or the first one, once it has been issued.
  * @throws TypeError if the source cannot issue at all while no usable token is held: the minter's `pem` is not a
  *   PKCS8 P-256 private key, or the fetcher's URL is relative and there is no document to resolve it against.
