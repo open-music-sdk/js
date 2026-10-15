@@ -44,7 +44,10 @@ export type tQueryOf<F> =
     : (...args: A) => tQuery<Awaited<U>>
   : never;
 
-/** Every read function of `F`, as its query. */
+/**
+ * Every read function of `F`, as its query. A relationship or a view is generic over its name, which a mapped type
+ * loses, so its query is typed as the union of what any of its names holds.
+ */
 export type tQueries<F> = { readonly [K in keyof F as [tQueryOf<F[K]>] extends [never] ? never : K]: tQueryOf<F[K]> };
 
 /** What `musicQueries` gives: the catalog's and the listener's read functions, each as its query. */
@@ -138,13 +141,14 @@ function queriesOf<F extends object>(ns: "catalog" | "user", music: tAppleMusicC
  * Every read function of the catalog and of the listener's library, as its query for TanStack Query: one function of
  * the same arguments for each, giving what `useQuery` takes, or what `useInfiniteQuery` takes for one that walks
  * pages. A write is not among them: it is `useMutation` over the client's namespace. `scope` goes into every key, so
- * that one listener's cache is never another's: `useMusicQueries` passes the provider's generation, raised by every
- * change of token. A token is never part of a key. Made once for one client and reused; nothing is asked until a
- * query runs.
+ * that one listener's cache is never another's: `useMusicQueries` passes the provider's scope, a new one for every
+ * sign-in. A token is never part of a key. No `staleTime` is set: that is your app's to choose. Made once for one
+ * client and reused; nothing is asked until a query runs.
  *
  * @param music - The client the queries ask through: from `createClient`, `createServerClient` or
  * `createBrowserClient`, or anything with its five functions.
- * @param scope - What tells one listener's keys from another's: the provider's generation, or your own. Default 0.
+ * @param scope - What tells one listener's keys from another's: the provider's scope, or your own. Default 0, the
+ * scope of a page's client before any sign-in, so a server's prefetch of the catalog matches the page's queries.
  * @returns The two namespaces of query builders, frozen.
  * @throws TypeError if `music` is not a client, or `scope` is neither a string nor a number.
  */
