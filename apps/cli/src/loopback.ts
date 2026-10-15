@@ -27,8 +27,8 @@ export interface tLoopback {
   /** The page, with this run's state in it: what the browser opens. */
   readonly url: string;
   /**
-   * Settles once the store has the token Apple accepted and the page has been told, or rejects with what a request
-   * failed with that is not the request's own.
+   * Settles once the store has the token Apple accepted and the page has been told, or its connection is gone; or
+   * rejects with what a request failed with that is not the request's own.
    */
   readonly stored: Promise<void>;
   /** Stops listening and drops every connection. */
@@ -96,7 +96,7 @@ function isState(state: Buffer, given: string | null): boolean {
  * - `/token?state=` is `tokenEndpoint`, minting fifteen-minute tokens bound to the page's origin;
  * - `/user-token` is `userTokenIntake`, which takes a post only with the state in an `x-login-state` header, asks
  *   Apple, and only then stores; the header and the JSON body make another site's post ask first, and nothing
- *   here answers that asking.
+ *   here answers that asking. One token is taken: a post while another is asked about, or after one is kept, is 409.
  *
  * Anything else is 404. The state is fresh for each run.
  *
@@ -113,17 +113,10 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
     resolveStored = resolve;
     rejectStored = reject;
   });
-  // The intake calls `set` once Apple has accepted the token. What `login` waits for is the page being told so as
-  // well, since the server closes as soon as it hears: until then, the answer is only on its way.
+  // One token is taken: while a post is being asked about, or once one is kept, another is turned away, so the token
+  // kept is the one the terminal reports.
+  let asking = false;
   let kept = false;
-  const waited: tUserTokenStore = {
-    get: (id) => store.get(id),
-    delete: (id) => store.delete(id),
-    set: async (id, token) => {
-      await store.set(id, token);
-      kept = true;
-    },
-  };
 
   const server = createServer();
   await new Promise<void>((resolve, reject) => {
@@ -137,7 +130,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
   const origin = `http://${host}`;
 
   const endpoint = tokenEndpoint({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, origin: [origin] });
-  const intake = userTokenIntake(music, { store: waited, userId: (req) => (isState(stateBytes, req.headers.get("x-login-state")) ? userId : undefined) });
+  const intake = userTokenIntake(music, { store, userId: (req) => (isState(stateBytes, req.headers.get("x-login-state")) ? userId : undefined) });
 
   const route = async (req: Request): Promise<Response> => {
     if (req.headers.get("host")?.toLowerCase() !== host) return text(421, "Misdirected Request");
@@ -147,7 +140,18 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
       return new Response(PAGE, { headers: { ...PAGE_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": CSP } });
     if (url.pathname === "/page.js" && req.method === "GET") return new Response(await readFile(script), { headers: { ...PAGE_HEADERS, "content-type": "text/javascript; charset=utf-8" } });
     if (url.pathname === "/token" && ours) return endpoint(req);
-    if (url.pathname === "/user-token") return intake(req);
+    if (url.pathname === "/user-token") {
+      if (asking || kept) return text(409, kept ? "A token is kept already." : "Another token is being asked about.");
+      asking = true;
+      try {
+        // 204 once Apple has accepted the token and the store has it.
+        const answer = await intake(req);
+        kept = answer.status === 204;
+        return answer;
+      } finally {
+        asking = false;
+      }
+    }
     return text(404, "Not Found");
   };
 
@@ -159,10 +163,14 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
     }
     route(request).then(
       async (response) => {
+        // The token is kept. `login` closes the server as soon as it hears, so it hears once the page has been told,
+        // or once the page's connection is gone and there is no one left to tell.
+        if (response.status === 204 && new URL(request.url).pathname === "/user-token") {
+          if (res.closed) resolveStored();
+          else res.once("close", resolveStored);
+        }
         res.writeHead(response.status, Object.fromEntries(response.headers));
-        res.end(Buffer.from(await response.arrayBuffer()), () => {
-          if (kept && response.status === 204 && new URL(request.url).pathname === "/user-token") resolveStored();
-        });
+        res.end(Buffer.from(await response.arrayBuffer()));
       },
       (e: unknown) => {
         res.writeHead(500, { "cache-control": "no-store" }).end();

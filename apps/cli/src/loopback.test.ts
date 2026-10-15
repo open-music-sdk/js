@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import v8 from "node:v8";
 import { runInNewContext } from "node:vm";
 import { MemoryUserTokenStore, createServerClient, type tUserTokenStore } from "@open-music-sdk/server";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { CliError, type tKey } from "./files";
 import { startLoopback, toRequest, type tLoopback } from "./loopback";
 
@@ -145,7 +145,8 @@ describe("startLoopback: the page and its address", () => {
   test("a request node:http takes and fetch does not, from anyone on this machine, is refused and leaves the server running", async () => {
     const { port, state } = await start();
     for (const method of ["TRACE", "TRACK", "CONNECT"]) {
-      const answered = await send(port, method === "CONNECT" ? `localhost:${String(port)}` : "/", { method }).catch((e: unknown) => e);
+      // node:http drops a CONNECT it has no handler for; the others are answered.
+      const answered = await send(port, method === "CONNECT" ? `localhost:${String(port)}` : "/", { method }).catch((e: unknown) => e as Error);
       if (!(answered instanceof Error)) expect(answered.status, method).toBe(400);
     }
     expect((await send(port, `/?state=${state}`)).status).toBe(200);
@@ -193,6 +194,64 @@ describe("startLoopback: the token route, a dispenser only for this page", () =>
 });
 
 describe("startLoopback: the intake, which asks Apple before it stores", () => {
+  test("login hears only once the page has been told: closing the server the moment it hears leaves the page its 204", async () => {
+    const { loopback: running, port, state } = await start();
+    // What login does: close as soon as the wait settles.
+    void running.stored.then(() => running.close());
+    const answer = await postToken(port, state);
+    expect(answer.status).toBe(204);
+    await running.stored;
+  });
+
+  test("a page whose connection is gone before it is told does not leave login waiting for a token it has", async () => {
+    let release!: () => void;
+    const slow: tUserTokenStore = {
+      get: (id) => store.get(id),
+      delete: (id) => store.delete(id),
+      set: async (id, token) => {
+        await new Promise<void>((resolve) => (release = resolve));
+        await store.set(id, token);
+      },
+    };
+    const { loopback: running, port, state } = await start({ store: slow });
+    const req = httpRequest({ host: "127.0.0.1", port, path: "/user-token", method: "POST", headers: { host: `localhost:${String(port)}`, "content-type": "application/json", "x-login-state": state } });
+    req.on("error", () => undefined);
+    req.end(JSON.stringify({ token: TOKEN }));
+    await vi.waitFor(() => {
+      expect(release).toBeTypeOf("function");
+    });
+    // The browser goes away while the store is writing, after Apple said yes.
+    req.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release();
+    await expect(Promise.race([running.stored.then(() => "stored"), new Promise((resolve) => setTimeout(resolve, 2000, "still waiting"))])).resolves.toBe("stored");
+    expect(await store.get("default")).toBe(TOKEN);
+  });
+
+  test("one token is taken: a post while another is being asked about, or once one is kept, is turned away", async () => {
+    let release!: () => void;
+    const slow: tUserTokenStore = {
+      get: (id) => store.get(id),
+      delete: (id) => store.delete(id),
+      set: async (id, token) => {
+        await new Promise<void>((resolve) => (release = resolve));
+        await store.set(id, token);
+      },
+    };
+    const { port, state } = await start({ store: slow });
+    const first = postToken(port, state);
+    await vi.waitFor(() => {
+      expect(release).toBeTypeOf("function");
+    });
+    const during = await postToken(port, state, JSON.stringify({ token: "another-accounts-token" }));
+    release();
+    expect((await first).status).toBe(204);
+    const after = await postToken(port, state, JSON.stringify({ token: "another-accounts-token" }));
+    expect([during.status, after.status]).toEqual([409, 409]);
+    expect(await store.get("default")).toBe(TOKEN);
+    expect(asked).toHaveLength(1);
+  });
+
   test("a token posted with this run's state is asked of Apple, stored, and settles what login waits for", async () => {
     const { loopback: running, port, state } = await start();
     const answer = await postToken(port, state);
@@ -279,7 +338,7 @@ describe("toRequest: node:http's request as a web-standard one", () => {
       upload.on("error", () => undefined);
       for (let sent = 0; sent < 64; sent++) {
         if (upload.write(chunk)) continue;
-        const drained = await Promise.race([new Promise((resolve) => upload.once("drain", () => resolve(true))), new Promise((resolve) => setTimeout(resolve, 1000, false))]);
+        const drained = await Promise.race([new Promise((resolve) => upload.once("drain", () => { resolve(true); })), new Promise((resolve) => setTimeout(resolve, 1000, false))]);
         if (drained === false) break;
       }
       gc();

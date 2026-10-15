@@ -44,6 +44,7 @@ void helper.ready.finally(() => {
 /** What the CLI's answer to the post means for the person at the page. */
 const REFUSED: Record<number, string> = {
   401: "This page is not the one the terminal opened, or its run has ended. Run login again.",
+  409: "The terminal has taken a token already, from this page or another. You can close this tab.",
   422: "Apple would not take this account's token: the account may have no Apple Music subscription.",
   502: "Apple could not be asked about the token. Try again.",
 };
