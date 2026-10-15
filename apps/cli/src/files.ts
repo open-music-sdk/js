@@ -4,6 +4,7 @@ import { createPrivateKey, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { tUserTokenStore } from "@open-music-sdk/server";
 
 /** A failure the person running the CLI can fix, worded for them, with the exit status it ends in: 1, or 2 for a mistake in how it was run. */
@@ -43,10 +44,27 @@ async function writePrivate(path: string, data: string): Promise<void> {
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
     await writeFile(temporary, data, { mode: 0o600, flag: "wx" });
-    await rename(temporary, path);
+    await renameOver(temporary, path);
   } catch (e) {
     await rm(temporary, { force: true });
     throw e;
+  }
+}
+
+/**
+ * `rename`, tried again for a couple of seconds on Windows, which refuses one while another handle has either file
+ * open: a second write's, or a virus scanner's looking at the file just written.
+ */
+async function renameOver(from: string, to: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (process.platform !== "win32" || attempt === 15 || (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY")) throw e;
+      await sleep(attempt * 20);
+    }
   }
 }
 

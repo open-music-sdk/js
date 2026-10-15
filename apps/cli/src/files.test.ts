@@ -99,12 +99,14 @@ describe("FileUserTokenStore: core's three methods over one file", () => {
     expect(await store.get("other")).toBeUndefined();
   });
 
-  test("a write leaves the file whole and nothing beside it", async () => {
+  test("writes at the same time all land, each replacing the file whole, and leave nothing beside it", async () => {
     const path = join(dir, "user-token.json");
     const store = new FileUserTokenStore(path);
-    await Promise.all([store.set("default", TOKEN), store.set("default", TOKEN)]);
+    // On Windows a rename is refused while another write has the file open; each is tried again until it lands.
+    const tokens = Array.from({ length: 40 }, (_, i) => `token-${String(i)}`);
+    await Promise.all(tokens.map((token) => store.set("default", token)));
     expect(await readdir(dir)).toEqual(["user-token.json"]);
-    expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ default: TOKEN });
+    expect(tokens).toContain((JSON.parse(await readFile(path, "utf8")) as { default: string }).default);
   });
 
   test.skipIf(process.platform === "win32")("the file is readable by its user alone, and so is a folder the store makes", async () => {
