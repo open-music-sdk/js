@@ -9,10 +9,10 @@ or [`react`](../../integrations/react/README.md) instead, which re-export what a
 one to build your own client.
 
 ```
-pnpm add @open-music-sdk/user-token @open-music-sdk/core
+pnpm add @open-music-sdk/user-token @open-music-sdk/core @open-music-sdk/developer-token
 ```
 
-Keep the two on the same version. See
+`developer-token` is for the example's developer token. Keep them all on the same version. See
 [One version for every package](https://open-music-sdk.github.io/js/concepts/packages#one-version-for-every-package).
 
 ## Example

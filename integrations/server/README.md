@@ -33,10 +33,14 @@ const listener = music.as(musicUserToken); // a client for one listener, with th
 try {
   for await (const playlist of listener.user.listLibraryPlaylists()) console.log(playlist.attributes?.name);
 } catch (e) {
-  if (isAppleMusicError(e, "UserTokenInvalid")) askListenerToSignInAgain();
+  if (isAppleMusicError(e, "UserTokenInvalid")) askListenerToSignInAgain(); // Apple answered 403
   else throw e;
 }
 ```
+
+A listener who isn't signed in, or has no subscription, can get a `401` instead, which arrives as
+`DeveloperTokenInvalid`. [Handle errors](https://open-music-sdk.github.io/js/guides/errors) shows how to tell the
+two apart.
 
 ## What's in it
 
@@ -67,6 +71,8 @@ the parts, install the packages themselves.
 - [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
 - [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
+- [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
+  the listener's token
 - [Cloudflare Workers](https://open-music-sdk.github.io/js/guides/cloudflare-workers) and
   [Next.js](https://open-music-sdk.github.io/js/guides/nextjs)
 - [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/server/)

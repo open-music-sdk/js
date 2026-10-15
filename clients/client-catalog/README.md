@@ -13,7 +13,8 @@ package to build your own client.
 pnpm add @open-music-sdk/client-catalog @open-music-sdk/core
 ```
 
-Keep the two on the same version. A client or an error from another copy of `core` still works here.
+Keep the two on the same version. See
+[One version for every package](https://open-music-sdk.github.io/js/concepts/packages#one-version-for-every-package).
 
 ## Example
 

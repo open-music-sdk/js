@@ -48,6 +48,9 @@ Each property keeps Apple's description as its doc comment, so your editor shows
 same whether your `moduleResolution` is `bundler`, `node16` or `nodenext`. The `dist/index.js` beside it is empty.
 To check a value at runtime, use [`@open-music-sdk/validate`](../validate/README.md).
 
+The source is written by [`codegen`](https://github.com/open-music-sdk/js/blob/main/codegen/README.md), which says
+how to regenerate it.
+
 ### Names
 
 A name is Apple's dictionary name with the dots removed and a `t` in front, in the singular where the object is a
@@ -61,13 +64,6 @@ single thing. Apple documents one song as `Songs`, the value of its `type`, so t
 - A property Apple marks as not required is optional. Extended attributes are always optional, since they arrive
   only when you ask for them with `extend`.
 - A dictionary Apple documents with no properties is `Record<string, unknown>`.
-
-### Regenerating
-
-Everything under `src/generated/`, and `src/index.ts`, is written by
-[`codegen`](https://github.com/open-music-sdk/js/blob/main/codegen/README.md), one file per resource family, such
-as `song.ts`, `library-playlist.ts`, `search-response.ts`, and `common.ts` for shared dictionaries. Don't edit
-them: run the crawl and the emitter again instead.
 
 ## Learn more
 

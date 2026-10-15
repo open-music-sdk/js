@@ -10,7 +10,10 @@ to build your own client, or to call a path no function covers.
 
 ```
 pnpm add @open-music-sdk/core
+pnpm add -D @open-music-sdk/types
 ```
+
+The second line is for the types the example imports.
 
 ## Example
 

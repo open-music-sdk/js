@@ -23,7 +23,7 @@ import { MusicProvider, createBrowserClient, useConnect, useMusicQueries } from 
 import { useQuery } from "@tanstack/react-query";
 
 // Create the client once, outside the component tree.
-const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
 export const App = () => <MusicProvider music={music}><Connect /><Album id="1613600183" /></MusicProvider>;
 
 function Connect() {

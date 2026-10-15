@@ -11,7 +11,10 @@ client.
 
 ```
 pnpm add @open-music-sdk/lib-preview-player
+pnpm add -D @open-music-sdk/types
 ```
+
+The second line is for the types the example imports.
 
 ## Example
 

@@ -15,24 +15,29 @@ which is this package with a provider and hooks.
 
 ## Example
 
-In your page, where `playButton`, `connectButton`, `showError` and `showLibrary` stand for your own code:
+This runs in your page. `playButton`, `connectButton`, `showError` and `showLibrary` stand for your own code, and
+the client fetches its developer token from your token endpoint when a request first needs one:
 
 ```ts
 import { createBrowserClient, createConnect, previewPlayer } from "@open-music-sdk/browser";
 
-// Create the client once. It fetches a token from your token endpoint when a request first needs one.
-const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" }); // once per page
 
 const { results } = await music.catalog.searchCatalog("james brown", { types: ["songs"], limit: 5 });
 const player = previewPlayer();
 player.load(results.songs?.data ?? []);
 playButton.onclick = () => void player.play().catch(showError); // sound has to start from a click
 
-// Create the sign-in helper where the button is shown, so Apple's script is loaded before the click.
+// Create the sign-in helper where the button is shown, and enable the button once Apple's script is ready.
 const signIn = createConnect(music, { app: { name: "Crate Digger" } });
+void signIn.ready.then(() => (connectButton.disabled = false), showError);
 connectButton.onclick = async () => {
-  const token = await signIn.connect(); // opens Apple's sign-in window
-  if (token) showLibrary(music.as(token)); // a client for this listener
+  try {
+    const token = await signIn.connect(); // opens Apple's sign-in window
+    if (token) showLibrary(music.as(token)); // a client for this listener
+  } catch (e) {
+    showError(e); // what Apple's script threw: show it, never print it
+  }
 };
 ```
 

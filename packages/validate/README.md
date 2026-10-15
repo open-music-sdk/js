@@ -14,7 +14,8 @@ pnpm add @open-music-sdk/validate
 
 ## Example
 
-Anywhere. `music` is a client from `createClient`, and `value` is a value you got some other way:
+Anywhere. `music` is a client from `createClient`, `getSong` comes from `@open-music-sdk/client-catalog`, which is
+a separate install, and `value` is a value you got some other way:
 
 ```ts
 import { getSong } from "@open-music-sdk/client-catalog";
@@ -45,6 +46,9 @@ A validator is taken as `schema` by `core`'s `request` and by every function of 
 The validators are plain constants, over a runtime of a handful of small functions, so a bundler keeps only the
 ones you import and what they refer to.
 
+The validators are written by [`codegen`](https://github.com/open-music-sdk/js/blob/main/codegen/README.md), which
+says how to regenerate them.
+
 ### Names
 
 A name is the dictionary's name in Apple's documentation with the dots removed, the first letter in lower case, and
@@ -60,13 +64,6 @@ in the singular where the object is a single thing: `Songs.Attributes` is `songA
 - A key Apple doesn't document is allowed. Apple adds attributes without notice, and that shouldn't break your app.
 
 Each issue carries a `path` from the top of the value, so a bad field deep in an answer is easy to find.
-
-### Regenerating
-
-Everything under `src/generated/`, and `src/index.ts`, is written by
-[`codegen`](https://github.com/open-music-sdk/js/blob/main/codegen/README.md), one file per resource family, as in
-`@open-music-sdk/types`. `src/runtime.ts` is written by hand. Don't edit the generated files: run the crawl and the
-emitter again instead.
 
 ## Learn more
 
