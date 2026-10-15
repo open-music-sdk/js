@@ -1,6 +1,7 @@
 // What the CLI keeps between runs, and where it finds the key. The packages read no environment and no file; the
 // CLI is the app in that rule, so this is where both are read.
 import { createPrivateKey, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -204,10 +205,22 @@ export async function loadKey(flags: tKeyFlags, env: tEnv, saved: tSavedKey): Pr
   try {
     pem = await readFile(path, "utf8");
   } catch (e) {
-    throw usage(`Cannot read the key at ${path}, from ${from}: ${(e as NodeJS.ErrnoException).code ?? "unreadable"}.`);
+    const code = (e as NodeJS.ErrnoException).code ?? "unreadable";
+    if (isShowable(keyPath, path)) throw usage(`Cannot read the key at ${path}, from ${from}: ${code}.`);
+    throw usage(`Cannot read a key file at what ${from} holds, ${String(keyPath.length)} characters not repeated here in case they are the key itself or a token: pass the path to your AuthKey_XXXXXXXXXX.p8, not its contents.`);
   }
   if (!isMusicKitKey(pem)) throw usage(`The file at ${path}, from ${from}, is not a MusicKit private key: expected the .p8 file Apple gave you, a P-256 key in PEM.`);
   return { pem, teamId, keyId, keyPath: path };
+}
+
+/**
+ * Whether a path that could not be read may be repeated in an error. What was passed may be the key's contents or a
+ * token put where the path goes, so it is shown only when it looks like a path: no line break and no PEM armour, a
+ * file name of a usual length with an extension, which base64 has no character for, in a folder that exists. A key,
+ * a line of one, or a token fails at least one.
+ */
+function isShowable(given: string, path: string): boolean {
+  return !/[\r\n]/.test(given) && !given.includes("-----") && /^.{1,56}\.\w{1,8}$/.test(basename(path)) && existsSync(dirname(path));
 }
 
 /** Whether `pem` is a P-256 private key, which is what a MusicKit key is. */

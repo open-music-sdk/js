@@ -226,6 +226,33 @@ describe("loadKey: from the flags, else the environment, else the last login", (
     expect(e.message).toContain("ENOENT");
   });
 
+  test("the key's contents, or a token, put where its path goes, is not repeated in the error that it names no file", async () => {
+    const body = PEM.split("\n")[1] ?? "";
+    const musicUserToken = `Ag${"Bc/dEf+gH".repeat(40)}==`;
+    const developerToken = `eyJhbGciOiJFUzI1NiJ9.${"e".repeat(150)}.${"s".repeat(86)}`;
+    const cases: [string, Record<string, string>, Record<string, string>][] = [
+      ["the key, in the environment", {}, { APPLE_MUSIC_KEY_PATH: PEM }],
+      ["the key with its line breaks escaped", {}, { APPLE_MUSIC_KEY_PATH: PEM.replaceAll("\n", "\\n") }],
+      ["the key's body alone", { key: body }, {}],
+      ["the key, as a flag", { key: PEM }, {}],
+      ["a Music User Token", { key: musicUserToken }, {}],
+      ["a developer token", { key: developerToken }, {}],
+    ];
+    for (const [name, flags, env] of cases) {
+      const e = await thrown(() => loadKey({ ...flags, "team-id": TEAM, "key-id": KEY_ID }, env, {}));
+      expect(e.exitCode, name).toBe(2);
+      expect(e.message, name).toContain("not repeated");
+      for (const secret of [body.slice(0, 20), body.slice(-20), musicUserToken.slice(10, 40), developerToken.slice(30, 60)]) expect(e.message, name).not.toContain(secret);
+    }
+  });
+
+  test("a path mistyped in a folder that exists is repeated, so the mistake can be seen", async () => {
+    const typo = join(dir, "AuthKey_ABC123DEFH.p8");
+    const e = await thrown(() => loadKey({ key: typo, "team-id": TEAM }, {}, {}));
+    expect(e.message).toContain(typo);
+    expect(e.message).toContain("ENOENT");
+  });
+
   test("a file that is no P-256 private key is refused here, not as a 401 from Apple, and none of it is quoted", async () => {
     const cases = {
       "not a key": `hello ${TEAM}`,
