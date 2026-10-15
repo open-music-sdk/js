@@ -14,12 +14,28 @@ let posted: Request[];
 /** The developer tokens Apple's script was configured with: only the token route hands out this one. */
 let configuredWith: string[];
 
-const signedIn = () => {
+/** Keeps copies on the origin as Apple's script might: under names of its own, and over names that were there before. */
+const keepCopies = () => {
   document.cookie = "media-user-token=copy; path=/";
+  document.cookie = "shared-name=copy; path=/";
   localStorage.setItem("music.ABC123DEFG.u", "copy");
+  localStorage.setItem("left-by-an-earlier-app", "copy");
   sessionStorage.setItem("mk-session", "copy");
+};
+const signedIn = () => {
+  keepCopies();
   return Promise.resolve(TOKEN);
 };
+
+/** Whether the origin is as it was before the page loaded. */
+function asBefore(): void {
+  expect(document.cookie).not.toContain("media-user-token");
+  expect(document.cookie).toContain("other-app-session=theirs");
+  expect(document.cookie).toContain("shared-name=theirs");
+  expect(localStorage.getItem("music.ABC123DEFG.u")).toBeNull();
+  expect(localStorage.getItem("left-by-an-earlier-app")).toBe("theirs");
+  expect(sessionStorage.getItem("mk-session")).toBeNull();
+}
 
 beforeEach(async () => {
   vi.resetModules();
@@ -33,6 +49,7 @@ beforeEach(async () => {
   document.body.innerHTML = '<p id="status"></p><button id="connect" type="button" disabled></button>';
   // What other servers on localhost keep, which share its cookies, and what this origin held before.
   document.cookie = "other-app-session=theirs; path=/";
+  document.cookie = "shared-name=theirs; path=/";
   localStorage.setItem("left-by-an-earlier-app", "theirs");
   // Apple's script, already on the page: the helper takes the global rather than loading it from Apple's CDN.
   configuredWith = [];
@@ -53,7 +70,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const name of ["media-user-token", "other-app-session"]) document.cookie = `${name}=; max-age=0; path=/`;
+  for (const name of ["media-user-token", "other-app-session", "shared-name"]) document.cookie = `${name}=; max-age=0; path=/`;
   localStorage.clear();
   sessionStorage.clear();
 });
@@ -83,40 +100,74 @@ describe("the sign-in page", () => {
     expect(button().disabled).toBe(true);
   });
 
-  test("what Apple's script kept on the origin is cleared once the token is posted, and nothing it did not add", async () => {
+  test("once the token is posted, the origin is as it was: what Apple's script added is gone, and what it wrote over has its old value", async () => {
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("Signed in"); });
-    expect(document.cookie).not.toContain("media-user-token");
-    expect(localStorage.getItem("music.ABC123DEFG.u")).toBeNull();
-    expect(sessionStorage.getItem("mk-session")).toBeNull();
-    expect(document.cookie).toContain("other-app-session=theirs");
-    expect(localStorage.getItem("left-by-an-earlier-app")).toBe("theirs");
+    asBefore();
   });
 
-  test("a sign-in the listener cancels posts nothing and lets them try again", async () => {
-    authorize = () => Promise.resolve(undefined);
+  test("a sign-in the listener cancels posts nothing, leaves the origin as it was, and lets them try again", async () => {
+    authorize = () => {
+      keepCopies();
+      return Promise.resolve(undefined);
+    };
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("cancelled"); });
     expect(posted).toEqual([]);
     expect(button().disabled).toBe(false);
+    asBefore();
   });
 
-  test("a token Apple refuses says why, still clears Apple's copy, and lets them try again", async () => {
+  test("a token Apple refuses says why, leaves the origin as it was, and lets them try again", async () => {
     intakeStatus = 422;
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("no Apple Music subscription"); });
     expect(button().disabled).toBe(false);
-    expect(document.cookie).not.toContain("media-user-token");
+    asBefore();
   });
 
-  test("a sign-in that fails says so and lets them try again", async () => {
-    authorize = () => Promise.reject(new Error("popup blocked"));
+  test("a sign-in that fails says so, leaves the origin as it was, and lets them try again", async () => {
+    authorize = () => {
+      keepCopies();
+      return Promise.reject(new Error("popup blocked"));
+    };
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("popup blocked"); });
     expect(button().disabled).toBe(false);
+    asBefore();
+  });
+
+  test("a tab closed in the middle of a sign-in leaves the origin as it was", async () => {
+    authorize = () => {
+      keepCopies();
+      return new Promise<undefined>(() => undefined);
+    };
+    await ready();
+    button().click();
+    await vi.waitFor(() => { expect(document.cookie).toContain("media-user-token"); });
+    window.dispatchEvent(new Event("pagehide"));
+    asBefore();
+  });
+
+  test("a load of Apple's script that fails still enables the button, which tries again, and leaves no rejection unhandled", async () => {
+    vi.resetModules();
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listener);
+    try {
+      document.body.innerHTML = '<p id="status"></p><button id="connect" type="button" disabled></button>';
+      vi.stubGlobal("fetch", () => Promise.resolve(new Response(null, { status: 503 })));
+      await import("./page");
+      await ready();
+      expect(status()).toContain("could not be loaded");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
   });
 });

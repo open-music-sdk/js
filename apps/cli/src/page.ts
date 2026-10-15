@@ -12,19 +12,53 @@ const say = (message: string) => {
 };
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-const cookieNames = () => document.cookie.split(";").map((pair) => pair.split("=")[0]?.trim() ?? "").filter(Boolean);
-const keysOf = (storage: Storage) => Array.from({ length: storage.length }, (_, i) => storage.key(i) ?? "");
+/** The cookies this page can see, by name. */
+const cookies = () =>
+  new Map(
+    document.cookie
+      .split(";")
+      .map((pair): [string, string] => [pair.slice(0, Math.max(pair.indexOf("="), 0)).trim(), pair.slice(pair.indexOf("=") + 1)])
+      .filter(([name]) => name !== ""),
+  );
+/** What a storage holds, by key. */
+const entries = (storage: Storage) =>
+  new Map(
+    Array.from({ length: storage.length }, (_, i): [string, string | null] => {
+      const key = storage.key(i) ?? "";
+      return [key, storage.getItem(key)];
+    }),
+  );
 
-// What this origin held before Apple's script ran, so that afterwards only what it added is cleared: a cookie on
+// What this origin held before Apple's script ran, so that afterwards only what it changed is put back: a cookie on
 // localhost is shared by every port, and other servers on this machine may have set their own.
-const before = { cookies: new Set(cookieNames()), local: new Set(keysOf(localStorage)), session: new Set(keysOf(sessionStorage)) };
+const before = { cookies: cookies(), local: entries(localStorage), session: entries(sessionStorage) };
 
-/** Clears what Apple's script kept of the sign-in on this origin, which would otherwise outlive the page. */
-function clearAdded(): void {
-  for (const name of cookieNames()) if (!before.cookies.has(name)) document.cookie = `${name}=; max-age=0; path=/`;
-  for (const key of keysOf(localStorage)) if (!before.local.has(key)) localStorage.removeItem(key);
-  for (const key of keysOf(sessionStorage)) if (!before.session.has(key)) sessionStorage.removeItem(key);
+/**
+ * Puts the origin back as it was before Apple's script ran, so the copy of the sign-in it kept does not outlive the
+ * page: what it added is deleted, and what it changed is given its old value back.
+ */
+function restore(): void {
+  for (const [name, value] of cookies()) {
+    const was = before.cookies.get(name);
+    if (was === value) continue;
+    if (was !== undefined) document.cookie = `${name}=${was}; path=/`;
+    // Deleted with the domain and without it, whichever way it was set.
+    else for (const domain of ["", `; domain=${location.hostname}`]) document.cookie = `${name}=; max-age=0; path=/${domain}`;
+  }
+  for (const [storage, held] of [
+    [localStorage, before.local],
+    [sessionStorage, before.session],
+  ] as const) {
+    for (const [key, value] of entries(storage)) {
+      const was = held.get(key);
+      if (was === value) continue;
+      if (was === undefined || was === null) storage.removeItem(key);
+      else storage.setItem(key, was);
+    }
+  }
 }
+// Whichever way the page is left, the sign-in finished or not.
+window.addEventListener("pagehide", restore);
 
 const music = createBrowserClient({ tokenUrl: `/token?state=${encodeURIComponent(state)}` });
 const helper = createConnect(music, { app: { name: "open-music-sdk CLI" } });
@@ -38,9 +72,10 @@ helper.ready.then(
   },
 );
 // Enabled either way: after a load that failed, `connect()` loads and configures the script afresh.
-void helper.ready.finally(() => {
+const enable = () => {
   button.disabled = false;
-});
+};
+helper.ready.then(enable, enable);
 
 /** What the CLI's answer to the post means for the person at the page. */
 const REFUSED: Record<number, string> = {
@@ -62,12 +97,7 @@ button.addEventListener("click", () => {
         return;
       }
       say("Checking the token with Apple…");
-      let answer: Response;
-      try {
-        answer = await fetch("/user-token", { method: "POST", headers: { "content-type": "application/json", "x-login-state": state }, body: JSON.stringify({ token }) });
-      } finally {
-        clearAdded();
-      }
+      const answer = await fetch("/user-token", { method: "POST", headers: { "content-type": "application/json", "x-login-state": state }, body: JSON.stringify({ token }) });
       if (answer.status === 204) {
         signedIn = true;
         helper.dispose();
@@ -78,6 +108,8 @@ button.addEventListener("click", () => {
     } catch (e) {
       say(`Sign-in failed: ${messageOf(e)}`);
     } finally {
+      // After every try, posted or not: the script may have kept a copy before it was declined or failed.
+      restore();
       button.disabled = signedIn;
     }
   })();
