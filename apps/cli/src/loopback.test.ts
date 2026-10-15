@@ -5,10 +5,12 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import v8 from "node:v8";
+import { runInNewContext } from "node:vm";
 import { MemoryUserTokenStore, createServerClient, type tUserTokenStore } from "@open-music-sdk/server";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { CliError, type tKey } from "./files";
-import { startLoopback, type tLoopback } from "./loopback";
+import { startLoopback, toRequest, type tLoopback } from "./loopback";
 
 const TEAM = "DEF123GHIJ";
 const KEY_ID = "ABC123DEFG";
@@ -251,5 +253,43 @@ describe("startLoopback: the intake, which asks Apple before it stores", () => {
     const answer = await postToken(port, state, JSON.stringify({ token: "x".repeat(20_000) }));
     expect(answer.status).toBe(413);
     expect(asked).toEqual([]);
+  });
+
+});
+
+describe("toRequest: node:http's request as a web-standard one", () => {
+  test("a body is read only as far as the handler asks: while a handler neither reads nor answers, what is sent waits in the socket", { timeout: 30_000 }, async () => {
+    v8.setFlagsFromString("--expose-gc");
+    const gc = runInNewContext("gc") as () => void;
+    // A handler that holds the request and does nothing with it, as a slow one would.
+    const held: Request[] = [];
+    const server = createServer((req, res) => {
+      const request = toRequest(req, res, "http://localhost");
+      if (request !== undefined) held.push(request);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      gc();
+      const before = process.memoryUsage().arrayBuffers;
+      // Up to 64 MiB, one reused MiB at a time, so only what the server keeps can grow; the writing stops once the
+      // server stops taking it in.
+      const chunk = Buffer.alloc(1 << 20);
+      const upload = httpRequest({ host: "127.0.0.1", port, method: "POST", headers: { "content-length": String(64 << 20) } });
+      upload.on("error", () => undefined);
+      for (let sent = 0; sent < 64; sent++) {
+        if (upload.write(chunk)) continue;
+        const drained = await Promise.race([new Promise((resolve) => upload.once("drain", () => resolve(true))), new Promise((resolve) => setTimeout(resolve, 1000, false))]);
+        if (drained === false) break;
+      }
+      gc();
+      const during = process.memoryUsage().arrayBuffers;
+      upload.destroy();
+      expect(held).toHaveLength(1);
+      expect(during - before).toBeLessThan(16 << 20);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

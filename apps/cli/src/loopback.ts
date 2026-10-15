@@ -190,7 +190,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
  * sent, or undefined when its target is not a path on this server or fetch takes no request like it. What is left of
  * a body the intake stops reading is let go by, so its answer can still be written.
  */
-function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): Request | undefined {
+export function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): Request | undefined {
   // The URL is this server's own origin and the target as sent, never the Host header, which is checked by itself:
   // a target that is not a path, such as `http://elsewhere/`, makes no URL here.
   let url: URL;
@@ -210,7 +210,11 @@ function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): R
   const body = new ReadableStream<Uint8Array>({
     start(stream) {
       req.on("data", (chunk: Buffer) => {
-        if (!cancelled) stream.enqueue(new Uint8Array(chunk));
+        if (cancelled) return;
+        stream.enqueue(new Uint8Array(chunk));
+        // Read as far as the handler has asked and no further: the rest waits in the socket, not in memory. Once the
+        // answer is sent, node:http stops reading of its own accord.
+        if ((stream.desiredSize ?? 0) <= 0) req.pause();
       });
       req.on("end", () => {
         if (!cancelled) stream.close();
@@ -218,6 +222,9 @@ function toRequest(req: IncomingMessage, res: ServerResponse, origin: string): R
       req.on("error", (e) => {
         if (!cancelled) stream.error(e);
       });
+    },
+    pull() {
+      req.resume();
     },
     cancel() {
       cancelled = true;
