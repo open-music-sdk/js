@@ -170,6 +170,13 @@ describe("token: the kept token on stdout, and nothing else there", () => {
     expect(stderr).toContain("open-music-sdk login");
   });
 
+  test("--developer mints from a key in SEC1 form as well as Apple's PKCS8", async () => {
+    await writeFile(keyPath, generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey.export({ type: "sec1", format: "pem" }).toString());
+    expect(await main(["token", "--developer", "--key", keyPath, "--team-id", TEAM])).toBe(0);
+    expect(stdout).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+\n$/);
+    expect(stderr).toBe("");
+  });
+
   test("--developer mints a developer token from the key, signed with its ID, without asking Apple", async () => {
     expect(await main(["token", "--developer", "--key", keyPath, "--team-id", TEAM])).toBe(0);
     const [header, claims] = stdout.trim().split(".").slice(0, 2).map((part) => JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as Record<string, unknown>);

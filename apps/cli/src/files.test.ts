@@ -253,6 +253,14 @@ describe("loadKey: from the flags, else the environment, else the last login", (
     expect(e.message).toContain("ENOENT");
   });
 
+  test("a P-256 key in another form than Apple's, such as SEC1, is taken, and handed on in the form the minter takes", async () => {
+    const sec1 = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+    await writeFile(keyPath, sec1.export({ type: "sec1", format: "pem" }).toString());
+    const key = await loadKey({ key: keyPath, "team-id": TEAM }, {}, {});
+    expect(key.pem).toBe(sec1.export({ type: "pkcs8", format: "pem" }).toString());
+    expect(key.pem).toMatch(/^-----BEGIN PRIVATE KEY-----/);
+  });
+
   test("a file that is no P-256 private key is refused here, not as a 401 from Apple, and none of it is quoted", async () => {
     const cases = {
       "not a key": `hello ${TEAM}`,

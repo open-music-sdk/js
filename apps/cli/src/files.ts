@@ -209,8 +209,9 @@ export async function loadKey(flags: tKeyFlags, env: tEnv, saved: tSavedKey): Pr
     if (isShowable(keyPath, path)) throw usage(`Cannot read the key at ${path}, from ${from}: ${code}.`);
     throw usage(`Cannot read a key file at what ${from} holds, ${String(keyPath.length)} characters not repeated here in case they are the key itself or a token: pass the path to your AuthKey_XXXXXXXXXX.p8, not its contents.`);
   }
-  if (!isMusicKitKey(pem)) throw usage(`The file at ${path}, from ${from}, is not a MusicKit private key: expected the .p8 file Apple gave you, a P-256 key in PEM.`);
-  return { pem, teamId, keyId, keyPath: path };
+  const pkcs8 = musicKitKey(pem);
+  if (pkcs8 === undefined) throw usage(`The file at ${path}, from ${from}, is not a MusicKit private key: expected the .p8 file Apple gave you, a P-256 key in PEM.`);
+  return { pem: pkcs8, teamId, keyId, keyPath: path };
 }
 
 /**
@@ -223,11 +224,15 @@ function isShowable(given: string, path: string): boolean {
   return !/[\r\n]/.test(given) && !given.includes("-----") && /^.{1,56}\.\w{1,8}$/.test(basename(path)) && existsSync(dirname(path));
 }
 
-/** Whether `pem` is a P-256 private key, which is what a MusicKit key is. */
-function isMusicKitKey(pem: string): boolean {
+/**
+ * The key as PKCS8 PEM, the form Apple gives and the minter takes, when `pem` is a P-256 private key, which is what a
+ * MusicKit key is, in that form or another, such as the SEC1 `EC PRIVATE KEY` a conversion leaves; otherwise undefined.
+ */
+function musicKitKey(pem: string): string | undefined {
   try {
-    return createPrivateKey(pem).asymmetricKeyDetails?.namedCurve === "prime256v1";
+    const key = createPrivateKey(pem);
+    return key.asymmetricKeyDetails?.namedCurve === "prime256v1" ? key.export({ type: "pkcs8", format: "pem" }).toString() : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
