@@ -13,7 +13,8 @@ const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const realFetch = globalThis.fetch;
 
-/** How the fake Apple answers each path, and every request it was asked. */
+/** How the fake Apple answers each path, with a status or `HANG` for no answer until the request is aborted, and every request it was asked. */
+const HANG = 0;
 let apple: Record<string, number> = {};
 let asked: Request[] = [];
 const responses: Response[] = [];
@@ -44,6 +45,12 @@ beforeEach(async () => {
     if (url.origin !== "https://api.music.apple.com") return realFetch(input, init);
     asked.push(req);
     const status = apple[url.pathname] ?? 404;
+    if (status === HANG)
+      return new Promise((_resolve, reject) => {
+        req.signal.addEventListener("abort", () => {
+          reject(req.signal.reason as Error);
+        });
+      });
     const res =
       status !== 200
         ? Response.json({ errors: [{ status: String(status), title: "Refused", detail: "apple-detail" }] }, { status })
@@ -288,6 +295,44 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(await main(["doctor"])).toBe(0);
     expect(await main(["token"])).toBe(0);
     expect(stdout.endsWith(`${TOKEN}\n`)).toBe(true);
+  });
+
+  test("Ctrl+C while Apple is asked about the key stops it too: exit 130, and no page", async () => {
+    apple["/v1/test"] = HANG;
+    const before = new Set(process.listeners("SIGINT"));
+    const running = main(["login", "--no-browser", "--key", keyPath, "--team-id", TEAM]);
+    await vi.waitFor(() => {
+      expect(asked).toHaveLength(1);
+    });
+    const added = process.listeners("SIGINT").filter((listener) => !before.has(listener));
+    expect(added).toHaveLength(1);
+    added[0]?.("SIGINT");
+    expect(await running).toBe(130);
+    expect(stderr).toContain("Stopped. Nothing was kept.");
+    expect(stderr).not.toContain("http://localhost");
+    expect(process.listeners("SIGINT")).toHaveLength(before.size);
+  });
+
+  test("no sign-in within five minutes ends it: exit 1, nothing kept, and the page is gone", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const running = main(["login", "--no-browser", "--key", keyPath, "--team-id", TEAM]);
+      const url = await vi.waitFor(
+        () => {
+          const found = /http:\/\/localhost:\d+\/\?state=[\w-]+/.exec(stderr)?.[0];
+          if (found === undefined) throw new Error("no page yet");
+          return found;
+        },
+        { timeout: 5000, interval: 10 },
+      );
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+      expect(await running).toBe(1);
+      expect(stderr).toContain("No sign-in within 5 minutes");
+      await expect(readFile(tokenFile(), "utf8")).rejects.toThrow(/ENOENT/);
+      await expect(realFetch(url)).rejects.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("Ctrl+C stops it: exit 130, nothing kept, and the page is gone", async () => {

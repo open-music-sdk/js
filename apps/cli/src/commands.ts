@@ -61,7 +61,8 @@ const serverClient = (key: tKey, onResponse?: Parameters<typeof createServerClie
   createServerClient({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, onResponse });
 
 /** Asks Apple whether the key works: `GET /v1/test`, which needs the developer token and nothing else. */
-const askKey = (music: tMusic) => music.request("v1/test", { user: false, signal: AbortSignal.timeout(TIMEOUT_MS) });
+const askKey = (music: tMusic, stop?: AbortSignal) =>
+  music.request("v1/test", { user: false, signal: AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), ...(stop === undefined ? [] : [stop])]) });
 
 /** The port `--port` names, or 0 for one the system picks. */
 function portOf(value: string | undefined): number {
@@ -71,26 +72,26 @@ function portOf(value: string | undefined): number {
   throw usage("--port must be a whole number from 1 to 65535.");
 }
 
-/** Settles with `stored`, or rejects after `WAIT_MS`, or on Ctrl+C. A second Ctrl+C ends the process as Node does. */
-async function waitFor(stored: Promise<void>): Promise<void> {
-  const controller = new AbortController();
-  const interrupt = () => {
-    controller.abort(new CliError("Stopped. Nothing was kept.", 130));
-  };
-  const timer = setTimeout(() => {
-    controller.abort(new CliError(`No sign-in within ${String(WAIT_MS / 60_000)} minutes. Nothing was kept; run login again when you are ready.`));
-  }, WAIT_MS);
-  process.once("SIGINT", interrupt);
+/** Settles with `stored`, or rejects after `WAIT_MS`, or with the reason `stop` aborted with, now or later. */
+async function waitFor(stored: Promise<void>, stop: AbortSignal): Promise<void> {
+  stop.throwIfAborted();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await new Promise<void>((resolve, reject) => {
       stored.then(resolve, reject);
-      controller.signal.addEventListener("abort", () => {
-        reject(controller.signal.reason as Error);
-      });
+      timer = setTimeout(() => {
+        reject(new CliError(`No sign-in within ${String(WAIT_MS / 60_000)} minutes. Nothing was kept; run login again when you are ready.`));
+      }, WAIT_MS);
+      stop.addEventListener(
+        "abort",
+        () => {
+          reject(stop.reason as Error);
+        },
+        { once: true },
+      );
     });
   } finally {
     clearTimeout(timer);
-    process.off("SIGINT", interrupt);
   }
 }
 
@@ -113,19 +114,30 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
     if (typeof id === "string") storefront = id;
   });
 
-  say(`Asking Apple about key ${key.keyId} of team ${key.teamId}…`);
-  await askKey(music);
-  const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url), timeoutMs: TIMEOUT_MS });
+  // Ctrl+C, from here to the end, stops what is under way and exits 130 with nothing kept. A second one ends the
+  // process as Node does, since the handler is gone after the first.
+  const stop = new AbortController();
+  const interrupt = () => {
+    stop.abort(new CliError("Stopped. Nothing was kept.", 130));
+  };
+  process.once("SIGINT", interrupt);
   try {
-    say(`Sign in at Apple on this page:\n\n  ${loopback.url}\n`);
-    if (flags.browser !== false) {
-      openBrowser(loopback.url);
-      say("It should be open in your browser; if not, open the address yourself.");
+    say(`Asking Apple about key ${key.keyId} of team ${key.teamId}…`);
+    await askKey(music, stop.signal);
+    const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url), timeoutMs: TIMEOUT_MS });
+    try {
+      say(`Sign in at Apple on this page:\n\n  ${loopback.url}\n`);
+      if (flags.browser !== false) {
+        openBrowser(loopback.url);
+        say("It should be open in your browser; if not, open the address yourself.");
+      }
+      say("Waiting for the sign-in. Ctrl+C stops.");
+      await waitFor(loopback.stored, stop.signal);
+    } finally {
+      await loopback.close();
     }
-    say("Waiting for the sign-in. Ctrl+C stops.");
-    await waitFor(loopback.stored);
   } finally {
-    await loopback.close();
+    process.off("SIGINT", interrupt);
   }
   await saveKey(files.config, key);
   say(`${paint(ctx, "green", "Signed in", process.stderr)}${storefront === undefined ? "" : `, storefront ${storefront}`}. The token is kept in ${files.tokens}, readable by you alone.`);
