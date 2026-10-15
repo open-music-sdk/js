@@ -14,6 +14,13 @@ export interface tPlaylists {
    * its search came back with. Asks the catalog alone, with no Music User Token: a client that has none will do,
    * so long as it or the call names a storefront.
    *
+   * ISRCs are looked up 25 to a request, the most Apple documents taking. Each description still not found that has
+   * a name is then searched for, one request each. A song the search found is kept only when its name and its artist
+   * are the description's, compared without case, apostrophes or punctuation, and without the accents on Latin
+   * letters: `Beyoncé` is `beyonce`, but `Hey Jude (Remastered 2015)` is not `Hey Jude`, and a mark on a letter of
+   * another script is part of the letter. Where several songs fit, one whose name and artist are written exactly as
+   * the description's is taken first, then the one on its album, then the one nearest its length.
+   *
    * @param descriptions - The tracks to find, each by its ISRC, or by its name and artist, with its album and
    * length to decide between songs that fit.
    * @param options - The storefront to ask in, how long to leave between requests, what stops the call, and what
@@ -66,6 +73,15 @@ export interface tPlaylists {
   /**
    * Carries out a plan: finds or makes the playlist, reads it, adds what it is missing to its end, and reads it
    * once more. No write is sent twice, and calling it again with the same plan adds only what is still missing.
+   *
+   * When the answer to a write is lost, or is a 5xx, the playlist is read back: if the tracks are at its end the run
+   * carries on, and if they do not show within the reads `settle` allows it rejects with the error it got. A
+   * refusal, a 4xx or a 429 the client already waited out, rejects at once. Making the playlist goes the same way:
+   * after a lost answer the listener's playlists are looked through for it, and it is not made a second time.
+   *
+   * Apple carries a write out after it answers, so a read made at once may not show it. A run begun again before an
+   * earlier run's tracks show adds them a second time, and one begun before a playlist an earlier run made is listed
+   * makes a second playlist, which nothing in the API can delete. `verified` says whether this run's writes showed.
    *
    * @param plan - The plan as `plan` gave it. Its playlist and its tracks are what is read: what is missing is
    * worked out afresh from what the playlist holds now.

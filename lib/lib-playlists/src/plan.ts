@@ -56,7 +56,10 @@ export interface tNewPlaylist {
   readonly description?: string | undefined;
 }
 
-/** What `plan` gives: the tracks a playlist is to hold, and what that takes. Plain, and frozen all the way down: it holds nothing of the caller's that could change under it. */
+/**
+ * What `plan` gives: the tracks a playlist is to hold, and what that takes. Plain, and frozen all the way down: it
+ * holds nothing of the caller's that could change under it, and can be written to a file and applied later.
+ */
 export interface tPlaylistPlan {
   /** The playlist the plan is for: by its id, or by the name and description of one to find or make. */
   readonly playlist:
@@ -67,7 +70,11 @@ export interface tPlaylistPlan {
     | tNewPlaylist;
   /** The tracks the playlist is to hold, each as `{ id, type }`, in order. */
   readonly tracks: readonly tPlaylistTrack[];
-  /** The ones it does not hold yet, in order: what `apply` adds to its end. */
+  /**
+   * The ones it does not hold yet, in order: what `apply` adds to its end. A wanted track is held when one of the
+   * playlist's tracks has its id, as its `catalogId` or as its own `id`. Each track of the playlist answers for one
+   * wanted track at most, so a song wanted twice and held once is added once more.
+   */
   readonly append: readonly tPlaylistTrack[];
   /** The tracks it holds that are not wanted. Apple's API cannot take a track out, so they stay. */
   readonly extra: readonly tPlaylistSnapshotTrack[];

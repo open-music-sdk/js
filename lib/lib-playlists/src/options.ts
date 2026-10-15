@@ -4,9 +4,16 @@ import { got, sleep } from "@open-music-sdk/core";
 
 /** How far a verb has got, counted in tracks. */
 export interface tProgress {
-  /** How many tracks are done with. */
+  /**
+   * How many tracks are done with. For `resolve`, the descriptions settled, found or not, which one answer by ISRC can
+   * settle many of at once; for `read`, the tracks read, told a page at a time; for `apply`, the tracks added, told
+   * after each request.
+   */
   readonly done: number;
-  /** How many there are in all, or `undefined` where that is not known until the end, as when a playlist is read. */
+  /**
+   * How many there are in all: the descriptions handed to `resolve`, or the tracks `apply` has to add. `undefined`
+   * for `read`, since Apple does not say how many tracks there are until the last page.
+   */
   readonly total: number | undefined;
 }
 
@@ -18,7 +25,7 @@ export interface tAskOptions {
   readonly onProgress?: ((progress: tProgress) => void) | undefined;
 }
 
-/** What a verb that makes several requests of its own takes beside: how long to leave between them. */
+/** What a verb that makes several requests of its own takes beside: how long to leave between them. Each verb makes one request at a time. */
 export interface tPaceOptions {
   /**
    * How long to wait between the requests a verb makes one after another for the same thing, in milliseconds:
