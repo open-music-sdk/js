@@ -101,16 +101,22 @@ SDK keeps tokens fresh.
 Every retry is another request against your rate limit, which all your listeners share. See
 [One rate limit for all your listeners](./tokens#one-rate-limit-for-all-your-listeners).
 
-## A write is sent once
+## A `POST` is sent once
 
 A `POST` makes something each time Apple carries it out: a playlist, or a track added to one. After a `5xx` or a
 lost connection, you can't tell whether Apple carried it out before the answer was lost. Sending it again could
 make a second playlist.
 
-So the client sends a `POST` again only after the two failures that say it wasn't carried out: a `RateLimited`,
-or a `DeveloperTokenUnavailable`, when there was no token to send it with. Even then, it does so only if the
-policy would retry that error anyway. After any other failure, the error reaches you, and whether to try again is
-your decision.
+So the client sends a `POST` again only after a failure that says it wasn't carried out:
+
+- a `RateLimited`, or a `DeveloperTokenUnavailable` when there was no token to send it with, and only if the
+  policy would retry that error anyway;
+- a `401`, once, when the developer token provider hands over a new token, as for every request.
+
+After any other failure, the error reaches you, and whether to try again is your decision.
+
+A `PUT` or a `DELETE`, which sets or deletes a rating, comes out the same however many times Apple carries it out.
+The policy retries it as it does a read, after a `5xx` or a `NetworkError` too.
 
 `lib-playlists` doesn't send a write again either. When it can't tell whether a write was carried out, it reads
 the playlist back, and what the playlist holds decides. Calling `apply` again with the same plan carries on from
@@ -124,18 +130,28 @@ goes on after it.
 
 ## What an error message shows
 
-No error prints a key or a token. A value in the wrong place may be a secret, so an error describes a value rather
-than repeating it:
+A value in the wrong place may be a key or a token, so a `TypeError` describes it rather than repeating it:
 
 - a string by its length, such as `got 228 characters`;
 - a number as it is, since a number can't be a secret;
 - anything else by its kind, such as `got object` or `got undefined`.
 
-An `AppleMusicError`'s message says what happened and names the path that was asked for, with the title of
-Apple's first error. That path holds the ids and the storefront you passed. They can't carry a token there: an id,
-a name or a storefront longer than 64 characters is refused as a mistake first, and a token is longer than that.
-The one `TypeError` that quotes what it was given is the one for a path that leaves Apple's origin, which quotes
-the path.
+Some messages do quote what you passed, where it's a name you chose rather than a value:
+
+- An error about `params` names the parameter, as in `params.limit`.
+- A function that takes ids by type, such as `getCatalogResources`, names the type, as in `ids.songs`.
+- `withNamespaces` names the namespace.
+- `developerTokenFetcher` quotes the protocol of a URL that isn't `http` or `https`, and nothing else of the URL.
+- The `TypeError` for a path that leaves Apple's origin quotes the path.
+
+An `AppleMusicError`'s message says what happened and names the path that was asked for. That path holds the ids
+and the storefront you passed. They can't carry a token there: an id, a name or a storefront longer than 64
+characters is refused as a mistake first, and a token is longer than that. Some messages carry more:
+
+- An answer from Apple adds the title of Apple's first error, and its `detail` when it has one.
+- A `NetworkError` quotes the message of what failed underneath: what `fetch` rejected with, or what reading the
+  answer failed with. With a `fetch` of your own, what that message holds is up to it.
+- The `UserTokenInvalid` of `forUser` names the user id that has no stored token.
 
 See the [security model](./security#what-errors-and-logs-contain) for what else is kept out of errors and logs.
 

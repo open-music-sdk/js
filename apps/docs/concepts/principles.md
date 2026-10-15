@@ -23,11 +23,11 @@ asks for, how fast requests are made and where an artwork URL points aren't chec
 limiter and the `hosts` check are there for you to turn on. See
 [What is read from outside](./security#what-is-read-from-outside).
 
-## No error prints a key or a token
+## An error doesn't repeat a value that may be a secret
 
-A value that should have been a key or a token, but isn't, is described by its length or its kind. A secret
-never reaches a log by way of an error message. See
-[What an error message shows](./errors#what-an-error-message-shows).
+A value that should have been a key or a token, or that may be one, is described by its length or its kind,
+never repeated. A message quotes only names you chose, such as a parameter's, and what Apple or your `fetch` said.
+See [What an error message shows](./errors#what-an-error-message-shows).
 
 ## Options are checked and taken when a thing is created
 
@@ -45,17 +45,20 @@ happens.
 No function of `client-catalog` sends it, whichever client it's handed and wherever a `next` link points. Every
 function of `client-user` does. See [Which requests send which token](./tokens#which-requests-send-which-token).
 
-## A write is sent once, unless Apple says it wasn't carried out
+## A `POST` is sent once, unless Apple says it wasn't carried out
 
-A `POST` is sent again only after a `429`, or when there was no developer token to send it with. A lost answer
-can't make a playlist twice. `lib-playlists` doesn't send a write again either: it reads the playlist back, and
-what the playlist holds decides. See [A write is sent once](./errors#a-write-is-sent-once).
+A `POST` is sent again only after a `429`, a `401` that a new developer token may fix, or when there was no
+developer token to send it with. A lost answer can't make a playlist twice. A `PUT` or a `DELETE`, which comes out
+the same however often it's carried out, is retried as a read is. `lib-playlists` doesn't send a write again
+either: it reads the playlist back, and what the playlist holds decides. See
+[A `POST` is sent once](./errors#a-post-is-sent-once).
 
-## One function for each endpoint, held to Apple's documentation
+## A function for nearly every endpoint, held to Apple's documentation
 
 The types and validators are generated from Apple's documentation. Each client's tests hold every function to the
-method, the path, the parameters and the answer its endpoint documents. Where a package differs from the
-documentation, [Differences from Apple's documentation](../differences) says how.
+method, the path, the parameters and the answer its endpoint documents. The few endpoints with no function are
+reached through `core`'s `request`: see [Call an endpoint the clients don't cover](../guides/direct-requests).
+Where a package differs from the documentation, [Differences from Apple's documentation](../differences) says how.
 
 ## What is read from outside is bounded
 

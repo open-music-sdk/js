@@ -11,11 +11,11 @@ Most of how the SDK is split into packages, and most of what it asks of you, fol
 | | Developer token | Music User Token |
 | --- | --- | --- |
 | Who makes it | You, by signing a [JWT](../glossary#jwt) with your MusicKit private key | Apple, after the listener signs in |
-| Needed for | Every request | Requests under `/v1/me`: the listener's library, ratings, recommendations and history |
+| Needed for | Every request | Requests for the listener's own things: their library, ratings, recommendations and history under `/v1/me`, their personal station, and a catalog resource's `library` relationship |
 | Sent as | `Authorization: Bearer <token>` | `Music-User-Token: <token>`, always beside a developer token |
 | How long it lasts | You choose, up to six months | Apple doesn't say. It ends when the listener changes their password or subscription, or removes your app's access. |
 | Who it belongs to | Your whole developer team, whose rate limit it spends | One listener |
-| When Apple refuses it | `DeveloperTokenInvalid` | `UserTokenInvalid` |
+| When Apple refuses it | `DeveloperTokenInvalid`, on a `401` | `UserTokenInvalid`, on a `403`. A `401` for a listener who isn't signed in or subscribed arrives as `DeveloperTokenInvalid`. |
 
 ## The developer token
 
@@ -36,15 +36,12 @@ The SDK keeps the token fresh for you, whether it signs the token or fetches it:
   seen by a request, as long as it ends before the token expires.
 - If Apple rejects a token, the SDK gets a new one and sends the request once more. It asks for a new token at
   most once a minute while the one it holds hasn't expired, because a revoked key would only sign another token
-  Apple rejects.
+  Apple rejects. The same rule covers a `401` that's really about the listener, which a new developer token
+  wouldn't fix.
 
-Tokens the SDK signs last one hour by default. The ones `tokenEndpoint` hands to a page last fifteen minutes. A
-longer life buys you nothing, because the SDK replaces tokens on its own, and a token can't be revoked without
-revoking the key. Its lifetime is how long a leaked one stays useful.
-
-A developer token can name the web origins it's for, such as `https://app.example`. Apple honours that for
-requests from browsers. It narrows who can use a token from a page. It doesn't stop anyone from fetching one from
-your endpoint. See the [security model](./security).
+Because the SDK replaces tokens on its own, the tokens it signs are short-lived, and a token can name the web
+origins it's for. [The developer token](./security#the-developer-token) in the security model says how long they
+last, and what an origin does and doesn't stop.
 
 ## The Music User Token
 
@@ -67,10 +64,15 @@ that takes the token in and the store that keeps it.
 Wherever it goes, treat it like a session cookie:
 
 - In a page, keep it in memory. Never write it to `localStorage`, `sessionStorage` or a cookie.
-- On a server, keep it out of logs and URLs. A request hook that prints requests prints both tokens.
-- When Apple refuses it, you get a `UserTokenInvalid` error. Ask the listener to sign in again. Don't retry.
+- On a server, keep it out of logs and URLs. A request hook that prints requests prints both tokens: see
+  [What errors and logs contain](./security#what-errors-and-logs-contain).
+- When Apple refuses it with a `403`, you get a `UserTokenInvalid` error. Ask the listener to sign in again. Don't
+  retry.
 
-`validateUserToken` asks Apple whether a token works, with one request, before you rely on it.
+A listener who isn't signed in, or has no Apple Music subscription, gets a `401` instead. Apple answers a bad
+developer token with a `401` too, so the client can't tell the two apart, and you get `DeveloperTokenInvalid`.
+`validateUserToken` asks Apple whether a token works before you rely on it, and does tell them apart: after a
+`401`, it asks once more with the developer token alone. See [Handle errors](../guides/errors).
 
 ## Which requests send which token
 

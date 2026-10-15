@@ -72,15 +72,12 @@ What `tokenEndpoint` does:
 - `createServerClient` refuses an `origin` option. The server's own token never meets a browser; the one that does
   is the endpoint's.
 
-What's left to you:
+What's left to you is who takes tokens, and how often: rate-limiting the route, putting it behind your session
+where tokens are for your signed-in users only, keeping a CDN from caching it, and running one endpoint per
+deployment, since anyone who fetches a token can read every origin in it.
 
-- Rate-limit the route, as you would a login.
-- If tokens should go only to your signed-in users, put the route behind your session. This works on your own
-  origin only, because a page on another origin can't send your cookie or a header of its own to the route.
-- Don't let a CDN rule cache the route regardless of its headers. It would hand one token to everyone, even after
-  the token expires.
-- Run one endpoint per deployment, listing that deployment's origins only. Anyone who fetches a token can decode
-  it and read every origin in it, so your production endpoint shouldn't publish a staging or `localhost` origin.
+Two more things are yours:
+
 - Make sure your framework never builds the route ahead of time. A token signed at build time would be served to
   everyone. [Next.js](../guides/nextjs) shows the line that prevents it there.
 - If you write your own endpoint with `developerTokenMinter` instead, set `origin` on every token a browser will
@@ -97,7 +94,8 @@ On the page's side, the client that fetches the token:
 - reports anything that goes wrong at your endpoint as `DeveloperTokenUnavailable`, never as an answer from
   Apple. A `404` from your endpoint isn't "no such song".
 
-[Serve a developer token to a page](../guides/token-endpoint) sets the endpoint up.
+[Serve a developer token to a page](../guides/token-endpoint) sets the endpoint up, and limits who can take
+tokens from it.
 
 ## The Music User Token
 
@@ -134,11 +132,13 @@ listener's token on any later visit, not only while a page that holds it is open
 :::
 
 Signing out is `disconnect()`. It's Apple's own sign-out, through the script, and it ends the sign-in in the script
-and the copy it kept, so the next page load restores nothing. Forgetting the token in your page alone isn't a
-sign-out: the script would restore it next time.
+and the copy it kept, so the next page load restores nothing. It does nothing where the script has no sign-out, or
+where the page holds no configuration of the script because loading or configuring it failed. Forgetting the token
+in your page alone isn't a sign-out: the script would restore it next time.
 
 ::: info Not yet run against the live API
-Whether Apple's sign-out also ends the token at Apple, and with it a copy your server stored, isn't established.
+Whether `disconnect()` also ends the token at Apple, and with it a copy your server stored, is one of the things a
+first live sign-in has to settle: see [Differences from Apple's documentation](../differences#browser).
 :::
 
 ### Apple's script
@@ -148,18 +148,14 @@ download per page, made only when a page creates the helper. It runs with your p
 site that uses MusicKit. It can't be pinned, bundled or re-hosted: Apple serves one unversioned URL, and its
 licence forbids the rest.
 
-Your security headers have to let it in:
-
-- Allow `MUSICKIT_SCRIPT`'s host in `script-src`.
-- Set `base-uri 'self'`, so that no `<base>` element put into the page can move where anything is fetched from.
-- Expect a strict `connect-src` to need Apple's hosts too.
-- A `Cross-Origin-Opener-Policy` of `same-origin` cuts the sign-in window off. `same-origin-allow-popups` keeps it.
-- Under a content security policy with a nonce, or Trusted Types, load the script yourself and pass it to
-  `createConnect` as `musicKit`.
+Your security headers have to let it in, with `MUSICKIT_SCRIPT`'s host in `script-src`. Set `base-uri 'self'` as
+well, so that no `<base>` element put into the page can move where anything is fetched from.
+[Sign a listener in](../guides/sign-in) gives the headers, what `Cross-Origin-Opener-Policy` does to the sign-in
+window, and how to load the script yourself under a nonce or Trusted Types.
 
 ::: info Not yet run against the live API
-What `connect-src` needs, and how each `Cross-Origin-Opener-Policy` value affects the sign-in window, are still to
-be confirmed against Apple's live script.
+What a strict `connect-src` needs, and what each `Cross-Origin-Opener-Policy` does to the sign-in window, are for
+a first live sign-in to settle: see [Differences from Apple's documentation](../differences#browser).
 :::
 
 The helper guards against a few more things:
@@ -171,20 +167,18 @@ The helper guards against a few more things:
 - What Apple's script throws is handed on as it came. Its shape is Apple's, and undocumented. Catch it and show
   it, but never print it where a token might be.
 
-[Sign a listener in](../guides/sign-in) sets this up.
-
 ### On your server
 
 In a hybrid app, the page posts the token to your server, and `userTokenIntake` takes it in. The handler checks
 the token with Apple and stores it only after Apple accepts it.
 
-- **`userId` is the authentication.** It must return the signed-in user from your own session, and nothing when
+- `userId` is the authentication. It must return the signed-in user from your own session, and nothing when
   there is none. The body can't name a user.
-- **Requiring JSON is the cross-site defence.** A form or a `no-cors` fetch on another site can't send
+- Requiring JSON is the cross-site defence. A form or a `no-cors` fetch on another site can't send
   `application/json`, so it can't bind its own token to your visitor. That holds only while your CORS policy
   doesn't allow other origins to send that header with credentials.
-- **Every attempt is a request to Apple** on your developer token, and a `401` costs one more to find out whose
-  it was. Rate-limit the route as you would a login.
+- Every attempt is a request to Apple on your developer token, and a `401` costs one more to find out whose it
+  was. Rate-limit the route as you would a login.
 - How long Apple is waited for is the client's retry policy, not the handler's. By default a failure is retried
   once, and a `429` is waited out for a `Retry-After` of up to 60 seconds. Pass a client with the policy you want
   on this route, or put your own timeout around the handler.
@@ -196,7 +190,7 @@ the token with Apple and stores it only after Apple accepts it.
 
 The stores:
 
-- **Neither store encrypts.** `KvUserTokenStore` writes the token as given, so whoever can read the namespace can
+- Neither store encrypts. `KvUserTokenStore` writes the token as given, so whoever can read the namespace can
   read the token. Wrap the namespace if you need more than your platform provides.
 - `MemoryUserTokenStore` loses every token on restart, and isn't shared between processes or isolates.
 - Workers KV is eventually consistent. A token just stored or just deleted can take up to a minute to look that
@@ -243,12 +237,12 @@ anywhere else: a cache or a database that others can write to, a link someone sh
 
 What a bad URL can do depends on where you put it:
 
-- **An `<img>`.** No script runs, but the browser makes the request: to someone else's host, who learns your
+- In an `<img>`, no script runs, but the browser makes the request: to someone else's host, who learns your
   visitor was there, or, for a URL with no host, to your own site with your visitor's cookies. An audio element
   playing a preview clip requests whatever URL it's given, too.
-- **A link, `window.open` or `location`**, as for "open the artwork full size": a `javascript:` URL runs.
-- **A request your server makes**, as in an image proxy or a social card: it goes wherever the URL says, from
-  inside your network.
+- In a link, `window.open` or `location`, as for "open the artwork full size", a `javascript:` URL runs.
+- In a request your server makes, as in an image proxy or a social card, the request goes wherever the URL says,
+  from inside your network.
 
 Pass `hosts` to have the URL checked. With `hosts`, a URL that isn't `https` on one of those hosts or a subdomain
 of one, with no port and no credentials, is refused:
@@ -260,9 +254,8 @@ of one, with no port and no credentials, is refused:
 - The preview player skips the track, with the reason `"host"`. See [Play song previews](../guides/previews).
 
 ::: info Not yet run against the live API
-Apple doesn't document which host preview clips come from. The example host in the preview player's errors,
-`itunes.apple.com`, is a guess from clips seen on `audio-ssl.itunes.apple.com`, and hasn't been checked against
-the live API. Look at what your own answers hold before you set `hosts`.
+Apple doesn't document which host preview clips come from, so look at what your own answers hold before you set
+`hosts`: see [Differences from Apple's documentation](../differences#lib-preview-player).
 :::
 
 An artwork function returns a URL, not markup. Assigned to an element's property, or given to React, it's escaped
@@ -271,14 +264,19 @@ CSS `url(…)` as it is.
 
 ## What errors and logs contain
 
-- No error prints a key or a token. A value in the wrong place is described by its length or its kind, never
-  repeated. [Errors](./errors#what-an-error-message-shows) has the details, and what an error's message
-  does include.
-- Nothing in the SDK logs. **But the `onRequest` hook is handed the whole request, with the `Authorization` and
-  `Music-User-Token` headers on it. A hook that prints requests prints both tokens.**
+- A value in the wrong place, which may be a key or a token, is described by its length or its kind, never
+  repeated. A `NetworkError` quotes what your `fetch` failed with, so what it holds is up to that `fetch`.
+  [Errors](./errors#what-an-error-message-shows) has the details, and what an error's message does include.
+- Nothing in the SDK logs.
 - What Apple's sign-in script throws is passed on as it came. Never print it where a token might be.
 - What your routes send back carries no secret: the token endpoint echoes nothing of an error to the page, and
   the intake handler's answers carry neither the token nor Apple's error text.
+
+::: warning A hook that logs requests logs both tokens
+The client's `onRequest` and `onResponse` hooks, and the `onResponse` you can pass to a single request, are handed
+the whole request, with the `Authorization` and `Music-User-Token` headers on it. A hook that prints requests
+prints both tokens. Never print the request's headers.
+:::
 
 ## What is read from outside
 
@@ -289,8 +287,8 @@ not how much is kept:
   cancelled. A token longer than 8 KB isn't believed either: a real one is a few hundred bytes.
 - A body posted to the intake handler is read up to 8 KiB, counted as it arrives, and the rest is cancelled.
 
-On a runtime whose responses have no body stream to count, the token endpoint's answer is read whole and then held
-to the same limit.
+On a runtime whose requests or responses have no body stream to count, both are read whole and then held to the
+same limit: the token endpoint's answer, and the body posted to the intake handler.
 
 Apple's answers aren't checked unless you ask. The types describe what Apple documents. To hold an answer to it at
 runtime, pass a `schema`: see [Validate Apple's responses](../guides/validation).
