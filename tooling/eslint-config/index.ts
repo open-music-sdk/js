@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 /** Shared ESLint config. Consumers call `config({ tsconfigRootDir: import.meta.dirname })`. */
 export function config({ tsconfigRootDir }: { tsconfigRootDir: string }) {
   return defineConfig(
-    { ignores: ["**/dist/**", "**/src/generated/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "**/coverage/**"] },
+    { ignores: ["**/dist/**", "**/src/generated/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "**/coverage/**", "**/.vitepress/cache/**"] },
     js.configs.recommended,
     ...tseslint.configs.strictTypeChecked,
     ...tseslint.configs.stylisticTypeChecked,

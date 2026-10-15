@@ -1,12 +1,35 @@
-// Two things TypeDoc does not do by itself: show a function built by a generic builder with its arguments one by
-// one, and hold every function to saying what each argument is and what it returns. What a function throws is not
-// checked here: a function with no @throws throws nothing, and no check can tell that from a forgotten tag, so it
-// is read for in review.
+// Three things TypeDoc does not do by itself: show a function built by a generic builder with its arguments one by
+// one, hold every function to saying what each argument is and what it returns, and document a re-exported name once,
+// in the package that declares it. What a function throws is not checked here: a function with no @throws throws
+// nothing, and no check can tell that from a forgotten tag, so it is read for in review.
+import { readFileSync } from "node:fs";
+import { dirname, sep } from "node:path";
 import ts from "typescript";
 import { Application, Converter, ParameterReflection, ReflectionFlag, ReflectionKind } from "typedoc";
 
 /** @param {Application} app */
 export function load(app) {
+  // server, browser and react re-export most of the family, and the clients re-export a few of core's types. Each
+  // package is converted on its own, so without this a re-exported name would get a page under every package that
+  // exports it, and a link to it could land on a copy. A package keeps what is declared in its own source; a namespace
+  // such as `schemas` keeps its page and loses the members another package declares.
+  app.converter.on(Converter.EVENT_RESOLVE_BEGIN, (context) => {
+    const { project } = context;
+    // TypeDoc takes a removed name for one hidden on purpose, and drops every link to it. These are not hidden: they are
+    // documented where they are declared, and the links are to land there when the packages are merged. So the marks
+    // this adds are taken back. The map is TypeDoc's own, and an upgrade that changes it has to change this too.
+    if (typeof project.removedSymbolIds?.keys !== "function") throw new Error("typedoc.plugin.mjs: TypeDoc no longer has removedSymbolIds; update the re-export filter");
+    const hidden = new Set(project.removedSymbolIds.keys());
+    const foreign = (reflection) => packageOf(reflection.sources?.[0]?.fullFileName) !== project.packageName;
+    for (const reflection of project.getChildrenByKind(ReflectionKind.SomeExport)) {
+      if (!reflection.sources?.length) continue;
+      if (reflection.kindOf(ReflectionKind.Namespace)) {
+        for (const child of [...(reflection.children ?? [])]) if (foreign(child)) project.removeReflection(child);
+      } else if (foreign(reflection)) project.removeReflection(reflection);
+    }
+    for (const id of [...project.removedSymbolIds.keys()]) if (!hidden.has(id)) project.removedSymbolIds.delete(id);
+  });
+
   app.converter.on(Converter.EVENT_CREATE_SIGNATURE, (context, signature) => {
     // A const with @function is shown as a function, with the signature its type declares. That signature is core's
     // tEndpoint call signature, and TypeDoc would take the comment written there, the same for all 137, over the one
@@ -45,6 +68,23 @@ export function load(app) {
     }
   });
 }
+
+/** The name in the nearest package.json above a source file. */
+const packages = new Map();
+const packageOf = (file) => {
+  if (!file) return undefined;
+  for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
+    if (packages.has(dir)) return packages.get(dir);
+    try {
+      const name = JSON.parse(readFileSync(`${dir}${sep}package.json`, "utf8")).name;
+      packages.set(dir, name);
+      return name;
+    } catch {
+      // no package.json here; look further up
+    }
+  }
+  return undefined;
+};
 
 /** `void`, `undefined`, or a promise of either. */
 const returnsNothing = (type) =>
