@@ -25,11 +25,11 @@ packages/             foundation packages: types, validate, core, developer-toke
 clients/              one client per token boundary: client-catalog, client-user
 lib/                  conveniences over the clients: lib-playlists, lib-preview-player
 integrations/         what people install: server, browser, react
-apps/                 private apps of the repository: docs, the docs site (see apps/docs/README.md)
-.github/workflows/    ci: build, typecheck, lint, test and check on what a change affects · pages: the docs site, from main
+apps/                 beside the packages: cli, the published CLI, and docs, the docs site (each has a README)
+.github/workflows/    ci: build, typecheck, lint and test on what a change affects · pages: the docs site, from main
 ```
 
-Planned workspaces: `apps/cli` (the CLI) and `samples/` (private sample apps).
+Planned workspace: `samples/` (private sample apps).
 
 ## Developer Certificate of Origin
 

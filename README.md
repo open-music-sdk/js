@@ -14,8 +14,8 @@ An open, community-led TypeScript SDK for the Apple Music API. It gives you a ty
 endpoint, tokens that look after themselves, and ESM-only packages for servers, web pages and React. It uses
 Apple's MusicKit on the Web for one thing: signing a listener in.
 
-> **🚧 Under construction.** Nothing is published to npm yet, and nothing has been run against the live Apple
-> Music API, in a browser, or in a React app outside its tests. See
+> **🚧 Under construction.** Nothing is published to npm yet. The CLI's sign-in has run once against the live
+> Apple Music API, on Windows; the rest hasn't, and nothing has run in a React app outside its tests. See
 > [Status and roadmap](https://open-music-sdk.github.io/js/status) for what exists.
 
 **Documentation: [open-music-sdk.github.io/js](https://open-music-sdk.github.io/js/)**
@@ -33,6 +33,20 @@ Most apps install one package:
 
 Each gives you a client with the catalog, the listener's library and playlist tools on it. See
 [Which package to install](https://open-music-sdk.github.io/js/concepts/packages) for the rest of the family.
+
+## The CLI
+
+[`@open-music-sdk/cli`](./apps/cli/README.md) is the command you use beside the packages while you build. `doctor`
+tells you whether Apple takes your MusicKit key. `login` signs you in at Apple in your browser and keeps a Music
+User Token for your own account, and `token` prints it for a script to read.
+
+```sh
+pnpm add -D @open-music-sdk/cli
+pnpm exec open-music-sdk doctor
+pnpm exec open-music-sdk login
+```
+
+It reads your key from the same variables as the example below. `open-music-sdk --help` lists every command.
 
 ## Example
 
