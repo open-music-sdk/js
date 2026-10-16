@@ -23,6 +23,11 @@ function streams(tty = true) {
   return { input, output, shown: () => shown };
 }
 
+/** Types `text` as a person does, a key at a time, each arriving by itself. */
+const type = (input: PassThrough, text: string) => {
+  for (const c of text) input.write(c);
+};
+
 const neverShown = (shown: string) => {
   for (const line of BODY) expect(shown).not.toContain(line.slice(0, 16));
 };
@@ -42,10 +47,10 @@ describe("terminal: whether it may ask", () => {
 });
 
 describe("terminal: an ID", () => {
-  test("is what was typed to Enter, in capitals, shown as it is typed, and raw mode is left behind", async () => {
+  test("is what was typed to Enter, in capitals, shown key by key as it is typed, and raw mode is left behind", async () => {
     const { input, output, shown } = streams();
     const answer = terminal(input, output).id("Team ID: ");
-    input.write("def123ghij\r");
+    type(input, "def123ghij\r");
     expect(await answer).toBe("DEF123GHIJ");
     expect(shown()).toBe("Team ID: DEF123GHIJ\n");
     expect(input.setRawMode.mock.calls).toEqual([[true], [false]]);
@@ -55,22 +60,40 @@ describe("terminal: an ID", () => {
   test("backspace takes back what it shows, and no more than ten characters are shown", async () => {
     const { input, output, shown } = streams();
     const answer = terminal(input, output).id("Key ID: ");
-    input.write(`ABX${BACKSPACE}C123DEFGHIJ\r`);
+    type(input, `ABX${BACKSPACE}C123DEFGHIJ\r`);
     expect(await answer).toBe("ABC123DEFGHIJ");
     expect(shown()).toBe("Key ID: ABX\b \bC123DEFG\n");
   });
 
-  test("a key pasted at it shows nothing of the key, however the paste arrives, and the rest of it answers nothing", async () => {
-    for (const pieces of [[PASTED], PASTED.split("\r").map((line) => `${line}\r`)]) {
+  test("an ID pasted is shown once it is known to be an ID", async () => {
+    const { input, output, shown } = streams();
+    const answer = terminal(input, output).id("Team ID: ");
+    input.write("DEF123GHIJ\r");
+    expect(await answer).toBe("DEF123GHIJ");
+    expect(shown()).toBe("Team ID: \rTeam ID: DEF123GHIJ\n");
+  });
+
+  test("a key pasted at it shows nothing of the key, however fast or slowly the paste arrives, and the rest of it answers nothing", async () => {
+    const lines = PASTED.split("\r").map((line) => `${line}\r`);
+    // All at once; a line at a time; and a line at a time with each one after the last has been let go by.
+    for (const [pieces, gap] of [[[PASTED], 0], [lines, 0], [lines, 150]] as const) {
       const { input, output, shown } = streams();
       const term = terminal(input, output);
-      const answer = term.id("Team ID: ");
-      for (const piece of pieces) input.write(piece);
-      expect((await answer)?.startsWith("-----BEGIN")).toBe(true);
-      // The paste's other lines were let go by, so the next question waits for what is typed.
-      const next = term.id("Team ID: ");
-      input.write("DEF123GHIJ\r");
-      expect(await next).toBe("DEF123GHIJ");
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const pasting = (async () => {
+        for (const piece of pieces) {
+          input.write(piece);
+          await sleep(gap);
+        }
+        // Then the right answer, typed, once the paste has been let go by.
+        await sleep(150);
+        type(input, "DEF123GHIJ\r");
+      })();
+      // Asked again after each wrong answer, as the key's loading does, until the typed one comes.
+      let answers = 0;
+      while ((await term.id("Team ID: ")) !== "DEF123GHIJ") answers++;
+      await pasting;
+      expect(answers).toBeGreaterThan(0);
       neverShown(shown());
       expect(shown()).not.toContain("BEGIN");
     }

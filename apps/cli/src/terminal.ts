@@ -69,16 +69,20 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
   let ahead = "";
 
   /**
-   * Reads one answer in raw mode, a character at a time through `take`, until it gives one. What is left of the
-   * chunk is kept for the next question, unless `drain` says to let input go by until it stops for a moment.
+   * Reads one answer in raw mode, a character at a time through `take`, until it gives one; `take` is told whether
+   * the character came by itself, as a key typed does, or with others, as a paste does. What is left of the chunk is
+   * kept for the next question, unless `drain` says to let input go by until it stops for a moment.
    */
-  const read = <T>(take: (c: string) => T | typeof PENDING, drain: (answer: T) => boolean): Promise<T> =>
+  const read = <T>(take: (c: string, alone: boolean) => T | typeof PENDING, drain: (answer: T) => boolean): Promise<T> =>
     new Promise((resolve, reject) => {
       const setRawMode = input.setRawMode?.bind(input);
       // Without raw mode the terminal shows what is typed; there is no asking for a key that way.
       if (setRawMode === undefined) throw new Error("terminal: stdin cannot be put in raw mode, so what is typed could not be kept from showing");
       let answer: T | CliError | typeof PENDING = PENDING;
-      let quiet: ReturnType<typeof setTimeout> | undefined;
+      let draining = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // Raw mode is left from a timer, never from inside the read that brought the answer: on Windows, a console
+      // taken out of raw mode there and put back for the next question echoes, and reads no more.
       const end = () => {
         input.off("data", onData);
         setRawMode(false);
@@ -88,27 +92,28 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
         else resolve(answer as T);
       };
       const onData = (chunk: Buffer | string) => {
+        const text = String(chunk);
         if (answer !== PENDING) {
-          // Letting input go by: each chunk puts the end off again.
-          clearTimeout(quiet);
-          quiet = setTimeout(end, DRAIN_MS);
+          // Answered: what comes before the end is let go by, putting the end off, or kept for the next question.
+          if (draining) {
+            clearTimeout(timer);
+            timer = setTimeout(end, DRAIN_MS);
+          } else ahead += text;
           return;
         }
-        const text = String(chunk);
         let i = 0;
         while (i < text.length && answer === PENDING) {
           const c = text.charAt(i++);
-          answer = c === CTRL_C ? stopped() : take(c);
+          answer = c === CTRL_C ? stopped() : take(c, text.length === 1);
         }
         if (answer === PENDING) return;
-        if (answer instanceof CliError || drain(answer)) {
-          quiet = setTimeout(end, DRAIN_MS);
-          return;
+        draining = answer instanceof CliError || drain(answer);
+        if (!draining) {
+          // The line feed of a CR LF that ended this answer is this answer's, not an empty one for the next question.
+          if (text.charAt(i - 1) === "\r" && text.charAt(i) === "\n") i++;
+          ahead = text.slice(i);
         }
-        // The line feed of a CR LF that ended this answer is this answer's, not an empty one for the next question.
-        if (text.charAt(i - 1) === "\r" && text.charAt(i) === "\n") i++;
-        ahead = text.slice(i);
-        end();
+        timer = setTimeout(end, draining ? DRAIN_MS : 0);
       };
       setRawMode(true);
       input.setEncoding("utf8");
@@ -136,14 +141,19 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       const shown: boolean[] = [];
       let other = false;
       let afterReturn = false;
+      /** The answer, shown in full once it is known to be an ID, when some of it came in a paste and was held back. */
+      const answered = (answer: string) => {
+        if (!shown.every(Boolean) && !other && answer.length === ID_LENGTH) output.write(`\r${question}${answer}`);
+        return answer;
+      };
       return read<string | undefined>(
-        (c) => {
+        (c, alone) => {
           // A line break sent as CR LF is one break, not an empty answer to the next question.
           const lineFeedOfBreak = c === "\n" && afterReturn;
           afterReturn = c === "\r";
           if (lineFeedOfBreak) return PENDING;
-          if (c === "\r" || c === "\n") return typed;
-          if (c === CTRL_D) return typed === "" ? undefined : typed;
+          if (c === "\r" || c === "\n") return answered(typed);
+          if (c === CTRL_D) return typed === "" ? undefined : answered(typed);
           if (BACKSPACE.includes(c)) {
             typed = typed.slice(0, -1);
             if (shown.pop() === true) output.write("\b \b");
@@ -153,7 +163,9 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
           other ||= !isId;
           // Enough is kept to tell an answer is wrong, and no more.
           if (typed.length > 64) return PENDING;
-          const show = !other && shown.filter(Boolean).length < ID_LENGTH;
+          // A key typed is shown as it comes; what is pasted waits until it is known to be an ID. A key pasted here
+          // by mistake is not, however slowly its lines arrive.
+          const show = alone && !other && shown.filter(Boolean).length < ID_LENGTH;
           typed += isId ? c.toUpperCase() : c;
           shown.push(show);
           if (show) output.write(c.toUpperCase());
