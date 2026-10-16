@@ -1,7 +1,7 @@
 // Questions at the terminal, and stdin read as a pipe. Each question is written to stderr, so a pipe on stdout gets
-// only what the command produces.
+// only what the command produces. Every answer is read in raw mode, so the CLI decides what is shown: a key pasted
+// at the wrong question shows no more than it would at the right one.
 import type { Readable, Writable } from "node:stream";
-import { createInterface } from "node:readline";
 import { CliError } from "./files";
 
 /** The terminal as the key's loading uses it. */
@@ -13,15 +13,17 @@ export interface tTerminal {
   /** Says a line to the person at the terminal, on stderr. */
   tell(line: string): void;
   /**
-   * Asks for a line, shown as it is typed.
+   * Asks for an ID, read to Enter. Letters are taken as capitals. What is shown is ID characters, ten at most, and
+   * nothing at all once anything else arrives, such as a key pasted here by mistake; what came after a wrong answer
+   * is let go by, so a paste's other lines answer nothing.
    *
-   * @returns The line, or undefined when stdin ends first, as with Ctrl+D.
+   * @returns All that was typed, or undefined when stdin ends first, as with Ctrl+D.
    * @throws CliError with exit status 130 on Ctrl+C.
    */
-  line(question: string): Promise<string | undefined>;
+  id(question: string): Promise<string | undefined>;
   /**
    * Asks for a private key, with nothing shown, read until its `-----END … PRIVATE KEY-----` line, Ctrl+D, or `max`
-   * characters.
+   * characters. Whatever arrives after it is let go by, so a paste's other lines never reach the shell.
    *
    * @returns What was given, or undefined past `max`.
    * @throws CliError with exit status 130 on Ctrl+C.
@@ -42,11 +44,18 @@ interface tTerminalInput extends Readable {
 }
 
 const stopped = () => new CliError("Stopped. Nothing was kept.", 130);
+const ESC = String.fromCharCode(27);
 const CTRL_C = String.fromCharCode(3);
 const CTRL_D = String.fromCharCode(4);
 const BACKSPACE = [String.fromCharCode(8), String.fromCharCode(127)];
 const END = /-----END [A-Z ]*PRIVATE KEY-----\s*$/;
-/** A paste that is not over yet. */
+/** What a terminal in bracketed-paste mode puts around a paste. */
+const PASTE_MARKS = [`${ESC}[200~`, `${ESC}[201~`];
+const ID_CHARACTER = /^[A-Za-z0-9]$/;
+const ID_LENGTH = 10;
+/** How long input must stop for before what is left of a paste is taken to be over. */
+const DRAIN_MS = 100;
+/** An answer that is not over yet. */
 const PENDING = Symbol("pending");
 
 /**
@@ -56,6 +65,62 @@ const PENDING = Symbol("pending");
  * @param output - Where questions are written.
  */
 export function terminal(input: tTerminalInput, output: Writable & { readonly isTTY?: boolean | undefined }): tTerminal {
+  /** Keys typed ahead of the question they answer, kept for it. */
+  let ahead = "";
+
+  /**
+   * Reads one answer in raw mode, a character at a time through `take`, until it gives one. What is left of the
+   * chunk is kept for the next question, unless `drain` says to let input go by until it stops for a moment.
+   */
+  const read = <T>(take: (c: string) => T | typeof PENDING, drain: (answer: T) => boolean): Promise<T> =>
+    new Promise((resolve, reject) => {
+      const setRawMode = input.setRawMode?.bind(input);
+      // Without raw mode the terminal shows what is typed; there is no asking for a key that way.
+      if (setRawMode === undefined) throw new Error("terminal: stdin cannot be put in raw mode, so what is typed could not be kept from showing");
+      let answer: T | CliError | typeof PENDING = PENDING;
+      let quiet: ReturnType<typeof setTimeout> | undefined;
+      const end = () => {
+        input.off("data", onData);
+        setRawMode(false);
+        input.pause();
+        output.write("\n");
+        if (answer instanceof CliError) reject(answer);
+        else resolve(answer as T);
+      };
+      const onData = (chunk: Buffer | string) => {
+        if (answer !== PENDING) {
+          // Letting input go by: each chunk puts the end off again.
+          clearTimeout(quiet);
+          quiet = setTimeout(end, DRAIN_MS);
+          return;
+        }
+        const text = String(chunk);
+        let i = 0;
+        while (i < text.length && answer === PENDING) {
+          const c = text.charAt(i++);
+          answer = c === CTRL_C ? stopped() : take(c);
+        }
+        if (answer === PENDING) return;
+        if (answer instanceof CliError || drain(answer)) {
+          quiet = setTimeout(end, DRAIN_MS);
+          return;
+        }
+        // The line feed of a CR LF that ended this answer is this answer's, not an empty one for the next question.
+        if (text.charAt(i - 1) === "\r" && text.charAt(i) === "\n") i++;
+        ahead = text.slice(i);
+        end();
+      };
+      setRawMode(true);
+      input.setEncoding("utf8");
+      input.on("data", onData);
+      input.resume();
+      if (ahead !== "") {
+        const typed = ahead;
+        ahead = "";
+        onData(typed);
+      }
+    });
+
   return {
     interactive: input.isTTY === true && output.isTTY === true,
     stdinIsTerminal: input.isTTY === true,
@@ -64,60 +129,63 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       output.write(`${line}\n`);
     },
 
-    line: (question) =>
-      new Promise((resolve, reject) => {
-        const rl = createInterface({ input, output, terminal: true });
-        let answered = false;
-        // A terminal in readline's hands sends Ctrl+C to it, not to the process.
-        rl.on("SIGINT", () => {
-          answered = true;
-          rl.close();
-          output.write("\n");
-          reject(stopped());
-        });
-        rl.on("close", () => {
-          if (!answered) resolve(undefined);
-        });
-        rl.question(question, (answer) => {
-          answered = true;
-          rl.close();
-          resolve(answer);
-        });
-      }),
-
-    secret: (question, max) =>
-      new Promise((resolve, reject) => {
-        output.write(question);
-        let text = "";
-        /** What the keys pressed so far come to: the text once it is whole, undefined past `max`, Ctrl+C's error, or PENDING. */
-        const take = (chunk: string): string | undefined | CliError | typeof PENDING => {
-          for (const c of chunk) {
-            if (c === CTRL_C) return stopped();
-            if (c === CTRL_D) return text;
-            if (BACKSPACE.includes(c)) text = text.slice(0, -1);
-            // A terminal in raw mode sends a line break as a carriage return.
-            else text += c === "\r" ? "\n" : c;
-            if (text.length > max) return undefined;
-            if (END.test(text)) return text;
+    id: (question) => {
+      output.write(question);
+      let typed = "";
+      /** For each character kept, whether it was shown. */
+      const shown: boolean[] = [];
+      let other = false;
+      let afterReturn = false;
+      return read<string | undefined>(
+        (c) => {
+          // A line break sent as CR LF is one break, not an empty answer to the next question.
+          const lineFeedOfBreak = c === "\n" && afterReturn;
+          afterReturn = c === "\r";
+          if (lineFeedOfBreak) return PENDING;
+          if (c === "\r" || c === "\n") return typed;
+          if (c === CTRL_D) return typed === "" ? undefined : typed;
+          if (BACKSPACE.includes(c)) {
+            typed = typed.slice(0, -1);
+            if (shown.pop() === true) output.write("\b \b");
+            return PENDING;
           }
+          const isId = ID_CHARACTER.test(c);
+          other ||= !isId;
+          // Enough is kept to tell an answer is wrong, and no more.
+          if (typed.length > 64) return PENDING;
+          const show = !other && shown.filter(Boolean).length < ID_LENGTH;
+          typed += isId ? c.toUpperCase() : c;
+          shown.push(show);
+          if (show) output.write(c.toUpperCase());
           return PENDING;
-        };
-        const onData = (chunk: Buffer | string) => {
-          const outcome = take(String(chunk));
-          if (outcome === PENDING) return;
-          input.off("data", onData);
-          input.setRawMode?.(false);
-          input.pause();
-          output.write("\n");
-          if (outcome instanceof CliError) reject(outcome);
-          else resolve(outcome);
-        };
-        // Raw mode: nothing typed or pasted is shown, and each key arrives as it is pressed.
-        input.setRawMode?.(true);
-        input.setEncoding("utf8");
-        input.on("data", onData);
-        input.resume();
-      }),
+        },
+        // After a wrong answer, the rest of a paste is let go by rather than answering the next question.
+        (answer) => answer !== undefined && (other || answer.length !== ID_LENGTH),
+      );
+    },
+
+    secret: (question, max) => {
+      output.write(question);
+      let text = "";
+      let afterReturn = false;
+      const unmarked = () => PASTE_MARKS.reduce((t, mark) => t.replaceAll(mark, ""), text);
+      return read<string | undefined>(
+        (c) => {
+          const lineFeedOfBreak = c === "\n" && afterReturn;
+          afterReturn = c === "\r";
+          if (lineFeedOfBreak) return PENDING;
+          if (c === CTRL_D) return unmarked();
+          if (BACKSPACE.includes(c)) text = text.slice(0, -1);
+          // A terminal in raw mode sends a line break as a carriage return.
+          else text += c === "\r" ? "\n" : c;
+          if (text.length > max) return undefined;
+          if (END.test(text)) return unmarked();
+          return PENDING;
+        },
+        // What follows a key, the rest of a pasted file say, is for no one: it is let go by, not left for the shell.
+        () => true,
+      );
+    },
 
     pipe: async (max) => {
       const chunks: Buffer[] = [];

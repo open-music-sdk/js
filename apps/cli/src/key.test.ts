@@ -30,10 +30,10 @@ afterEach(async () => {
 });
 
 /** A terminal that answers from a script, records the questions it was asked and what it was told, and holds a pipe's contents. */
-function fake(options: { interactive?: boolean; stdinIsTerminal?: boolean; lines?: (string | undefined)[]; secrets?: (string | undefined)[]; piped?: string } = {}) {
+function fake(options: { interactive?: boolean; stdinIsTerminal?: boolean; ids?: (string | undefined)[]; secrets?: (string | undefined)[]; piped?: string } = {}) {
   const asked: string[] = [];
   const told: string[] = [];
-  const lines = [...(options.lines ?? [])];
+  const ids = [...(options.ids ?? [])];
   const secrets = [...(options.secrets ?? [])];
   const interactive = options.interactive ?? true;
   const term: tTerminal = {
@@ -42,9 +42,9 @@ function fake(options: { interactive?: boolean; stdinIsTerminal?: boolean; lines
     tell: (line) => {
       told.push(line);
     },
-    line: (question) => {
+    id: (question) => {
       asked.push(question);
-      return Promise.resolve(lines.shift());
+      return Promise.resolve(ids.shift());
     },
     secret: (question) => {
       asked.push(question);
@@ -130,12 +130,23 @@ describe("loadKey: a file is read only when --key-file names it", () => {
     expect(e.message).toContain("No key: set APPLE_MUSIC_PRIVATE_KEY");
   });
 
-  test("a file that cannot be read is named by its path when it looks like one", async () => {
-    const typo = join(dir, "AuthKey_ABC123DEFH.p8");
-    const e = await thrown(() => loadKey({ "key-file": typo }, ENV, fake().term));
-    expect(e).toMatchObject({ exitCode: 2 });
-    expect(e.message).toContain(typo);
-    expect(e.message).toContain("ENOENT");
+  test("a file that cannot be read is named by its path when it looks like one, in a folder that is there or not, with the reason", async () => {
+    // A ~ the shell did not expand, as PowerShell 5.1 leaves it, is a folder that is not there.
+    for (const typo of [join(dir, "AuthKey_ABC123DEFH.p8"), join("~", "keys", "AuthKey_ABC123DEFG.p8")]) {
+      const e = await thrown(() => loadKey({ "key-file": typo }, ENV, fake().term));
+      expect(e).toMatchObject({ exitCode: 2 });
+      expect(e.message).toContain(resolve(typo));
+      expect(e.message).toContain("ENOENT");
+    }
+  });
+
+  test("what --key-file names must be a file no larger than any key: a folder, a device, or something large is refused before it is read", async () => {
+    const folder = await thrown(() => loadKey({ "key-file": dir }, ENV, fake().term));
+    expect(folder.message).toContain(`${resolve(dir)}, from --key-file, is a folder`);
+    const large = join(dir, "large.p8");
+    await writeFile(large, "x".repeat(16 * 1024 + 1));
+    expect((await thrown(() => loadKey({ "key-file": large }, ENV, fake().term))).message).toContain("over 16 KB");
+    if (process.platform !== "win32") expect((await thrown(() => loadKey({ "key-file": "/dev/zero" }, ENV, fake().term))).message).toContain("is no file");
   });
 
   test("the key's contents, or a token, put where the file's path goes, is not repeated", async () => {
@@ -192,17 +203,17 @@ describe("loadKey: --key-file - reads the key from a pipe", () => {
 });
 
 describe("loadKey: what the flags and the environment leave out is asked for", () => {
-  test("only what is missing is asked for, in the order team ID, key ID, key, after saying so once", async () => {
-    const { term, asked, told } = fake({ lines: [TEAM, KEY_ID], secrets: [PEM] });
+  test("only what is missing is asked for, the key first, so a key on the clipboard is pasted where nothing is shown", async () => {
+    const { term, asked, told } = fake({ ids: [TEAM, KEY_ID], secrets: [PEM] });
     const key = await loadKey({}, {}, term);
-    expect(key).toEqual({ pem: PEM, teamId: TEAM, keyId: KEY_ID, from: "pasted", asked: true });
-    expect(asked.map((question) => question.split(",")[0])).toEqual(["Team ID", "Key ID", "Private key"]);
-    expect(told[0]).toContain("team ID, key ID, key");
+    expect(key).toEqual({ pem: PEM, teamId: TEAM, keyId: KEY_ID, from: "what was pasted", asked: true });
+    expect(asked.map((question) => question.split(",")[0])).toEqual(["Private key", "Team ID", "Key ID"]);
+    expect(told[0]).toContain("key, team ID, key ID");
     expect(told[0]).toContain("--no-input");
   });
 
   test("a value the environment has is not asked for", async () => {
-    const { term, asked } = fake({ lines: [KEY_ID] });
+    const { term, asked } = fake({ ids: [KEY_ID] });
     expect(await loadKey({}, { APPLE_MUSIC_PRIVATE_KEY: PEM, APPLE_MUSIC_TEAM_ID: TEAM }, term)).toMatchObject({ keyId: KEY_ID, from: "APPLE_MUSIC_PRIVATE_KEY", asked: true });
     expect(asked).toHaveLength(1);
     expect(asked[0]).toMatch(/^Key ID/);
@@ -211,27 +222,50 @@ describe("loadKey: what the flags and the environment leave out is asked for", (
   test("the key is asked for through the prompt that shows nothing", async () => {
     const { term, asked } = fake({ secrets: [PEM] });
     await loadKey({}, { APPLE_MUSIC_TEAM_ID: TEAM, APPLE_MUSIC_KEY_ID: KEY_ID }, term);
-    expect(asked).toEqual(["Private key, the whole .p8 from BEGIN to END (not shown): "]);
+    expect(asked).toEqual(["Private key, the whole .p8 from BEGIN to END, not shown (Ctrl+D ends it early): "]);
   });
 
-  test("an ID typed wrong, and a key pasted wrong, are asked for again, and what was typed is not repeated", async () => {
-    const { term, told } = fake({ lines: ["def123ghij", TEAM, KEY_ID], secrets: [BODY, PEM] });
+  test("an ID typed wrong, and a key pasted wrong, are asked for again, with what is wrong said and what was typed not repeated", async () => {
+    const { term, told } = fake({ ids: ["DEF123", "DEF123GHI!", TEAM, KEY_ID], secrets: [BODY, PEM] });
     expect(await loadKey({}, {}, term)).toMatchObject({ teamId: TEAM, pem: PEM });
-    expect(told.join("\n")).toContain("That is 10 characters; a team ID is ten capital letters and digits");
-    expect(told.join("\n")).toContain("That is not a MusicKit private key");
-    expect(told.join("\n")).not.toContain("def123ghij");
-    expect(told.join("\n")).not.toContain(BODY.slice(0, 20));
+    const said = told.join("\n");
+    expect(said).toContain("That is not a team ID: it is 6 characters. A team ID is ten capital letters and digits.");
+    expect(said).toContain("That is not a team ID: it has characters other than A to Z and 0 to 9.");
+    expect(said).toContain("That is not a MusicKit private key");
+    expect(said).not.toContain("DEF123");
+    expect(said).not.toContain(BODY.slice(0, 20));
   });
 
   test("stdin ending at a question, or an empty paste, is a mistake: nothing was given", async () => {
-    expect(await thrown(() => loadKey({}, {}, fake({ lines: [] }).term))).toMatchObject({ exitCode: 2, message: "No team ID was given." });
+    expect(await thrown(() => loadKey({}, { APPLE_MUSIC_PRIVATE_KEY: PEM }, fake({ ids: [] }).term))).toMatchObject({ exitCode: 2, message: "No team ID was given." });
     expect(await thrown(() => loadKey({}, { APPLE_MUSIC_TEAM_ID: TEAM, APPLE_MUSIC_KEY_ID: KEY_ID }, fake({ secrets: [""] }).term))).toMatchObject({ exitCode: 2, message: "No key was given." });
   });
 
   test("Ctrl+C at a question stops it with exit status 130", async () => {
     const { term } = fake();
-    const stopped = { ...term, line: () => Promise.reject(new CliError("Stopped. Nothing was kept.", 130)) };
+    const stopped = { ...term, secret: () => Promise.reject(new CliError("Stopped. Nothing was kept.", 130)) };
     expect(await thrown(() => loadKey({}, {}, stopped))).toMatchObject({ exitCode: 130 });
+  });
+
+  test("a wrong ID, or a value missing that cannot be asked for, is found before a file or a pipe is read", async () => {
+    let read = 0;
+    const counting = (options: Parameters<typeof fake>[0]) => {
+      const { term } = fake(options);
+      return {
+        ...term,
+        pipe: (max: number) => {
+          read++;
+          return term.pipe(max);
+        },
+      };
+    };
+    const piped = { interactive: true, stdinIsTerminal: false, piped: PEM };
+    expect(await thrown(() => loadKey({ "key-file": "-", "team-id": "def123ghij", "key-id": KEY_ID }, {}, counting(piped)))).toMatchObject({ exitCode: 2 });
+    expect(await thrown(() => loadKey({ "key-file": "-", "team-id": TEAM }, {}, counting(piped)))).toMatchObject({ exitCode: 2, message: expect.stringContaining("No key ID") as unknown });
+    expect(read).toBe(0);
+    // A file that is not there would say so if it were read first.
+    const e = await thrown(() => loadKey({ "key-file": join(dir, "AuthKey_NOTTHERE00.p8"), "team-id": "SHORT" }, {}, fake().term));
+    expect(e.message).toContain("team ID from --team-id");
   });
 
   test("nothing is asked with --no-input or away from a terminal: each missing value is named with its flag and its variable", async () => {
@@ -247,10 +281,10 @@ describe("loadKey: what the flags and the environment leave out is asked for", (
     }
   });
 
-  test("an ID from a flag, a variable or a file name that is wrong is refused, named by where it came from and not by its value", async () => {
+  test("an ID from a flag or a variable that is wrong is refused, named by where it came from and what is wrong, not by its value", async () => {
     const cases: [tKeyFlags, Record<string, string>, string][] = [
-      [{ "team-id": "def123ghij" }, ENV, "team ID from --team-id"],
-      [{}, { ...ENV, APPLE_MUSIC_KEY_ID: "SHORT" }, "key ID from APPLE_MUSIC_KEY_ID"],
+      [{ "team-id": "def123ghij" }, ENV, "The team ID from --team-id is not one: it has lower-case letters."],
+      [{}, { ...ENV, APPLE_MUSIC_KEY_ID: "SHORT" }, "The key ID from APPLE_MUSIC_KEY_ID is not one: it is 5 characters."],
     ];
     for (const [flags, env, named] of cases) {
       const { term, asked } = fake();
