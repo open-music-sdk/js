@@ -9,14 +9,15 @@ import v8 from "node:v8";
 import { runInNewContext } from "node:vm";
 import { MemoryUserTokenStore, createServerClient, type tUserTokenStore } from "@open-music-sdk/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { CliError, type tKey } from "./files";
+import { CliError } from "./files";
+import type { tKey } from "./key";
 import { startLoopback, toRequest, type tLoopback } from "./loopback";
 
 const TEAM = "DEF123GHIJ";
 const KEY_ID = "ABC123DEFG";
 const TOKEN = "Ag-music-user-token-from-apple";
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-const KEY: tKey = { pem: privateKey.export({ type: "pkcs8", format: "pem" }).toString(), teamId: TEAM, keyId: KEY_ID, keyPath: "/keys/AuthKey_ABC123DEFG.p8" };
+const KEY: tKey = { pem: privateKey.export({ type: "pkcs8", format: "pem" }).toString(), teamId: TEAM, keyId: KEY_ID, from: "APPLE_MUSIC_PRIVATE_KEY", asked: false };
 const SCRIPT = "/* the page's script */";
 
 /** What the fake Apple answers /v1/me/storefront with, or `"hang"` for no answer until the request is aborted, and every request it was asked. */

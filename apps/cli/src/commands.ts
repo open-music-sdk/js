@@ -3,23 +3,25 @@
 import { join } from "node:path";
 import { styleText } from "node:util";
 import { createServerClient, isAppleMusicError, mintDeveloperToken, validateUserToken, type tMusic } from "@open-music-sdk/server";
-import { CliError, FileUserTokenStore, configDir, loadKey, readSavedKey, saveKey, usage, type tEnv, type tKey, type tKeyFlags } from "./files";
+import { CliError, FileUserTokenStore, configDir, usage, type tEnv } from "./files";
+import { VARIABLES, loadKey, type tKey, type tKeyFlags } from "./key";
 import { openBrowser, startLoopback } from "./loopback";
+import type { tTerminal } from "./terminal";
 
 export const NAME = "open-music-sdk";
 /** The CLI keeps one listener's token: the person running it. */
 const USER_ID = "default";
-const CONFIG_FILE = "config.json";
 const TOKEN_FILE = "user-token.json";
 /** How long a question to Apple may take, retries and all. */
 const TIMEOUT_MS = 30_000;
 /** How long `login` waits for the sign-in. */
 const WAIT_MS = 5 * 60_000;
 
-/** What every command is run with: the environment it reads, and whether it may print in color. */
+/** What every command is run with: the environment it reads, whether it may print in color, and the terminal it may ask at. */
 export interface tContext {
   readonly env: tEnv;
   readonly color: boolean;
+  readonly terminal: tTerminal;
 }
 
 /** The flags each command takes, as `parseArgs` gives them. */
@@ -34,10 +36,8 @@ export const paint = (ctx: tContext, format: tFormat, text: string, stream: Node
 const out = (line: string) => process.stdout.write(`${line}\n`);
 const say = (line: string) => process.stderr.write(`${line}\n`);
 
-const paths = (env: tEnv) => {
-  const dir = configDir(env);
-  return { config: join(dir, CONFIG_FILE), tokens: join(dir, TOKEN_FILE) };
-};
+/** The one file the CLI keeps: the token. */
+const tokenFile = (env: tEnv) => join(configDir(env), TOKEN_FILE);
 
 /** Text from Apple or the network, without the control characters a terminal would act on rather than show. */
 export const printable = (text: string): string =>
@@ -117,15 +117,15 @@ async function waitFor(stored: Promise<void>, stop: AbortSignal): Promise<void> 
 
 /**
  * Signs in through Apple's own sign-in on a page served on localhost, and keeps the token once Apple has accepted
- * it, with the key's path and ids for the commands after it.
+ * it. The key and its IDs are not kept: the next command finds them where this one did.
  */
 export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   const port = portOf(flags.port);
-  const files = paths(ctx.env);
-  const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
-  // Read once before the sign-in, so a token file the store cannot write over is found now, not after Apple's yes.
-  const store = new FileUserTokenStore(files.tokens);
+  const tokens = tokenFile(ctx.env);
+  // Read once before anything is asked, so a token file the store cannot write over is found now, not after Apple's yes.
+  const store = new FileUserTokenStore(tokens);
   await store.get(USER_ID);
+  const key = await loadKey(flags, ctx.env, ctx.terminal);
   // The intake resolves to nothing; the storefront it was told is read off the answer it got.
   let storefront: string | undefined;
   const music = serverClient(key, (_res, req, { body, error }) => {
@@ -142,7 +142,7 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   };
   process.once("SIGINT", interrupt);
   try {
-    say(`Asking Apple about key ${key.keyId} of team ${key.teamId}…`);
+    say(`Asking Apple about key ${key.keyId} of team ${key.teamId}, the key from ${key.from}…`);
     await askKey(music, stop.signal);
     const loopback = await startLoopback({ key, music, store, userId: USER_ID, port, script: new URL("./page.js", import.meta.url), timeoutMs: TIMEOUT_MS });
     try {
@@ -159,21 +159,20 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   } finally {
     process.off("SIGINT", interrupt);
   }
-  await saveKey(files.config, key);
-  say(`${paint(ctx, "green", "Signed in", process.stderr)}${storefront === undefined ? "" : `, storefront ${printable(storefront)}`}. The token is kept in ${files.tokens}, readable by you alone.`);
+  say(`${paint(ctx, "green", "Signed in", process.stderr)}${storefront === undefined ? "" : `, storefront ${printable(storefront)}`}. The token is kept in ${tokens}, readable by you alone.`);
   say(`Next: '${NAME} token' prints it, and '${NAME} doctor' asks Apple whether it still works.`);
+  if (key.asked) say(`To be asked nothing next time, set ${VARIABLES.key}, ${VARIABLES.teamId} and ${VARIABLES.keyId}.`);
   return 0;
 }
 
 /** Asks Apple whether the key works, and then whether the kept token does, which tells the two causes of a 401 apart. */
 export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
-  const files = paths(ctx.env);
-  const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
+  const key = await loadKey(flags, ctx.env, ctx.terminal);
   const music = serverClient(key);
   const pass = (line: string) => out(`${paint(ctx, "green", "✓", process.stdout)} ${line}`);
   const fail = (line: string) => out(`${paint(ctx, "red", "✗", process.stdout)} ${line}`);
 
-  say(`Asking Apple about key ${key.keyId} of team ${key.teamId}, from ${key.keyPath}…`);
+  say(`Asking Apple about key ${key.keyId} of team ${key.teamId}, the key from ${key.from}…`);
   try {
     await askKey(music);
     pass(`Key: Apple takes developer tokens signed with key ${key.keyId} of team ${key.teamId}.`);
@@ -185,7 +184,7 @@ export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
     return 1;
   }
 
-  const token = await new FileUserTokenStore(files.tokens).get(USER_ID);
+  const token = await new FileUserTokenStore(tokenFile(ctx.env)).get(USER_ID);
   if (token === undefined) {
     fail(`Music User Token: none is kept. Run '${NAME} login' to sign in.`);
     return 1;
@@ -204,14 +203,14 @@ export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
 
 /** Prints the kept token, or with `--developer` mints a developer token and prints that. */
 export async function token(flags: tFlags, ctx: tContext): Promise<number> {
-  const files = paths(ctx.env);
   if (flags.developer === true) {
-    const key = await loadKey(flags, ctx.env, () => readSavedKey(files.config));
+    const key = await loadKey(flags, ctx.env, ctx.terminal);
     out(await mintDeveloperToken({ pem: key.pem, teamId: key.teamId, keyId: key.keyId }));
     return 0;
   }
-  if (flags.key !== undefined || flags["team-id"] !== undefined || flags["key-id"] !== undefined) throw usage("--key, --team-id and --key-id go with --developer: the Music User Token is printed as login kept it.");
-  const kept = await new FileUserTokenStore(files.tokens).get(USER_ID);
+  if (flags["key-file"] !== undefined || flags["team-id"] !== undefined || flags["key-id"] !== undefined || flags.input !== undefined)
+    throw usage("--key-file, --team-id, --key-id and --no-input go with --developer: the Music User Token is printed as login kept it.");
+  const kept = await new FileUserTokenStore(tokenFile(ctx.env)).get(USER_ID);
   if (kept === undefined) throw new CliError(`No Music User Token is kept. Run '${NAME} login' to sign in.`);
   out(kept);
   return 0;
@@ -219,13 +218,13 @@ export async function token(flags: tFlags, ctx: tContext): Promise<number> {
 
 /** Forgets the kept token. */
 export async function logout(_flags: tFlags, ctx: tContext): Promise<number> {
-  const files = paths(ctx.env);
-  const store = new FileUserTokenStore(files.tokens);
+  const tokens = tokenFile(ctx.env);
+  const store = new FileUserTokenStore(tokens);
   if ((await store.get(USER_ID)) === undefined) {
     say("No Music User Token is kept; there is nothing to forget.");
     return 0;
   }
   await store.delete(USER_ID);
-  say(`Forgot the Music User Token kept in ${files.tokens}. Copies of it handed to other programs work until Apple ends it.`);
+  say(`Forgot the Music User Token kept in ${tokens}. Copies of it handed to other programs work until Apple ends it.`);
   return 0;
 }

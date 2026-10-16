@@ -4,6 +4,8 @@ import { parseArgs } from "node:util";
 import manifest from "../package.json" with { type: "json" };
 import { NAME, describe, doctor, login, logout, paint, token, type tContext, type tFlags } from "./commands";
 import { CliError, configDir, usage } from "./files";
+import { VARIABLES } from "./key";
+import { terminal } from "./terminal";
 
 const DOCS = "https://github.com/open-music-sdk/js/tree/main/apps/cli#readme";
 const ISSUES = "https://github.com/open-music-sdk/js/issues";
@@ -12,9 +14,10 @@ const OPTIONS = {
   help: { type: "boolean", short: "h" },
   version: { type: "boolean" },
   color: { type: "boolean" },
-  key: { type: "string" },
+  "key-file": { type: "string" },
   "team-id": { type: "string" },
   "key-id": { type: "string" },
+  input: { type: "boolean" },
   port: { type: "string", short: "p" },
   browser: { type: "boolean" },
   developer: { type: "boolean" },
@@ -23,14 +26,25 @@ const OPTIONS = {
 /** Options every command takes. */
 const GLOBAL = ["help", "version", "color"];
 /** The flags that are given as `--no-`, and only so. */
-const NEGATABLE = ["color", "browser"];
+const NEGATABLE = ["color", "browser", "input"];
+/** The options of every command that needs the key. */
+const KEY_OPTIONS = ["key-file", "team-id", "key-id", "input"];
 
 const KEY_HELP = [
-  "      --key <path>    Your MusicKit private key, AuthKey_XXXXXXXXXX.p8",
-  "      --team-id <id>  Your Apple Developer Team ID",
-  "      --key-id <id>   The key's ID; default: the one in the key file's name",
+  "      --key-file <path>  Read the key from this file, or from stdin with -",
+  "      --team-id <id>     Your Apple Developer Team ID",
+  "      --key-id <id>      The key's ID",
+  "      --no-input         Ask nothing: fail when something is missing",
 ];
-const KEY_ABOUT = "The key and its IDs come from the flags, else from APPLE_MUSIC_KEY_PATH, APPLE_MUSIC_TEAM_ID and\nAPPLE_MUSIC_KEY_ID, else from what the last login kept.";
+/** Where the key and its IDs come from, for the help of every command that needs them. */
+const KEY_SOURCES = [
+  "  Each comes from its flag, else its environment variable, else a question when the terminal is interactive.",
+  `    Key       --key-file <path>   ${VARIABLES.key}   asked for, not shown`,
+  `    Team ID   --team-id <id>      ${VARIABLES.teamId}       asked for`,
+  `    Key ID    --key-id <id>       ${VARIABLES.keyId}        asked for; with --key-file, AuthKey_<id>.p8 first`,
+  `  ${VARIABLES.key} holds the key itself, the contents of the .p8. A key file is read only when --key-file names`,
+  "  it, and nothing given or typed is kept.",
+];
 
 interface tCommand {
   readonly summary: string;
@@ -45,42 +59,40 @@ interface tCommand {
 const COMMANDS: Readonly<Record<string, tCommand>> = {
   login: {
     summary: "Sign in at Apple in your browser, and keep the Music User Token",
-    usage: "login [--key <path>] [--team-id <id>] [--key-id <id>] [--port <n>] [--no-browser]",
+    usage: "login [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input] [--port <n>] [--no-browser]",
     about: [
       "Asks Apple whether the key works, then serves a page on http://localhost that runs Apple's own sign-in,",
-      "and opens it in your browser. Once Apple accepts the token, it is kept in a file only you can read,",
-      "with the key's path and IDs, so the commands after it need no flags. Waits five minutes; Ctrl+C stops it.",
-      KEY_ABOUT,
+      "and opens it in your browser. Once Apple accepts the token, it is kept in a file only you can read.",
+      "Waits five minutes; Ctrl+C stops it.",
     ],
-    options: ["key", "team-id", "key-id", "port", "browser"],
-    optionHelp: [...KEY_HELP, "  -p, --port <n>      The port to listen on; default: one the system picks", "      --no-browser    Print the page's address without opening a browser"],
-    examples: [`${NAME} login --key ./AuthKey_ABC123DEFG.p8 --team-id DEF123GHIJ`, `${NAME} login --no-browser`],
+    options: [...KEY_OPTIONS, "port", "browser"],
+    optionHelp: [...KEY_HELP, "  -p, --port <n>         The port to listen on; default: one the system picks", "      --no-browser       Print the page's address without opening a browser"],
+    examples: [
+      `${NAME} login                                    with the key and its IDs in the environment`,
+      `${NAME} login --key-file ./AuthKey_ABC123DEFG.p8 --team-id DEF123GHIJ`,
+      `op read "op://Dev/MusicKit/AuthKey.p8" | ${NAME} login --key-file - --team-id DEF123GHIJ --key-id ABC123DEFG`,
+    ],
     run: login,
   },
   token: {
     summary: "Print the kept Music User Token, or mint a developer token",
-    usage: "token [--developer [--key <path>] [--team-id <id>] [--key-id <id>]]",
-    about: [
-      "Prints the Music User Token login kept, and nothing else, for another program to read.",
-      "With --developer, mints a developer token from the key instead, which lives an hour.",
-      KEY_ABOUT,
-    ],
-    options: ["developer", "key", "team-id", "key-id"],
-    optionHelp: ["      --developer     Mint and print a developer token instead", ...KEY_HELP],
+    usage: "token [--developer [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input]]",
+    about: ["Prints the Music User Token login kept, and nothing else, for another program to read.", "With --developer, mints a developer token from the key instead, which lives an hour."],
+    options: ["developer", ...KEY_OPTIONS],
+    optionHelp: ["      --developer        Mint and print a developer token instead", ...KEY_HELP],
     // In a variable, not an argument: a program's arguments are there for every user of the machine to read.
     examples: [`APPLE_MUSIC_USER_TOKEN=$(${NAME} token) node job.js`, `APPLE_MUSIC_DEVELOPER_TOKEN=$(${NAME} token --developer) node job.js`],
     run: token,
   },
   doctor: {
     summary: "Ask Apple whether the key and the kept token work",
-    usage: "doctor [--key <path>] [--team-id <id>] [--key-id <id>]",
+    usage: "doctor [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input]",
     about: [
       "Asks Apple whether the key works, with GET /v1/test, and then whether the kept Music User Token does, with",
       "GET /v1/me/storefront: a 401 can be either, and this tells them apart. Prints nothing secret, and exits 1",
       "when either fails.",
-      KEY_ABOUT,
     ],
-    options: ["key", "team-id", "key-id"],
+    options: KEY_OPTIONS,
     optionHelp: KEY_HELP,
     examples: [`${NAME} doctor`],
     run: doctor,
@@ -112,9 +124,12 @@ function topHelp(ctx: tContext): string {
     `  ${"help".padEnd(width)}Show the help for a command`,
     "",
     heading(ctx, "EXAMPLES"),
-    `  ${NAME} login --key ./AuthKey_ABC123DEFG.p8 --team-id DEF123GHIJ`,
+    `  ${NAME} login                 with ${VARIABLES.key}, ${VARIABLES.teamId} and ${VARIABLES.keyId} set`,
     `  ${NAME} doctor`,
     `  APPLE_MUSIC_USER_TOKEN=$(${NAME} token) node job.js`,
+    "",
+    heading(ctx, "THE KEY AND ITS IDS"),
+    ...KEY_SOURCES,
     "",
     heading(ctx, "OPTIONS"),
     "  -h, --help        Show this help, or after a command, that command's",
@@ -144,8 +159,9 @@ function commandHelp(ctx: tContext, command: tCommand): string {
     "",
     heading(ctx, "OPTIONS"),
     ...command.optionHelp,
-    "  -h, --help          Show this help",
+    "  -h, --help             Show this help",
     "",
+    ...(command.options.includes("key-file") ? [heading(ctx, "THE KEY AND ITS IDS"), ...KEY_SOURCES, ""] : []),
     heading(ctx, "EXAMPLES"),
     ...command.examples.map((example) => `  ${example}`),
     "",
@@ -207,8 +223,12 @@ function parse(argv: readonly string[]) {
  * @param argv - The arguments, such as `["login", "--no-browser"]`.
  */
 export async function main(argv: readonly string[]): Promise<number> {
-  const env = process.env;
-  let ctx: tContext = { env, color: !argv.includes("--no-color") };
+  // The CLI reads its own copy of the environment. The key is taken out of the process's, so no program it starts,
+  // the browser above all, is handed it.
+  const env = { ...process.env };
+  Reflect.deleteProperty(process.env, VARIABLES.key);
+  const term = terminal(process.stdin, process.stderr);
+  let ctx: tContext = { env, color: !argv.includes("--no-color"), terminal: term };
   // Known before the flags are read, so that a flag it refuses still points at the command's own help.
   let name = argv[0] !== undefined && Object.hasOwn(COMMANDS, argv[0]) ? argv[0] : undefined;
   try {
@@ -221,7 +241,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       throw e;
     }
     const { values, positionals } = parsed;
-    ctx = { env, color: values.color !== false };
+    ctx = { env, color: values.color !== false, terminal: term };
     const [first, ...rest] = positionals;
     name = first;
 

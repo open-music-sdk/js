@@ -1,10 +1,9 @@
-// What the CLI keeps between runs, and where it finds the key. The packages read no environment and no file; the
-// CLI is the app in that rule, so this is where both are read.
-import { createPrivateKey, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+// What the CLI keeps between runs: the folder it keeps it in, and the store for the token. The packages read no
+// environment and no file; the CLI is the app in that rule.
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, posix, resolve, win32 } from "node:path";
+import { dirname, posix, win32 } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { tUserTokenStore } from "@open-music-sdk/server";
 
@@ -143,105 +142,5 @@ export class FileUserTokenStore implements tUserTokenStore {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete tokens[userId];
     await writePrivate(this.#path, JSON.stringify(tokens));
-  }
-}
-
-/** What `login` keeps of the key: its path, never its contents, and its two ids. */
-export interface tSavedKey {
-  readonly keyPath?: string | undefined;
-  readonly teamId?: string | undefined;
-  readonly keyId?: string | undefined;
-}
-
-/** The key the last `login` kept, as far as the file holds strings. */
-export async function readSavedKey(path: string): Promise<tSavedKey> {
-  const saved = await readObject(path);
-  const text = (name: string) => (typeof saved[name] === "string" ? saved[name] : undefined);
-  return { keyPath: text("keyPath"), teamId: text("teamId"), keyId: text("keyId") };
-}
-
-/** Keeps the key's path and ids for the commands after this one. */
-export async function saveKey(path: string, key: tKey): Promise<void> {
-  await writePrivate(path, `${JSON.stringify({ keyPath: key.keyPath, teamId: key.teamId, keyId: key.keyId }, null, 2)}\n`);
-}
-
-/** The key as the server's client and the minter take it, and the absolute path it was read from. */
-export interface tKey {
-  readonly pem: string;
-  readonly teamId: string;
-  readonly keyId: string;
-  readonly keyPath: string;
-}
-
-/** What was passed on the command line for the key. */
-export interface tKeyFlags {
-  readonly key?: string | undefined;
-  readonly "team-id"?: string | undefined;
-  readonly "key-id"?: string | undefined;
-}
-
-/** Apple's Team IDs and key IDs are ten capital letters and digits. */
-const ID = /^[A-Z0-9]{10}$/;
-
-/**
- * The key, from the flags, else the environment, else what the last `login` kept; the key ID defaults to the one in
- * the file's name, `AuthKey_<key id>.p8`. What was kept is read only when something is missing, so a kept file that
- * cannot be read does not stand in the way of flags that say it all. The key's file is read and checked to be a
- * P-256 private key, so a wrong file fails here, by its path, and not as a 401 from Apple. Nothing in any error
- * quotes the file.
- *
- * @param readSaved - Reads what the last `login` kept.
- * @throws CliError with exit status 2 when something is missing, is not what Apple issues, or cannot be read.
- */
-export async function loadKey(flags: tKeyFlags, env: tEnv, readSaved: () => Promise<tSavedKey>): Promise<tKey> {
-  // A variable set to nothing is taken as not set, as a shell's `VAR= command` means it.
-  const fromEnv = (name: string) => (env[name] === "" ? undefined : env[name]);
-  let kept: tSavedKey | undefined;
-  const saved = async () => (kept ??= await readSaved());
-  const envPath = fromEnv("APPLE_MUSIC_KEY_PATH");
-  const [keyPath, from] = flags.key !== undefined ? [flags.key, "--key"] : envPath !== undefined ? [envPath, "APPLE_MUSIC_KEY_PATH"] : [(await saved()).keyPath, "the last login"];
-  if (keyPath === undefined || keyPath === "") throw usage("No key: pass --key with the path to your AuthKey_XXXXXXXXXX.p8, or set APPLE_MUSIC_KEY_PATH.");
-  const teamId = flags["team-id"] ?? fromEnv("APPLE_MUSIC_TEAM_ID") ?? (await saved()).teamId;
-  if (teamId === undefined || teamId === "") throw usage("No team ID: pass --team-id, or set APPLE_MUSIC_TEAM_ID. It is on your membership page at developer.apple.com/account.");
-  if (!ID.test(teamId)) throw usage(`The team ID must be ten capital letters and digits, as Apple issues it; got ${String(teamId.length)} characters.`);
-  const named = /^AuthKey_([A-Z0-9]{10})\.p8$/.exec(basename(keyPath))?.[1];
-  const keyId = flags["key-id"] ?? fromEnv("APPLE_MUSIC_KEY_ID") ?? named ?? (await saved()).keyId;
-  if (keyId === undefined || keyId === "") throw usage("No key ID: pass --key-id, set APPLE_MUSIC_KEY_ID, or keep the file's name as Apple gave it, AuthKey_<key id>.p8.");
-  if (!ID.test(keyId)) throw usage(`The key ID must be ten capital letters and digits, as Apple issues it; got ${String(keyId.length)} characters.`);
-
-  const path = resolve(keyPath);
-  let pem: string;
-  try {
-    pem = await readFile(path, "utf8");
-  } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code ?? "unreadable";
-    if (isShowable(keyPath, path)) throw usage(`Cannot read the key at ${path}, from ${from}: ${code}.`);
-    throw usage(`Cannot read a key file at what ${from} holds, ${String(keyPath.length)} characters not repeated here in case they are the key itself or a token: pass the path to your AuthKey_XXXXXXXXXX.p8, not its contents.`);
-  }
-  const pkcs8 = musicKitKey(pem);
-  if (pkcs8 === undefined) throw usage(`The file at ${path}, from ${from}, is not a MusicKit private key: expected the .p8 file Apple gave you, a P-256 key in PEM.`);
-  return { pem: pkcs8, teamId, keyId, keyPath: path };
-}
-
-/**
- * Whether a path that could not be read may be repeated in an error. What was passed may be the key's contents or a
- * token put where the path goes, so it is shown only when it looks like a path: no line break and no PEM armour, a
- * file name of a usual length with an extension, which base64 has no character for, in a folder that exists. A key,
- * a line of one, or a token fails at least one.
- */
-function isShowable(given: string, path: string): boolean {
-  return !/[\r\n]/.test(given) && !given.includes("-----") && /^.{1,56}\.\w{1,8}$/.test(basename(path)) && existsSync(dirname(path));
-}
-
-/**
- * The key as PKCS8 PEM, the form Apple gives and the minter takes, when `pem` is a P-256 private key, which is what a
- * MusicKit key is, in that form or another, such as the SEC1 `EC PRIVATE KEY` a conversion leaves; otherwise undefined.
- */
-function musicKitKey(pem: string): string | undefined {
-  try {
-    const key = createPrivateKey(pem);
-    return key.asymmetricKeyDetails?.namedCurve === "prime256v1" ? key.export({ type: "pkcs8", format: "pem" }).toString() : undefined;
-  } catch {
-    return undefined;
   }
 }

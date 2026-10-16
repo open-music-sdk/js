@@ -6,7 +6,8 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tokenEndpoint, userTokenIntake, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/server";
-import { usage, type tKey } from "./files";
+import { usage } from "./files";
+import type { tKey } from "./key";
 
 export interface tLoopbackOptions {
   /** The key the token endpoint mints the page's developer tokens with. */
