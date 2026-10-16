@@ -1,0 +1,12 @@
+# What Codecov holds the repo to. CI uploads the coverage of every package on each push to main and each pull request.
+coverage:
+  status:
+    # The whole repo, with half a point of slack so that a change that only moves lines around does not fail it.
+    project:
+      default:
+        target: 98%
+        threshold: 0.5%
+    # The lines a pull request adds or changes.
+    patch:
+      default:
+        target: 95%
