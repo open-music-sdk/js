@@ -148,6 +148,36 @@ describe("terminal: an ID", () => {
     }
   });
 
+  test("a CR LF split between two pieces is one line break, not an empty answer to the next question, whenever its line feed arrives", async () => {
+    // The line feed comes before the first answer is given, or after it is given and before the next question.
+    for (const early of [true, false]) {
+      const { input, output } = streams();
+      const term = terminal(input, output);
+      const first = term.id("Team ID: ");
+      input.write("DEF123GHIJ\r");
+      if (early) input.write("\n");
+      expect(await first).toBe("DEF123GHIJ");
+      if (!early) input.write("\n");
+      const second = term.id("Key ID: ");
+      type(input, "ABC123DEFG\r");
+      expect(await second).toBe("ABC123DEFG");
+    }
+  });
+
+  test("only a line feed that comes straight after a carriage return is taken for its break: one after anything else is an answer", async () => {
+    const { input, output } = streams();
+    const term = terminal(input, output);
+    const first = term.id("Team ID: ");
+    input.write("DEF123GHIJ\r");
+    expect(await first).toBe("DEF123GHIJ");
+    const second = term.id("Key ID: ");
+    input.write("A\n");
+    expect(await second).toBe("A");
+    const third = term.id("Key ID: ");
+    input.write("\n");
+    expect(await third).toBe("");
+  });
+
   test("stdin ending before anything is typed is no answer, and after it is what was typed; Ctrl+C is exit status 130", async () => {
     const ended = streams();
     const none = terminal(ended.input, ended.output).id("Team ID: ");
