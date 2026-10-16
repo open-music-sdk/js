@@ -2,7 +2,8 @@
 
 Everything around a listener's Music User Token except issuing it: asking Apple whether it works, taking it in from
 your page, and keeping it where `core`'s `forUser(userId)` finds it. Only Apple's sign-in issues the token. This
-package starts once you hold the string.
+package starts once you hold the string. For your own account, the
+[CLI](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)'s `login` gets one from the terminal.
 
 Most apps install [`server`](../../integrations/server/README.md), [`browser`](../../integrations/browser/README.md)
 or [`react`](../../integrations/react/README.md) instead, which re-export what an app uses of this package. Use this
@@ -58,6 +59,8 @@ stores are classes, which you give `createClient` as `userTokenStore`.
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens): the
   intake route, its answers, `acceptUserToken` for other frameworks, and choosing a store
 - [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), which gets the token in your page
+- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), which gets
+  one for your own account
 - [Cloudflare Workers](https://open-music-sdk.github.io/js/guides/cloudflare-workers), for `KvUserTokenStore`
 - [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens): where the token
   can go, and how to treat it

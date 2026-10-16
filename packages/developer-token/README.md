@@ -64,6 +64,10 @@ import { developerTokenFetcher } from "@open-music-sdk/developer-token/fetcher";
 const developerToken = developerTokenFetcher("/api/music/token"); // hand it to createClient
 ```
 
+To check your key, or to hand a developer token to another tool without writing code, the
+[CLI](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) has `open-music-sdk doctor` and
+`open-music-sdk token --developer`, which mints one that lives an hour.
+
 ## Learn more
 
 - [Set up your MusicKit key](https://open-music-sdk.github.io/js/guides/musickit-key)

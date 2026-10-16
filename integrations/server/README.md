@@ -29,7 +29,7 @@ const music = createServerClient({
 
 const album = await music.catalog.getAlbum("1613600183"); // needs the developer token only
 
-const listener = music.as(musicUserToken); // a client for one listener, with the token your page sent you
+const listener = music.as(musicUserToken); // one listener's client, with the token your page sent you or the CLI printed
 try {
   for await (const playlist of listener.user.listLibraryPlaylists()) console.log(playlist.attributes?.name);
 } catch (e) {
@@ -69,6 +69,8 @@ the parts, install the packages themselves.
 ## Learn more
 
 - [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
+- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), to check
+  your key and get a Music User Token for your own account
 - [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
 - [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
