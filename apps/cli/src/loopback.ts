@@ -62,10 +62,14 @@ const PAGE_HEADERS = { "cache-control": "no-store", "x-content-type-options": "n
 const LOGO_HEADERS = { ...PAGE_HEADERS, "content-type": "image/svg+xml", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" };
 
 /**
- * The page, with the secret its script sends to the token routes. The secret is base64url, which needs no escaping.
- * Apple's script takes the app's icon from the `apple-music-app-icon` link, not from what it is configured with,
- * and hands its address to Apple's sign-in window.
+ * The app's icon as Apple's sign-in window shows it: the project's logo, as its GitHub organisation's avatar, 240
+ * pixels for a 120-pixel icon. Apple's script takes the icon from the `apple-music-app-icon` link, not from what it
+ * is configured with, and hands its address to the window, an HTTPS page of Apple's. A public HTTPS address is one
+ * that page can load; one on this server would be `http://localhost`.
  */
+const APP_ICON = "https://avatars.githubusercontent.com/u/338387998?s=240";
+
+/** The page, with the secret its script sends to the token routes. The secret is base64url, which needs no escaping. */
 const page = (secret: string) => `<!doctype html>
 <html lang="en">
 <head>
@@ -74,7 +78,7 @@ const page = (secret: string) => `<!doctype html>
 <meta name="login-state" content="${secret}">
 <title>Sign in · Open Music CLI</title>
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
-<link rel="apple-music-app-icon" sizes="120x120" href="/logo.svg">
+<link rel="apple-music-app-icon" sizes="120x120" href="${APP_ICON}">
 <style>
 :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
