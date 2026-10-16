@@ -134,6 +134,8 @@ describe("help and version: every form shows it, and it goes to stdout", () => {
       expect(await main(argv), argv.join(" ")).toBe(0);
       expect(stdout).toContain("--no-browser");
       expect(stdout).toContain("APPLE_MUSIC_PRIVATE_KEY");
+      expect(stdout).toContain("the key first, then the team ID, then the key ID");
+      expect(stdout).toContain("AuthKey_<key id>.p8 comes before APPLE_MUSIC_KEY_ID");
     }
     expect(asked).toEqual([]);
   });
@@ -299,6 +301,8 @@ describe("doctor: the key, then the token, asked of Apple", () => {
   });
 
   test("with nothing in the flags or the environment, and no terminal to ask at, each value is named with its flag and its variable", async () => {
+    // Vitest runs its workers with stdin piped, which is what makes this no terminal.
+    expect(process.stdin.isTTY).not.toBe(true);
     expect(await main(["doctor"])).toBe(2);
     for (const name of ["--team-id or set APPLE_MUSIC_TEAM_ID", "--key-id or set APPLE_MUSIC_KEY_ID", "set APPLE_MUSIC_PRIVATE_KEY", "--key-file <path>"]) expect(stderr).toContain(name);
     expect(asked).toEqual([]);
@@ -313,6 +317,21 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(stderr).toContain(tokenFile());
     expect(stderr).not.toContain("http://localhost");
     expect(asked).toEqual([]);
+  });
+
+  test.runIf(process.platform === "win32")("on Windows, a variable is found however its name is cased, as Windows finds it", async () => {
+    vi.stubEnv("apple_music_private_key", PEM);
+    vi.stubEnv("Apple_Music_Team_Id", TEAM);
+    vi.stubEnv("apple_music_key_id", KEY_ID);
+    await kept();
+    expect(await main(["doctor"])).toBe(0);
+  });
+
+  test("--no-input is taken by every command, so a script can pass it to all of them", async () => {
+    await kept();
+    expect(await main(["token", "--no-input"])).toBe(0);
+    expect(await main(["logout", "--no-input"])).toBe(0);
+    expect(await main(["--no-input", "--version"])).toBe(0);
   });
 
   test("the key is taken out of the process's environment, so the browser, and anything it starts, is not handed it", async () => {

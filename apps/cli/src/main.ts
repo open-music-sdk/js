@@ -3,7 +3,7 @@
 import { parseArgs } from "node:util";
 import manifest from "../package.json" with { type: "json" };
 import { NAME, describe, doctor, login, logout, paint, token, type tContext, type tFlags } from "./commands";
-import { CliError, configDir, usage } from "./files";
+import { CliError, configDir, usage, type tEnv } from "./files";
 import { VARIABLES } from "./key";
 import { terminal } from "./terminal";
 
@@ -23,12 +23,15 @@ const OPTIONS = {
   developer: { type: "boolean" },
 } as const;
 
+/** The environment variables the CLI reads: the key's three, and where its folder goes. */
+const READ = [VARIABLES.key, VARIABLES.teamId, VARIABLES.keyId, "LOCALAPPDATA", "XDG_CONFIG_HOME"];
+
 /** Options every command takes. */
-const GLOBAL = ["help", "version", "color"];
+const GLOBAL = ["help", "version", "color", "input"];
 /** The flags that are given as `--no-`, and only so. */
 const NEGATABLE = ["color", "browser", "input"];
 /** The options of every command that needs the key. */
-const KEY_OPTIONS = ["key-file", "team-id", "key-id", "input"];
+const KEY_OPTIONS = ["key-file", "team-id", "key-id"];
 
 const KEY_HELP = [
   "      --key-file <path>  Read the key from this file, or from stdin with -",
@@ -38,10 +41,12 @@ const KEY_HELP = [
 ];
 /** Where the key and its IDs come from, for the help of every command that needs them. */
 const KEY_SOURCES = [
-  "  Each comes from its flag, else its environment variable, else a question when the terminal is interactive.",
+  "  Each comes from its flag, else its environment variable, else a question when the terminal is interactive:",
+  "  the key first, then the team ID, then the key ID.",
   `    Key       --key-file <path>   ${VARIABLES.key}   asked for, not shown`,
   `    Team ID   --team-id <id>      ${VARIABLES.teamId}       asked for`,
-  `    Key ID    --key-id <id>       ${VARIABLES.keyId}        asked for; with --key-file, AuthKey_<id>.p8 first`,
+  `    Key ID    --key-id <id>       ${VARIABLES.keyId}        asked for`,
+  `  The key ID in the name of a --key-file called AuthKey_<key id>.p8 comes before ${VARIABLES.keyId}.`,
   `  ${VARIABLES.key} holds the key itself, the contents of the .p8. A key file is read only when --key-file names`,
   "  it, and nothing given or typed is kept.",
 ];
@@ -135,6 +140,7 @@ function topHelp(ctx: tContext): string {
     "  -h, --help        Show this help, or after a command, that command's",
     "      --version     Print the version",
     "      --no-color    Print without color; so does NO_COLOR",
+    "      --no-input    Ask nothing: fail when something is missing",
     "",
     heading(ctx, "FILES"),
     `  ${configDir(ctx.env)}`,
@@ -223,9 +229,10 @@ function parse(argv: readonly string[]) {
  * @param argv - The arguments, such as `["login", "--no-browser"]`.
  */
 export async function main(argv: readonly string[]): Promise<number> {
-  // The CLI reads its own copy of the environment. The key is taken out of the process's, so no program it starts,
-  // the browser above all, is handed it.
-  const env = { ...process.env };
+  // What the CLI reads of the environment, read through process.env, which on Windows finds a name however it is
+  // cased. Then the key is taken out of the process's, so no program the CLI starts, the browser above all, is handed
+  // it. What started the CLI, a shell or npx, had it already.
+  const env: tEnv = Object.fromEntries(READ.map((name) => [name, process.env[name]]));
   Reflect.deleteProperty(process.env, VARIABLES.key);
   const term = terminal(process.stdin, process.stderr);
   let ctx: tContext = { env, color: !argv.includes("--no-color"), terminal: term };

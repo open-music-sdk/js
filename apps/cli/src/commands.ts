@@ -3,7 +3,7 @@
 import { join } from "node:path";
 import { styleText } from "node:util";
 import { createServerClient, isAppleMusicError, mintDeveloperToken, validateUserToken, type tMusic } from "@open-music-sdk/server";
-import { CliError, FileUserTokenStore, configDir, usage, type tEnv } from "./files";
+import { CliError, FileUserTokenStore, configDir, printable, usage, type tEnv } from "./files";
 import { VARIABLES, loadKey, type tKey, type tKeyFlags } from "./key";
 import { openBrowser, startLoopback } from "./loopback";
 import type { tTerminal } from "./terminal";
@@ -38,15 +38,6 @@ const say = (line: string) => process.stderr.write(`${line}\n`);
 
 /** The one file the CLI keeps: the token. */
 const tokenFile = (env: tEnv) => join(configDir(env), TOKEN_FILE);
-
-/** Text from Apple or the network, without the control characters a terminal would act on rather than show. */
-export const printable = (text: string): string =>
-  Array.from(text)
-    .filter((c) => {
-      const code = c.codePointAt(0) ?? 0;
-      return code > 0x1f && (code < 0x7f || code > 0x9f);
-    })
-    .join("");
 
 /** The system's own code for why a request failed, such as `ENOTFOUND` or a certificate's, from down the error's causes. */
 function codeOf(e: unknown): string | undefined {
@@ -208,8 +199,8 @@ export async function token(flags: tFlags, ctx: tContext): Promise<number> {
     out(await mintDeveloperToken({ pem: key.pem, teamId: key.teamId, keyId: key.keyId }));
     return 0;
   }
-  if (flags["key-file"] !== undefined || flags["team-id"] !== undefined || flags["key-id"] !== undefined || flags.input !== undefined)
-    throw usage("--key-file, --team-id, --key-id and --no-input go with --developer: the Music User Token is printed as login kept it.");
+  if (flags["key-file"] !== undefined || flags["team-id"] !== undefined || flags["key-id"] !== undefined)
+    throw usage("--key-file, --team-id and --key-id go with --developer: the Music User Token is printed as login kept it.");
   const kept = await new FileUserTokenStore(tokenFile(ctx.env)).get(USER_ID);
   if (kept === undefined) throw new CliError(`No Music User Token is kept. Run '${NAME} login' to sign in.`);
   out(kept);
