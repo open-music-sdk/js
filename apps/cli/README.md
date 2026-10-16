@@ -55,21 +55,29 @@ flag, else its environment variable, else a question:
 - **`APPLE_MUSIC_PRIVATE_KEY`** holds the contents of the `.p8`. It may hold them with escaped `\n` line
   breaks, Windows line endings, or a byte order mark. A path in it is refused, with a pointer to
   `--key-file`.
-- **A key file is read only when `--key-file` names it.** If the file keeps the name Apple gave it,
-  `AuthKey_<key id>.p8`, its key ID is used before `APPLE_MUSIC_KEY_ID`.
+- **A key file is read only when `--key-file` names it,** and it must be a file of at most 16 KB, not a
+  folder, a device or a pipe. If the file keeps the name Apple gave it, `AuthKey_<key id>.p8`, its key ID
+  is used before `APPLE_MUSIC_KEY_ID`, though after `--key-id`.
 - **`--key-file -` reads the key from a pipe,** so it goes from a secret manager to the CLI and nowhere
   else: `op read "op://Dev/MusicKit/AuthKey.p8" | open-music-sdk login --key-file - --team-id … --key-id …`.
   With stdin carrying the key, nothing else can be asked for, so the IDs must come from their flags or
-  variables. A terminal on stdin is refused, since the key would be typed where it shows.
+  variables, and a missing one is reported before the pipe is read. A terminal on stdin is refused, since
+  the key would be typed where it shows.
 - **Questions are asked only at an interactive terminal,** for what the flags and the environment leave
-  out, in the order team ID, key ID, key. The key is pasted with nothing shown and read to its `END` line.
-  `--no-input` turns questions off. Without a terminal, or with `--no-input`, a missing value ends with exit
-  status 2 and a message naming its flag and its variable.
+  out. The key is asked for first, so a key on your clipboard is pasted where nothing is shown. It is read
+  to its `END` line, or to Ctrl+D, and whatever arrives after it, the rest of a pasted file say, is let go
+  by rather than left for your shell. The team ID and key ID follow: letters are taken as capitals, and
+  only ID characters are shown, so even a key pasted there shows nothing of itself.
+- **`--no-input` turns questions off,** and every command takes it. Without a terminal, or with
+  `--no-input`, a missing value ends with exit status 2 and a message naming its flag and its variable.
 - **Nothing given or typed is kept.** The next command finds the key and its IDs where this one did.
 - **The key is checked before anything is asked of Apple:** it must be a P-256 private key, in Apple's PKCS8
-  form or in SEC1. No message ever repeats it, or anything else that came in.
-- **The key reaches no other program.** `APPLE_MUSIC_PRIVATE_KEY` is taken out of the CLI's own environment
-  as soon as it starts, so the browser it opens, and anything that starts, is not handed it.
+  form or in SEC1. No message repeats the key, a token, or anything that came in that might be one. The
+  team ID, the key ID and a key file's path are printed, since none of them is secret.
+- **The CLI hands the key to no program it starts.** `APPLE_MUSIC_PRIVATE_KEY` is taken out of the CLI's
+  own environment before it starts anything, so the browser it opens is not handed it. Whatever started the
+  CLI had the variable already, your shell and `npx` among them, and on Linux and macOS the CLI's starting
+  environment stays readable, by you and root alone, while it runs.
 
 ## What it keeps
 
@@ -138,11 +146,11 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
   `Cross-Origin-Opener-Policy`, since the sign-in window talks back to the page that opened it.
 - **No secret in a message.** Only `token` prints the token. An argument that looks like neither a command
   nor a flag is not repeated in an error, in case it is a token pasted in the wrong place, and neither is a
-  key path that names no file unless it looks like a path. Text from Apple is printed without control
-  characters.
-- **A pinned version is all pinned.** The family is bundled into the command when it is built, so
-  `npx @open-music-sdk/cli@<version>` runs exactly the packages that version was made with. `jose` is its
-  one dependency.
+  key path that names no file unless it looks like a path. Text from Apple, and paths, are printed without
+  control characters.
+- **A pinned version is all pinned.** The family is bundled into the command when it is built, and `jose`,
+  its one dependency, is pinned to the exact version the family is tested with, so
+  `npx @open-music-sdk/cli@<version>` runs exactly the code that version was made with.
 - **The page has no signing code.** The browser package is bundled into it, and a test reads what the
   build makes and finds none of `jose` in it.
 
