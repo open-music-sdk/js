@@ -268,7 +268,7 @@ export function usePreviewPlayer<T extends tPreviewable = tPreviewable>(options?
     return () => {
       made.dispose();
       current.current = undefined;
-      setPlayer((was) => (was === made ? undefined : was));
+      setPlayer(undefined);
     };
   }, []);
   const subscribe = useCallback((listener: () => void) => (player === undefined ? () => undefined : player.subscribe(listener)), [player]);
