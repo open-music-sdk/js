@@ -71,12 +71,18 @@ export interface tPreviewAudio {
 
 /** The options of `previewPlayer`. Both are checked and taken when the player is made. */
 export interface tPreviewPlayerOptions {
-  /** The audio element to play through. Default: one made with `new Audio()`, which a browser has and a server has not. */
+  /**
+   * The audio element to play through. Default: one made with `new Audio()`, which a browser has and a server has not.
+   * Your own keeps its controls, and what they do shows in `state`: a pause, or a volume set on the element. The
+   * player never adds the element to the page or takes it out.
+   */
   readonly audio?: tPreviewAudio | undefined;
   /**
-   * The hosts a clip may come from, such as `["itunes.apple.com"]`. With this, a track whose clip is not `https` on
-   * one of them or on a subdomain of one, with no port and no credentials, is skipped as `"host"`. Default: where a
-   * clip points is not checked at all.
+   * The hosts a clip may come from, as 1 to 16 bare host names in small letters, such as `["itunes.apple.com"]`.
+   * With this, a track whose clip is not `https` on one of them or on a subdomain of one, with no port and no
+   * credentials, is skipped as `"host"`. Default: where a clip points is not checked at all. Apple does not document
+   * which host serves its clips, and the example has not been checked against the live API: look at what your own
+   * answers hold before you set this.
    */
   readonly hosts?: readonly string[] | undefined;
 }
@@ -151,8 +157,10 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
    *
    * @param index - The place in the queue of the track to play, counted from 0, or nothing to carry on.
    * @throws TypeError if the player was disposed, or if `index` is not the place of a track in the queue.
-   * @throws The element's own refusal to play, as it rejected with it. The state is then `paused`, or `error` where
-   * the element said why with an event, unless a later call has taken over, when the state is that call's.
+   * @throws The element's own refusal to play, as it rejected with it: a browser's `NotAllowedError` where it wants a
+   * click behind the sound, or its `AbortError` where a later call overtook this one. The state is then `paused`, or
+   * `error` where the element said why with an event, unless a later call has taken over, when the state is that
+   * call's.
    * @throws What a listener threw on hearing that the clip is loading or playing. The element was asked all the
    * same.
    */
@@ -200,7 +208,13 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
   readonly state: tPreviewPlayerState<T>;
   /**
    * Calls `listener` after each change of `state`, and gives the function that stops it. A listener subscribed
-   * twice is called twice, and each of its two is stopped alone. Every listener is called, whatever another throws.
+   * twice is called twice, and each of its two is stopped alone. While a clip plays, `position` changes as often as
+   * the element says so, several times a second.
+   *
+   * A listener may call the player back. The element is asked to play before anyone hears that a clip is loading,
+   * so a listener that pauses, loads another queue or disposes on hearing it has the last word. Every listener is
+   * called, whatever another throws: the player's own work is done first, and the first error is then thrown on, to
+   * whoever called the function, or out through the element's event when it was the element that spoke.
    *
    * @param listener - What to call after each change. It takes nothing: the state is read from `state`.
    * @returns The function that stops the calls. It can be called more than once, and throws nothing.
@@ -208,8 +222,8 @@ export interface tPreviewPlayer<T extends tPreviewable = tPreviewable> extends A
    */
   readonly subscribe: (listener: () => void) => () => void;
   /**
-   * Pauses, takes its clip off the element and lets go of it, forgets the queue and whoever listens. Afterwards
-   * every other function refuses, and calling this again does nothing.
+   * Pauses, takes its clip off the element and lets go of it, forgets the queue and whoever listens. The element is
+   * yours again, to reuse or drop. Afterwards every other function refuses, and calling this again does nothing.
    *
    * @throws What a listener threw on hearing of the last change. The listeners are let go of all the same.
    */

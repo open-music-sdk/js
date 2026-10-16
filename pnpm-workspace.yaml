@@ -7,6 +7,10 @@ packages:
   - codegen/*
   - tooling/*
 
+# No install scripts run. esbuild (under VitePress's Vite) finds its binary in its platform package without one.
+allowBuilds:
+  esbuild: false
+
 # One version of every shared dependency for the whole repo.
 catalog:
   # runtime / peers
@@ -31,3 +35,6 @@ catalog:
   "@vitest/coverage-v8": ^4.0.0
   "@types/node": ^24
   typedoc: ^0.28.20
+  typedoc-plugin-markdown: ^4.14.0
+  typedoc-vitepress-theme: ^1.1.4
+  vitepress: ^1.6.4

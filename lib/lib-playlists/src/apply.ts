@@ -12,7 +12,11 @@ import { diff, isThere, refsOf, targetOf, type tHeld, type tNewPlaylist, type tP
 import { taken } from "./read";
 import { pagesOf, type tWalk } from "./walk";
 
-/** How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made at once may not show it. */
+/**
+ * How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made
+ * at once may not show it. The defaults are a guess: how long a write takes to show has not been measured against
+ * the live API.
+ */
 export interface tSettleOptions {
   /** How many times the playlist is read before what was written is taken not to show: a whole number from 1. Default 5. */
   readonly tries?: number | undefined;

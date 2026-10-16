@@ -56,5 +56,6 @@ export type {
 } from "@open-music-sdk/lib-playlists";
 export { previewPlayer } from "@open-music-sdk/lib-preview-player";
 export type { tLoadedPreviews, tPreviewAudio, tPreviewPlayer, tPreviewPlayerOptions, tPreviewPlayerState, tPreviewStatus, tPreviewable, tSkippedPreview } from "@open-music-sdk/lib-preview-player";
+/** Every validator of {@link "@open-music-sdk/validate"! | @open-music-sdk/validate}, such as `schemas.song`, to pass as a function's `schema`. */
 export * as schemas from "@open-music-sdk/validate";
 export type * from "@open-music-sdk/types";

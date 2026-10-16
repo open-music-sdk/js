@@ -52,7 +52,8 @@ export interface tSearchLibraryOptions extends tReadOptions<tLibrarySearchRespon
 
 /**
  * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
- * and `offset` apply to every type asked for.
+ * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
+ * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
  *
  * @function
  * @param client - The listener's client to ask with.

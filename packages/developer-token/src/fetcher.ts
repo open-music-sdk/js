@@ -11,7 +11,10 @@ export interface tFetcherOptions {
   readonly fetch?: typeof fetch | undefined;
   /** Fetch a replacement this long before `exp`. Default, and at most, half the life the token had left when it arrived. */
   readonly refreshAheadSeconds?: number | undefined;
-  /** How long the endpoint may take to answer, in whole milliseconds. Default 10 000; at most 2^31 - 1. */
+  /**
+   * How long the endpoint may take to answer, in whole milliseconds. Default 10 000; at most 2^31 - 1. It holds even
+   * when your `fetch` does not pass the abort signal on.
+   */
   readonly timeoutMs?: number | undefined;
 }
 
@@ -52,8 +55,21 @@ function parse(url: string | URL, base?: string): URL | undefined {
  * share one fetch, and a token Apple answers 401 to is fetched again. Whatever goes wrong at the endpoint is `DeveloperTokenUnavailable`, carrying
  * the endpoint's status when it answered, so it is never mistaken for an answer from Apple.
  *
+ * The request is a plain `GET` with `cache: "no-store"`. A redirect is refused, so the token comes from `url` or not
+ * at all: give the final URL, not one your framework redirects, such as `/api/token` to `/api/token/`. The answer is
+ * read up to 16 KB, counted after any decompression, and a token longer than 8 KB is not believed. What goes wrong
+ * is retried by the client's policy as this says:
+ *
+ * | The endpoint | `status` | Retried by the client |
+ * | --- | --- | --- |
+ * | is unreachable, redirects, times out, or drops the connection mid-body | none | Yes |
+ * | answers 429, or a 5xx other than 501 | the endpoint's | Yes, after its `Retry-After` if it sent one |
+ * | answers any other status that is not 2xx | the endpoint's | No |
+ * | answers 2xx without a JWT that has an `exp`, or with more than 16 KB | the endpoint's | No |
+ *
  * @param url - The endpoint: `http` or `https`, with no username or password in it. Absolute, or relative to the
- *   page in a browser.
+ *   document's base URL in a browser, resolved again each time a token is fetched, so a `<base>` element added to
+ *   the page later changes where the token is fetched from.
  * @param options - The fetch to use, how far ahead of `exp` the next token is fetched, and how long to wait for one.
  * @returns A provider to pass as `developerToken`. While it holds no usable token it rejects with what went wrong
  *   at the endpoint, as `DeveloperTokenUnavailable`; with a `TypeError` when `url` is relative and there is no

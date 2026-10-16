@@ -45,10 +45,6 @@
       "dependsOn": [
         "^build",
         "codegen-emit#codegen"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/README.md"
       ]
     },
     "dev": {

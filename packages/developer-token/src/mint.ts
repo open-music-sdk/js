@@ -8,15 +8,22 @@ import { redacted, type tRedacted } from "./redacted";
  * environment or a file. Invalid values throw a TypeError. No error quotes a value.
  */
 export interface tMintOptions {
-  /** The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Line breaks escaped as `\n` are accepted. */
+  /**
+   * The contents of AuthKey_XXXXXXXXXX.p8: a PKCS8 PEM. Line breaks escaped as `\n`, as an environment variable
+   * usually holds them, are accepted, and so are Windows line endings, a byte order mark and whitespace around it.
+   */
   readonly pem: string;
-  /** Your Apple Developer Team ID; becomes `iss`. */
+  /** Your Apple Developer Team ID, ten capital letters and digits as Apple issues it; becomes `iss`. */
   readonly teamId: string;
-  /** The ID of the MusicKit key; becomes `kid`. */
+  /** The ID of the MusicKit key, the ten capital letters and digits in the file's name; becomes `kid`. */
   readonly keyId: string;
   /** Lifetime in whole seconds, from 60 to 15 777 000 (Apple's six months). Default one hour. */
   readonly ttlSeconds?: number | undefined;
-  /** Web origins the token is valid for. Set it on any token a browser will see. */
+  /**
+   * Web origins the token is valid for, each exactly as a browser sends it: `https://app.example`, with no path and
+   * no trailing slash. An empty list is a TypeError; leave the option out for no restriction. Set it on any token a
+   * browser will see.
+   */
   readonly origin?: readonly string[] | undefined;
 }
 

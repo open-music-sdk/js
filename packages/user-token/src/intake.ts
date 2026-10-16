@@ -13,7 +13,8 @@ export interface tIntakeOptions {
   readonly store: tUserTokenStore;
   /**
    * The signed-in user this request belongs to, from your own session; the token is stored under it.
-   * Resolve to nothing when there is no session and the request is answered 401.
+   * Resolve to nothing when there is no session and the request is answered 401. This is the authentication:
+   * whoever it returns, the posted token is stored as theirs, so return the signed-in user from your own session.
    */
   readonly userId: (req: Request) => string | null | undefined | Promise<string | null | undefined>;
 }
@@ -46,6 +47,25 @@ export const isJson = (contentType: string | null): boolean => /^application\/js
  *
  * What it is handed is checked and taken here, once: a mistake is a TypeError now and not on the first request,
  * and nothing done to the options object afterwards changes where a token goes or whose it is.
+ *
+ * `userId` is the authentication: it must return the signed-in user from your own session. Requiring
+ * `application/json` is the cross-site defence, since a form or a `no-cors` fetch on another site cannot send it;
+ * that holds only while your CORS policy does not let other origins send that header with credentials. Each token
+ * that reaches Apple costs a request against your developer token, and a 401 one more: rate-limit the route as you
+ * would a login.
+ *
+ * Every answer is `Cache-Control: no-store`:
+ *
+ * | Status | Body | When |
+ * | --- | --- | --- |
+ * | 204 | none | Apple accepted the token and the store has it |
+ * | 400 | `{ "error": "BadRequest" }` | The body is not JSON, or has no string `token` |
+ * | 401 | `{ "error": "Unauthorized" }` | `userId(req)` resolved to nothing |
+ * | 405 | `{ "error": "MethodNotAllowed" }` | Not a `POST`; the answer carries `Allow: POST` |
+ * | 413 | `{ "error": "PayloadTooLarge" }` | The body is over 8 KiB. It is counted as it arrives, and the rest is cancelled. |
+ * | 415 | `{ "error": "UnsupportedMediaType" }` | The content type is not `application/json` |
+ * | 422 | `{ "error": "UserTokenInvalid" }` | What was posted is no token, Apple answered 403, or Apple answered 401 for the listener; nothing is stored |
+ * | 502 | `{ "error": "<tag>" }` | Apple did not confirm the token: `DeveloperTokenInvalid`, `DeveloperTokenUnavailable`, `RateLimited`, `ApiError` or `NetworkError`; nothing is stored |
  *
  * @param client - The client to ask Apple with.
  * @param options - Where an accepted token goes, and whose each request is.

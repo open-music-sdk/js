@@ -334,7 +334,9 @@ export type tCreateLibraryPlaylistOptions = tReadOptions<tLibraryPlaylistsRespon
 /**
  * Makes a playlist in the listener's library: `{ attributes: { name } }`, with its tracks and the folder to put it
  * in under `relationships`. Resolves to the answer that holds the new playlist. Bound, it gives the playlist, or
- * `undefined` if Apple's answer holds none: the playlist was made either way.
+ * `undefined` if Apple's answer holds none: the playlist was made either way. The playlist has to be a plain object,
+ * and still one once made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to
+ * judge, and nothing here limits its size, so limit it yourself if it comes from outside your app.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -408,7 +410,9 @@ export type tCreateLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistF
 /**
  * Makes a playlist folder in the listener's library: `{ attributes: { name } }`, with the folder to put it in under
  * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
- * Apple's answer holds none: the folder was made either way.
+ * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
+ * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
+ * here limits its size, so limit it yourself if it comes from outside your app.
  *
  * @function
  * @param client - The listener's client to ask with.

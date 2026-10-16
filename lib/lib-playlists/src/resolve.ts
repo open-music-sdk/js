@@ -13,10 +13,14 @@ import { held } from "./own";
  * What is known of a track from outside Apple's catalog. The names are the ones a song's attributes have, so a
  * song's attributes are a description, and so is a track of a playlist that was read. A description with an
  * `isrc` is looked up by it; one with a `name` and an `artistName` can be searched for; one with neither of those
- * is matched by nothing.
+ * is matched by nothing. A field that is a string and of no use, such as an empty name or an ISRC with a comma in
+ * it, is taken as not given.
  */
 export interface tTrackDescription {
-  /** The recording's International Standard Recording Code, such as `"USUM71703861"`. */
+  /**
+   * The recording's International Standard Recording Code, such as `"USUM71703861"`. It may be written as it is
+   * printed, with hyphens or spaces and in small letters: `GB-AYE-06-01498` is `GBAYE0601498`.
+   */
   readonly isrc?: string | undefined;
   /** The track's title, as a song's `name` attribute has it. Searched for together with `artistName`, and a song is kept only when both are the same. */
   readonly name?: string | undefined;

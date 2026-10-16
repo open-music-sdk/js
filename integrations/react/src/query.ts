@@ -9,7 +9,7 @@ import { clientOf, got, isPlain, ownOf, type tAppleMusicClient, type tEndpoint, 
 
 /** What `useQuery` takes, for one answer. */
 export interface tQuery<T> {
-  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`. An argument that is a schema is the marker `"schema"`, and one that is a function or a signal is `undefined` in its place. A plain object is keyed by what it holds, the same way, except that a function, a signal or an `undefined` in it is left out. Anything else is as it is. */
   readonly queryKey: readonly unknown[];
   /** Asks as the bound function does, and gives what it hands over. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: () => Promise<T>;
@@ -19,7 +19,7 @@ export interface tQuery<T> {
 
 /** What `useInfiniteQuery` takes, for a walk: Apple's pages, each with the `next` Apple sent, and nothing kept back. */
 export interface tInfiniteQuery<P extends tPage<unknown>> {
-  /** `["open-music-sdk", scope, namespace, function, ...arguments]`: the arguments as keyed, a schema as a marker, a function or a signal left out. */
+  /** `["open-music-sdk", scope, namespace, function, ...arguments]`. An argument that is a schema is the marker `"schema"`, and one that is a function or a signal is `undefined` in its place. A plain object is keyed by what it holds, the same way, except that a function, a signal or an `undefined` in it is left out. Anything else is as it is. */
   readonly queryKey: readonly unknown[];
   /** One page, frozen: the function's own for no `pageParam`, else the one at that `next` link, asked for as `paginate` asks, with the same schema. Rejects as the function or `request` rejects: a `TypeError` for an argument that is not what it should be, an `AppleMusicError` for what fails at Apple, the network or a token provider, the reason of a signal among the arguments, or whatever a hook throws. */
   readonly queryFn: (context: { readonly pageParam: string | undefined }) => Promise<P>;
@@ -44,7 +44,10 @@ export type tQueryOf<F> =
     : (...args: A) => tQuery<Awaited<U>>
   : never;
 
-/** Every read function of `F`, as its query. */
+/**
+ * Every read function of `F`, as its query. A relationship or a view is generic over its name, which a mapped type
+ * loses, so its query is typed as the union of what any of its names holds.
+ */
 export type tQueries<F> = { readonly [K in keyof F as [tQueryOf<F[K]>] extends [never] ? never : K]: tQueryOf<F[K]> };
 
 /** What `musicQueries` gives: the catalog's and the listener's read functions, each as its query. */
@@ -77,7 +80,7 @@ const bagOf = (args: readonly unknown[]): Record<string, unknown> | undefined =>
 
 /**
  * An argument as it goes into a key. A schema is a marker, since two are not told apart by a key; a function or a
- * signal is nothing to key on, and is left out; what is plain is keyed by what it holds.
+ * signal is nothing to key on, and is `undefined`, which a plain object leaves out; what is plain is keyed by what it holds.
  */
 function keyed(value: unknown): unknown {
   if (isSchema(value)) return "schema";
@@ -138,18 +141,19 @@ function queriesOf<F extends object>(ns: "catalog" | "user", music: tAppleMusicC
  * Every read function of the catalog and of the listener's library, as its query for TanStack Query: one function of
  * the same arguments for each, giving what `useQuery` takes, or what `useInfiniteQuery` takes for one that walks
  * pages. A write is not among them: it is `useMutation` over the client's namespace. `scope` goes into every key, so
- * that one listener's cache is never another's: `useMusicQueries` passes the provider's generation, raised by every
- * change of token. A token is never part of a key. Made once for one client and reused; nothing is asked until a
- * query runs.
+ * that one listener's cache is never another's: `useMusicQueries` passes the provider's scope, a new one for every
+ * sign-in. A token is never part of a key. No `staleTime` is set: that is your app's to choose. Made once for one
+ * client and reused; nothing is asked until a query runs.
  *
  * @param music - The client the queries ask through: from `createClient`, `createServerClient` or
  * `createBrowserClient`, or anything with its five functions.
- * @param scope - What tells one listener's keys from another's: the provider's generation, or your own. Default 0.
+ * @param scope - What tells one listener's keys from another's: the provider's scope, or your own. Default 0, the
+ * scope of a page's client before any sign-in, so a server's prefetch of the catalog matches the page's queries.
  * @returns The two namespaces of query builders, frozen.
  * @throws TypeError if `music` is not a client, or `scope` is neither a string nor a number.
  */
 export function musicQueries(music: tAppleMusicClient, scope?: string | number): tMusicQueries {
   const client = clientOf("musicQueries", music, METHODS);
-  if (scope !== undefined && typeof scope !== "string" && typeof scope !== "number") throw new TypeError(`musicQueries: scope must be a string or a number, such as the provider's generation; got ${got(scope)}`);
+  if (scope !== undefined && typeof scope !== "string" && typeof scope !== "number") throw new TypeError(`musicQueries: scope must be a string or a number, such as the provider's scope; got ${got(scope)}`);
   return Object.freeze(ownOf({ catalog: queriesOf("catalog", client, scope, catalogFunctions), user: queriesOf("user", client, scope, userFunctions) }));
 }

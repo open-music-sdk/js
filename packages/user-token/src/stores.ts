@@ -85,7 +85,11 @@ export interface tKvStoreOptions {
 
 const DEFAULT_PREFIX = "music-user-token:";
 
-/** Keeps each token under `prefix + userId` in a key-value namespace, as the namespace stores it: wrap `kv` to encrypt. */
+/**
+ * Keeps each token under `prefix + userId` in a key-value namespace, as the namespace stores it. Neither store here
+ * encrypts, so whoever can read the namespace reads the tokens: wrap `kv` to encrypt. Workers KV can take up to a
+ * minute for a token just stored or deleted to look that way elsewhere, and Apple's 403 stays the authority.
+ */
 export class KvUserTokenStore implements tUserTokenStore, AsyncDisposable {
   readonly #kv: tKvNamespace;
   readonly #prefix: string;

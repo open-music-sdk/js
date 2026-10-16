@@ -43,7 +43,8 @@ export interface tMusicProviderProps {
  * Holds the client and the listener's token, in React state and nowhere else: in memory, gone with the page. No
  * token arrives as a prop, since a prop from a server component is written into the page; `useMusicUserToken` and
  * the sign-in hand it over. `useMusic` gives the client bound to it, derived once here, so every component shares
- * one client and one storefront lookup.
+ * one client and one storefront lookup. The token is in the provider's state and its context value, where React
+ * DevTools, and a browser extension that uses its hook, can show it.
  *
  * @param props - The client, and the tree the hooks are used in.
  * @returns The context's provider around `children`.
@@ -98,6 +99,11 @@ export function useMusic(): tBrowserMusic {
  * The setter throws a `TypeError` for a value that is no token: printable characters with no spaces or line breaks
  * inside.
  *
+ * Forgetting the token here is not a sign-out. The provider then takes no token Apple's script restores until the
+ * next `connect()`, but the script restores it on the next page load; `disconnect()` from `useConnect` is the
+ * sign-out. The provider does not forget a token on a `UserTokenInvalid` by itself: the component that made the call
+ * gets the error.
+ *
  * @returns The token, or `undefined` while none is held, and the setter, which keeps its identity.
  * @throws TypeError if there is no `MusicProvider` above the component.
  */
@@ -107,7 +113,10 @@ export function useMusicUserToken(): readonly [token: string | undefined, setTok
 }
 
 /**
- * `musicQueries` over the provider's client, in the provider's scope, made once per client and per sign-in.
+ * `musicQueries` over the provider's client, in the provider's scope, made once per client and per sign-in. The scope
+ * is 0 for the client first handed to the provider, before any sign-in, so a server render and a hydration agree.
+ * Each sign-in, and each other client handed to the provider, has a scope of its own, unique across pages, reloads
+ * and providers, so what one listener cached, persisted or not, is never under another's keys.
  *
  * @returns The catalog's and the listener's read functions, each as its query.
  * @throws TypeError if there is no `MusicProvider` above the component.

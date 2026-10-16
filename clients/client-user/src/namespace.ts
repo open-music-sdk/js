@@ -258,7 +258,9 @@ export interface tUserFunctions {
   /**
    * Makes a playlist in the listener's library: `{ attributes: { name } }`, with its tracks and the folder to put it
    * in under `relationships`. Resolves to the answer that holds the new playlist. Bound, it gives the playlist, or
-   * `undefined` if Apple's answer holds none: the playlist was made either way.
+   * `undefined` if Apple's answer holds none: the playlist was made either way. The playlist has to be a plain object,
+   * and still one once made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to
+   * judge, and nothing here limits its size, so limit it yourself if it comes from outside your app.
    *
    * @param playlist - The playlist to make: its name under `attributes`, and its tracks and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
@@ -309,7 +311,9 @@ export interface tUserFunctions {
   /**
    * Makes a playlist folder in the listener's library: `{ attributes: { name } }`, with the folder to put it in under
    * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
-   * Apple's answer holds none: the folder was made either way.
+   * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
+   * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
+   * here limits its size, so limit it yourself if it comes from outside your app.
    *
    * @param folder - The folder to make: its name under `attributes`, and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
@@ -811,7 +815,8 @@ export interface tUserFunctions {
   readonly deleteLibraryPlaylistRating: typeof ratings.deleteLibraryPlaylistRating;
   /**
    * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
-   * and `offset` apply to every type asked for.
+   * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
+   * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
    *
    * @param term - What to search for, 1 to 256 characters.
    * @param options - The types to look for, which have to be given; how many of each to send and where to start; and what to send beside each.

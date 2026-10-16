@@ -1,6 +1,7 @@
-// One site for every published package, each read from its source. `typedoc` builds it to dist; `typedoc --emit none`
-// is the check a pull request runs, and it fails on a broken link, a name that is not exported, an export with no
-// comment, and a function that leaves out an argument or what it returns (the plugin).
+// The reference for every published package, each read from its source. `typedoc` writes it as Markdown to reference/,
+// with a sidebar, for VitePress to build into the site; `typedoc --emit none` is the check a pull request runs, and it
+// fails on a broken link, a name that is not exported, an export with no comment, and a function that leaves out an
+// argument or what it returns (the plugin).
 import { globSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
@@ -21,16 +22,22 @@ for (const dir of packages) {
 }
 
 const validation = { notExported: true, invalidLink: true, rewrittenLink: true, notDocumented: true };
+// TypeDoc's own list, and a namespace such as `schemas`, which it does not ask a comment of by default.
+const requiredToBeDocumented = ["Enum", "EnumMember", "Variable", "Function", "Class", "Interface", "Property", "Method", "Accessor", "TypeAlias", "Namespace"];
 
 export default {
-  name: "open-music-sdk",
-  readme: join(root, "README.md"),
+  name: "Reference",
+  readme: "none",
   entryPointStrategy: "packages",
   entryPoints: packages.map((dir) => join(root, dir)),
-  packageOptions: { entryPoints: ["src/index.ts"], compilerOptions: { paths }, validation },
+  packageOptions: { entryPoints: ["src/index.ts"], compilerOptions: { paths }, validation, requiredToBeDocumented },
   validation,
-  plugin: ["./typedoc.plugin.mjs"],
-  out: "dist",
+  requiredToBeDocumented,
+  plugin: ["typedoc-plugin-markdown", "typedoc-vitepress-theme", "./typedoc.plugin.mjs"],
+  out: "reference",
+  // Each package's README opens its page, rather than sitting on a page of its own.
+  mergeReadme: true,
+  useCodeBlocks: true,
   treatValidationWarningsAsErrors: true,
   treatWarningsAsErrors: true,
 };

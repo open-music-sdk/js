@@ -54,5 +54,6 @@ export type {
   tSkippedTrack,
   tTrackDescription,
 } from "@open-music-sdk/lib-playlists";
+/** Every validator of {@link "@open-music-sdk/validate"! | @open-music-sdk/validate}, such as `schemas.song`, to pass as a function's `schema`. */
 export * as schemas from "@open-music-sdk/validate";
 export type * from "@open-music-sdk/types";
