@@ -106,7 +106,7 @@ its sign-in for you. The SDK issues no token and re-implements no sign-in.
 
 | Option | |
 | --- | --- |
-| `app` | `{ name, build? }`: what Apple's sign-in window shows of your app. Required. |
+| `app` | `{ name, build? }`: your app, as Apple's script is configured with it. Required. Apple's sign-in window does not show this name: see below. |
 | `musicKit` | The page's own `MusicKit`, when it loaded Apple's script itself: under a content security policy with a nonce, or Trusted Types. Default: loaded from Apple's CDN. |
 
 | Member | Does |
@@ -118,6 +118,11 @@ its sign-in for you. The SDK issues no token and re-implements no sign-in.
 
 What a page has to know:
 
+- **Apple's window names your app by your page's host, not by `app.name`.** Apple's script (v3) sends the
+  window `window.location.host` as the name, so a page on `app.example` is shown as `app.example`, and one
+  on `localhost:5173` as that. The icon beside it is taken from the page's
+  `<link rel="apple-music-app-icon" sizes="120x120" href="…">`, else its `apple-touch-icon`. Give it an
+  HTTPS address: the window is an HTTPS page of Apple's, and it loads the icon itself.
 - **The script has to be there before the click.** A browser opens a window only inside a click, and
   a download that starts after the click can outlast it. Make the helper when the button is shown, and
   enable the button on `ready`.
