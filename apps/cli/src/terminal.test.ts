@@ -65,12 +65,25 @@ describe("terminal: an ID", () => {
     expect(shown()).toBe("Key ID: ABX\b \bC123DEFG\n");
   });
 
-  test("an ID pasted is shown once it is known to be an ID", async () => {
+  test("an ID pasted is shown as it is pasted, with or without the line break after it", async () => {
+    for (const paste of ["def123ghij", "DEF123GHIJ\r", "DEF123GHIJ\r\n"]) {
+      const { input, output, shown } = streams();
+      const answer = terminal(input, output).id("Team ID: ");
+      input.write(paste);
+      if (!paste.includes("\r")) input.write("\r");
+      expect(await answer).toBe("DEF123GHIJ");
+      expect(shown()).toBe("Team ID: DEF123GHIJ\n");
+    }
+  });
+
+  test("a paste that is more than one answer waits until the first is known to be an ID; the rest, the size of one, is shown at its question", async () => {
     const { input, output, shown } = streams();
-    const answer = terminal(input, output).id("Team ID: ");
-    input.write("DEF123GHIJ\r");
-    expect(await answer).toBe("DEF123GHIJ");
-    expect(shown()).toBe("Team ID: \rTeam ID: DEF123GHIJ\n");
+    const term = terminal(input, output);
+    const first = term.id("Team ID: ");
+    input.write("DEF123GHIJ\rABC123DEFG\r");
+    expect(await first).toBe("DEF123GHIJ");
+    expect(await term.id("Key ID: ")).toBe("ABC123DEFG");
+    expect(shown()).toBe("Team ID: \rTeam ID: DEF123GHIJ\nKey ID: ABC123DEFG\n");
   });
 
   test("a key pasted at it shows nothing of the key, however fast or slowly the paste arrives, and the rest of it answers nothing", async () => {

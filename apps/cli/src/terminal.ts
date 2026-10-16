@@ -52,6 +52,8 @@ const END = /-----END [A-Z ]*PRIVATE KEY-----\s*$/;
 /** What a terminal in bracketed-paste mode puts around a paste. */
 const PASTE_MARKS = [`${ESC}[200~`, `${ESC}[201~`];
 const ID_CHARACTER = /^[A-Za-z0-9]$/;
+/** A paste that can be nothing but an ID: no more than ten ID characters, and the line break after them. */
+const PASTED_ID = /^[A-Za-z0-9]{1,10}(\r\n?|\n)?$/;
 const ID_LENGTH = 10;
 /** How long input must stop for before what is left of a paste is taken to be over. */
 const DRAIN_MS = 100;
@@ -69,11 +71,11 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
   let ahead = "";
 
   /**
-   * Reads one answer in raw mode, a character at a time through `take`, until it gives one; `take` is told whether
-   * the character came by itself, as a key typed does, or with others, as a paste does. What is left of the chunk is
+   * Reads one answer in raw mode, a character at a time through `take`, until it gives one; `take` is handed the
+   * chunk the character came in, which is one key when typed and more when pasted. What is left of the chunk is
    * kept for the next question, unless `drain` says to let input go by until it stops for a moment.
    */
-  const read = <T>(take: (c: string, alone: boolean) => T | typeof PENDING, drain: (answer: T) => boolean): Promise<T> =>
+  const read = <T>(take: (c: string, chunk: string) => T | typeof PENDING, drain: (answer: T) => boolean): Promise<T> =>
     new Promise((resolve, reject) => {
       const setRawMode = input.setRawMode?.bind(input);
       // Without raw mode the terminal shows what is typed; there is no asking for a key that way.
@@ -104,7 +106,7 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
         let i = 0;
         while (i < text.length && answer === PENDING) {
           const c = text.charAt(i++);
-          answer = c === CTRL_C ? stopped() : take(c, text.length === 1);
+          answer = c === CTRL_C ? stopped() : take(c, text);
         }
         if (answer === PENDING) return;
         draining = answer instanceof CliError || drain(answer);
@@ -147,7 +149,7 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
         return answer;
       };
       return read<string | undefined>(
-        (c, alone) => {
+        (c, chunk) => {
           // A line break sent as CR LF is one break, not an empty answer to the next question.
           const lineFeedOfBreak = c === "\n" && afterReturn;
           afterReturn = c === "\r";
@@ -163,9 +165,9 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
           other ||= !isId;
           // Enough is kept to tell an answer is wrong, and no more.
           if (typed.length > 64) return PENDING;
-          // A key typed is shown as it comes; what is pasted waits until it is known to be an ID. A key pasted here
-          // by mistake is not, however slowly its lines arrive.
-          const show = alone && !other && shown.filter(Boolean).length < ID_LENGTH;
+          // A key typed is shown as it comes, and so is a paste the size of an ID; any other paste waits until it is
+          // known to be one. A key pasted here by mistake never is, however slowly its lines arrive.
+          const show = (chunk.length === 1 || PASTED_ID.test(chunk)) && !other && shown.filter(Boolean).length < ID_LENGTH;
           typed += isId ? c.toUpperCase() : c;
           shown.push(show);
           if (show) output.write(c.toUpperCase());
