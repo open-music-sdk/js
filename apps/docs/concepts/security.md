@@ -209,11 +209,41 @@ route and the store, and shows how.
 The CLI's `login` keeps your own token in one file in your user profile. It is readable by you alone, and not
 encrypted. `logout` forgets it, but doesn't tell Apple, so a copy you handed to another program keeps working until
 Apple ends it. Only `token` prints it, so a script gets it from `$(open-music-sdk token)` and not from a file you
-copy around.
+copy around. The CLI's [README](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) says where the file
+is.
 
-Its sign-in page is served on `localhost` only, its address opens once, and it stops once it has a token or after
-five minutes. The CLI's [README](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) describes what it
-holds to.
+The CLI takes your key from its flag, its variable or a question, and keeps none of them. It takes
+`APPLE_MUSIC_PRIVATE_KEY` out of its own environment before it starts anything, so the browser it opens doesn't get
+the key. Whatever started the CLI, your shell or `npx`, had the variable already. On Linux and macOS the CLI's
+starting environment stays readable, by you and root, while it runs.
+
+`login` serves its own sign-in page, made of the SDK: `browser`'s sign-in, `server`'s `tokenEndpoint` for the
+page's developer token, and `server`'s `userTokenIntake` for the token Apple gives. Here is what keeps that page
+safe:
+
+- Loopback only, on both addresses. The server listens on `127.0.0.1` and `::1`, on one port. A browser may try
+  either for `localhost`, and holding both means no other program can take the one left free. It answers only
+  requests whose `Host` is `localhost:<port>`, and refuses any whose `Origin` is another page's.
+- An address that works once. The page's address carries a random ticket, fresh each run, and it reaches the
+  browser in a command line that other users of the machine may read. So the ticket is used up when the page
+  opens, and a second opening is told to press Ctrl+C if it wasn't you.
+- A second secret for the routes. The page carries a secret of its own, never in an address or a command line, and
+  sends it with every request for a token and with its post. A post without it is refused before Apple is asked.
+  The post needs a JSON body and a header of the CLI's own, so another site's page would have to ask the browser
+  first, and nothing answers that asking.
+- One token, and a short wait. One token is taken, and a second post is turned away. The server closes once it
+  has a token, or after five minutes, or on Ctrl+C, and the token route exists only while `login` waits. Its
+  developer tokens live fifteen minutes and are bound to the page's origin.
+- Apple's copy doesn't outlive the page. A cookie set on `localhost` is shared by every port, so after every try,
+  and when the tab closes, the page deletes the cookies and storage entries Apple's script added, and puts back the
+  ones it overwrote. It doesn't call `disconnect()`, since whether that ends the token at Apple isn't known yet.
+- Its headers. `cache-control: no-store`, `x-content-type-options: nosniff`, and a content security policy that
+  lets in Apple's script and nothing but Apple's hosts.
+- No secret in a message. No message repeats the key, a token, or anything that might be one, such as an argument
+  that looks like neither a command nor a flag. Text from Apple, and paths, are printed without control characters.
+- A pinned version is pinned throughout. The SDK is bundled into the command, and `jose` is pinned to the exact
+  version the SDK is tested with, so `npx @open-music-sdk/cli@<version>` runs exactly the code of that version.
+  The page has no signing code, which a test of the build holds it to.
 
 ## Where requests go
 

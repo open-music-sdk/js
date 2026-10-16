@@ -64,9 +64,10 @@ npx @open-music-sdk/cli@<version> login
 ```
 
 `open-music-sdk --help` lists every command, and `open-music-sdk help <command>` gives a command's options. The
-CLI's [README](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) explains how `login` keeps the
-sign-in safe. The token is kept in one file in your user profile, readable by you alone and not encrypted, until
-`logout` forgets it.
+CLI's [README](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) covers where it finds your key and
+where it keeps the token: in one file in your user profile, readable by you alone and not encrypted, until `logout`
+forgets it. [On your machine, with the CLI](./security#on-your-machine-with-the-cli) explains how `login` keeps the
+sign-in safe.
 
 ::: info Before the first release
 To run the CLI from a clone of the repository, build it with `pnpm --filter @open-music-sdk/cli... build`, then

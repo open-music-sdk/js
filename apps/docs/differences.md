@@ -41,6 +41,21 @@ These are still open:
 - whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
   token.
 
+## [cli](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)
+
+The CLI's `login` is where the first live sign-in above ran, and its `doctor` asked both its questions of the live
+API, `GET /v1/test` and `GET /v1/me/storefront`. Still open for the CLI itself:
+
+- how `login` goes in other browsers, and on macOS and Linux;
+- whether Apple's script keeps a copy where the page doesn't look: the page puts back cookies, `localStorage` and
+  `sessionStorage` after a sign-in, not IndexedDB;
+- with `--port` fixed and a second `login`, what the page restores for a returning listener;
+- whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
+  token;
+- whether a browser ever asks for the page twice of its own accord, which the one-time address would turn away.
+
+`check`, the CLI's live checks of what Apple documents and what it doesn't, comes next.
+
 ## [client-catalog](./reference/@open-music-sdk/client-catalog/)
 
 - Every function takes the same options, so most take some that their endpoint isn't documented with: `limit` and
