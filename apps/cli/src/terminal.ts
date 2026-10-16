@@ -142,7 +142,6 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       /** For each character kept, whether it was shown. */
       const shown: boolean[] = [];
       let other = false;
-      let afterReturn = false;
       /** The answer, shown in full once it is known to be an ID, when some of it came in a paste and was held back. */
       const answered = (answer: string) => {
         if (!shown.every(Boolean) && !other && answer.length === ID_LENGTH) output.write(`\r${question}${answer}`);
@@ -150,10 +149,6 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       };
       return read<string | undefined>(
         (c, chunk) => {
-          // A line break sent as CR LF is one break, not an empty answer to the next question.
-          const lineFeedOfBreak = c === "\n" && afterReturn;
-          afterReturn = c === "\r";
-          if (lineFeedOfBreak) return PENDING;
           if (c === "\r" || c === "\n") return answered(typed);
           if (c === CTRL_D) return typed === "" ? undefined : answered(typed);
           if (BACKSPACE.includes(c)) {

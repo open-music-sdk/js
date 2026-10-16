@@ -39,6 +39,16 @@ describe("terminal: whether it may ask", () => {
     expect(terminal(streams(true).input, streams(false).output)).toMatchObject({ interactive: false, stdinIsTerminal: true });
   });
 
+  test("what it tells is a line of its own, on the stream the questions go to", async () => {
+    const { input, output, shown } = streams();
+    const term = terminal(input, output);
+    term.tell("Asking for what the flags and the environment leave out.");
+    const answer = term.id("Team ID: ");
+    type(input, "DEF123GHIJ\r");
+    await answer;
+    expect(shown()).toBe("Asking for what the flags and the environment leave out.\nTeam ID: DEF123GHIJ\n");
+  });
+
   test("without raw mode it asks for nothing, rather than show what is typed", async () => {
     const { input, output } = streams();
     const plain = Object.assign(input, { setRawMode: undefined });
@@ -57,12 +67,26 @@ describe("terminal: an ID", () => {
     expect(input.isPaused()).toBe(true);
   });
 
-  test("backspace takes back what it shows, and no more than ten characters are shown", async () => {
+  test("backspace takes back what it shows, and nothing it held back, and no more than ten characters are shown", async () => {
     const { input, output, shown } = streams();
     const answer = terminal(input, output).id("Key ID: ");
     type(input, `ABX${BACKSPACE}C123DEFGHIJ\r`);
     expect(await answer).toBe("ABC123DEFGHIJ");
     expect(shown()).toBe("Key ID: ABX\b \bC123DEFG\n");
+    // A paste a character too long to be an ID is held back; taken back to ten, it is one, and is shown whole.
+    const pasted = streams();
+    const fixed = terminal(pasted.input, pasted.output).id("Key ID: ");
+    pasted.input.write("ABC123DEFGH");
+    type(pasted.input, `${BACKSPACE}\r`);
+    expect(await fixed).toBe("ABC123DEFG");
+    expect(pasted.shown()).toBe("Key ID: \rKey ID: ABC123DEFG\n");
+  });
+
+  test("of a long paste, no more is kept than it takes to tell it is no ID", async () => {
+    const { input, output } = streams();
+    const answer = terminal(input, output).id("Team ID: ");
+    input.write(`${"A".repeat(1000)}\r`);
+    expect(await answer).toBe("A".repeat(65));
   });
 
   test("an ID pasted is shown as it is pasted, with or without the line break after it", async () => {
@@ -112,20 +136,27 @@ describe("terminal: an ID", () => {
     }
   });
 
-  test("answers typed ahead are kept for the questions they answer, and a CR LF is one line break", async () => {
-    const { input, output } = streams();
-    const term = terminal(input, output);
-    const first = term.id("Team ID: ");
-    input.write("DEF123GHIJ\r\nABC123DEFG\r\n");
-    expect(await first).toBe("DEF123GHIJ");
-    expect(await term.id("Key ID: ")).toBe("ABC123DEFG");
+  test("answers typed ahead are kept for the questions they answer, in one piece or more, and a CR LF is one line break", async () => {
+    // In one piece; and with the second answer in a piece of its own, come after the first was given and before it is asked for.
+    for (const pieces of [["DEF123GHIJ\r\nABC123DEFG\r\n"], ["DEF123GHIJ\r", "ABC123DEFG\r"]]) {
+      const { input, output } = streams();
+      const term = terminal(input, output);
+      const first = term.id("Team ID: ");
+      for (const piece of pieces) input.write(piece);
+      expect(await first).toBe("DEF123GHIJ");
+      expect(await term.id("Key ID: ")).toBe("ABC123DEFG");
+    }
   });
 
-  test("stdin ending before an answer is no answer, and Ctrl+C is exit status 130", async () => {
+  test("stdin ending before anything is typed is no answer, and after it is what was typed; Ctrl+C is exit status 130", async () => {
     const ended = streams();
     const none = terminal(ended.input, ended.output).id("Team ID: ");
     ended.input.write(CTRL_D);
     expect(await none).toBeUndefined();
+    const cut = streams();
+    const typed = terminal(cut.input, cut.output).id("Team ID: ");
+    type(cut.input, `DEF${CTRL_D}`);
+    expect(await typed).toBe("DEF");
     const stopped = streams();
     const asked = terminal(stopped.input, stopped.output).id("Team ID: ");
     stopped.input.write(`DEF${CTRL_C}`);
@@ -186,14 +217,18 @@ describe("terminal: the key", () => {
 });
 
 describe("terminal: a pipe", () => {
-  test("is read to its end, and refused past the limit", async () => {
-    const piped = streams(false);
-    const read = terminal(piped.input, piped.output).pipe(16_384);
-    piped.input.end(PEM);
-    expect(await read).toBe(PEM);
-    const large = streams(false);
-    const tooMuch = terminal(large.input, large.output).pipe(100);
-    large.input.end("x".repeat(101));
-    expect(await tooMuch).toBeUndefined();
+  test("is read to its end, and refused past the limit in bytes, whether it gives bytes or, with an encoding set, text", async () => {
+    const pipe = async (contents: string, max: number, encoding?: BufferEncoding) => {
+      const { input, output } = streams(false);
+      if (encoding !== undefined) input.setEncoding(encoding);
+      const read = terminal(input, output).pipe(max);
+      input.end(contents);
+      return read;
+    };
+    for (const encoding of [undefined, "utf8"] as const) {
+      expect(await pipe(PEM, 16_384, encoding)).toBe(PEM);
+      expect(await pipe("x".repeat(101), 100, encoding)).toBeUndefined();
+      expect(await pipe("é".repeat(51), 100, encoding)).toBeUndefined();
+    }
   });
 });
