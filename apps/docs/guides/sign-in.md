@@ -4,6 +4,9 @@ To read or change a listener's library, your app needs their [Music User Token](
 and only Apple can issue one. In this guide you add a button that opens Apple's sign-in window, take the token it
 gives, and sign the listener out again.
 
+To sign yourself in, to try the API with your own account or to run a script, you don't need a page of your own:
+the CLI's `login` does it from the terminal. See [The command-line tool](../concepts/packages#the-command-line-tool).
+
 Before you start, you need:
 
 - a route on your server that serves a developer token to your page. See
@@ -38,7 +41,16 @@ import { createConnect } from "@open-music-sdk/browser";
 const signIn = createConnect(music, { app: { name: "Crate Digger" } });
 ```
 
-`app.name` is what Apple's sign-in window shows of your app. You can add `app.build`, your app's version.
+`app` is what Apple's script is configured with. You can add `app.build`, your app's version.
+
+Apple's sign-in window doesn't show `app.name`. It names your app by your page's host, such as `app.example`, or
+`localhost:5173` while you develop. The icon beside it comes from your page's `apple-music-app-icon` link, else its
+`apple-touch-icon`. Give the icon an HTTPS address: the window is an HTTPS page of Apple's, and loads the icon
+itself.
+
+```html
+<link rel="apple-music-app-icon" sizes="120x120" href="https://app.example/music-icon-240.png">
+```
 
 The script is one download from Apple, about 140 kB compressed as measured on 10 October 2026, made only by a
 page that creates the helper. It runs with your page's access, and you can't pin it, bundle it or host it
@@ -114,24 +126,30 @@ leaves Apple's script in the page.
 ## 6. Let Apple's script through your security headers
 
 Apple's script is loaded from `MUSICKIT_SCRIPT`, which the package exports: a URL on
-`https://js-cdn.music.apple.com`. If your site sends a content security policy, allow that host in `script-src`,
-set `base-uri 'self'`, and, in a page that calls Apple, allow `https://api.music.apple.com` in `connect-src`.
-Send a `Cross-Origin-Opener-Policy` of `same-origin-allow-popups`, not `same-origin`, which is expected to cut
-your page off from the sign-in window:
+`https://js-cdn.music.apple.com`. If your site sends a content security policy, it has to let that script in, and
+let it reach Apple's hosts. This policy let a sign-in through in the first live run, from the CLI's page:
 
 ```http
-Content-Security-Policy: script-src 'self' https://js-cdn.music.apple.com; connect-src 'self' https://api.music.apple.com; base-uri 'self'
-Cross-Origin-Opener-Policy: same-origin-allow-popups
+Content-Security-Policy: default-src 'self' https://*.apple.com; script-src 'self' https://js-cdn.music.apple.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.apple.com https://*.mzstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'
 ```
+
+Keep `base-uri 'self'` whatever else you change, so that no `<base>` put into your page can move where anything
+is fetched from.
+
+Two more headers matter:
+
+- Don't send `Referrer-Policy: no-referrer`. Developers report that it breaks Apple's sign-in.
+- If you send a `Cross-Origin-Opener-Policy`, make it `same-origin-allow-popups`. `same-origin` is expected to cut
+  your page off from the sign-in window. The first live run sent none.
 
 If your policy uses a nonce or Trusted Types, load Apple's script yourself, and pass its `MusicKit` global as the
 `musicKit` option of `createConnect`.
 
 [Apple's script](../concepts/security#apple-s-script) in the security model says what each header guards against.
 
-::: info Not yet run against the live API
-No sign-in has run against Apple's live script yet: [Differences from Apple's documentation](../differences#browser)
-lists what the first one has to settle.
+::: info Run once against the live API
+One sign-in has run against Apple's live script, from the CLI's page on `localhost`, on Windows, in one browser.
+[Differences from Apple's documentation](../differences#browser) lists what it settled and what is still open.
 :::
 
 ## 7. Decide where the token goes

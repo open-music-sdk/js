@@ -129,6 +129,9 @@ except through `disconnect()`.
 
 Any script running on your origin can read that copy. A cross-site scripting hole therefore exposes the
 listener's token on any later visit, not only while a page that holds it is open.
+
+While you develop on `localhost`, keep in mind that a cookie there is shared by every port. If the script keeps a
+copy in a cookie, every server you run on your machine is sent it.
 :::
 
 Signing out is `disconnect()`. It's Apple's own sign-out, through the script, and it ends the sign-in in the script
@@ -136,9 +139,9 @@ and the copy it kept, so the next page load restores nothing. It does nothing wh
 where the page holds no configuration of the script because loading or configuring it failed. Forgetting the token
 in your page alone isn't a sign-out: the script would restore it next time.
 
-::: info Not yet run against the live API
-Whether `disconnect()` also ends the token at Apple, and with it a copy your server stored, is one of the things a
-first live sign-in has to settle: see [Differences from Apple's documentation](../differences#browser).
+::: info Still open
+Whether `disconnect()` also ends the token at Apple, and with it a copy your server stored, wasn't settled by the
+first live sign-in: see [Differences from Apple's documentation](../differences#browser).
 :::
 
 ### Apple's script
@@ -153,9 +156,10 @@ well, so that no `<base>` element put into the page can move where anything is f
 [Sign a listener in](../guides/sign-in) gives the headers, what `Cross-Origin-Opener-Policy` does to the sign-in
 window, and how to load the script yourself under a nonce or Trusted Types.
 
-::: info Not yet run against the live API
-What a strict `connect-src` needs, and what each `Cross-Origin-Opener-Policy` does to the sign-in window, are for
-a first live sign-in to settle: see [Differences from Apple's documentation](../differences#browser).
+::: info Run once against the live API
+The policy in [Sign a listener in](../guides/sign-in) let the first live sign-in through, in one browser on
+Windows. What each `Cross-Origin-Opener-Policy` does to the sign-in window is still open: see
+[Differences from Apple's documentation](../differences#browser).
 :::
 
 The helper guards against a few more things:
@@ -199,6 +203,17 @@ The stores:
 When Apple refuses a stored token, forget only the token that was rejected: the listener may have signed in again
 while the request was in flight. [Keep a listener's token on your server](../guides/store-user-tokens) sets up the
 route and the store, and shows how.
+
+### On your machine, with the CLI
+
+The CLI's `login` keeps your own token in one file in your user profile. It is readable by you alone, and not
+encrypted. `logout` forgets it, but doesn't tell Apple, so a copy you handed to another program keeps working until
+Apple ends it. Only `token` prints it, so a script gets it from `$(open-music-sdk token)` and not from a file you
+copy around.
+
+Its sign-in page is served on `localhost` only, its address opens once, and it stops once it has a token or after
+five minutes. The CLI's [README](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) describes what it
+holds to.
 
 ## Where requests go
 

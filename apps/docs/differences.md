@@ -1,9 +1,10 @@
 # Differences from Apple's documentation
 
 The types and validators are generated from Apple's documentation, and each client's tests hold every function
-to it: the method, the path, every documented parameter and the answer of each endpoint. Nothing has been run
-against the live API yet, so what Apple does where its documentation is silent isn't known. This page lists,
-package by package, where the SDK differs from the documentation, and what it takes on trust.
+to it: the method, the path, every documented parameter and the answer of each endpoint. Little has been run
+against the live API yet: one sign-in, through the CLI, and the requests around it. So what Apple does where its
+documentation is silent is mostly not known. This page lists, package by package, where the SDK differs from the
+documentation, and what it takes on trust.
 
 ## [browser](./reference/@open-music-sdk/browser/)
 
@@ -13,17 +14,32 @@ Sign-in runs Apple's own script, whose behaviour Apple doesn't fully document:
 - The script keeps a copy of the Music User Token in the browser's storage, under a key ending `media-user-token`
   as seen on 10 October 2026. See the [security model](./concepts/security#in-a-page).
 
-None of this has met Apple's live script yet. The first live sign-in has to settle:
+The first live sign-in, on 16 October 2026, ran from the CLI's page on `localhost`, on Windows, in one browser.
+It settled these:
 
-- whether loading and configuring the script ahead of the click keeps the sign-in window inside the click in
-  every browser, Safari first;
+- Apple's sign-in takes a page on `http://localhost:<port>`, with a developer token bound to that origin, and the
+  token it gives is one `userTokenIntake` accepts.
+- The sign-in window names the app by the page's host, `window.location.host`, not by the `app` the script is
+  configured with.
+- The window's icon comes from the page's `apple-music-app-icon` link, and shows once that is an HTTPS address.
+- The content security policy in [Sign a listener in](./guides/sign-in#_6-let-apple-s-script-through-your-security-headers)
+  let everything the sign-in needed through.
+
+These are still open:
+
+- how sign-in goes in other browsers, Safari first, and on macOS and Linux, including whether loading the script
+  ahead of the click keeps the window inside the click everywhere;
 - whether a listener who declines is the script answering with nothing, or a rejection, and with what;
 - what a configured instance holds for a returning listener, and whether it takes a new developer token;
 - whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event;
-- which of Apple's hosts a strict `connect-src` has to allow, and whether a `Cross-Origin-Opener-Policy` of
-  `same-origin` cuts the sign-in window off, as expected, where `same-origin-allow-popups` keeps it;
+- where else Apple's script keeps its copy of the token, beside the storage key seen above: whether in cookies,
+  which on `localhost` every port shares, or in IndexedDB;
+- whether a `Cross-Origin-Opener-Policy` of `same-origin` cuts the sign-in window off, as expected, where
+  `same-origin-allow-popups` keeps it;
 - whether `disconnect()`, which runs the script's own sign-out, also ends the token at Apple, and with it a copy
-  your server stored.
+  your server stored;
+- whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
+  token.
 
 ## [client-catalog](./reference/@open-music-sdk/client-catalog/)
 
