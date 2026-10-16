@@ -154,7 +154,7 @@ export interface tUseConnect {
  * unless the provider holds one already or the app has forgotten one; the token `connect()` gives always does. The
  * options are read on the first mount only, as the helper reads them once.
  *
- * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
+ * @param options - The app as Apple's script is configured with it, and the page's own `MusicKit` where it loaded the script itself.
  * @returns Where the sign-in stands, and `connect` and `disconnect`, each keeping its identity.
  * @throws TypeError if there is no `MusicProvider` above the component; what `createConnect` refuses in the
  * options, a mount with no `document`, or a page whose script is configured for another app, is a `TypeError`

@@ -251,6 +251,37 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  apps/cli:
+    dependencies:
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
+    devDependencies:
+      '@open-music-sdk/browser':
+        specifier: workspace:*
+        version: link:../../integrations/browser
+      '@open-music-sdk/server':
+        specifier: workspace:*
+        version: link:../../integrations/server
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(vitest@4.1.11)
+      happy-dom:
+        specifier: 'catalog:'
+        version: 21.0.1
+      tooling-vitest-config:
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(@vitest/coverage-v8@4.1.11)(happy-dom@21.0.1)(vite@8.3.2(@types/node@24.19.1)(yaml@2.9.1))
+
   apps/docs:
     devDependencies:
       '@open-music-sdk/browser':
