@@ -178,10 +178,14 @@ describe("the sign-in page", () => {
     expect(button().disabled).toBe(false);
   });
 
-  test.each([
-    ["an Error", new Error("popup blocked")],
-    ["something that is not an Error", "popup blocked"],
-  ])("a sign-in that fails with %s says so, leaves the origin as it was, and lets them try again", async (_kind, reason) => {
+  test.each<[string, unknown, string]>([
+    ["an Error, by its message", new Error("popup blocked"), "popup blocked"],
+    ["an Error with no message, by its name", new TypeError(), "TypeError"],
+    // Apple's script rejects with an object of its own, whose shape is undocumented.
+    ["the object Apple's script rejects with, by its message", { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" }, "Unauthorized"],
+    ["such an object with no message, by its code", { errorCode: "AUTHORIZATION_ERROR" }, "AUTHORIZATION_ERROR"],
+    ["anything else, as text", "popup blocked", "popup blocked"],
+  ])("a sign-in that fails with %s says so, leaves the origin as it was, and lets them try again", async (_kind, reason, shown) => {
     authorize = () => {
       keepCopies();
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script may reject with something of its own, not an Error
@@ -189,7 +193,7 @@ describe("the sign-in page", () => {
     };
     await ready();
     button().click();
-    await vi.waitFor(() => { expect(status()).toBe("Sign-in failed: popup blocked"); });
+    await vi.waitFor(() => { expect(status()).toBe(`Sign-in failed: ${shown}`); });
     expect(outcome()).toBe("error");
     expect(button().disabled).toBe(false);
     asBefore();
