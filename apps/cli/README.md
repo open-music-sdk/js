@@ -4,8 +4,11 @@ Get a Music User Token for your own Apple Music account from the command line. A
 in at Apple, and the terminal has the token, the way `aws login` gets you a session. It also tells you
 whether your MusicKit key works.
 
+With your key in `APPLE_MUSIC_PRIVATE_KEY`, and its IDs in `APPLE_MUSIC_TEAM_ID` and `APPLE_MUSIC_KEY_ID`,
+as the SDK's own READMEs keep them, no command needs a flag:
+
 ```
-npx @open-music-sdk/cli@0.0.0 login --key ./AuthKey_ABC123DEFG.p8 --team-id DEF123GHIJ
+npx @open-music-sdk/cli@0.0.0 login
 npx @open-music-sdk/cli@0.0.0 doctor
 APPLE_MUSIC_USER_TOKEN=$(npx @open-music-sdk/cli@0.0.0 token) node job.js
 ```
@@ -15,7 +18,7 @@ dependency, and the command is `open-music-sdk`:
 
 ```
 pnpm add -D @open-music-sdk/cli
-pnpm exec open-music-sdk login --key ./AuthKey_ABC123DEFG.p8 --team-id DEF123GHIJ
+pnpm exec open-music-sdk login
 ```
 
 You need Node 24 or newer, a MusicKit key from your Apple Developer account, and an Apple Account with an
@@ -39,34 +42,48 @@ error. Color goes off when the output is not a terminal, when `NO_COLOR` is set,
 
 ## Where the key comes from
 
-Each of the three comes from the first of these that has it:
+`login`, `doctor` and `token --developer` need your key and its two IDs. Each of the three comes from its
+flag, else its environment variable, else a question:
 
-1. The flags: `--key <path>`, `--team-id <id>`, `--key-id <id>`.
-2. The environment: `APPLE_MUSIC_KEY_PATH`, `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`.
-3. What the last `login` kept.
+| Value | Flag | Environment variable | Asked for |
+| --- | --- | --- | --- |
+| Private key | `--key-file <path>`, or `--key-file -` for stdin | `APPLE_MUSIC_PRIVATE_KEY`, holding the key itself | Pasted, with nothing shown |
+| Team ID | `--team-id <id>` | `APPLE_MUSIC_TEAM_ID` | Typed |
+| Key ID | `--key-id <id>` | `APPLE_MUSIC_KEY_ID` | Typed |
 
-The key ID is in the name Apple gave the file, `AuthKey_<key id>.p8`, so you can leave it out while the
-file keeps that name. The key is read from its file, never from a flag or a variable: a flag would show up
-in your shell's history and in `ps`. The CLI checks that the file is a P-256 private key before anything
-is asked of Apple, and no message ever quotes it.
+- **The variables' names are fixed:** they are the ones the SDK's READMEs use.
+- **`APPLE_MUSIC_PRIVATE_KEY`** holds the contents of the `.p8`. It may hold them with escaped `\n` line
+  breaks, Windows line endings, or a byte order mark. A path in it is refused, with a pointer to
+  `--key-file`.
+- **A key file is read only when `--key-file` names it.** If the file keeps the name Apple gave it,
+  `AuthKey_<key id>.p8`, its key ID is used before `APPLE_MUSIC_KEY_ID`.
+- **`--key-file -` reads the key from a pipe,** so it goes from a secret manager to the CLI and nowhere
+  else: `op read "op://Dev/MusicKit/AuthKey.p8" | open-music-sdk login --key-file - --team-id … --key-id …`.
+  With stdin carrying the key, nothing else can be asked for, so the IDs must come from their flags or
+  variables. A terminal on stdin is refused, since the key would be typed where it shows.
+- **Questions are asked only at an interactive terminal,** for what the flags and the environment leave
+  out, in the order team ID, key ID, key. The key is pasted with nothing shown and read to its `END` line.
+  `--no-input` turns questions off. Without a terminal, or with `--no-input`, a missing value ends with exit
+  status 2 and a message naming its flag and its variable.
+- **Nothing given or typed is kept.** The next command finds the key and its IDs where this one did.
+- **The key is checked before anything is asked of Apple:** it must be a P-256 private key, in Apple's PKCS8
+  form or in SEC1. No message ever repeats it, or anything else that came in.
+- **The key reaches no other program.** `APPLE_MUSIC_PRIVATE_KEY` is taken out of the CLI's own environment
+  as soon as it starts, so the browser it opens, and anything that starts, is not handed it.
 
 ## What it keeps
 
-Two files, in `%LOCALAPPDATA%\open-music-sdk` on Windows, and in `$XDG_CONFIG_HOME/open-music-sdk`, or
-`~/.config/open-music-sdk`, elsewhere. `open-music-sdk --help` prints the folder. On Windows it is not the
-roaming `%APPDATA%`, which a domain copies to its servers and to your other machines.
+One file, `user-token.json`, in `%LOCALAPPDATA%\open-music-sdk` on Windows, and in
+`$XDG_CONFIG_HOME/open-music-sdk`, or `~/.config/open-music-sdk`, elsewhere. `open-music-sdk --help` prints
+the folder. On Windows it is not the roaming `%APPDATA%`, which a domain copies to its servers and to your
+other machines. The file holds the Music User Token, and only `token` prints it.
 
-| File | Holds |
-| --- | --- |
-| `user-token.json` | The Music User Token. Only `token` prints it. |
-| `config.json` | The key's path and its two IDs, which `login` keeps so the commands after it need no flags. Never the key itself. |
-
-Each is written to a temporary file and renamed, so you never find half of one; on Windows, where a rename is
+It is written to a temporary file and renamed, so you never find half of it; on Windows, where a rename is
 refused while another program has the file open, it is tried again for a couple of seconds. On macOS and
-Linux both files are readable by you alone (mode `600`), and a folder the CLI makes is mode `700`; one that
-was already there keeps its mode. On Windows they sit in your own profile, which other users cannot read.
-The system's keychain is not used: that needs a native module, or a different command on each system, and
-waits until someone asks for it.
+Linux it is readable by you alone (mode `600`), and a folder the CLI makes is mode `700`; one that was
+already there keeps its mode. On Windows it sits in your own profile, which other users cannot read. It is
+not encrypted. The system's keychain is not used: that needs a native module, or a different command on
+each system, and waits until someone asks for it.
 
 The token file is kept by `FileUserTokenStore`: core's `tUserTokenStore`, the three methods that
 `forUser()` and the [intake](../../packages/user-token/README.md) call, over one JSON file. A store of your
@@ -76,8 +93,9 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
 
 ## How `login` works
 
-1. Your key is loaded, and the token file read, so a bad key or a file the CLI cannot write fails before a
-   browser opens. Apple is asked `GET /v1/test`.
+1. The token file is read, so a file the CLI cannot write fails before anything is asked. Your key and its
+   IDs are found, or asked for, and Apple is asked `GET /v1/test`, so a bad key fails before a browser
+   opens.
 2. A server listens on both loopback addresses, `127.0.0.1` and `::1`, on one port the system picks unless
    you give `--port`. Its page is `http://localhost:<port>/?state=<ticket>`, with a fresh random ticket each
    run. Apple registers no address, so a new port each time costs nothing.
