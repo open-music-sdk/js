@@ -49,7 +49,7 @@ Apple's `errors`, `issues` and `retryAfterMs`, each `undefined` where there's no
 | `ApiError` | Apple answered another failing status, which is in `status`, with its own details in `errors` | A `404` means the resource doesn't exist, perhaps not in this [storefront](../glossary#storefront). A `5xx` is Apple's side, and the client has already retried it. Other `4xx` statuses mean Apple didn't accept the request: read `errors`. |
 | `NetworkError` | `fetch` failed, or the answer couldn't be read. What `fetch` threw is in `cause`. | The client has already retried it. Tell the user, and try again later. |
 | `DeveloperTokenUnavailable` | Your developer token provider couldn't get a token. In a page, that's your token route failing. `status` is your route's, never Apple's. | Check your token route and its logs. See [Serve a developer token to a page](./token-endpoint). |
-| `DeveloperTokenInvalid` | Apple answered `401` to the developer token, and the client has already asked its provider for a fresh one | Check your key, key ID and team ID. Under `/v1/me`, a `401` can also mean the listener isn't signed in or has no Apple Music subscription. |
+| `DeveloperTokenInvalid` | Apple answered `401` to the developer token, and the client has already asked its provider for a fresh one | Check your key, key ID and team ID: the CLI's `open-music-sdk doctor` asks Apple about the key alone. Under `/v1/me`, a `401` can also mean the listener isn't signed in or has no Apple Music subscription. |
 | `ValidationError` | The answer didn't match the `schema` you passed. What's wrong is in `issues`. | See [Validate Apple's responses](./validation). |
 
 An `ApiError` can also come from a successful answer that isn't what the call needs: a body that isn't JSON, or,

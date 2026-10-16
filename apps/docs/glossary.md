@@ -72,7 +72,8 @@ your app read and change their [library](#library).
 
 A token Apple issues after a listener signs in, which lets your app act for them. Requests for their library,
 ratings, recommendations and history (paths under `/v1/me`), their personal station and a catalog resource's
-`library` relationship need it, as well as a developer token. Only Apple can issue one. See
+`library` relationship need it, as well as a developer token. Only Apple can issue one. For your own account, the
+CLI's `login` gets one: see [The command-line tool](./concepts/packages#the-command-line-tool). See also
 [Developer tokens and Music User Tokens](./concepts/tokens).
 
 ### MusicKit on the Web

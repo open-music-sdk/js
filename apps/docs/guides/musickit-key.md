@@ -66,7 +66,18 @@ your server instead: see [Serve a developer token to a page](./token-endpoint).
 
 ## 5. Check that it works
 
-On your machine, in a file named `check.mts`:
+The quickest check is the CLI's `doctor`. It asks Apple, with `GET /v1/test`, whether it takes a token signed with
+your key, and prints nothing secret. It reads the three variables from your shell, and asks for any that aren't
+set. [The command-line tool](../concepts/packages#the-command-line-tool) shows how to add it.
+
+```sh
+open-music-sdk doctor
+```
+
+Its first line says whether Apple takes your key. Until you've signed in with `open-music-sdk login`, its second
+line says no Music User Token is kept, which you can ignore here.
+
+To check from your own code instead, on your machine, in a file named `check.mts`:
 
 ```ts
 import { createServerClient } from "@open-music-sdk/server";

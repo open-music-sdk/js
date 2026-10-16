@@ -50,11 +50,15 @@ MusicKit on the Web script opens. Apple publishes no endpoint for it, and the SD
 it runs Apple's script for you: `createConnect` in `browser`, or `useConnect` in `react`.
 [Sign a listener in](../guides/sign-in) shows how.
 
+For your own account, you need no page of your own. The CLI's `login` runs the same sign-in from a page it serves
+on `localhost`, keeps the token, and `token` prints it for a script to read. See
+[The command-line tool](./packages#the-command-line-tool).
+
 Once your page has the token, you decide where it goes next. There are three ways to set an app up:
 
 | | Where the token goes | Checked | Kept | Suits |
 | --- | --- | --- | --- | --- |
-| Server only | Whoever runs the program supplies it | On the server | In the process | A command-line tool, a job, a script |
+| Server only | Whoever runs the program supplies their own, such as from the CLI's `login` | On the server | In the process | A command-line tool, a job, a script |
 | Client only | Stays in the page | In the page | In the page's memory | A site that calls Apple straight from the page |
 | Hybrid | The page posts it to your server | On the server | In a store on the server | A full-stack app |
 

@@ -29,20 +29,26 @@ features:
   - title: react
     details: For a React app. A provider, hooks for sign-in and previews, and queries for TanStack Query.
     link: /reference/@open-music-sdk/react/
+  - title: cli
+    details: For you, while you build. Checks your MusicKit key, and signs you in at Apple to get a Music User Token for your own account.
+    link: /concepts/packages#the-command-line-tool
 ---
 
 ::: warning Under construction
-Nothing is published to npm yet, and nothing has been run against the live Apple Music API, in a browser, or in
-a React app outside its tests. See [Status and roadmap](./status) for what exists.
+Nothing is published to npm yet. The CLI's sign-in has run once against the live Apple Music API, on Windows; the
+rest hasn't, and nothing has run in a React app outside its tests. See [Status and roadmap](./status) for what
+exists.
 :::
 
 ## Where to start
 
 1. Read [Which package to install](./concepts/packages). Most apps need one package.
 2. [Set up your MusicKit key](./guides/musickit-key). Every request needs a developer token, and you sign it
-   with this key.
+   with this key. The CLI's `doctor` tells you whether Apple takes it.
 3. Follow the example in the reference page of your package: [`server`](./reference/@open-music-sdk/server/),
    [`browser`](./reference/@open-music-sdk/browser/) or [`react`](./reference/@open-music-sdk/react/).
+4. To try the listener's side with your own account before your app has a sign-in, get a Music User Token with
+   the CLI's `login`. See [The command-line tool](./concepts/packages#the-command-line-tool).
 
 ## A first look
 
