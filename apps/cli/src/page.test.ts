@@ -13,6 +13,8 @@ let intakeStatus: number;
 let posted: Request[];
 /** The developer tokens Apple's script was configured with: only the token route hands out this one. */
 let configuredWith: string[];
+/** The app's name Apple's script was configured with. */
+let configuredAs: string | undefined;
 
 /** Keeps copies on the origin as Apple's script might: under names of its own, and over names that were there before. */
 const keepCopies = () => {
@@ -54,8 +56,9 @@ beforeEach(async () => {
   // Apple's script, already on the page: the helper takes the global rather than loading it from Apple's CDN.
   configuredWith = [];
   vi.stubGlobal("MusicKit", {
-    configure: ({ developerToken }: { developerToken: string }) => {
+    configure: ({ developerToken, app }: { developerToken: string; app: { name: string } }) => {
       configuredWith.push(developerToken);
+      configuredAs = app.name;
       return { musicUserToken: undefined, authorize: () => authorize() };
     },
   });
@@ -84,6 +87,8 @@ describe("the sign-in page", () => {
     await ready();
     expect(status()).toBe("Ready.");
     expect(configuredWith).toEqual([JWT]);
+    // The name Apple's sign-in window shows.
+    expect(configuredAs).toBe("Open Music CLI");
   });
 
   test("a sign-in posts the token as JSON with this run's state, says the tab can close, and leaves the button off", async () => {

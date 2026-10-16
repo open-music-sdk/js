@@ -111,7 +111,9 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
    routes below.
 4. The page is the browser package's `createBrowserClient` and `createConnect`. Its developer token comes
    from the server package's `tokenEndpoint`, at `/token?state=<secret>`, which mints fifteen-minute
-   tokens bound to the page's origin. Its button runs Apple's sign-in inside your click.
+   tokens bound to the page's origin. Its button runs Apple's sign-in inside your click. The page names
+   the app Open Music CLI, with the project's logo, and hands both to Apple's sign-in window: the name
+   through `createConnect`, the logo through the `apple-music-app-icon` link Apple's script reads.
 5. The page posts the token to the server package's `userTokenIntake`, at `/user-token`, with the secret in
    an `x-login-state` header. The intake asks Apple about the token, for up to 30 seconds, and only then
    keeps it. One token is taken: a second post is turned away.

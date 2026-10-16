@@ -22,6 +22,8 @@ export interface tLoopbackOptions {
   readonly port: number;
   /** The page's script, read when the page asks for it. */
   readonly script: URL;
+  /** The logo, an SVG, shown on the page and named to Apple's script as the app's icon. */
+  readonly logo: URL;
   /** How long a request may take, asking Apple about a posted token included. */
   readonly timeoutMs: number;
 }
@@ -56,26 +58,37 @@ const CSP = [
 // sign-in window has to talk back to the page that opened it.
 const PAGE_HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
 
-/** The page, with the secret its script sends to the token routes. The secret is base64url, which needs no escaping. */
+// An SVG of the CLI's own, served as an image: nothing in it runs, whatever it held, should it be opened by itself.
+const LOGO_HEADERS = { ...PAGE_HEADERS, "content-type": "image/svg+xml", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" };
+
+/**
+ * The page, with the secret its script sends to the token routes. The secret is base64url, which needs no escaping.
+ * Apple's script takes the app's icon from the `apple-music-app-icon` link, not from what it is configured with,
+ * and hands its address to Apple's sign-in window.
+ */
 const page = (secret: string) => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="login-state" content="${secret}">
-<title>Sign in · open-music-sdk</title>
+<title>Sign in · Open Music CLI</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="apple-music-app-icon" sizes="120x120" href="/logo.svg">
 <style>
 :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
-main { max-width: 34rem; }
-button { font: inherit; padding: 0.6em 1.2em; border-radius: 8px; cursor: pointer; }
+main { max-width: 34rem; text-align: center; }
+h1 { margin: 0.4em 0 0.2em; }
+button { font: inherit; font-weight: 600; padding: 0.7em 1.6em; border: none; border-radius: 999px; background: #fa233b; color: #fff; cursor: pointer; }
 button:disabled { cursor: default; opacity: 0.6; }
 </style>
 </head>
 <body>
 <main>
-<h1>Sign in to Apple Music</h1>
-<p>The open-music-sdk command line is waiting for a Music User Token. Sign in with the Apple Account whose library it is for.</p>
+<img src="/logo.svg" alt="" width="96" height="96">
+<h1>Open Music CLI</h1>
+<p>The command line is waiting for a Music User Token. Sign in to Apple Music with the Apple Account whose library it is for.</p>
 <p id="status" role="status" aria-live="polite">Loading Apple's sign-in…</p>
 <button id="connect" type="button" disabled>Sign in with Apple Music</button>
 </main>
@@ -102,7 +115,7 @@ const OPENED =
  *
  * - `GET /?state=` is the page, once: the ticket in the address is used up by the first request, since the address
  *   is passed to the browser in a command line other users may read. The page carries a second secret, which its
- *   script sends to the two routes below. `GET /page.js` is its script.
+ *   script sends to the two routes below. `GET /page.js` is its script, and `GET /logo.svg` its logo.
  * - `/token?state=<secret>` is `tokenEndpoint`, minting fifteen-minute tokens bound to the page's origin;
  * - `/user-token` is `userTokenIntake`, which takes a post only with the secret in an `x-login-state` header, asks
  *   Apple, and only then stores; the header and the JSON body make another site's post ask first, and nothing
@@ -151,6 +164,7 @@ export async function startLoopback(options: tLoopbackOptions): Promise<tLoopbac
       return new Response(page(secret), { headers: { ...PAGE_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": CSP } });
     }
     if (url.pathname === "/page.js" && req.method === "GET") return new Response(await readFile(script), { headers: { ...PAGE_HEADERS, "content-type": "text/javascript; charset=utf-8" } });
+    if (url.pathname === "/logo.svg" && req.method === "GET") return new Response(await readFile(options.logo), { headers: LOGO_HEADERS });
     if (url.pathname === "/token" && isSecret(secretBytes, given)) return endpoint(req);
     if (url.pathname === "/user-token") {
       if (asking || kept) return text(409, kept ? "A token is kept already." : "Another token is being asked about.");
@@ -309,7 +323,9 @@ export function toRequest(req: IncomingMessage, res: ServerResponse, origin: str
 
 /** Opens `url` in the default browser with the system's own command. Whether it opens or not, `login` has printed the URL. */
 export function openBrowser(url: string): void {
-  const [command, args] = process.platform === "win32" ? ["explorer.exe", [url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+  // On Windows, explorer.exe given this address opened the Documents folder; the URL protocol handler opens the
+  // default browser, and runs no shell over the address.
+  const [command, args] = process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
   const child = spawn(command, args, { stdio: "ignore", detached: true });
   child.on("error", () => undefined);
   child.unref();

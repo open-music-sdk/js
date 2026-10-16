@@ -19,6 +19,7 @@ const TOKEN = "Ag-music-user-token-from-apple";
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const KEY: tKey = { pem: privateKey.export({ type: "pkcs8", format: "pem" }).toString(), teamId: TEAM, keyId: KEY_ID, from: "APPLE_MUSIC_PRIVATE_KEY", asked: false };
 const SCRIPT = "/* the page's script */";
+const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>`;
 
 /** What the fake Apple answers /v1/me/storefront with, or `"hang"` for no answer until the request is aborted, and every request it was asked. */
 let appleStatus: number | "hang" = 200;
@@ -48,6 +49,7 @@ let loopback: tLoopback | undefined;
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "omsdk-loopback-"));
   await writeFile(join(dir, "page.js"), SCRIPT);
+  await writeFile(join(dir, "logo.svg"), LOGO);
   appleStatus = 200;
   asked = [];
   store = new MemoryUserTokenStore();
@@ -73,6 +75,7 @@ async function start(overrides: { store?: tUserTokenStore; port?: number; timeou
     userId: "default",
     port: overrides.port ?? 0,
     script: pathToFileURL(join(dir, "page.js")),
+    logo: pathToFileURL(join(dir, "logo.svg")),
     timeoutMs: overrides.timeoutMs ?? 10_000,
   });
   const url = new URL(loopback.url);
@@ -166,6 +169,25 @@ describe("startLoopback: the page and its address", () => {
     const script = await send(port, "/page.js");
     expect(script).toMatchObject({ status: 200, body: SCRIPT });
     expect(script.headers["content-type"]).toBe("text/javascript; charset=utf-8");
+  });
+
+  test("the page is the Open Music CLI's, with its logo shown and named to Apple's script as the app's icon", async () => {
+    const { port, ticket } = await start({ open: false });
+    const page = await send(port, `/?state=${ticket}`);
+    expect(page.body).toContain("<title>Sign in · Open Music CLI</title>");
+    expect(page.body).toContain("<h1>Open Music CLI</h1>");
+    expect(page.body).toContain('<img src="/logo.svg"');
+    // Where Apple's script looks for the icon it hands to Apple's sign-in window.
+    expect(page.body).toContain('<link rel="apple-music-app-icon" sizes="120x120" href="/logo.svg">');
+  });
+
+  test("serves the logo as an image, in which nothing could run even when it is opened by itself", async () => {
+    const { port } = await start();
+    const logo = await send(port, "/logo.svg");
+    expect(logo).toMatchObject({ status: 200, body: LOGO });
+    expect(logo.headers["content-type"]).toBe("image/svg+xml");
+    expect(logo.headers["content-security-policy"]).toBe("default-src 'none'; style-src 'unsafe-inline'");
+    expect(logo.headers["x-content-type-options"]).toBe("nosniff");
   });
 
   test("the page needs this run's ticket and the token its secret, and neither is the other; anything else is not here", async () => {

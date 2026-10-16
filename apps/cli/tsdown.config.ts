@@ -21,6 +21,8 @@ export default defineConfig([
     deps: { alwaysBundle: [/^@open-music-sdk\//] },
     fixedExtension: false,
     minify: true,
+    // The project's logo, beside the page that shows it and names it to Apple as the app's icon.
+    copy: { from: "../../assets/open-music-app-logo.svg", to: "dist", flatten: true },
     dts: false,
   },
 ]);

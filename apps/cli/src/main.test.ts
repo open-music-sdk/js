@@ -378,11 +378,13 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(status).toBe(0);
     expect(spawn).toHaveBeenCalledTimes(1);
     const [command, args, options] = vi.mocked(spawn).mock.calls[0] ?? [];
-    expect(command).toBe(process.platform === "win32" ? "explorer.exe" : process.platform === "darwin" ? "open" : "xdg-open");
-    expect(args).toEqual([expect.stringMatching(/^http:\/\/localhost:\d+\/\?state=[\w-]{43}$/)]);
+    // On Windows, the URL protocol handler: explorer.exe opened the Documents folder instead.
+    expect(command).toBe(process.platform === "win32" ? "rundll32" : process.platform === "darwin" ? "open" : "xdg-open");
+    const address = expect.stringMatching(/^http:\/\/localhost:\d+\/\?state=[\w-]{43}$/) as unknown;
+    expect(args).toEqual(process.platform === "win32" ? ["url.dll,FileProtocolHandler", address] : [address]);
     expect(options).toEqual({ stdio: "ignore", detached: true });
     // The address is printed as well, whether or not a browser opens.
-    expect(stderr).toContain((args as string[])[0]);
+    expect(stderr).toContain((args as string[]).at(-1));
   });
 
   test("--no-browser opens nothing and prints the address", async () => {

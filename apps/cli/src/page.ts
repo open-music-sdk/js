@@ -61,7 +61,7 @@ function restore(): void {
 window.addEventListener("pagehide", restore);
 
 const music = createBrowserClient({ tokenUrl: `/token?state=${encodeURIComponent(state)}` });
-const helper = createConnect(music, { app: { name: "open-music-sdk CLI" } });
+const helper = createConnect(music, { app: { name: "Open Music CLI" } });
 
 helper.ready.then(
   () => {
