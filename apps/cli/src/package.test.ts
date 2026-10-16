@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { build } from "tsdown";
 import { describe, expect, test } from "vitest";
 import manifest from "../package.json" with { type: "json" };
@@ -39,8 +40,11 @@ describe("the package", () => {
     expect(manifest).not.toHaveProperty("private");
   });
 
-  test("its one dependency at run time is jose; the family is bundled in, the server package into the command and the browser package into the page", () => {
-    expect(manifest.dependencies).toEqual({ jose: "catalog:" });
+  test("its one dependency at run time is jose, at one exact version, the one the family is built and tested with; the family is bundled in, the server package into the command and the browser package into the page", () => {
+    // A range would let `npx` fetch a later jose than the one tested, and jose is handed the key.
+    expect(Object.keys(manifest.dependencies)).toEqual(["jose"]);
+    const tested = (JSON.parse(readFileSync(new URL("../node_modules/jose/package.json", import.meta.url), "utf8")) as { version: string }).version;
+    expect(manifest.dependencies.jose).toBe(tested);
     expect(manifest.devDependencies).toHaveProperty("@open-music-sdk/server", "workspace:*");
     expect(manifest.devDependencies).toHaveProperty("@open-music-sdk/browser", "workspace:*");
   });

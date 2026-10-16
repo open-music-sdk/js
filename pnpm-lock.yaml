@@ -245,7 +245,7 @@ importers:
   apps/cli:
     dependencies:
       jose:
-        specifier: 'catalog:'
+        specifier: 6.2.12
         version: 6.2.12
     devDependencies:
       '@open-music-sdk/browser':

@@ -36,7 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "jose": "catalog:"
+    "jose": "6.2.12"
   },
   "devDependencies": {
     "@open-music-sdk/browser": "workspace:*",
