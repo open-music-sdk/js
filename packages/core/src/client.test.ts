@@ -618,6 +618,15 @@ describe("retrying", () => {
     expect(e.message).toBe("GET /v1/catalog/us/songs/1: fetch failed");
   });
 
+  test("a fetch that rejects with something other than an Error is a NetworkError all the same, described by what it rejected with", async () => {
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a fetch you pass may reject with anything
+    const music = createClient({ developerToken: "dev", fetch: () => Promise.reject("socket hang up"), retry: false });
+    const e = await failure(music.request("v1/catalog/us/songs/1"));
+    expect(e._tag).toBe("NetworkError");
+    expect(e.cause).toBe("socket hang up");
+    expect(e.message).toBe("GET /v1/catalog/us/songs/1: socket hang up");
+  });
+
   describe("a POST makes something each time it is carried out, so it is sent again only when the first was not", () => {
     const post = { method: "POST", body: { attributes: { name: "Road" } } } as const;
 
@@ -763,6 +772,22 @@ describe("retrying", () => {
       expect(e.message).toBe("GET /v1/catalog/us/songs/1: terminated");
     });
 
+    test("a body that fails with something other than an Error is described by what it failed with", async () => {
+      const lost = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.error("socket closed");
+              },
+            }),
+          ),
+        );
+      const e = await failure(createClient({ developerToken: "dev", fetch: lost, retry: false }).request("v1/catalog/us/songs/1"));
+      expect(e._tag).toBe("NetworkError");
+      expect(e.message).toBe("GET /v1/catalog/us/songs/1: socket closed");
+    });
+
     test("an abort during the read surfaces untouched", async () => {
       const music = createClient({ developerToken: "dev", fetch: broken("abort"), retry: quick });
       const controller = new AbortController();
@@ -901,8 +926,9 @@ describe("abort", () => {
 
 describe("schema", () => {
   const okSchema: tSchemaLike<{ ok: true }> = { "~standard": { validate: (v) => ({ value: v as { ok: true } }) } };
+  // Standard Schema gives a segment of a path as a key, or as an object holding one.
   const badSchema: tSchemaLike<never> = {
-    "~standard": { validate: () => ({ issues: [{ message: "required", path: ["data", 0, "href"] }, { message: "expected object" }] }) },
+    "~standard": { validate: () => ({ issues: [{ message: "required", path: ["data", { key: 0 }, "href"] }, { message: "expected object" }] }) },
   };
   const asyncSchema: tSchemaLike<string> = { "~standard": { validate: (v) => Promise.resolve(typeof v === "string" ? { value: v } : { issues: [{ message: "expected string" }] }) } };
 
