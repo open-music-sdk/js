@@ -295,6 +295,16 @@ describe("createConnect: ready and connect()", () => {
     await expect(helper.disconnect()).rejects.toThrow(new TypeError("createConnect: disconnect() was called after dispose()"));
   });
 
+  test("disconnect() on a page whose configuration failed does nothing: there is no sign-in to end, and nothing is configured to end one", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const configure = vi.fn(() => Promise.reject(new Error("configure failed")));
+    const helper = createConnect({ developerToken: provider() }, { app: APP, musicKit: { configure } });
+    await expect(helper.ready).rejects.toThrow("configure failed");
+    await expect(helper.disconnect()).resolves.toBeUndefined();
+    expect(configure).toHaveBeenCalledTimes(1);
+  });
+
   test("connect() before ready waits for it, and then goes on", async () => {
     const { helper } = made({ authorize: () => Promise.resolve("listener") });
     expect(await helper.connect()).toBe("listener");
@@ -391,6 +401,71 @@ describe("createConnect: the developer token is kept fresh off the click path", 
     expect(developerToken).toHaveBeenCalledTimes(2);
   });
 
+  test("a provider that fails when the tab comes back is nobody's unhandled rejection, and the timer asks again", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const first = jwt(900);
+    const answers = [Promise.resolve(first), Promise.reject(new Error("endpoint down"))];
+    for (const answer of answers) answer.catch(() => undefined);
+    const developerToken = vi.fn(() => answers.shift() ?? Promise.resolve(jwt(900, "b")));
+    const musicKit = kit();
+    const helper = createConnect({ developerToken }, { app: APP, musicKit });
+    await helper.ready;
+    doc.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(developerToken).toHaveBeenCalledTimes(2);
+    expect(musicKit.instance.developerToken).toBe(first);
+    await vi.advanceTimersByTimeAsync(451_000);
+    expect(developerToken).toHaveBeenCalledTimes(3);
+    expect(musicKit.instance.developerToken).not.toBe(first);
+  });
+
+  test("after a configuration that failed there is nothing to keep fresh: the tab coming back and the timer ask nothing, until connect() configures afresh", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const instance: tMusicKitInstance = { authorize: () => Promise.resolve("listener") };
+    const configure = vi.fn<(options: { developerToken: string }) => Promise<tMusicKitInstance>>().mockRejectedValueOnce(new Error("configure failed")).mockResolvedValue(instance);
+    const developerToken = vi.fn(() => Promise.resolve(jwt(900)));
+    const helper = createConnect({ developerToken }, { app: APP, musicKit: { configure } });
+    await expect(helper.ready).rejects.toThrow("configure failed");
+    doc.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(developerToken).toHaveBeenCalledTimes(1);
+    expect(await helper.connect()).toBe("listener");
+    expect(developerToken).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(451_000);
+    expect(developerToken).toHaveBeenCalledTimes(3);
+  });
+
+  test("dispose() before ready settles: ready still settles, and no timer is left behind", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    const helper = createConnect({ developerToken: provider() }, { app: APP, musicKit: kit({ musicUserToken: "restored" }) });
+    helper.dispose();
+    expect(await helper.ready).toBe("restored");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("dispose() while the provider is being asked: what it answers is not set on the instance, and no timer is left behind", async () => {
+    const doc = page();
+    vi.stubGlobal("document", doc);
+    let answer: (token: string) => void = () => undefined;
+    const answers = [Promise.resolve(jwt(900)), new Promise<string>((resolve) => (answer = resolve))];
+    const developerToken = vi.fn(() => answers.shift() ?? Promise.resolve(jwt(900, "c")));
+    const musicKit = kit();
+    const helper = createConnect({ developerToken }, { app: APP, musicKit });
+    await helper.ready;
+    const first = musicKit.instance.developerToken;
+    doc.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(developerToken).toHaveBeenCalledTimes(2);
+    helper.dispose();
+    answer(jwt(900, "b"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(musicKit.instance.developerToken).toBe(first);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test("dispose() stops the timer and the listening, and connect() after it is a TypeError", async () => {
     const doc = page();
     vi.stubGlobal("document", doc);
@@ -425,17 +500,21 @@ describe("createConnect: the developer token is kept fresh off the click path", 
     expect(await helper.connect()).toBe("listener");
   });
 
-  test("an instance whose developerToken cannot be set keeps its own, and the asking goes on: whether a configured instance takes a new token is a live check", async () => {
+  test.each<[string, () => tMusicKitInstance]>([
+    ["whose developerToken cannot be set keeps its own", () => Object.defineProperty({ authorize: () => Promise.resolve("listener") }, "developerToken", { get: () => "fixed", enumerable: true })],
+    ["with no developerToken is given none", () => ({ authorize: () => Promise.resolve("listener") })],
+  ])("an instance %s, and the asking goes on: whether a configured instance takes a new token is a live check", async (_name, made) => {
     const doc = page();
     vi.stubGlobal("document", doc);
     const tokens = [jwt(900, "a"), jwt(900, "b"), jwt(900, "c")];
     const developerToken = vi.fn(() => Promise.resolve(tokens.shift() ?? jwt(900, "d")));
-    const instance: tMusicKitInstance = Object.defineProperty({ authorize: () => Promise.resolve("listener") }, "developerToken", { get: () => "fixed", enumerable: true });
+    const instance = made();
+    const before = { ...instance };
     const helper = createConnect({ developerToken }, { app: APP, musicKit: { configure: () => Promise.resolve(instance) } });
     await helper.ready;
     await vi.advanceTimersByTimeAsync(451_000);
     expect(developerToken).toHaveBeenCalledTimes(2);
-    expect(instance.developerToken).toBe("fixed");
+    expect({ ...instance }).toEqual(before);
     await vi.advanceTimersByTimeAsync(451_000);
     expect(developerToken.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
