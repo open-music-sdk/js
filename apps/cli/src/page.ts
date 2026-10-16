@@ -5,10 +5,23 @@ import { createBrowserClient, createConnect } from "@open-music-sdk/browser";
 
 // The secret the server put in the page, for its token routes. The address's own ticket is used up by now.
 const state = document.querySelector<HTMLMetaElement>('meta[name="login-state"]')?.content ?? "";
+const intro = document.getElementById("intro") as HTMLParagraphElement;
 const status = document.getElementById("status") as HTMLParagraphElement;
 const button = document.getElementById("connect") as HTMLButtonElement;
+/** A step on the way, in the status line's own small print. */
 const say = (message: string) => {
+  status.className = "";
   status.textContent = message;
+};
+/**
+ * How it came out, in large print and nothing else to read: on success the button goes too, since what is left to
+ * do is in the terminal; on an error the button stays, to try again.
+ */
+const settle = (outcome: "success" | "error", message: string) => {
+  intro.hidden = true;
+  status.className = outcome;
+  status.textContent = message;
+  button.hidden = outcome === "success";
 };
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -68,7 +81,7 @@ helper.ready.then(
     say("Ready.");
   },
   (e: unknown) => {
-    say(`Apple's sign-in could not be loaded: ${messageOf(e)}. The button tries again.`);
+    settle("error", `Apple's sign-in could not be loaded: ${messageOf(e)}. The button tries again.`);
   },
 );
 // Enabled either way: after a load that failed, `connect()` loads and configures the script afresh.
@@ -80,7 +93,6 @@ helper.ready.then(enable, enable);
 /** What the CLI's answer to the post means for the person at the page. */
 const REFUSED: Record<number, string> = {
   401: "This page is not the one the terminal opened, or its run has ended. Run login again.",
-  409: "The terminal has taken a token already, from this page or another. You can close this tab.",
   422: "Apple would not take this account's token: the account may have no Apple Music subscription.",
   502: "Apple could not be asked about the token. Try again.",
   504: "Apple did not answer about the token in time. Try again.",
@@ -93,20 +105,21 @@ button.addEventListener("click", () => {
     try {
       const token = await helper.connect();
       if (token === undefined) {
-        say("Sign-in was cancelled. Try again, or press Ctrl+C in the terminal to stop.");
+        settle("error", "Sign-in was cancelled. Try again, or press Ctrl+C in the terminal to stop.");
         return;
       }
       say("Checking the token with Apple…");
       const answer = await fetch("/user-token", { method: "POST", headers: { "content-type": "application/json", "x-login-state": state }, body: JSON.stringify({ token }) });
-      if (answer.status === 204) {
+      // 409: the terminal took a token already, from this page or another; there too, what is left is in the terminal.
+      if (answer.status === 204 || answer.status === 409) {
         signedIn = true;
         helper.dispose();
-        say("Signed in. The terminal has the token, and you can close this tab.");
+        settle("success", "Signed in. Return to the terminal.");
         return;
       }
-      say(REFUSED[answer.status] ?? `The terminal answered ${String(answer.status)}. Try again, or run login again.`);
+      settle("error", REFUSED[answer.status] ?? `The terminal answered ${String(answer.status)}. Try again, or run login again.`);
     } catch (e) {
-      say(`Sign-in failed: ${messageOf(e)}`);
+      settle("error", `Sign-in failed: ${messageOf(e)}`);
     } finally {
       // After every try, posted or not: the script may have kept a copy before it was declined or failed.
       restore();

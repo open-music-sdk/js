@@ -176,6 +176,8 @@ describe("startLoopback: the page and its address", () => {
     const page = await send(port, `/?state=${ticket}`);
     expect(page.body).toContain("<title>Sign in · Open Music CLI</title>");
     expect(page.body).toContain("<h1>Open Music CLI</h1>");
+    // The small print the page's script takes away once there is an outcome.
+    expect(page.body).toContain('<p id="intro">');
     expect(page.body).toContain('<img src="/logo.svg"');
     // Where Apple's script looks for the icon it hands to Apple's sign-in window: an HTTPS address that page can load.
     expect(page.body).toContain('<link rel="apple-music-app-icon" sizes="120x120" href="https://avatars.githubusercontent.com/u/338387998?s=240">');

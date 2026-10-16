@@ -48,7 +48,7 @@ beforeEach(async () => {
   // which is not that secret, in the address.
   history.replaceState(null, "", "/?state=the-address-ticket");
   document.head.innerHTML = `<meta name="login-state" content="${STATE}">`;
-  document.body.innerHTML = '<p id="status"></p><button id="connect" type="button" disabled></button>';
+  document.body.innerHTML = '<p id="intro">The command line is waiting.</p><p id="status"></p><button id="connect" type="button" disabled></button>';
   // What other servers on localhost keep, which share its cookies, and what this origin held before.
   document.cookie = "other-app-session=theirs; path=/";
   document.cookie = "shared-name=theirs; path=/";
@@ -80,6 +80,9 @@ afterEach(() => {
 
 const button = () => document.getElementById("connect") as HTMLButtonElement;
 const status = () => document.getElementById("status")?.textContent ?? "";
+/** How the status line is printed: "success" or "error" in large print, "" in the small print of a step. */
+const outcome = () => document.getElementById("status")?.className ?? "";
+const intro = () => document.getElementById("intro") as HTMLParagraphElement;
 const ready = () => vi.waitFor(() => { expect(button().disabled).toBe(false); });
 
 describe("the sign-in page", () => {
@@ -91,7 +94,7 @@ describe("the sign-in page", () => {
     expect(configuredAs).toBe("Open Music CLI");
   });
 
-  test("a sign-in posts the token as JSON with this run's state, says the tab can close, and leaves the button off", async () => {
+  test("a sign-in posts the token as JSON with this run's state", async () => {
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("Signed in"); });
@@ -102,7 +105,24 @@ describe("the sign-in page", () => {
     expect(req?.headers.get("content-type")).toBe("application/json");
     expect(req?.headers.get("x-login-state")).toBe(STATE);
     expect(await req?.json()).toEqual({ token: TOKEN });
-    expect(button().disabled).toBe(true);
+  });
+
+  test("once signed in, the page says only, in large print, to return to the terminal: the small print and the button are gone", async () => {
+    await ready();
+    button().click();
+    await vi.waitFor(() => { expect(status()).toBe("Signed in. Return to the terminal."); });
+    expect(outcome()).toBe("success");
+    expect(intro().hidden).toBe(true);
+    expect(button().hidden).toBe(true);
+  });
+
+  test("a terminal that has a token already, from this page or another, is a success too: what is left to do is in the terminal", async () => {
+    intakeStatus = 409;
+    await ready();
+    button().click();
+    await vi.waitFor(() => { expect(outcome()).toBe("success"); });
+    expect(status()).toBe("Signed in. Return to the terminal.");
+    expect(button().hidden).toBe(true);
   });
 
   test("once the token is posted, the origin is as it was: what Apple's script added is gone, and what it wrote over has its old value", async () => {
@@ -120,18 +140,33 @@ describe("the sign-in page", () => {
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("cancelled"); });
+    expect(outcome()).toBe("error");
     expect(posted).toEqual([]);
     expect(button().disabled).toBe(false);
     asBefore();
   });
 
-  test("a token Apple refuses says why, leaves the origin as it was, and lets them try again", async () => {
+  test("a token Apple refuses says why in large print, with the small print gone and the button there to try again, and leaves the origin as it was", async () => {
     intakeStatus = 422;
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("no Apple Music subscription"); });
+    expect(outcome()).toBe("error");
+    expect(intro().hidden).toBe(true);
+    expect(button().hidden).toBe(false);
     expect(button().disabled).toBe(false);
     asBefore();
+  });
+
+  test("after an error the button tries again, and a sign-in that then goes through is a success", async () => {
+    intakeStatus = 422;
+    await ready();
+    button().click();
+    await vi.waitFor(() => { expect(outcome()).toBe("error"); });
+    intakeStatus = 204;
+    button().click();
+    await vi.waitFor(() => { expect(outcome()).toBe("success"); });
+    expect(posted).toHaveLength(2);
   });
 
   test("a sign-in that fails says so, leaves the origin as it was, and lets them try again", async () => {
@@ -142,6 +177,7 @@ describe("the sign-in page", () => {
     await ready();
     button().click();
     await vi.waitFor(() => { expect(status()).toContain("popup blocked"); });
+    expect(outcome()).toBe("error");
     expect(button().disabled).toBe(false);
     asBefore();
   });
@@ -164,11 +200,13 @@ describe("the sign-in page", () => {
     const listener = (reason: unknown) => unhandled.push(reason);
     process.on("unhandledRejection", listener);
     try {
-      document.body.innerHTML = '<p id="status"></p><button id="connect" type="button" disabled></button>';
+      document.body.innerHTML = '<p id="intro">The command line is waiting.</p><p id="status"></p><button id="connect" type="button" disabled></button>';
       vi.stubGlobal("fetch", () => Promise.resolve(new Response(null, { status: 503 })));
       await import("./page");
       await ready();
       expect(status()).toContain("could not be loaded");
+      expect(outcome()).toBe("error");
+      expect(button().hidden).toBe(false);
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(unhandled).toEqual([]);
     } finally {

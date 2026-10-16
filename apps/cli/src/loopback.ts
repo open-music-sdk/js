@@ -86,13 +86,17 @@ main { max-width: 34rem; text-align: center; }
 h1 { margin: 0.4em 0 0.2em; }
 button { font: inherit; font-weight: 600; padding: 0.7em 1.6em; border: none; border-radius: 999px; background: #fa233b; color: #fff; cursor: pointer; }
 button:disabled { cursor: default; opacity: 0.6; }
+#status.success, #status.error { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin: 0.8em 0 1em; }
+#status.success { color: #1a7f37; }
+#status.error { color: #cf222e; }
+@media (prefers-color-scheme: dark) { #status.success { color: #3fb950; } #status.error { color: #f85149; } }
 </style>
 </head>
 <body>
 <main>
 <img src="/logo.svg" alt="" width="96" height="96">
 <h1>Open Music CLI</h1>
-<p>The command line is waiting for a Music User Token. Sign in to Apple Music with the Apple Account whose library it is for.</p>
+<p id="intro">The command line is waiting for a Music User Token. Sign in to Apple Music with the Apple Account whose library it is for.</p>
 <p id="status" role="status" aria-live="polite">Loading Apple's sign-in…</p>
 <button id="connect" type="button" disabled>Sign in with Apple Music</button>
 </main>
