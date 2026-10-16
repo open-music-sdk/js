@@ -5,8 +5,10 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { login } from "./commands";
 import { FileUserTokenStore } from "./files";
 import { main } from "./main";
+import type { tTerminal } from "./terminal";
 
 // No browser is opened by these tests: what login asks the system to run is recorded instead.
 vi.mock("node:child_process", () => ({ spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) }));
@@ -92,9 +94,9 @@ const keepInEnvironment = () => {
 /** Writes the token file as login would have left it. */
 const kept = (token = TOKEN) => new FileUserTokenStore(tokenFile()).set("default", token);
 
-/** Starts `login`, and once it prints its page, signs in as the page would: the page, then the token posted with the state. */
-async function signIn(argv: string[]): Promise<{ status: number; posted: number }> {
-  const running = main(argv);
+/** Starts `login`, through main with `argv` or already started, and once it prints its page, signs in as the page would: the page, then the token posted with the state. */
+async function signIn(argv: string[] | Promise<number>): Promise<{ status: number; posted: number }> {
+  const running = Array.isArray(argv) ? main(argv) : argv;
   const url = await vi.waitFor(
     () => {
       const found = /http:\/\/localhost:\d+\/\?state=[\w-]+/.exec(stderr)?.[0];
@@ -140,6 +142,12 @@ describe("help and version: every form shows it, and it goes to stdout", () => {
     expect(asked).toEqual([]);
   });
 
+  test("help for a command that needs no key says nothing of where the key comes from", async () => {
+    expect(await main(["help", "logout"])).toBe(0);
+    expect(stdout).toContain("Forget the kept Music User Token");
+    expect(stdout).not.toContain("THE KEY AND ITS IDS");
+  });
+
   test("--version prints the version alone", async () => {
     expect(await main(["--version"])).toBe(0);
     expect(stdout).toMatch(/^\d+\.\d+\.\d+\n$/);
@@ -173,6 +181,7 @@ describe("mistakes in how the CLI was run: exit status 2, and a pointer to the h
     [["doctor", "--no-browser"], "--no-browser is not an option of doctor", "open-music-sdk doctor --help"],
     [["logout", "extra"], "logout takes no arguments", "open-music-sdk logout --help"],
     [["login", "--port", "70000", "--key-file", "k", "--team-id", TEAM], "--port must be a whole number from 1 to 65535", "open-music-sdk login --help"],
+    [["login", "--port", "3e3"], "--port must be a whole number from 1 to 65535", "open-music-sdk login --help"],
     [["login", "--key-file"], "--key-file", "open-music-sdk login --help"],
     [["doctor"], "No key", "open-music-sdk doctor --help"],
     [["token", "--key-file", "k"], "go with --developer", "open-music-sdk token --help"],
@@ -277,6 +286,26 @@ describe("doctor: the key, then the token, asked of Apple", () => {
     expect(stdout).toMatch(/✗ Key: Apple could not be reached: .*\(ENOTFOUND\)/);
   });
 
+  test("Apple not answering in time fails the key, and says to check the connection", async () => {
+    apple["/v1/test"] = HANG;
+    // Thirty seconds is long for a test: the time allowed is a millisecond instead.
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(1));
+    expect(await main(["doctor", "--key-file", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stdout).toContain("✗ Key: Apple did not answer within 30 seconds. Check your connection and try again.");
+  });
+
+  test("a kept token that is no token, as a hand-edited file may hold, is not taken for one Apple refused: Apple is not asked about it", async () => {
+    await kept("edited by hand");
+    expect(await main(["doctor", "--key-file", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stdout).toMatch(/✓ Key/);
+    expect(stdout).not.toContain("Music User Token");
+    expect(stderr).toContain("something went wrong that the CLI did not expect");
+    expect(stderr).toContain("TypeError: validateUserToken: token must be printable characters");
+    expect(stderr).not.toContain("edited by hand");
+    expect(asked.map((req) => new URL(req.url).pathname)).toEqual(["/v1/test"]);
+  });
+
   test("what Apple sends reaches the terminal without the control characters a terminal would act on", async () => {
     await kept();
     const escape = String.fromCharCode(27);
@@ -368,8 +397,25 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(await readdir(join(dir, "open-music-sdk"))).toEqual(["user-token.json"]);
     expect(stderr).toContain("Signed in, storefront gb");
     expect(stderr).toContain("open-music-sdk token");
+    expect(stderr).not.toContain("To be asked nothing next time");
     expect(stdout).toBe("");
     expect(stderr).not.toContain(TOKEN);
+  });
+
+  test("what was asked for at the terminal is not kept, and login names the variables that would spare the questions next time", async () => {
+    const ids = [TEAM, KEY_ID];
+    const term: tTerminal = {
+      interactive: true,
+      stdinIsTerminal: true,
+      tell: () => undefined,
+      id: () => Promise.resolve(ids.shift()),
+      secret: () => Promise.resolve(PEM),
+      pipe: () => Promise.resolve(undefined),
+    };
+    const { status } = await signIn(login({ browser: false }, { env: process.env, color: false, terminal: term }));
+    expect(status).toBe(0);
+    expect(await readdir(join(dir, "open-music-sdk"))).toEqual(["user-token.json"]);
+    expect(stderr).toContain("To be asked nothing next time, set APPLE_MUSIC_PRIVATE_KEY, APPLE_MUSIC_TEAM_ID and APPLE_MUSIC_KEY_ID.");
   });
 
   test("the browser is opened with the system's own command, the address one argument of it and no shell between", async () => {
@@ -474,5 +520,43 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
     expect(process.listeners("SIGINT")).toHaveLength(before.size);
     await expect(readFile(tokenFile(), "utf8")).rejects.toThrow(/ENOENT/);
     await expect(realFetch(url)).rejects.toThrow();
+  });
+});
+
+describe("what no command words for itself: exit 1, and the error on stderr", () => {
+  test("the system's own refusal is said as the system words it, and is not taken for a bug", async () => {
+    // A folder where the token file goes: reading it is refused, on every system.
+    await mkdir(tokenFile(), { recursive: true });
+    expect(await main(["token"])).toBe(1);
+    expect(stderr).toContain("Error: EISDIR");
+    expect(stderr).not.toContain("This is a bug");
+  });
+
+  test.each([
+    ["an Error without a stack, by its message", Object.assign(new Error("unforeseen"), { stack: undefined })],
+    ["a value that is no Error, as text", "unforeseen"],
+  ])("anything else is a bug, shown for the report and not taken for the key failing: %s", async (_what, thrown) => {
+    // Nothing in asking Apple fails this way for real; an abort is the one way to have it fail with any value at all.
+    vi.spyOn(AbortSignal, "timeout").mockReturnValueOnce(AbortSignal.abort(thrown));
+    expect(await main(["doctor", "--key-file", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("something went wrong that the CLI did not expect.\nunforeseen\n");
+    expect(stderr).toContain("This is a bug. Please report it, with the output above, at https://github.com/open-music-sdk/js/issues");
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("the open-music-sdk command", () => {
+  test("runs on the arguments after node's and its own, and sets the exit status rather than exiting, so a pipe gets all that was written", async () => {
+    const { argv, exitCode } = process;
+    process.argv = [argv[0] ?? "node", "open-music-sdk", "logn"];
+    try {
+      await import("./bin");
+      expect(process.exitCode).toBe(2);
+      expect(stderr).toContain("There is no command 'logn'");
+    } finally {
+      process.argv = argv;
+      process.exitCode = exitCode;
+    }
   });
 });
