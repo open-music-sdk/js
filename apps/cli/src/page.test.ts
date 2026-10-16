@@ -87,7 +87,7 @@ describe("the sign-in page", () => {
     await ready();
     expect(status()).toBe("Ready.");
     expect(configuredWith).toEqual([JWT]);
-    // The name Apple's sign-in window shows.
+    // The app as Apple's script is configured with it. Its sign-in window shows the page's host instead.
     expect(configuredAs).toBe("Open Music CLI");
   });
 
