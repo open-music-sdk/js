@@ -169,11 +169,21 @@ To remove everything: `open-music-sdk logout`, then delete the folder.
 
 ## What Apple documents, and what it does not
 
-`login` is where the SDK's sign-in first meets Apple's live script, and none of it has been run against
-Apple yet. These are open until the first live run:
+`login` is where the SDK's sign-in first meets Apple's live script. The first live run, on 16 October 2026
+on Windows, settled these:
 
-- Whether Apple's sign-in takes a page on `http://localhost`, and honours the `origin` claim from it.
-- Which hosts Apple's script reaches, and so whether the page's CSP lets them all in.
+- **Sign-in works from localhost.** Apple's sign-in takes a page on `http://localhost:<port>`, with a
+  developer token bound to that origin, and `login` keeps the token Apple then gives. `doctor` asks both of
+  its questions of the live API.
+- **The CSP was enough.** It let in all that sign-in needed, in the browser the run used.
+- **The consent window names the app by the page's host,** `localhost:<port>`, and not by the name
+  `createConnect` configures. Apple's script (v3) sends the window `window.location.host` as the name.
+- **The icon comes from the page's `apple-music-app-icon` link.** It showed once it was an HTTPS address,
+  since the window is an HTTPS page of Apple's.
+
+These are still open:
+
+- How it goes in other browsers and on macOS and Linux.
 - Where Apple's script keeps its copy of the token: the page puts back cookies, `localStorage` and
   `sessionStorage`, not IndexedDB.
 - What a decline gives, and, with `--port` fixed and a second `login`, what the page restores for a
