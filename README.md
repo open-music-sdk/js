@@ -13,8 +13,8 @@
 Open, community-led TypeScript SDK for the Apple Music API. Providing strongly typed, ESM only, and framework specific alternatives to Apple's official MusicKit on the Web.
 
 > **🚧 Under construction.** Nothing is published to npm yet. The type, validator, client core, developer
-> token, user token and artwork packages, the two clients, the two libs and the three integrations exist and pass
-> their tests, but none has been run against the live API, in a browser, or in a React app outside its tests.
+> token, user token and artwork packages, the two clients, the two libs, the three integrations and the CLI exist and
+> pass their tests, but none has been run against the live API, in a browser, or in a React app outside its tests.
 > The table below is the source of truth for what works; expect everything else to be missing or to change.
 
 ## Project status
@@ -41,7 +41,7 @@ libs, and the integrations people actually install. Every package ships the same
 | [`@open-music-sdk/browser`](./integrations/browser/README.md) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · untested in a browser against Apple's live script |
 | [`@open-music-sdk/react`](./integrations/react/README.md) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
 | [Docs site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 40% | The reference: TypeDoc over every package's doc comments, with arguments, returns and throws on every function, which CI checks, published to GitHub Pages from `main` · one VitePress site with guides, concepts and the reference · package READMEs cut to a short template · a tutorial once the samples exist |
-| `@open-music-sdk/cli`, `apps/cli` | 🚧 In progress | 0% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style · `doctor`, `token`, `check` · where the packages first meet the live API |
+| [`@open-music-sdk/cli`, `apps/cli`](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) | 🚧 In progress | 60% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style, on a loopback page made of `server`'s token endpoint and intake and `browser`'s sign-in · `token`, `doctor`, `logout` · `check` still to come · tested against fakes, not yet run against the live API |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
@@ -108,11 +108,11 @@ packages/             foundation packages: types, validate, core, developer-toke
 clients/              one client per token boundary: client-catalog, client-user
 lib/                  conveniences over the clients: lib-playlists, lib-preview-player
 integrations/         what people install: server, browser, react
-apps/                 private apps of the repository: docs, the TypeDoc reference (see apps/docs/README.md)
+apps/                 beside the packages: cli, the published CLI, and docs, the TypeDoc reference (each has a README)
 .github/workflows/    ci: build, typecheck, lint, test and check on what a change affects · pages: the reference, from main
 ```
 
-Planned workspaces: `apps/cli` (the CLI) and `samples/` (private sample apps).
+Planned workspace: `samples/` (private sample apps).
 
 ## Development
 

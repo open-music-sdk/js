@@ -10,7 +10,7 @@ export interface tMusicKit {
    * Apple's own: configures the script for one app, with the developer token its requests carry. Called once per
    * page by the first helper, and again after a configuration that failed.
    *
-   * @param options - The developer token and the app as the sign-in window shows it.
+   * @param options - The developer token, and the app as the script is told of it.
    * @returns The configured instance, or a promise of it, as the script's version gives it.
    * @throws Whatever Apple's script throws or rejects with when it refuses the token or the app; the helper hands
    * it on as it came, through `ready` and `connect()`.
@@ -36,17 +36,21 @@ export interface tMusicKitInstance {
   unauthorize?: (() => unknown) | undefined;
 }
 
-/** What Apple's sign-in window shows of the app. */
+/**
+ * The app as Apple's script is configured with it. Its sign-in window does not show this name: the script (v3) names
+ * the app to the window by the page's host, `window.location.host`, and takes the icon it shows from the page's
+ * `<link rel="apple-music-app-icon">`, a 120x120 one first, else an `apple-touch-icon`.
+ */
 export interface tConnectApp {
-  /** The app's name, as the window shows it: a string with something in it. */
+  /** The app's name, as the script is configured with it: a string with something in it. */
   readonly name: string;
-  /** The app's version, where the window is to show one. */
+  /** The app's version, where the script is to be told one. */
   readonly build?: string | undefined;
 }
 
 /** Invalid values throw a TypeError when the helper is made. */
 export interface tConnectOptions {
-  /** The app, as Apple's sign-in window names it. */
+  /** The app, as Apple's script is configured with it; its sign-in window names the app by the page's host. */
   readonly app: tConnectApp;
   /**
    * The page's own `MusicKit`, when it loaded Apple's script itself, under a CSP nonce or Trusted Types. Default:
@@ -194,7 +198,7 @@ function appOf(app: unknown): tConnectApp {
  * `ready` or `connect()`.
  *
  * @param music - The client from `createBrowserClient`, or anything with a `developerToken` provider on it.
- * @param options - The app as the window shows it, and the page's own `MusicKit` where it loaded the script itself.
+ * @param options - The app as Apple's script is configured with it, and the page's own `MusicKit` where it loaded the script itself.
  * @returns The helper, frozen: `ready`, `connect`, `disconnect` and `dispose`.
  * @throws TypeError if `music` has no `developerToken`, `options` is not a plain object, `app` is not an object
  * with a `name` that has something in it or a `build` that is not a string, `musicKit` has no `configure`, there
