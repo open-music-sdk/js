@@ -196,11 +196,13 @@ describe("FileUserTokenStore: core's three methods over one file", () => {
     expect(await new FileUserTokenStore(path).get("default")).toBe(TOKEN);
   });
 
-  test("a file that is there but cannot be read is an error, not an empty store for a set to write over", async () => {
-    // A folder where the file goes is one such.
+  test("a file that is there but cannot be read is an error that names it, not an empty store for a set to write over", async () => {
+    // A folder where the file goes is one such, and the system's own error for it does not say which.
     const store = new FileUserTokenStore(dir);
-    await expect(store.get("default")).rejects.toMatchObject({ code: "EISDIR" });
-    await expect(store.set("default", TOKEN)).rejects.toMatchObject({ code: "EISDIR" });
+    for (const e of [await thrown(() => store.get("default")), await thrown(() => store.set("default", TOKEN))]) {
+      expect(e.message).toBe(`${dir} cannot be read: EISDIR: illegal operation on a directory, read`);
+      expect(e.exitCode).toBe(1);
+    }
     expect(await readdir(dir)).toEqual([]);
   });
 });

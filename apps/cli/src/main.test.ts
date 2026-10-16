@@ -526,11 +526,21 @@ describe("login: Apple's sign-in on a page served on localhost", () => {
 });
 
 describe("what no command words for itself: exit 1, and the error on stderr", () => {
-  test("the system's own refusal is said as the system words it, and is not taken for a bug", async () => {
-    // A folder where the token file goes: reading it is refused, on every system.
+  test("a token file that cannot be read is named, with the system's reason, and is not taken for a bug", async () => {
+    // A folder where the token file goes: reading it is refused, on every system, and the refusal names no file.
     await mkdir(tokenFile(), { recursive: true });
     expect(await main(["token"])).toBe(1);
-    expect(stderr).toContain("Error: EISDIR");
+    expect(stderr).toContain(`Error: ${tokenFile()} cannot be read: EISDIR`);
+    expect(stderr).not.toContain("This is a bug");
+  });
+
+  test("the system's own refusal, which names what it refused, is said as the system words it, and is not taken for a bug", async () => {
+    await kept();
+    // A token file the system will not let logout write, as a folder made read-only would.
+    const refused = Object.assign(new Error(`EACCES: permission denied, open '${tokenFile()}'`), { code: "EACCES", syscall: "open", path: tokenFile() });
+    vi.spyOn(FileUserTokenStore.prototype, "delete").mockRejectedValueOnce(refused);
+    expect(await main(["logout"])).toBe(1);
+    expect(stderr).toContain(`Error: EACCES: permission denied, open '${tokenFile()}'`);
     expect(stderr).not.toContain("This is a bug");
   });
 
