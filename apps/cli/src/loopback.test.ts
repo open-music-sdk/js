@@ -306,12 +306,12 @@ describe("startLoopback: the page and its address", () => {
     expect((await send(port, "/page.js")).status).toBe(200);
   });
 
-  test("a system that picks ports held on ::1 time after time is given up on after five, each let go, as a port in use", async () => {
+  test("a system that picks ports held on ::1 time after time is given up on after five, each let go: no mistake in how the CLI was run, and --port is the way round it", async () => {
     const refused = failListen("::1", "EADDRINUSE");
     const failed = await start().catch((e: unknown) => e);
     expect(refused).toHaveLength(5);
     expect(failed).toBeInstanceOf(CliError);
-    expect(failed).toMatchObject({ exitCode: 2, message: expect.stringContaining(`Port ${String(refused[4])} is in use`) as unknown });
+    expect(failed).toMatchObject({ exitCode: 1, message: "Each of the 5 ports the system picked was held on ::1 by another program. Try again, or pick a port with --port." });
     for (const port of refused) await expect(send(port, "/page.js")).rejects.toThrow(/ECONNREFUSED/);
   });
 
