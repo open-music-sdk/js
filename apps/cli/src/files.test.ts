@@ -120,12 +120,17 @@ describe("FileUserTokenStore: core's three methods over one file", () => {
     expect(JSON.parse(await readFile(path, "utf8"))).toEqual(JSON.parse(`{"__proto__":"${TOKEN}"}`));
   });
 
-  test("a value that is no string is no token", async () => {
+  test("a value that is no token, as a hand edit may leave, is no token: a string that is not one included", async () => {
     const path = join(dir, "user-token.json");
-    await writeFile(path, JSON.stringify({ default: 42, other: { token: TOKEN } }));
+    await writeFile(path, JSON.stringify({ default: 42, other: { token: TOKEN }, edited: "edited by hand", blank: " " }));
     const store = new FileUserTokenStore(path);
-    expect(await store.get("default")).toBeUndefined();
-    expect(await store.get("other")).toBeUndefined();
+    for (const id of ["default", "other", "edited", "blank"]) expect(await store.get(id), id).toBeUndefined();
+  });
+
+  test("a token with whitespace around it, as an editor may save it, is read without it", async () => {
+    const path = join(dir, "user-token.json");
+    await writeFile(path, JSON.stringify({ default: ` ${TOKEN}\r\n` }));
+    expect(await new FileUserTokenStore(path).get("default")).toBe(TOKEN);
   });
 
   test("writes at the same time all land, each replacing the file whole, and leave nothing beside it", async () => {

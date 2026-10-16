@@ -5,6 +5,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, posix, win32 } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { parseToken } from "@open-music-sdk/core";
 import type { tUserTokenStore } from "@open-music-sdk/server";
 
 /** A failure the person running the CLI can fix, worded for them, with the exit status it ends in: 1, or 2 for a mistake in how it was run. */
@@ -117,12 +118,12 @@ export class FileUserTokenStore implements tUserTokenStore {
    * The token kept for a listener.
    *
    * @param userId - The id it was set under.
-   * @returns The token, or undefined when none is kept.
+   * @returns The token, without whitespace around it, or undefined when none is kept: what a hand edit left that is
+   * no token, as core's `parseToken` says, is none.
    * @throws CliError if the file is not JSON the store wrote, and whatever reading it fails with.
    */
   async get(userId: string): Promise<string | undefined> {
-    const token = (await readObject(this.#path))[userId];
-    return typeof token === "string" ? token : undefined;
+    return parseToken((await readObject(this.#path))[userId]);
   }
 
   /**

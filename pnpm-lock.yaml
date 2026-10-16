@@ -260,6 +260,9 @@ importers:
       '@open-music-sdk/browser':
         specifier: workspace:*
         version: link:../../integrations/browser
+      '@open-music-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@open-music-sdk/server':
         specifier: workspace:*
         version: link:../../integrations/server

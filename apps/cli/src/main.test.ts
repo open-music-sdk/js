@@ -295,15 +295,17 @@ describe("doctor: the key, then the token, asked of Apple", () => {
     expect(stdout).toContain("✗ Key: Apple did not answer within 30 seconds. Check your connection and try again.");
   });
 
-  test("a kept token that is no token, as a hand-edited file may hold, is not taken for one Apple refused: Apple is not asked about it", async () => {
+  test("what a hand edit left in the token file is no token: none is kept, Apple is not asked about it, and token prints nothing", async () => {
     await kept("edited by hand");
     expect(await main(["doctor", "--key-file", keyPath, "--team-id", TEAM])).toBe(1);
     expect(stdout).toMatch(/✓ Key/);
-    expect(stdout).not.toContain("Music User Token");
-    expect(stderr).toContain("something went wrong that the CLI did not expect");
-    expect(stderr).toContain("TypeError: validateUserToken: token must be printable characters");
-    expect(stderr).not.toContain("edited by hand");
+    expect(stdout).toMatch(/✗ Music User Token: none is kept\. Run 'open-music-sdk login'/);
+    expect(stderr).not.toContain("did not expect");
     expect(asked.map((req) => new URL(req.url).pathname)).toEqual(["/v1/test"]);
+    stdout = "";
+    expect(await main(["token"])).toBe(1);
+    expect(stdout).toBe("");
+    expect(stdout + stderr).not.toContain("edited by hand");
   });
 
   test("what Apple sends reaches the terminal without the control characters a terminal would act on", async () => {
@@ -543,6 +545,18 @@ describe("what no command words for itself: exit 1, and the error on stderr", ()
     expect(stderr).toContain("something went wrong that the CLI did not expect.\nunforeseen\n");
     expect(stderr).toContain("This is a bug. Please report it, with the output above, at https://github.com/open-music-sdk/js/issues");
     expect(asked).toEqual([]);
+  });
+
+  test("the same while the kept token is asked about: it is not taken for Apple refusing the token", async () => {
+    await kept();
+    // The key's question goes as it would; the token's fails with what nothing in asking Apple fails with.
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementationOnce(timeout).mockReturnValueOnce(AbortSignal.abort("unforeseen"));
+    expect(await main(["doctor", "--key-file", keyPath, "--team-id", TEAM])).toBe(1);
+    expect(stdout).toMatch(/✓ Key/);
+    expect(stdout).not.toContain("Music User Token");
+    expect(stderr).toContain("something went wrong that the CLI did not expect.\nunforeseen\n");
+    expect(asked.map((req) => new URL(req.url).pathname)).toEqual(["/v1/test"]);
   });
 });
 
