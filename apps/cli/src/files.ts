@@ -24,7 +24,7 @@ export const usage = (message: string): CliError => new CliError(message, 2);
 export const printable = (text: string): string =>
   Array.from(text)
     .filter((c) => {
-      const code = c.codePointAt(0) ?? 0;
+      const code = c.charCodeAt(0);
       return code > 0x1f && (code < 0x7f || code > 0x9f);
     })
     .join("");
