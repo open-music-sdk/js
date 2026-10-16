@@ -6,7 +6,7 @@ import { describe as describeFailure } from "./commands";
 test.each([
   ["a rate limit says to wait", new AppleMusicError("RateLimited", "GET /v1/test: 429", { status: 429 }), "Apple is limiting requests for this key. Wait a minute and try again."],
   ["any other answer is given with its status", new AppleMusicError("ApiError", "GET /v1/test: Service Unavailable", { status: 503 }), "Apple answered 503: GET /v1/test: Service Unavailable"],
-  ["one with no status is given without one", new AppleMusicError("DeveloperTokenUnavailable", "the minter failed"), "Apple answered: the minter failed"],
+  ["one with no status had no answer, and is not given as one", new AppleMusicError("DeveloperTokenUnavailable", "the minter failed"), "Apple could not be asked: the minter failed"],
   [
     "a network failure with no system code down its causes is given without one",
     new AppleMusicError("NetworkError", "GET /v1/test: fetch failed", { cause: new TypeError("fetch failed", { cause: { code: 42 } }) }),

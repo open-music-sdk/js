@@ -64,7 +64,8 @@ export function describe(e: unknown): string | undefined {
       return `Apple could not be reached: ${printable(e.message)}${code === undefined ? "" : ` (${code})`}`;
     }
     default:
-      return `Apple answered${e.status === undefined ? "" : ` ${String(e.status)}`}: ${printable(e.message)}`;
+      // With no status there was no answer, as when no developer token could be had to ask with.
+      return e.status === undefined ? `Apple could not be asked: ${printable(e.message)}` : `Apple answered ${String(e.status)}: ${printable(e.message)}`;
   }
 }
 
