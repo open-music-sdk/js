@@ -33,6 +33,7 @@ APPLE_MUSIC_USER_TOKEN=$(open-music-sdk token) node job.js
 | `login` | Checks your key with Apple, then serves a page on `http://localhost` that runs Apple's sign-in, and opens it in your browser. Keeps the token once Apple accepts it. `--port` fixes the port; `--no-browser` only prints the address. |
 | `token` | Prints the kept token, and nothing else, for another program to read. `--developer` mints a developer token from your key instead, which lives an hour. |
 | `doctor` | Asks Apple whether your key works (`GET /v1/test`), then whether the kept token does (`GET /v1/me/storefront`). A `401` can mean either, and this tells them apart. Prints nothing secret. |
+| `check` | Asks the live API what the SDK takes on trust about it, as you, and prints what Apple did. See [`check`](#check). |
 | `logout` | Forgets the kept token. Apple isn't told, so a copy you handed to another program works until Apple ends it. |
 
 `open-music-sdk --help` lists every command, and `open-music-sdk help <command>` gives a command's options and
@@ -51,7 +52,7 @@ the output isn't a terminal, when `NO_COLOR` is set, or with `--no-color`.
 
 ## Where the key comes from
 
-`login`, `doctor` and `token --developer` need your key and its two IDs. Each comes from its flag, else its
+`login`, `doctor`, `check` and `token --developer` need your key and its two IDs. Each comes from its flag, else its
 environment variable, else a question:
 
 | Value | Flag | Environment variable | Asked for |
@@ -118,6 +119,40 @@ script names an app by the page's host.
   what keeps the page, your key and the kept token safe.
 - [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#cli) says what its
   first live run, on 16 October 2026, settled, and what's still open.
+
+## `check`
+
+Apple's documentation is silent or wrong in places, and the SDK takes some things on trust there. `check` asks the
+live API about each of them, through the SDK's own functions, signed in as you with the token `login` kept. It
+starts with `doctor`'s two questions, then prints a line for each answer:
+
+| Mark | Means |
+| --- | --- |
+| `✓` | Apple did what the SDK assumes. |
+| `≠` | It didn't. The line says which package assumes otherwise. |
+| `·` | What Apple did, where the SDK assumes nothing, such as how long a write takes to show. |
+| `-` | Your account can't be asked this, for example when no playlist of yours is long enough. |
+| `✗` | Apple failed, so the question wasn't answered. |
+
+It exits `1` for a `≠` or a `✗`. The first line names the CLI's version, Node's and your system, and nothing printed
+names anything of your library, so the output can go in an issue as it is.
+
+```sh
+open-music-sdk check                           # every check that only reads
+open-music-sdk check isrc-next rating-unset    # those two alone
+open-music-sdk check --write                   # the checks that write too
+open-music-sdk help check                      # every check, by name
+```
+
+The checks that write run only with `--write`, since what they add stays in your library: Apple's API can't delete
+it. They add up to four things to your library, make one song a favorite, and make a playlist of up to 300 songs,
+which may put those songs in your library too. Each is something you didn't have, and the run ends with numbered
+steps that remove them in the Music app, with a link to each. They're printed whatever happens, Ctrl+C included.
+Run them on an account you don't mind cluttering, with an Apple Music subscription.
+
+What `check` finds goes into [Differences from Apple's
+documentation](https://open-music-sdk.github.io/js/differences), and a difference into a fix of the package it
+names.
 
 ## Development
 

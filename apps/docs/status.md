@@ -31,7 +31,7 @@ ships the same version number. See
 | [`@open-music-sdk/browser`](./reference/@open-music-sdk/browser/) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · signed in once against Apple's live script, from the CLI's page, in one browser on Windows |
 | [`@open-music-sdk/react`](./reference/@open-music-sdk/react/) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
 | [Docs site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 70% | The reference: TypeDoc over every package's doc comments, with arguments, returns and throws on every function, which CI checks · one VitePress site with guides, concepts and the reference, published to GitHub Pages from `main` · package READMEs cut to a short template · a tutorial once the samples exist |
-| [`@open-music-sdk/cli`, `apps/cli`](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) | 🚧 In progress | 60% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style, on a loopback page made of `server`'s token endpoint and intake and `browser`'s sign-in · `token`, `doctor`, `logout` · `check` still to come · tested against fakes, and run once against the live API on Windows: sign-in and `doctor` |
+| [`@open-music-sdk/cli`, `apps/cli`](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) | 🚧 In progress | 60% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style, on a loopback page made of `server`'s token endpoint and intake and `browser`'s sign-in · `token`, `doctor`, `logout` · `check`, the live checks of what the SDK takes on trust, each by its name, built and not yet run · tested against fakes, and run once against the live API on Windows: sign-in and `doctor` |
 | Sample apps, `samples/` | ⬜ Not started | 0% | Worker · Express · vanilla web · React · Next.js · each runs in development with one command |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
@@ -42,8 +42,8 @@ Progress is a judgement of how much of the described scope exists and is tested.
 In this order:
 
 1. The docs site: this site, with its guides and concepts.
-2. The first run against the live API, through the CLI, with the fixes it brings. Sign-in has run once; `check`,
-   the CLI's live checks of what Apple documents, comes next.
+2. The first run against the live API, through the CLI, with the fixes it brings. Sign-in has run once, and
+   `check`, the CLI's live checks of what Apple documents, is built; running it comes next.
 3. The sample apps, and with them a tutorial.
 4. Changesets.
 5. The first release.

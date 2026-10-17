@@ -38,7 +38,8 @@ Each gives you a client with the catalog, the listener's library and playlist to
 
 [`@open-music-sdk/cli`](./apps/cli/README.md) is the command you use beside the packages while you build. `doctor`
 tells you whether Apple takes your MusicKit key. `login` signs you in at Apple in your browser and keeps a Music
-User Token for your own account, and `token` prints it for a script to read.
+User Token for your own account, and `token` prints it for a script to read. `check` asks the live API what the
+SDK takes on trust about it.
 
 ```sh
 pnpm add -D @open-music-sdk/cli
