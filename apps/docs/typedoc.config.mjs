@@ -1,7 +1,7 @@
 // The reference for every published package, each read from its source. `typedoc` writes it as Markdown to reference/,
-// with a sidebar, for VitePress to build into the site; `typedoc --emit none` is the check a pull request runs, and it
-// fails on a broken link, a name that is not exported, an export with no comment, and a function that leaves out an
-// argument or what it returns (the plugin).
+// with a sidebar, for VitePress to build into the site, and fails on a broken link, a name that is not exported, an
+// export with no comment, and a function that leaves out an argument or what it returns (the plugin). The docs build is
+// the check a pull request runs; `typedoc --emit none` is the same checks without writing anything, to run by hand.
 import { globSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
