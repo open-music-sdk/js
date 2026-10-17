@@ -169,14 +169,31 @@ describe("the sign-in page", () => {
     expect(posted).toHaveLength(2);
   });
 
-  test("a sign-in that fails says so, leaves the origin as it was, and lets them try again", async () => {
+  test("an answer from the terminal the page has no words for is given by its status, with the button there to try again", async () => {
+    intakeStatus = 500;
+    await ready();
+    button().click();
+    await vi.waitFor(() => { expect(outcome()).toBe("error"); });
+    expect(status()).toBe("The terminal answered 500. Try again, or run login again.");
+    expect(button().disabled).toBe(false);
+  });
+
+  test.each<[string, unknown, string]>([
+    ["an Error, by its message", new Error("popup blocked"), "popup blocked"],
+    ["an Error with no message, by its name", new TypeError(), "TypeError"],
+    // Apple's script rejects with an object of its own, whose shape is undocumented.
+    ["the object Apple's script rejects with, by its message", { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" }, "Unauthorized"],
+    ["such an object with no message, by its code", { errorCode: "AUTHORIZATION_ERROR" }, "AUTHORIZATION_ERROR"],
+    ["anything else, as text", "popup blocked", "popup blocked"],
+  ])("a sign-in that fails with %s says so, leaves the origin as it was, and lets them try again", async (_kind, reason, shown) => {
     authorize = () => {
       keepCopies();
-      return Promise.reject(new Error("popup blocked"));
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script may reject with something of its own, not an Error
+      return Promise.reject(reason);
     };
     await ready();
     button().click();
-    await vi.waitFor(() => { expect(status()).toContain("popup blocked"); });
+    await vi.waitFor(() => { expect(status()).toBe(`Sign-in failed: ${shown}`); });
     expect(outcome()).toBe("error");
     expect(button().disabled).toBe(false);
     asBefore();
@@ -212,5 +229,15 @@ describe("the sign-in page", () => {
     } finally {
       process.off("unhandledRejection", listener);
     }
+  });
+
+  test("a page served without its state still loads, and says Apple's sign-in could not be loaded, since the token route refuses it", async () => {
+    vi.resetModules();
+    document.head.innerHTML = "";
+    document.body.innerHTML = '<p id="intro">The command line is waiting.</p><p id="status"></p><button id="connect" type="button" disabled></button>';
+    await import("./page");
+    await ready();
+    expect(status()).toContain("could not be loaded");
+    expect(outcome()).toBe("error");
   });
 });

@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tokenEndpoint, userTokenIntake, type tAppleMusicClient, type tUserTokenStore } from "@open-music-sdk/server";
-import { usage } from "./files";
+import { CliError, usage } from "./files";
 import type { tKey } from "./key";
 
 export interface tLoopbackOptions {
@@ -245,11 +245,14 @@ const listen = (server: Server, port: number, address: string) =>
 const taken = (e: unknown, port: number) =>
   (e as NodeJS.ErrnoException).code === "EADDRINUSE" ? usage(`Port ${String(port)} is in use: pick another with --port, or leave it out and the system picks one.`) : e;
 
+/** How many ports the system is asked to pick before the CLI gives up on finding one free on ::1 too. */
+const PICKS = 5;
+
 /**
  * Servers on both loopback addresses, 127.0.0.1 and ::1, on one port. `localhost` is either, and a browser may try
  * ::1 first: a port held on one address alone leaves the other to whoever takes it, page, state and token included.
  * Where the system has no IPv6, 127.0.0.1 is all `localhost` can be. A port the system picked that someone holds on
- * ::1 is picked again; a port asked for is refused.
+ * ::1 is picked again, `PICKS` times at most; a port asked for is refused.
  */
 async function listenOnLoopback(wanted: number): Promise<{ servers: Server[]; port: number }> {
   for (let attempt = 1; ; attempt++) {
@@ -266,7 +269,9 @@ async function listenOnLoopback(wanted: number): Promise<{ servers: Server[]; po
       const code = (e as NodeJS.ErrnoException).code;
       if (code === "EADDRNOTAVAIL" || code === "EAFNOSUPPORT") return { servers: [v4], port };
       await close(v4);
-      if (code !== "EADDRINUSE" || wanted !== 0 || attempt === 5) throw taken(e, port);
+      if (code !== "EADDRINUSE" || wanted !== 0) throw taken(e, port);
+      // No mistake in how the CLI was run: --port left out is what was asked for, and only --port gets round this.
+      if (attempt === PICKS) throw new CliError(`Each of the ${String(PICKS)} ports the system picked was held on ::1 by another program. Try again, or pick a port with --port.`);
     }
   }
 }

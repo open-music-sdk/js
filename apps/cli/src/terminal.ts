@@ -69,6 +69,14 @@ const PENDING = Symbol("pending");
 export function terminal(input: tTerminalInput, output: Writable & { readonly isTTY?: boolean | undefined }): tTerminal {
   /** Keys typed ahead of the question they answer, kept for it. */
   let ahead = "";
+  /** Whether the last answer ended its piece on a carriage return, so that a line feed arriving next is that break's. */
+  let lineFeedOwed = false;
+  /** `text` without the line feed of a CR LF split between two pieces, when it is the first thing to arrive after the CR. */
+  const owing = (text: string) => {
+    const owed = lineFeedOwed;
+    lineFeedOwed = false;
+    return owed && text.startsWith("\n") ? text.slice(1) : text;
+  };
 
   /**
    * Reads one answer in raw mode, a character at a time through `take`, until it gives one; `take` is handed the
@@ -94,15 +102,15 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
         else resolve(answer as T);
       };
       const onData = (chunk: Buffer | string) => {
-        const text = String(chunk);
         if (answer !== PENDING) {
           // Answered: what comes before the end is let go by, putting the end off, or kept for the next question.
           if (draining) {
             clearTimeout(timer);
             timer = setTimeout(end, DRAIN_MS);
-          } else ahead += text;
+          } else ahead += owing(String(chunk));
           return;
         }
+        const text = owing(String(chunk));
         let i = 0;
         while (i < text.length && answer === PENDING) {
           const c = text.charAt(i++);
@@ -111,8 +119,10 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
         if (answer === PENDING) return;
         draining = answer instanceof CliError || drain(answer);
         if (!draining) {
-          // The line feed of a CR LF that ended this answer is this answer's, not an empty one for the next question.
+          // The line feed of a CR LF that ended this answer is this answer's, not an empty one for the next question,
+          // whether it came in this piece or comes in the next.
           if (text.charAt(i - 1) === "\r" && text.charAt(i) === "\n") i++;
+          else lineFeedOwed = text.charAt(i - 1) === "\r" && i === text.length;
           ahead = text.slice(i);
         }
         timer = setTimeout(end, draining ? DRAIN_MS : 0);
@@ -142,7 +152,6 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       /** For each character kept, whether it was shown. */
       const shown: boolean[] = [];
       let other = false;
-      let afterReturn = false;
       /** The answer, shown in full once it is known to be an ID, when some of it came in a paste and was held back. */
       const answered = (answer: string) => {
         if (!shown.every(Boolean) && !other && answer.length === ID_LENGTH) output.write(`\r${question}${answer}`);
@@ -150,10 +159,6 @@ export function terminal(input: tTerminalInput, output: Writable & { readonly is
       };
       return read<string | undefined>(
         (c, chunk) => {
-          // A line break sent as CR LF is one break, not an empty answer to the next question.
-          const lineFeedOfBreak = c === "\n" && afterReturn;
-          afterReturn = c === "\r";
-          if (lineFeedOfBreak) return PENDING;
           if (c === "\r" || c === "\n") return answered(typed);
           if (c === CTRL_D) return typed === "" ? undefined : answered(typed);
           if (BACKSPACE.includes(c)) {

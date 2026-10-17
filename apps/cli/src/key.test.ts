@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -140,6 +140,15 @@ describe("loadKey: a file is read only when --key-file names it", () => {
     }
   });
 
+  // Root reads any file, whatever its mode says.
+  test.runIf(process.platform !== "win32" && process.getuid?.() !== 0)("a file that is there but may not be read is named by its path, with the reason", async () => {
+    await chmod(keyFile, 0o000);
+    const e = await thrown(() => loadKey({ "key-file": keyFile }, ENV, fake().term));
+    expect(e).toMatchObject({ exitCode: 2 });
+    expect(e.message).toContain(resolve(keyFile));
+    expect(e.message).toContain("EACCES");
+  });
+
   test("what --key-file names must be a file no larger than any key: a folder, a device, or something large is refused before it is read", async () => {
     const folder = await thrown(() => loadKey({ "key-file": dir }, ENV, fake().term));
     expect(folder.message).toContain(`${resolve(dir)}, from --key-file, is a folder`);
@@ -225,13 +234,16 @@ describe("loadKey: what the flags and the environment leave out is asked for", (
     expect(asked).toEqual(["Private key, the whole .p8 from BEGIN to END, not shown (Ctrl+D ends it early): "]);
   });
 
-  test("an ID typed wrong, and a key pasted wrong, are asked for again, with what is wrong said and what was typed not repeated", async () => {
-    const { term, told } = fake({ ids: ["DEF123", "DEF123GHI!", TEAM, KEY_ID], secrets: [BODY, PEM] });
+  test("an ID typed wrong or not at all, and a key pasted wrong or too long, are asked for again, with what is wrong said and what was typed not repeated", async () => {
+    // A key over the limit comes back from the prompt as undefined.
+    const { term, told } = fake({ ids: ["DEF123", "DEF123GHI!", "", TEAM, KEY_ID], secrets: [BODY, undefined, PEM] });
     expect(await loadKey({}, {}, term)).toMatchObject({ teamId: TEAM, pem: PEM });
     const said = told.join("\n");
     expect(said).toContain("That is not a team ID: it is 6 characters. A team ID is ten capital letters and digits.");
     expect(said).toContain("That is not a team ID: it has characters other than A to Z and 0 to 9.");
+    expect(said).toContain("That is not a team ID: nothing was given.");
     expect(said).toContain("That is not a MusicKit private key");
+    expect(said).toContain("That was over 16 KB, which no MusicKit key is. Paste the .p8 alone.");
     expect(said).not.toContain("DEF123");
     expect(said).not.toContain(BODY.slice(0, 20));
   });

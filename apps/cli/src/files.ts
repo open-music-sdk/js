@@ -5,6 +5,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, posix, win32 } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { parseToken } from "@open-music-sdk/core";
 import type { tUserTokenStore } from "@open-music-sdk/server";
 
 /** A failure the person running the CLI can fix, worded for them, with the exit status it ends in: 1, or 2 for a mistake in how it was run. */
@@ -24,7 +25,7 @@ export const usage = (message: string): CliError => new CliError(message, 2);
 export const printable = (text: string): string =>
   Array.from(text)
     .filter((c) => {
-      const code = c.codePointAt(0) ?? 0;
+      const code = c.charCodeAt(0);
       return code > 0x1f && (code < 0x7f || code > 0x9f);
     })
     .join("");
@@ -87,7 +88,8 @@ async function readObject(path: string): Promise<Record<string, unknown>> {
     text = await readFile(path, "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return Object.create(null) as Record<string, unknown>;
-    throw e;
+    // Named here: a refusal at reading, such as a folder's, does not say which file it was.
+    throw new CliError(`${path} cannot be read: ${(e as Error).message}`);
   }
   let parsed: unknown;
   try {
@@ -117,12 +119,12 @@ export class FileUserTokenStore implements tUserTokenStore {
    * The token kept for a listener.
    *
    * @param userId - The id it was set under.
-   * @returns The token, or undefined when none is kept.
-   * @throws CliError if the file is not JSON the store wrote, and whatever reading it fails with.
+   * @returns The token, without whitespace around it, or undefined when none is kept: what a hand edit left that is
+   * no token, as core's `parseToken` says, is none.
+   * @throws CliError, naming the file, if it is there and cannot be read or is not JSON the store wrote.
    */
   async get(userId: string): Promise<string | undefined> {
-    const token = (await readObject(this.#path))[userId];
-    return typeof token === "string" ? token : undefined;
+    return parseToken((await readObject(this.#path))[userId]);
   }
 
   /**
@@ -130,7 +132,8 @@ export class FileUserTokenStore implements tUserTokenStore {
    *
    * @param userId - The id to keep it under.
    * @param token - The Music User Token.
-   * @throws CliError if the file is not JSON the store wrote, and whatever reading or writing it fails with.
+   * @throws CliError, naming the file, if it is there and cannot be read or is not JSON the store wrote; and
+   * whatever writing it fails with.
    */
   async set(userId: string, token: string): Promise<void> {
     const tokens = await readObject(this.#path);
@@ -142,7 +145,8 @@ export class FileUserTokenStore implements tUserTokenStore {
    * Forgets a listener's token, if one is kept.
    *
    * @param userId - The id it was set under.
-   * @throws CliError if the file is not JSON the store wrote, and whatever reading or writing it fails with.
+   * @throws CliError, naming the file, if it is there and cannot be read or is not JSON the store wrote; and
+   * whatever writing it fails with.
    */
   async delete(userId: string): Promise<void> {
     const tokens = await readObject(this.#path);

@@ -371,6 +371,17 @@ describe("play", () => {
     expect(player.state).toMatchObject({ status: "playing", index: 0, position: 12 });
   });
 
+  test("while a clip plays, play with no index carries on with it, never back through loading", async () => {
+    const { audio, player } = loaded();
+    await player.play();
+    audio.reach(12, 30);
+    const again = player.play();
+    expect(player.state).toMatchObject({ status: "playing", index: 0, position: 12 });
+    await again;
+    expect(audio.sources).toEqual([clip("a")]);
+    expect(player.state).toMatchObject({ status: "playing", index: 0, position: 12 });
+  });
+
   test("once the queue has run out it starts again from the first track", async () => {
     const { audio, player } = loaded([song("a")]);
     await player.play();

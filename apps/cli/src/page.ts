@@ -23,7 +23,15 @@ const settle = (outcome: "success" | "error", message: string) => {
   status.textContent = message;
   button.hidden = outcome === "success";
 };
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** What a failure says: an Error's message, or the message or else the code of the object Apple's script rejects with, whose shape is undocumented. */
+const messageOf = (e: unknown): string => {
+  if (typeof e === "object" && e !== null) {
+    const { message, errorCode } = e as { readonly message?: unknown; readonly errorCode?: unknown };
+    if (typeof message === "string" && message !== "") return message;
+    if (typeof errorCode === "string") return errorCode;
+  }
+  return String(e);
+};
 
 /** The cookies this page can see, by name. */
 const cookies = () =>

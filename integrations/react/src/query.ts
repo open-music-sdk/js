@@ -110,10 +110,11 @@ function walkOf(fn: tAnyEndpoint, music: tAppleMusicClient, ns: "catalog" | "use
         await fn(
           {
             request: (path, init) => music.request(path, { ...init, onResponse: (res, req, outcome) => (next = linkOf(outcome.body), init?.onResponse?.(res, req, outcome)) }),
-            paginate: (from, init) => music.paginate(from, init),
-            storefront: () => music.storefront(),
-            as: (token) => music.as(token),
-            forUser: (userId) => music.forUser(userId),
+            // Bound rather than spread, so that a client whose functions are a class's, inherited and needing `this`, still works through here.
+            paginate: music.paginate.bind(music),
+            storefront: music.storefront.bind(music),
+            as: music.as.bind(music),
+            forUser: music.forUser.bind(music),
           },
           ...args,
         )

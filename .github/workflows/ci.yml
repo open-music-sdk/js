@@ -24,11 +24,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The docs build runs TypeDoc's checks and fails on a dead link or anchor, so `check`, the same checks without
       # the site, is left for local use.
-      - run: pnpm turbo run build typecheck lint test --affected
-      # Test coverage is for the whole repo, so this run is not --affected.
-      - if: github.ref == 'refs/heads/main'
-        run: pnpm turbo run test -- --coverage
-      - if: github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@v5
+      - run: pnpm turbo run build typecheck lint --affected
+      # Test coverage is for the whole repo, so the tests are not --affected. They run on pull requests too, so that
+      # Codecov can hold each one to codecov.yml.
+      - run: pnpm turbo run test -- --coverage
+      - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

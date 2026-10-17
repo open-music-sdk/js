@@ -1,5 +1,5 @@
 import type { tPlaylistTrack } from "@open-music-sdk/client-user";
-import { createClient, isAppleMusicError } from "@open-music-sdk/core";
+import { AppleMusicError, createClient, isAppleMusicError, type tAppleMusicClient } from "@open-music-sdk/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { apply, type tApplyOptions } from "./apply";
 import { plan, type tPlaylistPlan } from "./plan";
@@ -578,6 +578,33 @@ describe("apply: a playlist named by what it is called is found, or made once", 
     fail("POST", PLAYLISTS, status, false);
     await expect(apply(music, plan(mine, want("1")))).rejects.toMatchObject({ status });
     expect(lines()).toEqual(["GET /v1/me/library/playlists", "POST /v1/me/library/playlists"]);
+  });
+
+  // A client of the app's own, wrapping the SDK's, can fail with what it likes.
+  test.each<[string, Error]>([
+    ["an error that is not Apple's", new Error("the app's own")],
+    ["an ApiError with no status", new AppleMusicError("ApiError", "made by other code")],
+  ])("%s, from making it, says nothing of whether Apple did: the run rejects with it at once, and the library is not looked through again", async (_name, thrown) => {
+    const { music, lines } = apple();
+    const wrapped: tAppleMusicClient = { ...music, request: (path, init) => (init?.method === "POST" ? Promise.reject(thrown) : music.request(path, init)) };
+    await expect(apply(wrapped, plan(mine, want("1")), QUICK)).rejects.toBe(thrown);
+    expect(lines()).toEqual(["GET /v1/me/library/playlists"]);
+  });
+
+  test("a look for it that fails with an error that is not Apple's is not a look that found nothing: the run rejects with that error", async () => {
+    const { music, fail } = apple();
+    fail("POST", PLAYLISTS, "lost", true);
+    const thrown = new Error("the app's own");
+    let made = false;
+    const wrapped: tAppleMusicClient = {
+      ...music,
+      request: (path, init) => {
+        if (made) return Promise.reject(thrown);
+        made = init?.method === "POST";
+        return music.request(path, init);
+      },
+    };
+    await expect(apply(wrapped, plan(mine, want("1")), { settle: { tries: 3, waitMs: 0 } })).rejects.toBe(thrown);
   });
 
   test("an id put on Object.prototype by other code is not the plan's playlist: nothing is read there or written there", async () => {

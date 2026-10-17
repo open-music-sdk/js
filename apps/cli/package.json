@@ -40,6 +40,7 @@
   },
   "devDependencies": {
     "@open-music-sdk/browser": "workspace:*",
+    "@open-music-sdk/core": "workspace:*",
     "@open-music-sdk/server": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

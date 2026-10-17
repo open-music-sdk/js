@@ -178,7 +178,8 @@ function loaded(page: tPage, state: tPageState): Promise<tMusicKit> {
   });
   const attempt = state.loading;
   attempt.catch(() => {
-    if (state.loading === attempt) state.loading = undefined;
+    // Nothing replaces a load while it is pending, so the one that failed is still the page's.
+    state.loading = undefined;
   });
   return attempt;
 }
@@ -248,7 +249,8 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
     };
     state.configured = record;
     record.instance.catch(() => {
-      if (state.configured === record) state.configured = undefined;
+      // Nothing replaces a configuration while it is pending, so the one that failed is still the page's.
+      state.configured = undefined;
     });
     return record;
   };

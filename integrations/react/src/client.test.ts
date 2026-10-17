@@ -1,7 +1,7 @@
 import { createBrowserClient, type tBrowserMusic, type tMusicKitInstance } from "@open-music-sdk/browser";
 import { QueryClient } from "@tanstack/react-query";
 import { Window } from "happy-dom";
-import { StrictMode, act, createElement, type ReactNode } from "react";
+import { Activity, StrictMode, act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -152,6 +152,22 @@ describe("useMusicUserToken", () => {
     cache.clear();
   });
 
+  test("a page that is not secure has no crypto.randomUUID, and each sign-in still has a scope of its own", () => {
+    const { music } = page();
+    vi.stubGlobal("crypto", {});
+    const { Probe, seen } = probe(() => ({ setToken: useMusicUserToken()[1], key: useMusicQueries().catalog.getSong("1").queryKey }));
+    mount(createElement(MusicProvider, { music }, createElement(Probe)));
+    act(() => {
+      seen.current?.setToken("a");
+    });
+    const first = seen.current?.key[1];
+    act(() => {
+      seen.current?.setToken("b");
+    });
+    expect(typeof first).toBe("string");
+    expect(seen.current?.key[1]).not.toBe(first);
+  });
+
   test("a client handed over later is another scope; the first is the page's, 0, as on a server", () => {
     const { music } = page();
     const other = page().music;
@@ -248,6 +264,26 @@ describe("useConnect", () => {
       token = await seen.current?.connect.connect();
     });
     expect([token, seen.current?.token, seen.current?.connect.isReady, seen.current?.connect.error]).toEqual(["signed", "signed", true, undefined]);
+  });
+
+  test("a helper let go of while Apple's script was being configured, as when an Activity hides the component, puts its failure nowhere: the component shown again starts afresh", async () => {
+    const { music } = page();
+    let fail: (error: Error) => void = () => undefined;
+    const instance: tMusicKitInstance = { authorize: () => Promise.resolve("signed") };
+    const configure = vi.fn<(options: { developerToken: string }) => Promise<tMusicKitInstance>>().mockReturnValueOnce(new Promise((_resolve, reject) => (fail = reject))).mockResolvedValue(instance);
+    const { Probe, seen } = probe(() => useConnect({ app: APP, musicKit: { configure } }));
+    const tree = (mode: "visible" | "hidden") => createElement(MusicProvider, { music }, createElement(Activity, { mode, children: createElement(Probe) }));
+    const { rerender } = mount(tree("visible"));
+    await settle();
+    expect(configure).toHaveBeenCalledTimes(1);
+    rerender(tree("hidden"));
+    fail(new Error("configure failed"));
+    await settle();
+    rerender(tree("visible"));
+    expect([seen.current?.isReady, seen.current?.error]).toEqual([false, undefined]);
+    await settle();
+    expect([seen.current?.isReady, seen.current?.error]).toEqual([true, undefined]);
+    expect(configure).toHaveBeenCalledTimes(2);
   });
 
   test("a restored token is not taken while the provider holds one, nor after the app forgot one: signing out stays signed out", async () => {
@@ -370,6 +406,19 @@ describe("usePreviewPlayer", () => {
     await act(() => seen.current?.play());
     expect(seen.current?.state).not.toBe(first?.state);
     for (const verb of ["load", "play", "pause", "next", "previous", "seek", "setVolume"] as const) expect(seen.current?.[verb]).toBe(first?.[verb]);
+  });
+
+  test("under StrictMode, whose simulated remount disposes the first player, the hook holds the second: its state follows the verbs, which reach the element", async () => {
+    const element = audio();
+    const { Probe, seen } = probe(() => usePreviewPlayer<typeof SONG>({ audio: element }));
+    mount(createElement(StrictMode, null, createElement(Probe)));
+    act(() => {
+      seen.current?.load([SONG]);
+    });
+    expect(seen.current?.state.tracks).toEqual([SONG]);
+    await act(() => seen.current?.play());
+    expect(element.play).toHaveBeenCalledTimes(1);
+    expect([seen.current?.state.track, seen.current?.state.index]).toEqual([SONG, 0]);
   });
 
   test("a ref to the element is read when the component mounts, when the element is there", async () => {

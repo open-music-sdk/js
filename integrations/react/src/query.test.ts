@@ -120,6 +120,17 @@ describe("musicQueries: a walk", () => {
     expect(listener.userTokens()).toEqual(["listener", "listener"]);
   });
 
+  test("a client whose functions are inherited, as a class's are, walks as one from createClient does", async () => {
+    const { music, paths } = apple();
+    expect(await walk(musicQueries(Object.create(music) as tAppleMusicClient).catalog.listGenres())).toHaveLength(3);
+    expect(paths()).toEqual(["/v1/catalog/us/genres", "/v1/catalog/us/genres?offset=1", "/v1/catalog/us/genres?offset=2"]);
+  });
+
+  test("an answer with no body is a page with nothing in it, and the last", async () => {
+    const music = createClient({ developerToken: "dev", storefront: "us", fetch: () => Promise.resolve(new Response(null)), retry: false });
+    expect(await walk(musicQueries(music).catalog.listGenres())).toEqual([{ next: undefined }]);
+  });
+
   test("maxPages is refused: how many pages are kept is TanStack's to say", () => {
     const { music } = apple();
     expect(() => musicQueries(music).catalog.listGenres({ maxPages: 2 })).toThrow(new TypeError("musicQueries.catalog.listGenres: maxPages is not an option of a query; how many pages are kept is TanStack's maxPages, on useInfiniteQuery"));
