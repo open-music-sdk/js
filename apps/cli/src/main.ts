@@ -2,6 +2,7 @@
 // status: 0 done, 1 failed, 2 not run as it should be, 130 stopped with Ctrl+C.
 import { parseArgs } from "node:util";
 import manifest from "../package.json" with { type: "json" };
+import { CHECKS, check } from "./check";
 import { NAME, describe, doctor, login, logout, paint, token, type tContext, type tFlags } from "./commands";
 import { CliError, configDir, usage, type tEnv } from "./files";
 import { VARIABLES } from "./key";
@@ -21,6 +22,7 @@ const OPTIONS = {
   port: { type: "string", short: "p" },
   browser: { type: "boolean" },
   developer: { type: "boolean" },
+  write: { type: "boolean" },
 } as const;
 
 /** The environment variables the CLI reads: the key's three, and where its folder goes. */
@@ -58,8 +60,12 @@ interface tCommand {
   readonly options: readonly string[];
   readonly optionHelp: readonly string[];
   readonly examples: readonly string[];
-  readonly run: (flags: tFlags, ctx: tContext) => Promise<number>;
+  /** Whether it takes arguments after its name, as `check` takes the names of checks. */
+  readonly takesArguments?: boolean;
+  readonly run: (flags: tFlags, ctx: tContext, args: readonly string[]) => Promise<number>;
 }
+
+const CHECK_WIDTH = Math.max(...CHECKS.map((each) => each.id.length)) + 2;
 
 const COMMANDS: Readonly<Record<string, tCommand>> = {
   login: {
@@ -101,6 +107,28 @@ const COMMANDS: Readonly<Record<string, tCommand>> = {
     optionHelp: KEY_HELP,
     examples: [`${NAME} doctor`],
     run: doctor,
+  },
+  check: {
+    summary: "Ask the live API what the SDK takes on trust, and print what Apple did",
+    usage: "check [<check>...] [--write] [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input]",
+    about: [
+      "Asks Apple, as the kept Music User Token's listener, what the SDK's packages take on trust, through their own",
+      "functions, after doctor's two questions. Named checks are asked alone; with none named, every one that reads.",
+      "Each line is marked ✓ where Apple does what the SDK assumes, ≠ where it does not, · for what Apple did, - for a",
+      "question this account cannot be asked, and ✗ where Apple failed. Exits 1 for a ≠ or a ✗.",
+      "",
+      "The checks marked --write run only with it. What they add stays in your library, since Apple's API can delete",
+      "none of it: up to four things added to it, one song made a favorite, and a playlist of up to 300 songs, which",
+      "may put those songs in your library too. Each is something you did not have, and the run ends with the steps",
+      "that remove it in the Music app.",
+      "",
+      ...CHECKS.map((each) => `  ${each.id.padEnd(CHECK_WIDTH)}${each.about}${each.writes ? " (--write)" : ""}`),
+    ],
+    options: [...KEY_OPTIONS, "write"],
+    optionHelp: [...KEY_HELP, "      --write            Run the checks that write to your library too"],
+    examples: [`${NAME} check`, `${NAME} check isrc-next rating-unset`, `${NAME} check --write`, `${NAME} check playlist --write`],
+    takesArguments: true,
+    run: check,
   },
   logout: {
     summary: "Forget the kept Music User Token",
@@ -269,11 +297,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       name = undefined;
       throw usage(`There is no command${quoted(first)}. The commands are ${Object.keys(COMMANDS).join(", ")}.`);
     }
-    if (rest.length > 0) throw usage(`${first} takes no arguments, only options.`);
+    if (rest.length > 0 && command.takesArguments !== true) throw usage(`${first} takes no arguments, only options.`);
     for (const [option, value] of Object.entries(values)) {
       if (!GLOBAL.includes(option) && !command.options.includes(option)) throw usage(`${value === false ? `--no-${option}` : `--${option}`} is not an option of ${first}.`);
     }
-    return await command.run(values, ctx);
+    return await command.run(values, ctx, rest);
   } catch (e) {
     return report(e, ctx, name);
   }
