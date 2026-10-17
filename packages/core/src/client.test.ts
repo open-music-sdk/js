@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { createClient, parseToken, type tClientOptions, type tResponseOutcome, type tSchemaLike, type tUserTokenStore } from "./client";
 import { AppleMusicError, isAppleMusicError } from "./errors";
 import { createRateLimiter } from "./rate-limit";
@@ -186,6 +188,45 @@ describe("request: credentials never leave the Apple origin", () => {
     const { music, url } = client();
     await music.request("https://api.music.apple.com/v1/test");
     expect(url()).toBe("https://api.music.apple.com/v1/test");
+  });
+
+  describe("a redirect is refused, so no token follows an answer to wherever it points", () => {
+    // The real fetch, against a server standing in for Apple's that redirects, to another origin and to its own.
+    let server: Server;
+    let base: string;
+    const landed: Record<string, string | undefined>[] = [];
+    beforeAll(async () => {
+      server = createServer((req, res) => {
+        const port = String((server.address() as AddressInfo).port);
+        if (req.url?.startsWith("/landed")) {
+          landed.push({ authorization: req.headers.authorization, "music-user-token": req.headers["music-user-token"] as string | undefined });
+          res.end("{}");
+        } else if (req.url?.includes("elsewhere")) res.writeHead(307, { location: `http://localhost:${port}/landed` }).end();
+        else res.writeHead(302, { location: "/landed" }).end();
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+    });
+    afterAll(() => {
+      server.closeAllConnections();
+      server.close();
+    });
+
+    test.each([
+      ["another origin", "GET", "v1/me/library/elsewhere"],
+      ["another origin", "POST", "v1/me/library/elsewhere"],
+      ["another path of its own", "GET", "v1/me/library/moved"],
+    ] as const)("to %s, for a %s", async (_where, method, path) => {
+      // What the client sends, sent on to the stand-in as it is: method, headers, body and redirect mode.
+      const fetch = (input: RequestInfo | URL) => {
+        const req = input instanceof Request ? input : new Request(input);
+        return globalThis.fetch(new Request(base + new URL(req.url).pathname, req));
+      };
+      const music = createClient({ developerToken: "dev", userToken: "user", fetch, retry: false });
+      const e = await failure(music.request(path, { method, body: method === "POST" ? {} : undefined }));
+      expect(e._tag).toBe("NetworkError");
+      expect(landed).toEqual([]);
+    });
   });
 });
 
