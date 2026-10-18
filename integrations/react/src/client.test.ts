@@ -356,7 +356,8 @@ describe("useConnect", () => {
 
   test("what Apple's script throws from connect() is handed on as it came, and is the hook's error too", async () => {
     const { music } = page();
-    const boom = { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" };
+    // A failure of the script's own, not a decline, which is AUTHORIZATION_ERROR and resolves to nothing.
+    const boom = { errorCode: "UNAUTHORIZED_ERROR", message: "Unauthorized" };
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script rejects with an object of its own, not an Error
     const musicKit = kit({ authorize: () => Promise.reject(boom) });
     const { Probe, seen } = probe(() => ({ connect: useConnect({ app: APP, musicKit }), token: useMusicUserToken()[0] }));
