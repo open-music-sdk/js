@@ -367,7 +367,7 @@ describe("whereOf: which request failed, with no id of the listener's in it", ()
     ["a path, its ids left out", new AppleMusicError("ApiError", "500 /v1/me/library/playlists/p.AbC123/tracks: Oops (detail)", { status: 500 }), "/v1/me/library/playlists/{id}/tracks"],
     ["a catalog path, its storefront kept", new AppleMusicError("NetworkError", "GET /v1/catalog/gb/songs/1440833098/library: fetch failed"), "/v1/catalog/gb/songs/{id}/library"],
     ["the function that found the answer wanting", new AppleMusicError("ApiError", "getSongRating: Apple answered with no resource", { status: 200 }), "getSongRating"],
-    ["nothing, where the error names neither", new AppleMusicError("UserTokenInvalid", "No storefront configured and no Music User Token to resolve one from"), undefined],
+    ["that it names none, where the error names neither", new AppleMusicError("UserTokenInvalid", "No storefront configured and no Music User Token to resolve one from"), "a request it does not name"],
   ])("%s", (_what, error, where) => {
     expect(whereOf(error)).toBe(where);
   });
@@ -1142,6 +1142,17 @@ describe("add-to-library and add-to-favorites", () => {
     expect(cleanupOf()).toContain('Undo the favorite on the song "Name of s2" by Artist of s2: open https://music.apple.com/gb/x/s2, and choose Undo Favorite from its … menu. It went into your library as well: choose Delete from Library from the same menu.');
   });
 
+  test("a favorite whose answer was lost may have been made, and is undone in the steps as one that may not be there", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "POST") return Promise.reject(new TypeError("fetch failed"));
+      return real(req);
+    });
+    expect(await main(["check", "add-to-favorites", "--write", "--no-color"])).toBe(1);
+    expect(cleanupOf()).toMatch(/Undo the favorite on the song "Name of s2".*\(Apple's answer was lost, so it may not be there\)/);
+  });
+
   test("a favorite Apple refuses leaves nothing to undo, and the check is ✗", async () => {
     apple.failing["/v1/me/favorites"] = 400;
     expect(await main(["check", "add-to-favorites", "--write", "--no-color"])).toBe(1);
@@ -1237,6 +1248,21 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     // Twelve songs an album: the first 100 come from a1 to a9.
     expect(cleanupOf()).toContain('"Name of a9"');
     expect(cleanupOf()).not.toContain('"Name of a10"');
+  });
+
+  test("100 sent after 300 were refused, whose answer is lost, may have landed: their albums are in the steps, and the check is ✗", async () => {
+    apple.appendMost = 100;
+    apple.appendLost = "landed";
+    expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("playlist").at(-1)).toBe("✗");
+    expect(cleanupOf()).toContain('"Name of a9"');
+    expect(cleanupOf()).not.toContain('"Name of a10"');
+  });
+
+  test("a song on two chart albums is added once", async () => {
+    apple.albums = [catalogItem("albums", "a1"), catalogItem("albums", "a1")];
+    await main(["check", "playlist", "--write", "--no-color"]);
+    expect(linesOf("playlist")).toContain("· playlist: one request took 12 tracks.");
   });
 
   test("tracks refused at both sizes leave no albums to delete, since nothing was added", async () => {

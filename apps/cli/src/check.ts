@@ -182,16 +182,16 @@ export function brief(e: AppleMusicError): string {
 /**
  * Which request failed, from the error's own words: its path with every id in it left out, such as
  * `/v1/me/library/playlists/{id}/tracks`, since a library's ids are the listener's; or else the function that found
- * the answer wanting, such as `getSongRating`. Undefined when the error names neither.
+ * the answer wanting, such as `getSongRating`; or, where the error names neither, that it does not.
  */
-export function whereOf(e: AppleMusicError): string | undefined {
+export function whereOf(e: AppleMusicError): string {
   const path = /\/v1\/[^\s:?]*/.exec(e.message)?.[0];
   if (path !== undefined) {
     // What names a collection is small letters and hyphens; anything else after `/v1` is an id.
     const [, , ...segments] = path.split("/");
     return ["/v1", ...segments.map((segment) => (/^[a-z-]*$/.test(segment) ? segment : "{id}"))].join("/");
   }
-  return /^([a-z][A-Za-z]*): /.exec(e.message)?.[1];
+  return /^([a-z][A-Za-z]*): /.exec(e.message)?.[1] ?? "a request it does not name";
 }
 
 /**
@@ -900,10 +900,7 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
       } catch (e) {
         // Ctrl+C ends the run: core hands on the reason the signal aborted with, as it is.
         if (stop.signal.aborted) throw stop.signal.reason as Error;
-        if (isAppleMusicError(e)) {
-          const where = whereOf(e);
-          line("failed", `${brief(e)}${where === undefined ? "" : ` (at ${where})`}, so this was not answered.`);
-        }
+        if (isAppleMusicError(e)) line("failed", `${brief(e)} (at ${whereOf(e)}), so this was not answered.`);
         else {
           // A bug, of check's or in what it was handed: said, and the checks after it still asked. What it threw may
           // name a path of the listener's, so it goes to stderr, with the person, not into the report.
