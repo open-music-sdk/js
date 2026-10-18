@@ -8,7 +8,7 @@ import { inspect } from "node:util";
 import manifest from "../package.json" with { type: "json" };
 import { createRateLimiter, createServerClient, getCharts, isAppleMusicError } from "@open-music-sdk/server";
 import { isOnHost } from "@open-music-sdk/core";
-import { PACE, at, brief, isNotFound, itemsOf, list, plural, said, text, whereOf, type tCharts, type tItem, type tLeft, type tMark, type tWritten } from "./check-ask";
+import { PACE, at, brief, isNotFound, itemsOf, list, plural, said, text, whereOf, type tCharts, type tDiff, type tItem, type tLeft, type tMark, type tWritten } from "./check-ask";
 import { CHECKS, PACKAGES, type tCheck } from "./check-questions";
 import { ROWS, TRIPS, type tAsk, type tOutcome, type tRow } from "./check-sweep";
 import { NAME, TIMEOUT_MS, examine, out, paint, say, type tContext, type tFlags } from "./commands";
@@ -356,8 +356,9 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
         for (const diff of done.diffs) differences.set(diff.said, (differences.get(diff.said) ?? new Set()).add(diff.label));
       }
       for (const each of asked) {
-        const line = (mark: tMark, words: string) => {
+        const line = (mark: tMark, words: string, diffs: readonly tDiff[] = []) => {
           print({ mark, label: each.id, words });
+          for (const diff of diffs) differences.set(said(diff), (differences.get(said(diff)) ?? new Set()).add(each.id));
         };
         say(`Asking: ${each.id}…`);
         try {

@@ -665,7 +665,7 @@ function ratingTrip(type: tRatedType, fns: { readonly get: tGet; readonly gets: 
       await fns.del(r.music, id, signal);
       const gone = await seconds(r, "the rating to be taken away", async () => !(await ratingIn(() => fns.get(r.music, id, signal))).held);
       if (gone !== undefined) r.left.ratings.splice(r.left.ratings.indexOf(rated), 1);
-      if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`);
+      if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`, diffs);
 
       const wrong = [
         showed === undefined ? "it did not show within a minute" : alone.value === -1 ? undefined : `it was read back as ${printable(String(alone.value))}`,
@@ -758,7 +758,7 @@ async function folderTrip(r: tRun): Promise<void> {
     parent = idsIn(body)[0];
   }
   const listed = await seconds(r, "the new folder to be among the root folder's", async () => (await idsOf(sdk.getLibraryPlaylistFolderRelationship(r.music, root, "children", { limit: 100, ...signal }))).includes(id), madeAt);
-  if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`);
+  if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`, diffs);
   const wrong = [
     readable === undefined ? "it could not be read by its id within a minute" : undefined,
     listed === undefined ? "it was not among the root folder's children within a minute" : undefined,

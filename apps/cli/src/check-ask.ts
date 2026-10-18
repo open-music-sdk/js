@@ -87,8 +87,8 @@ export interface tRun {
   readonly signal: AbortSignal;
   readonly charts: () => Promise<tCharts>;
   readonly left: tLeft;
-  /** Prints a line for this check. */
-  readonly line: (mark: tMark, text: string) => void;
+  /** Prints a line for this check, with how what Apple answered differs from its type, for the run's list of those. */
+  readonly line: (mark: tMark, text: string, diffs?: readonly tDiff[]) => void;
   /** What the run's checks make once and share, by a name of its own: what it added, and what it found to ask with. */
   readonly memo: Map<string, Promise<unknown>>;
   /** The name the run's playlists and folder are given, which tells the listener when they were made. */
@@ -349,7 +349,7 @@ export async function libraryIdOf(run: tRun, { type, id }: Pick<tItem, "type" | 
   if (copy !== undefined && shape !== undefined && !run.memo.has(`library shape ${type}`)) {
     run.memo.set(`library shape ${type}`, Promise.resolve());
     const diffs = diffsOf(shape, body);
-    if (diffs.length > 0) run.line("differs", `the ${type} library relationship, which check asks by hand: types: ${someOf(diffs)}.`);
+    if (diffs.length > 0) run.line("differs", `the ${type} library relationship, which check asks by hand: types: ${someOf(diffs)}.`, diffs);
   }
   return copy;
 }

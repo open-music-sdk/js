@@ -507,7 +507,7 @@ async function playlistCheck(run: tRun): Promise<void> {
   run.line("report", id === undefined ? "the answer to making a playlist held no playlist, so apply has to find it by its name and description." : "the answer to making a playlist held the playlist, with its id.");
   // The answer is held to its type too: createLibraryPlaylist is asked here alone, since a run makes one playlist.
   const diffs = id === undefined ? [] : diffsOf(schemas.libraryPlaylistsResponse, answer);
-  if (diffs.length > 0) run.line("differs", `createLibraryPlaylist's answer: types: ${someOf(diffs)}.`);
+  if (diffs.length > 0) run.line("differs", `createLibraryPlaylist's answer: types: ${someOf(diffs)}.`, diffs);
 
   // Asked for by its id, as `read` asks, and looked for among the listener's playlists, where `apply` looks: at once,
   // each timed from when Apple took it. Without an id in the answer, the id is the one the listing gives.

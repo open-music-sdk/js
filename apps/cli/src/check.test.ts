@@ -2110,6 +2110,8 @@ describe("rating round trips: a dislike set on what the listener had not rated, 
     });
     expect(await main(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
     expect(linesOf("setSongRating")).toEqual(["≠ setSongRating: types: ratings href: expected string.", "≠ setSongRating: a rating of -1 was set, but it was read back as 1."]);
+    // A round trip's differences from the types are in the run's list of them, as the rows' are.
+    expect(stdout.slice(stdout.indexOf("Differences from the types"))).toBe(["Differences from the types (1):", "  ratings href: expected string", "    setSongRating", ""].join(LF));
   });
 
   test("a rating the run could not take away is taken away when the run ends, and one that cannot be is a step of the cleanup", async () => {
