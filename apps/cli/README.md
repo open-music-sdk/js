@@ -150,8 +150,9 @@ The checks that write run only with `--write`, since what they add stays: Apple'
 or anything else out of your library, and `check` doesn't take its favorite back. They add up to four things to
 your library, an album's songs with it, make one song a favorite, and make a playlist of up to 300 songs, which may
 put those songs in your library too. Each is something you didn't have, and the run ends with numbered
-steps that remove them in the Music app, with a link to each, and what to look for where a write may or may not have
-carried something else in with it. They're printed whatever happens, Ctrl+C and a SIGTERM included, and a second
+steps that remove them, each with a link to its own page in Apple Music, whose … menu takes it out: the library's
+own lists don't. A song's link is its own page, not its album's, where Delete from Library takes out the whole
+album. Where a write may or may not have carried something else in with it, the steps say what to look for. They're printed whatever happens, Ctrl+C and a SIGTERM included, and a second
 Ctrl+C waits for them. Run them on an account you don't mind cluttering, with an Apple Music subscription.
 
 What `check` finds goes into [Differences from Apple's

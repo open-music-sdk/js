@@ -216,19 +216,27 @@ async function seconds(run: tRun, what: string, shown: () => Promise<boolean>, s
 }
 const took = (s: number | undefined) => (s === undefined ? "more than a minute" : plural(s, "second"));
 
-/** The resources of a chart, those with an id. */
-function itemsOf(type: tItem["type"], data: unknown): tItem[] {
+/**
+ * The resources of a chart, those with an id, each with the page that opens it in Apple Music. A song's own `url` is
+ * its album's page, where Delete from Library takes the whole album out, as it did on 18 October 2026: a song gets the
+ * page of its own, which `/song/<id>` leads to.
+ */
+function itemsOf(type: tItem["type"], data: unknown, storefront: string): tItem[] {
   return list(data).flatMap((resource) => {
     const id = idOf(resource);
     if (id === undefined) return [];
     const attributes = at(resource, "attributes");
-    return [{ type, id, attributes, name: text(at(attributes, "name")) ?? id, by: text(at(attributes, "artistName")) ?? text(at(attributes, "curatorName")), url: text(at(attributes, "url")) }];
+    const url = type === "songs" ? `https://music.apple.com/${encodeURIComponent(storefront)}/song/${id}` : text(at(attributes, "url"));
+    return [{ type, id, attributes, name: text(at(attributes, "name")) ?? id, by: text(at(attributes, "artistName")) ?? text(at(attributes, "curatorName")), url }];
   });
 }
 
 /**
  * Whether a catalog resource is in the listener's library: its `library` relationship, which needs their token and
- * which no client function asks for, so the path is put together here, each segment encoded as core's are.
+ * which no client function asks for, so the path is put together here, each segment encoded as core's are. Against
+ * the live API on 18 October 2026 it answered 404 for each of a run's picks, none of which the listener had, and
+ * with the listener's copy once one was added. Whether it answers for an album of which they hold some songs alone
+ * isn't known: such an album would be taken for one they don't have.
  */
 async function inLibrary(run: tRun, { type, id }: Pick<tItem, "type" | "id">): Promise<boolean> {
   try {
@@ -785,7 +793,8 @@ const label = (item: tItem) => {
 const link = ({ url }: tItem) => (url !== undefined && isOnHost(url, ["music.apple.com"]) ? printable(url) : "search for it in the Music app");
 const UNSURE = " (Apple's answer was lost, so it may not be there)";
 const unsure = (written: tWritten<unknown>) => (written.sure ? "" : UNSURE);
-const DELETE = "and choose Delete from Library from its … menu";
+// From the page each opens: the lists of the library itself had no Delete from Library on 18 October 2026.
+const DELETE = "and choose Delete from Library from the … menu on the page it opens";
 
 /** The steps that undo what the write checks left, numbered; nothing when they left nothing. */
 function cleanup(left: tLeft): void {
@@ -793,16 +802,16 @@ function cleanup(left: tLeft): void {
   // Every playlist of the name: apply may have made a second, and failed before it said so.
   for (const name of new Set(left.playlists.map((each) => each.what))) {
     const sure = left.playlists.some((each) => each.what === name && each.sure);
-    steps.push({ step: `Delete every playlist named "${printable(name)}": find them in Playlists, and choose Delete from Library from each one's … menu.${sure ? "" : UNSURE}` });
+    steps.push({ step: `Delete every playlist named "${printable(name)}": open each from your playlists, and choose Delete from Library from the … menu on its page.${sure ? "" : UNSURE}` });
   }
   if (left.library.length > 0) steps.push({ step: `Delete these from your library: open each, ${DELETE}.`, items: left.library.map((each) => `${label(each.what)}: ${link(each.what)}${unsure(each)}`) });
   for (const { playlist, seen } of left.playlistsSongs) {
-    const each = `open ${link(playlist)}, and choose Delete from Library from each song's … menu.`;
+    const each = `open ${link(playlist)}, and choose Delete from Library from the … menu of each song on that page.`;
     steps.push({ step: seen ? `Adding ${label(playlist)} put its songs in your library as well. Delete them: ${each}` : `If adding ${label(playlist)} put its songs in your library, delete them: ${each}` });
   }
   for (const favorite of left.favorites) {
     const library = favorite.inLibrary ? " It went into your library as well: choose Delete from Library from the same menu." : " If it shows up in your library, choose Delete from Library from the same menu as well.";
-    steps.push({ step: `Undo the favorite on ${label(favorite.what)}: open ${link(favorite.what)}, and choose Undo Favorite from its … menu.${library}${unsure(favorite)}` });
+    steps.push({ step: `Undo the favorite on ${label(favorite.what)}: open ${link(favorite.what)}, and choose Undo Favorite from the … menu on its page.${library}${unsure(favorite)}` });
   }
   const songs = left.playlistSongs;
   if (songs !== undefined)
@@ -884,10 +893,10 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
               (body) => {
                 const first = (type: string) => list(at(body, "results", type))[0];
                 return {
-                  songs: itemsOf("songs", at(first("songs"), "data")),
-                  albums: itemsOf("albums", at(first("albums"), "data")),
-                  playlists: itemsOf("playlists", at(first("playlists"), "data")),
-                  musicVideos: itemsOf("music-videos", at(first("music-videos"), "data")),
+                  songs: itemsOf("songs", at(first("songs"), "data"), storefront),
+                  albums: itemsOf("albums", at(first("albums"), "data"), storefront),
+                  playlists: itemsOf("playlists", at(first("playlists"), "data"), storefront),
+                  musicVideos: itemsOf("music-videos", at(first("music-videos"), "data"), storefront),
                   songsNext: text(at(first("songs"), "next")),
                 };
               },

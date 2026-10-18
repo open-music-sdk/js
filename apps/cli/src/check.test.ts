@@ -466,24 +466,23 @@ describe("the owner's two rules for a run that writes, over a whole run", () => 
     apple.catalogPlaylistSongsInLibrary = true;
     await main(["check", "--write", "--no-color"]);
     const steps = cleanupOf();
-    // What the steps link to, each whole.
-    const links = new Set(steps.match(/https:\/\/music\.apple\.com\/gb\/x\/[\w.-]+/g));
-    const link = (id: string) => `https://music.apple.com/gb/x/${id}`;
+    // What the steps link to, by the id each link ends in: a song's own page, or the page Apple gave the rest.
+    const linked = new Set(Array.from(steps.matchAll(/https:\/\/music\.apple\.com\/gb\/(?:x|song)\/([\w.-]+)/g), (m) => m[1]));
 
     // Every addition and every favorite, by the link of what was sent.
     for (const req of asked.filter((each) => each.method === "POST" && ["/v1/me/library", "/v1/me/favorites"].includes(new URL(each.url).pathname)))
-      for (const ids of new URL(req.url).searchParams.values()) for (const id of ids.split(",")) expect(links.has(link(id)), id).toBe(true);
+      for (const ids of new URL(req.url).searchParams.values()) for (const id of ids.split(",")) expect(linked.has(id), id).toBe(true);
     // Every playlist made, by its name, and the album of every song added to one.
     const made = apple.listener.filter((playlist) => playlist.id.startsWith("p.made"));
     expect(made.length).toBeGreaterThan(0);
     for (const playlist of made) {
       expect(steps).toContain(`Delete every playlist named "${playlist.name}"`);
-      for (const track of playlist.tracks) expect(links.has(link(/^(a\d+)t/.exec(track.catalogId)?.[1] ?? "none")), track.catalogId).toBe(true);
+      for (const track of playlist.tracks) expect(linked.has(/^(a\d+)t/.exec(track.catalogId)?.[1] ?? "none"), track.catalogId).toBe(true);
     }
     // What was in the library before the run is nowhere in the steps, and a song rated before it is no favorite to undo.
-    for (const id of ["s1", "a1", "pl.chart2"]) expect(links.has(link(id)), id).toBe(false);
+    for (const id of ["s1", "a1", "pl.chart2"]) expect(linked.has(id), id).toBe(false);
     expect(steps).toMatch(/Undo the favorite on/);
-    expect(steps).not.toMatch(/Undo the favorite on [^\n]*\/x\/s2\b/);
+    expect(steps).not.toMatch(/Undo the favorite on [^\n]*\/song\/s2\b/);
   });
 });
 
@@ -1039,11 +1038,12 @@ describe("add-to-library and add-to-favorites", () => {
     ]);
     expect(posts()).toEqual(["/v1/me/library", "/v1/me/library", "/v1/me/library", "/v1/me/library"]);
     const steps = cleanupOf();
-    // s1 was the listener's already, so s2 was added, and only what was added is to be deleted.
-    expect(steps).toContain('- the song "Name of s2" by Artist of s2: https://music.apple.com/gb/x/s2');
+    // s1 was the listener's already, so s2 was added, and only what was added is to be deleted. A song is linked to
+    // its own page, where Delete from Library takes out the song alone, not to its album's, which Apple gives it.
+    expect(steps).toContain('- the song "Name of s2" by Artist of s2: https://music.apple.com/gb/song/s2');
     expect(steps).not.toContain("Name of s1");
     expect(steps).toContain('- the album "Name of a1" by Artist of a1, with its songs: https://music.apple.com/gb/x/a1');
-    expect(steps).toContain("choose Delete from Library from its … menu");
+    expect(steps).toContain("Delete these from your library: open each, and choose Delete from Library from the … menu on the page it opens.");
     // The playlist's songs were not seen in the library, but may show up there.
     expect(steps).toContain('If adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library, delete them: open https://music.apple.com/gb/x/pl.chart1');
   });
@@ -1053,7 +1053,7 @@ describe("add-to-library and add-to-favorites", () => {
     await main(["check", "add-to-library", "--write", "--no-color"]);
     expect(linesOf("add-to-library").at(-1)).toBe("· add-to-library: adding the playlist put its songs in the library too.");
     expect(cleanupOf()).toContain(
-      'Adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library as well. Delete them: open https://music.apple.com/gb/x/pl.chart1, and choose Delete from Library from each song\'s … menu.',
+      'Adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library as well. Delete them: open https://music.apple.com/gb/x/pl.chart1, and choose Delete from Library from the … menu of each song on that page.',
     );
   });
 
@@ -1081,14 +1081,17 @@ describe("add-to-library and add-to-favorites", () => {
 
   test("a link is offered only when it is an https address of Apple Music, and a name loses what would turn how it reads", async () => {
     const override = String.fromCharCode(0x202e);
+    // A song's link is its own page, made from its id, whatever its url holds.
     apple.songs = [catalogItem("songs", "s1", { name: `Hit${override}lanigiro`, url: "javascript:alert(1)" })];
     apple.albums = [catalogItem("albums", "a1", { url: "https://music.apple.com.evil.example/gb/album/1" })];
     apple.playlists = [catalogItem("playlists", "pl.1", { url: "http://music.apple.com/gb/playlist/1" })];
+    apple.videos = [catalogItem("music-videos", "mv1", { url: "javascript:alert(1)" })];
     await main(["check", "add-to-library", "--write", "--no-color"]);
-    expect(cleanupOf()).toContain('- the song "Hitlanigiro" by Artist of s1: search for it in the Music app');
+    expect(cleanupOf()).toContain('- the song "Hitlanigiro" by Artist of s1: https://music.apple.com/gb/song/s1');
     expect(cleanupOf()).toContain('- the album "Name of a1" by Artist of a1, with its songs: search for it in the Music app');
     expect(cleanupOf()).toContain('- the playlist "Name of pl.1" by Artist of pl.1: search for it in the Music app');
-    expect(cleanupOf()).toContain('- the music video "Name of mv1" by Artist of mv1: https://music.apple.com/gb/x/mv1');
+    expect(cleanupOf()).toContain('- the music video "Name of mv1" by Artist of mv1: search for it in the Music app');
+    expect(cleanupOf()).not.toContain("javascript:");
   });
 
   test.each([".", ".."])("a chart id of %s, which a URL reads as a step in the path, is passed over and never asked about", async (id) => {
@@ -1131,7 +1134,7 @@ describe("add-to-library and add-to-favorites", () => {
     });
     expect(await main(["check", "add-to-library", "--write", "--no-color"])).toBe(1);
     expect(linesOf("add-to-library")).toEqual(["✗ add-to-library: Apple could not be reached (at /v1/me/library), so this was not answered."]);
-    expect(cleanupOf()).toContain("Name of s1\" by Artist of s1: https://music.apple.com/gb/x/s1 (Apple's answer was lost, so it may not be there)");
+    expect(cleanupOf()).toContain("Name of s1\" by Artist of s1: https://music.apple.com/gb/song/s1 (Apple's answer was lost, so it may not be there)");
   });
 
   test("a favorite that shows as a rating, made of a song neither in the library nor rated, is undone in the cleanup", async () => {
@@ -1141,7 +1144,7 @@ describe("add-to-library and add-to-favorites", () => {
     // s1 is rated and s2 in the library, so s3.
     // Not seen in the library, but it may show up there later.
     expect(cleanupOf()).toContain(
-      'Undo the favorite on the song "Name of s3" by Artist of s3: open https://music.apple.com/gb/x/s3, and choose Undo Favorite from its … menu. If it shows up in your library, choose Delete from Library from the same menu as well.',
+      'Undo the favorite on the song "Name of s3" by Artist of s3: open https://music.apple.com/gb/song/s3, and choose Undo Favorite from the … menu on its page. If it shows up in your library, choose Delete from Library from the same menu as well.',
     );
     expect(cleanupOf()).not.toContain("Delete these from your library");
   });
@@ -1151,7 +1154,9 @@ describe("add-to-library and add-to-favorites", () => {
     apple.favoriteInLibrary = true;
     expect(await finish(["check", "add-to-favorites", "--write", "--no-color"])).toBe(0);
     expect(linesOf("add-to-favorites")).toEqual(["· add-to-favorites: addToFavorites took a song, which had no rating a minute later: a favorite is not a rating.", "· add-to-favorites: the song made a favorite was put in the library too."]);
-    expect(cleanupOf()).toContain('Undo the favorite on the song "Name of s2" by Artist of s2: open https://music.apple.com/gb/x/s2, and choose Undo Favorite from its … menu. It went into your library as well: choose Delete from Library from the same menu.');
+    expect(cleanupOf()).toContain(
+      'Undo the favorite on the song "Name of s2" by Artist of s2: open https://music.apple.com/gb/song/s2, and choose Undo Favorite from the … menu on its page. It went into your library as well: choose Delete from Library from the same menu.',
+    );
   });
 
   test("a favorite whose answer was lost may have been made, and is undone in the steps as one that may not be there", async () => {
@@ -1200,7 +1205,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     // One playlist made, one append: apply wrote nothing.
     expect(posts()).toEqual(["/v1/me/library/playlists", "/v1/me/library/playlists/p.made2/tracks"]);
     const steps = cleanupOf();
-    expect(steps).toMatch(/1\. Delete every playlist named "open-music-sdk check \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC": find them in Playlists/);
+    expect(steps).toMatch(/1\. Delete every playlist named "open-music-sdk check \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC": open each from your playlists/);
     expect(steps).toContain("2. The playlist's songs went into your library as well.");
     // Twelve songs an album, so 300 songs from 25 albums; a1 to a25.
     expect(steps).toContain('- the album "Name of a25" by Artist of a25, with its songs');
@@ -1432,7 +1437,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     });
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
     expect(marksOf("playlist")).toEqual(["✗"]);
-    expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC": find them in Playlists, and choose Delete from Library from each one's … menu\. \(Apple's answer was lost, so it may not be there\)/);
+    expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC": open each from your playlists, and choose Delete from Library from the … menu on its page\. \(Apple's answer was lost, so it may not be there\)/);
   });
 
   test("Ctrl+C while a request is under way stops it too, and the cleanup is printed", async () => {
