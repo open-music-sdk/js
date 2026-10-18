@@ -212,6 +212,32 @@ async function undoRatings(left: tLeft): Promise<void> {
   }
 }
 
+/** Words in a list: `a`, `a and b`, `a, b and c`. */
+const listed = (words: readonly string[]) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.slice(-1).join("")}`);
+
+/** What the checks chosen write, said before they run, or undefined when none of them writes. */
+function written(checks: readonly tCheck[]): string | undefined {
+  const ids = new Set(checks.filter((each) => each.writes).map((each) => each.id));
+  if (ids.size === 0) return undefined;
+  const copies = ["setLibrarySongRating", "setLibraryAlbumRating", "setLibraryMusicVideoRating"].filter((id) => ids.has(id)).length;
+  const added = [
+    ids.has("add-to-library") ? "up to four things added to it, an album's songs with it" : copies > 0 ? `${plural(copies, "thing")} added to it to rate` : undefined,
+    ids.has("add-to-favorites") ? "one song made a favorite" : undefined,
+    ids.has("playlist") ? "a playlist of up to 300 songs, which may put them in the library too" : undefined,
+    ids.has("setLibraryPlaylistRating") ? "an empty playlist to rate" : undefined,
+    ids.has("createLibraryPlaylistFolder") ? "a playlist folder" : undefined,
+  ].filter((part) => part !== undefined);
+  const ratings = TRIPS.filter((trip) => trip.id.endsWith("Rating") && ids.has(trip.id)).length;
+  return [
+    "--write:",
+    added.length === 0 ? undefined : `what is added stays, since Apple's API has no way to take it out of the library again: ${listed(added)}.`,
+    ratings === 0 ? undefined : `A dislike is set on ${plural(ratings, "thing")} you had not rated, and taken away again.`,
+    added.length === 0 ? undefined : "The steps to remove the rest are printed at the end.",
+  ]
+    .filter((part) => part !== undefined)
+    .join(" ");
+}
+
 /** What the run is made from, for an issue: the CLI's version, Node's and the system's. */
 const header = () => `${NAME} ${manifest.version} · Node ${process.versions.node} · ${process.platform} ${process.arch}`;
 
@@ -232,7 +258,10 @@ function wrapped(words: readonly string[], indent: string, width = 112): string[
 /** The help's list of what can be named: the questions, the functions by package, and the packages. */
 export function checkHelp(): string[] {
   const width = Math.max(...CHECKS.map((each) => each.id.length)) + 2;
-  const reads = (pkg: string) => ROWS.filter((each) => each.pkg === pkg && each.entry.kind === "row").map((each) => `${each.fn},`);
+  /** A function as words, with its names in brackets after it: `getArtistView (appears-on-albums, …, top-songs),`. */
+  const named = (fn: string, names: readonly string[] | undefined) =>
+    names === undefined || names.length === 0 ? [`${fn},`] : [fn, ...names.map((name, i) => `${i === 0 ? "(" : ""}${name}${i === names.length - 1 ? ")," : ","}`)];
+  const reads = (pkg: string) => ROWS.flatMap(({ pkg: of, fn, entry }) => (of === pkg && entry.kind === "row" ? named(fn, entry.names) : []));
   return [
     "Questions, by their names:",
     ...CHECKS.map((each) => `  ${each.id.padEnd(width)}${each.about}${each.writes ? " (--write)" : ""}`),
@@ -244,10 +273,7 @@ export function checkHelp(): string[] {
     ...wrapped(
       [
         "client-user, round trips with --write, each named for the function it writes with, and run by the others it asks:",
-        ...TRIPS.flatMap((trip) => {
-          const others = ROWS.filter(({ fn, entry }) => entry.kind === "check" && entry.to === trip.id && fn !== trip.id).map(({ fn }) => fn);
-          return others.length === 0 ? [`${trip.id},`] : [trip.id, `(${others.join(", ")}),`];
-        }),
+        ...TRIPS.flatMap((trip) => named(trip.id, ROWS.filter(({ fn, entry }) => entry.kind === "check" && entry.to === trip.id && fn !== trip.id).map(({ fn }) => fn))),
       ],
       "  ",
     ),
@@ -334,10 +360,8 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
   };
   try {
     if (names.length === 0 && flags.write !== true) say("What writes to your library is left out; --write adds it.");
-    if (checks.some((each) => each.writes))
-      say(
-        "--write: what is added stays, since Apple's API has no way to take it out of the library again: up to four things added to it, an album's songs with it, one song made a favorite, a playlist of up to 300 songs, which may put them in the library too, an empty playlist and a playlist folder. Ratings set are taken away again. The steps to remove the rest are printed at the end.",
-      );
+    const writing = written(checks);
+    if (writing !== undefined) say(writing);
     if (rows.length > 0) say(`Asking ${plural(rows.length, "function")}, ten requests at a time…`);
     // Every row is asked at once, at the run's pace, and printed in order as the ones before it are done.
     const answers = new Map(rows.map((picked) => [picked, rowLines(ask, picked)]));

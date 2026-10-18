@@ -642,7 +642,18 @@ describe("which checks run: by name, in the list's order, and the write checks o
     const warning = stderr.indexOf("--write: what is added stays");
     expect(warning).toBeGreaterThan(-1);
     expect(warning).toBeLessThan(stderr.indexOf("Asking: add-to-library"));
-    expect(stderr).toContain("an album's songs with it, one song made a favorite, a playlist of up to 300 songs, which may put them in the library too, an empty playlist and a playlist folder. Ratings set are taken away again.");
+    expect(stderr).toContain(
+      "--write: what is added stays, since Apple's API has no way to take it out of the library again: up to four things added to it, an album's songs with it, one song made a favorite, a playlist of up to 300 songs, which may put them in the library too, an empty playlist to rate and a playlist folder. A dislike is set on 9 things you had not rated, and taken away again. The steps to remove the rest are printed at the end.",
+    );
+  });
+
+  test.each([
+    ["setSongRating", "--write: A dislike is set on 1 thing you had not rated, and taken away again."],
+    ["setLibrarySongRating", "--write: what is added stays, since Apple's API has no way to take it out of the library again: 1 thing added to it to rate. A dislike is set on 1 thing you had not rated, and taken away again. The steps to remove the rest are printed at the end."],
+    ["createLibraryPlaylistFolder", "--write: what is added stays, since Apple's API has no way to take it out of the library again: a playlist folder. The steps to remove the rest are printed at the end."],
+  ])("what %s alone writes is all that is said before it runs", async (id, words) => {
+    await main(["check", id, "--write", "--no-color"]);
+    expect(stderr.split(LF).filter((line) => line.startsWith("--write:"))).toEqual([words]);
   });
 
   test("help lists every check by name, and marks those that write", async () => {
@@ -2040,7 +2051,12 @@ describe("the sweep: every function of client-catalog and client-user, each answ
 
   test("help lists every function by its package, the round trips, the functions a question asks, and the packages", async () => {
     expect(await main(["help", "check"])).toBe(0);
-    for (const { fn, entry } of ROWS) expect(stdout, fn).toContain(entry.kind === "row" ? `${fn},` : fn);
+    for (const { fn, entry } of ROWS) {
+      expect(stdout, fn).toContain(entry.kind === "row" && entry.names === undefined ? `${fn},` : fn);
+      // Each name of a function too, as it is named: getArtistView (appears-on-albums, …, top-songs).
+      if (entry.kind === "row" && entry.names !== undefined) for (const name of entry.names) expect(stdout, `${fn}:${name}`).toMatch(new RegExp(`[( ]${name}[,)]`));
+    }
+    expect(stdout).toMatch(/getArtistView\s+\(appears-on-albums,/);
     expect(stdout).toContain("addToLibrary (add-to-library),");
     expect(stdout).toContain("Packages, each its functions and its questions: client-catalog, client-user, lib-playlists, util-artwork, lib-preview-player, user-token.");
   });
@@ -2485,7 +2501,7 @@ describe("what the sweep and its round trips say when Apple answers otherwise", 
     apple.answers["/v1/catalog/gb/station-genres?offset=1"] = { data: [] };
     expect(await main(["check", "listGenres", "listStationGenres", "--no-color"])).toBe(0);
     expect(rowsOf("listGenres")).toEqual(["✓ listGenres: as the types have it, and page 2 too, by its next link, which carries nothing."]);
-    expect(rowsOf("listStationGenres")).toEqual(["✓ listStationGenres: as the types have it, and page 2 too, by its next link, which carries offset."]);
+    expect(rowsOf("listStationGenres")).toEqual(["✓ listStationGenres: as the types have it; page 2, by its next link, which carries offset, held nothing."]);
   });
 
   test("a language tag Apple does not give is nothing seen: -", async () => {

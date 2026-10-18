@@ -230,7 +230,8 @@ async function attempt<T>(a: tAsk, what: string, tries: readonly T[], call: (inp
     // The next link as Apple gave it, as core's paginate sends it: a page 2 that differs where page 1 did not is the
     // link's doing, as when it leaves out what page 1 was asked with.
     const second = await a.music.request(next, o(a));
-    const later = resourcesIn(second) > 0 ? diffsOf(schema, second) : [];
+    if (resourcesIn(second) === 0) return { mark: "same", words: `as the types have it; page 2, by its next link, which carries ${carries(next)}, held nothing.`, diffs: [] };
+    const later = diffsOf(schema, second);
     if (later.length > 0) return { mark: "differs", words: `page 1 is as the types have it, and page 2, by its next link, which carries ${carries(next)}, is not: ${someOf(later)}. The link may leave out what page 1 was asked with, and core's paginate sends it as Apple gave it.`, diffs: [] };
     return { mark: "same", words: `as the types have it, and page 2 too, by its next link, which carries ${carries(next)}.`, diffs: [] };
   }
