@@ -437,18 +437,28 @@ describe("which checks run: by name, in the list's order, and the write checks o
 describe("the limit on each request", () => {
   test("a request Apple never answers is given up on at the CLI's limit, each try of it, and the check is ✗, the run going on", async () => {
     const timeout = AbortSignal.timeout.bind(AbortSignal);
-    // The limit is asked for at 30 seconds, and waited out here at 5 milliseconds.
-    const asked30 = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => timeout(ms === 30_000 ? 5 : ms));
+    // Each limit is asked for at 30 seconds and handed out unexpired, so that only the search runs its own out: cut
+    // short for every request, it ran out on a slow machine for doctor's too, which are answered.
+    const limits: AbortController[] = [];
+    const asked30 = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      if (ms !== 30_000) return timeout(ms);
+      const limit = new AbortController();
+      limits.push(limit);
+      return limit.signal;
+    });
     const real = answer;
     vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
       const req = new Request(input, init);
       if (new URL(req.url).pathname !== "/v1/catalog/gb/search") return real(req);
       asked.push(req);
-      return new Promise<Response>((_resolve, reject) => {
+      const pending = new Promise<Response>((_resolve, reject) => {
         req.signal.addEventListener("abort", () => {
           reject(req.signal.reason as Error);
         });
       });
+      // The run asks for a request's limit just before handing it to fetch, so the last one is this request's.
+      limits.at(-1)?.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+      return pending;
     });
     expect(await main(["check", "search-next", "isrc-next", "--no-color"])).toBe(1);
     expect(linesOf("search-next")).toEqual(["✗ search-next: Apple did not answer, each try given 30 seconds (at /v1/catalog/gb/search), so this was not answered."]);
