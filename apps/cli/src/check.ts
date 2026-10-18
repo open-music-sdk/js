@@ -272,13 +272,28 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
     const req = new Request(input, init);
     return fetch(req, { signal: AbortSignal.any([req.signal, AbortSignal.timeout(TIMEOUT_MS)]) });
   };
-  // The key is most likely the one the developer's app asks with too, and Apple counts its limit by the key: the run
-  // keeps to a pace that leaves the app room, since a run that drew 429s would draw them for the app's listeners.
-  const music = createServerClient({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, userToken: token, storefront, fetch: timed, rateLimit: createRateLimiter(PACE) });
-
   // Ctrl+C, or a SIGTERM, stops what is under way, and the steps to undo it are printed all the same. Pressed again
   // before they are, it is let go by, not left to end the process with them unprinted.
   const stop = new AbortController();
+  // The key is most likely the one the developer's app asks with too, and Apple counts its limit by the key: the run
+  // keeps to a pace that leaves the app room, and stops at the first 429, since a run that went on would keep the key
+  // limited for the app's listeners too.
+  const limited = () => {
+    stop.abort(new CliError("Apple is limiting requests for this key, so check stopped rather than keep it limited for your app's listeners too. Try again later.", 1));
+  };
+  const music = createServerClient({
+    pem: key.pem,
+    teamId: key.teamId,
+    keyId: key.keyId,
+    userToken: token,
+    storefront,
+    fetch: timed,
+    rateLimit: createRateLimiter(PACE),
+    onResponse: (res) => {
+      if (res.status === 429) limited();
+    },
+  });
+
   const interrupt = () => {
     stop.abort(new CliError("Stopped.", 130));
   };

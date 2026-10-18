@@ -273,7 +273,7 @@ export const someOf = (diffs: readonly tDiff[]) => `${diffs.slice(0, 3).map(said
  * write it waits on was taken: resolves to the whole seconds since then, or undefined. A read Apple fails is taken as not shown yet, as `apply`'s own reads take one. Once the first
  * read finds nothing, stderr says what is waited for, so that a minute's quiet is not taken for a hang.
  */
-export async function seconds(run: Pick<tRun, "signal">, what: string, shown: () => Promise<boolean>, start = Date.now()): Promise<number | undefined> {
+export async function seconds(run: Pick<tRun, "signal">, what: string, shown: () => Promise<boolean>, start = Date.now(), pause = () => 1000): Promise<number | undefined> {
   for (let tries = 1; ; tries++) {
     let yes = false;
     try {
@@ -285,7 +285,7 @@ export async function seconds(run: Pick<tRun, "signal">, what: string, shown: ()
     if (yes) return Math.floor((Date.now() - start) / 1000);
     if (Date.now() - start >= POLL_MS) return undefined;
     if (tries === 1) say(`  Waiting for ${what}, a minute at most…`);
-    await sleep(1000, run.signal);
+    await sleep(pause(), run.signal);
   }
 }
 export const took = (s: number | undefined) => (s === undefined ? "more than a minute" : plural(s, "second"));
@@ -352,11 +352,18 @@ export async function ratingOf(run: tRun, id: string): Promise<unknown> {
   }
 }
 
-/** A playlist of the listener's with this name, from all the pages of their playlists. */
-export async function listed(run: tRun, name: string): Promise<unknown> {
-  // Asked again every second while it waits, so a walk is held to the first thousand playlists.
-  for await (const playlist of run.music.user.listLibraryPlaylists({ limit: 100, maxPages: 10, signal: run.signal })) if (text(at(playlist, "attributes", "name")) === name) return playlist;
-  return undefined;
+/**
+ * A playlist of the listener's with this name, from the pages of their playlists, and how many pages that took. A
+ * walk is held to the first thousand playlists, and a poll that walked some pages waits a second for each before the
+ * next, so that a large library is walked at about a page a second rather than at the run's whole pace.
+ */
+export async function listed(run: tRun, name: string): Promise<{ readonly playlist: unknown; readonly pages: number }> {
+  let seen = 0;
+  for await (const playlist of run.music.user.listLibraryPlaylists({ limit: 100, maxPages: 10, signal: run.signal })) {
+    seen += 1;
+    if (text(at(playlist, "attributes", "name")) === name) return { playlist, pages: Math.ceil(seen / 100) };
+  }
+  return { playlist: undefined, pages: Math.max(1, Math.ceil(seen / 100)) };
 }
 
 /** What `addToLibrary` takes, one of each of which a run adds. */

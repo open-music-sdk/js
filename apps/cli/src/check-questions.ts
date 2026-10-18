@@ -504,7 +504,13 @@ async function playlistCheck(run: tRun): Promise<void> {
   const madeAt = Date.now();
   let found: unknown;
   const readable = (known: string) => seconds(run, "the new playlist to be read by its id", async () => (await getLibraryPlaylist(music, known, { signal }), true), madeAt);
-  const listing = () => seconds(run, "the new playlist to be among the library's", async () => (found = await listed(run, name)) !== undefined, madeAt);
+  let pages = 1;
+  const among = async () => {
+    const walked = await listed(run, name);
+    pages = walked.pages;
+    return (found = walked.playlist) !== undefined;
+  };
+  const listing = () => seconds(run, "the new playlist to be among the library's", among, madeAt, () => pages * 1000);
   let readAfter: number | undefined;
   let listAfter: number | undefined;
   if (id === undefined) {

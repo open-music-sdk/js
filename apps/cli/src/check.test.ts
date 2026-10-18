@@ -1121,18 +1121,15 @@ describe("user-token-refused: what Apple answers for a Music User Token it never
     expect(linesOf("user-token-refused")[1]).toBe("≠ user-token-refused: validateUserToken took a Music User Token Apple never gave.");
   });
 
-  test.each([
-    [429, "Apple is limiting requests for this key (429, code 42901)"],
-    [500, "Apple answered 500, code 50001"],
-  ])("a %i for the made-up token says nothing of the token: the check is ✗, not an answer", async (status, words) => {
+  test("a 500 for the made-up token says nothing of the token: the check is ✗, not an answer", async () => {
     const real = answer;
     vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
       const req = new Request(input, init);
-      if (req.headers.get("music-user-token") === MADE_UP) return Promise.resolve(refuse(status));
+      if (req.headers.get("music-user-token") === MADE_UP) return Promise.resolve(refuse(500));
       return real(req);
     });
     expect(await finish(["check", "user-token-refused", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
-    expect(linesOf("user-token-refused")).toEqual([`✗ user-token-refused: ${words} (at /v1/me/storefront), so this was not answered.`]);
+    expect(linesOf("user-token-refused")).toEqual(["✗ user-token-refused: Apple answered 500, code 50001 (at /v1/me/storefront), so this was not answered."]);
   });
 
   test("validateUserToken failing in a way that is no refusal leaves its question unanswered: ✗, not ≠", async () => {
@@ -2162,6 +2159,44 @@ describe("createLibraryPlaylistFolder: a folder made, read back, and its parent 
     apple.answers["/v1/me/library/playlist-folders/p.f1/parent"] = { data: [item("library-playlist-folders", "p.folder", { name: "Folder" })] };
     expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
     expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but its parent was not the root folder."]);
+  });
+});
+
+describe("a 429 stops the run: the key is likely the app's too, and a run that went on would keep it limited for the app's listeners", () => {
+  test("the first 429 stops everything under way at once: exit 1, saying why, with nothing more asked of Apple", async () => {
+    apple.failing["/v1/catalog/gb/genres"] = 429;
+    expect(await main(["check", "client-catalog", "--no-color"])).toBe(1);
+    expect(stderr).toContain("Error: Apple is limiting requests for this key, so check stopped rather than keep it limited for your app's listeners too. Try again later.");
+    // The 429 is not tried again, though core tries a read again after one, and no question is asked after it.
+    const genres = asked.filter((req) => new URL(req.url).pathname === "/v1/catalog/gb/genres").map((req) => req.url);
+    expect(new Set(genres).size).toBe(genres.length);
+    expect(stderr).not.toContain("Asking: search-next");
+  });
+
+  test("a 429 while a rating is set still takes the rating away through the API, and the cleanup is printed", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "GET" && apple.rated.has("s2") && new URL(req.url).pathname === "/v1/me/ratings/songs/s2") {
+        asked.push(req);
+        return Promise.resolve(refuse(429));
+      }
+      return real(req);
+    });
+    expect(await main(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(stderr).toContain("Apple is limiting requests for this key");
+    expect(apple.rated.has("s2")).toBe(false);
+  });
+
+  test("a poll for the new playlist among a large library waits a second for each page it walked before the next", async () => {
+    apple.listener.push(...Array.from({ length: 250 }, (_, i) => had(`p.n${String(i)}`, [])));
+    apple.lag.listed = 12;
+    await finish(["check", "playlist", "--write", "--no-color"]);
+    // Three pages a walk, a walk every three seconds for the twelve seconds it takes to be listed: a walk a second
+    // would have made 39 for the poll alone, before apply's own.
+    const lists = asked.filter((req) => req.method === "GET" && new URL(req.url).pathname === "/v1/me/library/playlists");
+    expect(lists.length).toBeLessThan(13 * 3);
+    expect(linesOf("playlist")).toContain("· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 12 seconds; apply's settle waits about 9 seconds.");
   });
 });
 
