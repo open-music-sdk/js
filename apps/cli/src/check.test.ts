@@ -512,7 +512,7 @@ describe("marks and the exit status", () => {
     });
     expect(await main(["check", "isrc-next", "preview-hosts", "--no-color"])).toBe(1);
     expect(marksOf("isrc-next")).toEqual(["✗"]);
-    expect(marksOf("preview-hosts")).toEqual(["·"]);
+    expect(marksOf("preview-hosts")).toEqual(["·", "✓"]);
   });
 
   test("what is printed holds no token, no id of the listener's library, and nothing of Apple's error details", async () => {
@@ -851,23 +851,24 @@ describe("user-token-refused: what Apple answers for a Music User Token it never
 });
 
 describe("preview-hosts and artwork-placeholders: read from the charts", () => {
-  test("the hosts of the clips are reported, with how many of the songs have one", async () => {
+  test("the hosts of the clips are reported, and clips on a subdomain of itunes.apple.com are what the player's docs say to allow", async () => {
     (apple.songs[0]?.attributes as Record<string, unknown>).previews = [];
     expect(await main(["check", "preview-hosts", "--no-color"])).toBe(0);
-    expect(linesOf("preview-hosts")).toEqual(["· preview-hosts: 29 of 30 chart songs have a preview, served from audio-ssl.itunes.apple.com (29)."]);
+    expect(linesOf("preview-hosts")).toEqual([
+      "· preview-hosts: 29 of 30 chart songs have a preview, served from audio-ssl.itunes.apple.com (29).",
+      '✓ preview-hosts: every one is one that hosts: ["itunes.apple.com"] allows, as lib-preview-player\'s docs have it.',
+    ]);
   });
 
-  test("a clip not over https is ≠, since the player refuses it", async () => {
-    (apple.songs[0]?.attributes as Record<string, unknown>).previews = [{ url: "http://audio.itunes.apple.com/1.m4a" }];
-    (apple.songs[1]?.attributes as Record<string, unknown>).previews = [{ url: "not a url" }];
+  test("a clip the player's hosts would refuse is ≠, held to core's own check: another host, no https, or no URL at all", async () => {
+    const previews = (n: number, url: string) => ((apple.songs[n]?.attributes as Record<string, unknown>).previews = [{ url }]);
+    previews(0, "http://audio-ssl.itunes.apple.com/1.m4a");
+    previews(1, "https://clips.example/2.m4a");
+    previews(2, "not a url");
     expect(await main(["check", "preview-hosts", "--no-color"])).toBe(1);
-    expect(linesOf("preview-hosts")[0]).toContain("2 not over https");
-  });
-
-  test("clips none of which is a URL are served from no host", async () => {
-    for (const song of apple.songs) (song.attributes as Record<string, unknown>).previews = [{ url: "not a url" }];
-    await main(["check", "preview-hosts", "--no-color"]);
-    expect(linesOf("preview-hosts")[0]).toContain("served from no host; 30 not over https");
+    expect(linesOf("preview-hosts")[1]).toBe(
+      '≠ preview-hosts: 3 previews not allowed by hosts: ["itunes.apple.com"], which lib-preview-player\'s docs name as the host to allow: audio-ssl.itunes.apple.com (1), clips.example (1), no host (1).',
+    );
   });
 
   test("songs with no clip at all are not asked about", async () => {
@@ -876,23 +877,35 @@ describe("preview-hosts and artwork-placeholders: read from the charts", () => {
     expect(marksOf("preview-hosts")).toEqual(["-"]);
   });
 
-  test("templates holding only what util-artwork fills are ✓, with how many hold each", async () => {
+  test("templates util-artwork itself fills, on mzstatic.com, are ✓, with how many hold each placeholder, a URL parser's form among them", async () => {
     (apple.albums[0]?.attributes as Record<string, unknown>).artwork = { url: "https://is1-ssl.mzstatic.com/a/{w}x{h}{c}.{f}" };
+    (apple.albums[1]?.attributes as Record<string, unknown>).artwork = { url: "https://is2-ssl.mzstatic.com/a/%7Bw%7Dx%7Bh%7Dbb.jpg" };
     expect(await main(["check", "artwork-placeholders", "--no-color"])).toBe(0);
-    expect(linesOf("artwork-placeholders")).toEqual(["✓ artwork-placeholders: of 63 artwork templates, these hold {w} (63), {h} (63), {c} (1), {f} (1): util-artwork fills each of them."]);
+    expect(linesOf("artwork-placeholders")).toEqual([
+      "· artwork-placeholders: of 63 artwork templates, these hold {w} (63), {h} (63), {c} (1), {f} (1).",
+      "✓ artwork-placeholders: util-artwork fills every one, and each is on mzstatic.com, as its docs have it.",
+    ]);
   });
 
-  test("a placeholder util-artwork does not fill is ≠", async () => {
+  test("a placeholder util-artwork leaves in the URL it gives is ≠", async () => {
     (apple.videos[0]?.attributes as Record<string, unknown>).artwork = { url: "https://is1-ssl.mzstatic.com/v/{w}x{h}{q}.jpg" };
     expect(await main(["check", "artwork-placeholders", "--no-color"])).toBe(1);
-    expect(linesOf("artwork-placeholders")[0]).toContain("leaves {q} as it is");
+    expect(linesOf("artwork-placeholders")[1]).toMatch(/^≠ artwork-placeholders: util-artwork could not fill 1 template of 63, held to hosts: \["mzstatic\.com"\]\. The first: a placeholder left in https:\/\/is1-ssl\.mzstatic\.com\/v\/\S*\{q\}\.jpg$/);
+  });
+
+  test("artwork on another host than the docs name is ≠, as util-artwork refuses it", async () => {
+    (apple.songs[0]?.attributes as Record<string, unknown>).artwork = { url: "https://images.example/{w}x{h}bb.jpg" };
+    expect(await main(["check", "artwork-placeholders", "--no-color"])).toBe(1);
+    expect(linesOf("artwork-placeholders")[1]).toBe(
+      '≠ artwork-placeholders: util-artwork could not fill 1 template of 63, held to hosts: ["mzstatic.com"]. The first: artwork: the artwork\'s url is not https on one of the hosts allowed',
+    );
   });
 
   test("templates with no placeholder, and resources with no artwork, are counted as they are", async () => {
     for (const each of [...apple.songs, ...apple.albums, ...apple.playlists, ...apple.videos]) delete (each.attributes as Record<string, unknown>).artwork;
     (apple.albums[0]?.attributes as Record<string, unknown>).artwork = { url: "https://is1-ssl.mzstatic.com/a/fixed.jpg" };
     await main(["check", "artwork-placeholders", "--no-color"]);
-    expect(linesOf("artwork-placeholders")).toEqual(["✓ artwork-placeholders: of 1 artwork template, none holds a placeholder: util-artwork fills each of them."]);
+    expect(linesOf("artwork-placeholders")[0]).toBe("· artwork-placeholders: of 1 artwork template, none holds a placeholder.");
   });
 
   test("nothing in the charts with artwork is not asked about", async () => {

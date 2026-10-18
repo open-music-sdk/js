@@ -8,6 +8,7 @@ import {
   addLibraryPlaylistTracks,
   addToFavorites,
   addToLibrary,
+  artworkUrl,
   createLibraryPlaylist,
   createRateLimiter,
   createServerClient,
@@ -434,31 +435,64 @@ async function userTokenRefused(run: tRun): Promise<void> {
   }
 }
 
+/** The host lib-preview-player's docs name as the one to allow, a guess from clips seen on a subdomain of it. */
+const PREVIEW_HOST = "itunes.apple.com";
+/** Where util-artwork's docs say Apple serves catalog artwork. */
+const ARTWORK_HOST = "mzstatic.com";
+
+/** Each host, with how many of `urls` it serves, from the URL parser a browser reads them with. */
+function hostsIn(urls: readonly string[]): string {
+  const hosts = new Map<string, number>();
+  for (const url of urls) {
+    const host = URL.parse(url)?.host ?? "no host";
+    hosts.set(host, (hosts.get(host) ?? 0) + 1);
+  }
+  return [...hosts].map(([host, n]) => `${printable(host)} (${String(n)})`).join(", ");
+}
+
 async function previewHosts(run: tRun): Promise<void> {
   const { songs } = await run.charts();
   const urls = songs.map((song) => text(at(list(at(song.attributes, "previews"))[0], "url"))).filter(defined);
-  if (urls.length === 0) { run.line("skipped", "no chart song had a preview"); return; }
-  const hosts = new Map<string, number>();
-  let insecure = 0;
-  for (const url of urls) {
-    const parsed = URL.parse(url);
-    if (parsed?.protocol !== "https:") insecure++;
-    if (parsed !== null) hosts.set(parsed.host, (hosts.get(parsed.host) ?? 0) + 1);
+  if (urls.length === 0) {
+    run.line("skipped", "no chart song had a preview");
+    return;
   }
-  const from = [...hosts].map(([host, n]) => `${printable(host)} (${String(n)})`).join(", ");
-  run.line(insecure === 0 ? "report" : "differs", `${String(urls.length)} of ${plural(songs.length, "chart song")} have a preview, served from ${from || "no host"}${insecure === 0 ? "" : `; ${String(insecure)} not over https, which the preview player refuses`}.`);
+  run.line("report", `${String(urls.length)} of ${plural(songs.length, "chart song")} have a preview, served from ${hostsIn(urls)}.`);
+  // As the player holds a clip to its `hosts`, with core's own check: https, the host or one under it, no port.
+  const elsewhere = urls.filter((url) => !isOnHost(url, [PREVIEW_HOST]));
+  if (elsewhere.length === 0) run.line("same", `every one is one that hosts: ["${PREVIEW_HOST}"] allows, as lib-preview-player's docs have it.`);
+  else run.line("differs", `${plural(elsewhere.length, "preview")} not allowed by hosts: ["${PREVIEW_HOST}"], which lib-preview-player's docs name as the host to allow: ${hostsIn(elsewhere)}.`);
 }
 
 async function artworkPlaceholders(run: tRun): Promise<void> {
   const charts = await run.charts();
-  const templates = [...charts.songs, ...charts.albums, ...charts.playlists, ...charts.musicVideos].map((item) => text(at(item.attributes, "artwork", "url"))).filter(defined);
-  if (templates.length === 0) { run.line("skipped", "nothing in the charts had artwork"); return; }
+  const artworks = [...charts.songs, ...charts.albums, ...charts.playlists, ...charts.musicVideos].map((item) => at(item.attributes, "artwork")).filter((artwork) => text(at(artwork, "url")) !== undefined);
+  if (artworks.length === 0) {
+    run.line("skipped", "nothing in the charts had artwork");
+    return;
+  }
+  // Which placeholders the templates hold, as Apple sent them or as a URL parser left them.
   const seen = new Map<string, number>();
-  for (const template of templates) for (const name of new Set(Array.from(template.matchAll(/\{([^{}]*)\}/g), (m) => String(m[1])))) seen.set(name, (seen.get(name) ?? 0) + 1);
-  const held = [...seen].map(([name, n]) => `{${printable(name)}} (${String(n)})`).join(", ");
-  const unknown = [...seen.keys()].filter((name) => !["w", "h", "f", "c"].includes(name));
-  if (unknown.length === 0) run.line("same", `of ${plural(templates.length, "artwork template")}, ${held ? `these hold ${held}` : "none holds a placeholder"}: util-artwork fills each of them.`);
-  else run.line("differs", `of ${plural(templates.length, "artwork template")}, these hold ${held}. util-artwork fills {w}, {h}, {f} and {c}, and leaves ${unknown.map((name) => `{${printable(name)}}`).join(", ")} as it is, so the URL does not work.`);
+  for (const artwork of artworks) {
+    const template = String(at(artwork, "url")).replaceAll("%7B", "{").replaceAll("%7D", "}");
+    for (const name of new Set(Array.from(template.matchAll(/\{([^{}]*)\}/g), (m) => String(m[1])))) seen.set(name, (seen.get(name) ?? 0) + 1);
+  }
+  run.line("report", `of ${plural(artworks.length, "artwork template")}, ${seen.size === 0 ? "none holds a placeholder" : `these hold ${[...seen].map(([name, n]) => `{${printable(name)}} (${String(n)})`).join(", ")}`}.`);
+  // Each filled in by util-artwork itself, held to the host its docs name: a URL it gives with a brace left in it, or
+  // one it refuses, is a template it does not know how to fill.
+  const failed: string[] = [];
+  for (const artwork of artworks) {
+    try {
+      const url = artworkUrl(artwork as Parameters<typeof artworkUrl>[0], 100, { hosts: [ARTWORK_HOST] });
+      if (/[{}]|%7B|%7D/i.test(url)) failed.push(`a placeholder left in ${printable(url)}`);
+    } catch (e) {
+      // A TypeError, saying what it refused, as util-artwork's are.
+      failed.push(printable((e as Error).message));
+    }
+  }
+  const [first] = failed;
+  if (first === undefined) run.line("same", `util-artwork fills every one, and each is on ${ARTWORK_HOST}, as its docs have it.`);
+  else run.line("differs", `util-artwork could not fill ${plural(failed.length, "template")} of ${String(artworks.length)}, held to hosts: ["${ARTWORK_HOST}"]. The first: ${first}`);
 }
 
 async function addToLibraryCheck(run: tRun): Promise<void> {
