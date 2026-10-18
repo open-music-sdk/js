@@ -134,8 +134,10 @@ starts with `doctor`'s two questions, then prints a line for each answer:
 | `-` | Your account can't be asked this, for example when no playlist of yours is long enough. |
 | `✗` | Apple failed, so the question wasn't answered. |
 
-It exits `1` for a `≠` or a `✗`. The first line names the CLI's version, Node's and your system, and nothing printed
-names anything of your library, so the output can go in an issue as it is.
+It exits `1` for a `≠` or a `✗`. What it prints on stdout is the report, for an issue as it is, inside a code block.
+Its first line names the CLI's version, Node's and your system, and `doctor`'s lines after it name your key's ID,
+your team's and your storefront. Nothing in it names anything of your library, says whether something is in it,
+or counts your things. Progress, the paths of files, and the cleanup steps below go to stderr, which is for you.
 
 ```sh
 open-music-sdk check                           # every check that only reads

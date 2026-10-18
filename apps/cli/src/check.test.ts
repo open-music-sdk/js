@@ -442,6 +442,19 @@ describe("marks and the exit status", () => {
     expect(stdout).not.toContain("detail with");
     expect(stdout).not.toContain("Listener's song");
   });
+
+  test("the report on stdout says nothing of what is in the library: not what was picked for not being there, nor how many of the listener's things there are", async () => {
+    apple.library.add("songs/s1");
+    apple.library.add("albums/a1");
+    await main(["check", "--write", "--no-color"]);
+    // What the write checks picked is named in the cleanup, on stderr, and nowhere on stdout.
+    expect(cleanupOf()).toContain("Name of s2");
+    expect(stdout).not.toContain("Name of");
+    expect(stdout).not.toContain("To undo");
+    // Counts of the listener's own things: their plays, their ratings, their playlists and how long one is. The
+    // counts that are left are of what check itself sent.
+    expect(stdout.split(LF).filter((line) => /\b\d+ (tracks?|ratings?|playlists?|items?)\b/.test(line) && !line.startsWith("· playlist: ") && !line.includes("0 ratings"))).toEqual([]);
+  });
 });
 
 describe("recently-played-types: whether recently played needs types", () => {
@@ -548,7 +561,7 @@ describe("rating-unset: what Apple answers for a rating never set", () => {
   test("the songs never rated are left out of the ratings of several, and one is answered 404", async () => {
     expect(await main(["check", "rating-unset", "--no-color"])).toBe(0);
     expect(linesOf("rating-unset")).toEqual([
-      "· rating-unset: the ratings of 25 chart songs: Apple answered with 1 rating, and left out the songs with none.",
+      "· rating-unset: the ratings of 25 chart songs: Apple answered 200, and left out the songs with none.",
       "· rating-unset: the rating of a song never rated: Apple answered 404, which getSongRating rejects as an ApiError of status 404.",
     ]);
   });
@@ -589,11 +602,11 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
   test("the next link keeps include=catalog and the tracks past the first page carry ISRCs, and include=tracks carries tracks", async () => {
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
     expect(linesOf("playlist-include")).toEqual([
-      "· playlist-include: a long playlist's page 1 of tracks, with include=catalog: 100 tracks, 100 with their catalog song, 100 of those with its ISRC, and 100 with playParams.catalogId.",
-      "· playlist-include: a long playlist's page 2 of tracks, with include=catalog: 50 tracks, 50 with their catalog song, 50 of those with its ISRC, and 50 with playParams.catalogId.",
+      "· playlist-include: a long playlist's page 1 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
+      "· playlist-include: a long playlist's page 2 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: the next link keeps include=catalog.",
       "✓ playlist-include: the tracks past the first page carry their catalog song and its ISRC, as lib-playlists' read takes them.",
-      "✓ playlist-include: the playlist asked for with include=tracks carries its first 100 tracks, which read checks a 404 for its tracks against.",
+      "✓ playlist-include: the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.",
     ]);
   });
 
@@ -632,7 +645,7 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
   test("a library with no playlist of more than a page of tracks is not asked about, and an empty one is passed over", async () => {
     apple.listener = [{ id: "p.empty", name: "Empty", description: "", tracks: [], readable: 0, listed: 0, hidden: 0, shown: 0 }];
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
-    expect(linesOf("playlist-include")).toEqual(["- playlist-include: none of the first 1 playlist in the library has more than a page of tracks"]);
+    expect(linesOf("playlist-include")).toEqual(["- playlist-include: no playlist of the first 25 in the library has more than a page of tracks"]);
   });
 });
 
@@ -750,7 +763,7 @@ describe("preview-hosts and artwork-placeholders: read from the charts", () => {
 });
 
 /** The steps of the cleanup, after its heading. */
-const cleanupOf = () => stdout.slice(stdout.indexOf("To undo what check left"));
+const cleanupOf = () => stderr.slice(stderr.indexOf("To undo what check left"));
 
 /**
  * Runs `argv` under fake timers, a second of them at a time, until it is done: between steps the event loop is let
@@ -799,7 +812,7 @@ describe("add-to-library and add-to-favorites", () => {
     apple.addStatus = { songs: 400, albums: 400, playlists: 400 };
     expect(await main(["check", "add-to-library", "--write", "--no-color"])).toBe(0);
     expect(linesOf("add-to-library")).toEqual(["· add-to-library: addToLibrary took none of them; songs: Apple answered 400, code 40001; albums: Apple answered 400, code 40001; playlists: Apple answered 400, code 40001."]);
-    expect(stdout).not.toContain("To undo");
+    expect(stderr).not.toContain("To undo");
   });
 
   test("whether a resource is in the library failing, other than with a 404, fails the check before anything is written", async () => {
@@ -842,7 +855,7 @@ describe("add-to-library and add-to-favorites", () => {
     apple.videos = [catalogItem("music-videos", "mv1")];
     apple.library.add("music-videos/mv1");
     await main(["check", "add-to-library", "--write", "--no-color"]);
-    expect(linesOf("add-to-library")[0]).toContain("music-videos not asked, since the first five in the charts are in the library already");
+    expect(linesOf("add-to-library")[0]).toContain("music-videos not asked, since none of the chart's could be picked");
   });
 
   test("an addition whose answer was lost is in the cleanup as one that may not be there, and the check is ✗", async () => {
@@ -879,7 +892,7 @@ describe("add-to-library and add-to-favorites", () => {
     await main(["check", "add-to-favorites", "--write", "--no-color"]);
     expect(marksOf("add-to-favorites")).toEqual(["-"]);
     expect(posts()).toEqual([]);
-    expect(stdout).not.toContain("To undo");
+    expect(stderr).not.toContain("To undo");
   });
 });
 
@@ -1032,7 +1045,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     for (const album of apple.albums.slice(1)) apple.library.add(`albums/${album.id as string}`);
     apple.songless.add("a1");
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(0);
-    expect(linesOf("playlist").at(-1)).toBe("- playlist: no chart album that is not in the library had songs to add");
+    expect(linesOf("playlist").at(-1)).toBe("- playlist: no chart album's songs could be picked to add");
     expect(cleanupOf()).not.toContain("albums they are from");
   });
 

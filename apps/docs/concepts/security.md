@@ -217,10 +217,12 @@ The CLI takes your key from its flag, its variable or a question, and keeps none
 the key. Whatever started the CLI, your shell or `npx`, had the variable already. On Linux and macOS the CLI's
 starting environment stays readable, by you and root, while it runs.
 
-`check` asks Apple as you, with the kept token. What it prints names nothing of your library, so it can go in an
-issue as it is: counts, statuses and Apple's error codes, and the ids of songs and albums from Apple's charts.
-Without `--write` it only reads. With it, it adds to your library only things you didn't have, and ends with the
-steps that remove them.
+`check` asks Apple as you, with the kept token. Its report, on stdout, is for an issue as it is: statuses, Apple's
+error codes, and what Apple did. It names nothing of your library, doesn't say whether something is in it, and
+doesn't count your things. It does name your key's ID, your team's and your storefront, as `doctor` does. The
+cleanup steps name what `check` added, and with that what you didn't have, so they go to stderr with the progress.
+Without `--write` it only reads. With it, it adds to your library, and ends with the steps that remove what it
+added.
 
 `login` serves its own sign-in page, made of the SDK: `browser`'s sign-in, `server`'s `tokenEndpoint` for the
 page's developer token, and `server`'s `userTokenIntake` for the token Apple gives. Here is what keeps that page

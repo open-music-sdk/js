@@ -119,6 +119,8 @@ const idOf = (value: unknown): string | undefined => {
 };
 const defined = <T>(value: T | undefined): value is T => value !== undefined;
 const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`;
+/** How many of a listener's tracks, said without the count, which would say how long their playlist is. */
+const share = (n: number, of: number) => (n === of ? "all" : n === 0 ? "none" : "some");
 const refused = (e: unknown): e is AppleMusicError => isAppleMusicError(e, "ApiError") && e.status !== undefined && e.status >= 400 && e.status < 500;
 
 // What a check catches, it catches through one of these, and anything else is thrown on: Ctrl+C, and a bug.
@@ -267,8 +269,8 @@ async function recentlyPlayedTypes(run: tRun): Promise<void> {
     }
     const withTypes = list(at(await ask.with(), "data")).length;
     if (without === 0 && withTypes === 0) run.line("skipped", `${ask.fn}: nothing was played lately, asked with types or without`);
-    else if (without === 0) run.line("differs", `${ask.fn} without types: Apple answered with nothing, and with them with ${String(withTypes)}. client-user leaves types optional, so a call without them gets nothing.`);
-    else run.line("same", `${ask.fn} without types: Apple answered with ${String(without)}, and with them with ${String(withTypes)}. types is optional, as client-user has it.`);
+    else if (without === 0) run.line("differs", `${ask.fn} without types: Apple answered with nothing, though with them it answered with what was played. client-user leaves types optional, so a call without them gets nothing.`);
+    else run.line("same", `${ask.fn} without types: Apple answered with what was played, as it did with them. types is optional, as client-user has it.`);
   }
 }
 
@@ -317,7 +319,7 @@ async function ratingUnset(run: tRun): Promise<void> {
     rated = list(at(await getSongRatings(run.music, songs.map((song) => song.id), { signal: run.signal }), "data"))
       .map(idOf)
       .filter(defined);
-    run.line("report", `the ratings of ${plural(songs.length, "chart song")}: Apple answered with ${plural(rated.length, "rating")}, and left out the songs with none.`);
+    run.line("report", `the ratings of ${plural(songs.length, "chart song")}: Apple answered 200, and left out the songs with none.`);
   } catch (e) {
     notFound(e);
     rated = [];
@@ -371,7 +373,7 @@ async function playlistInclude(run: tRun): Promise<void> {
       [1, a],
       [2, b],
     ] as const)
-      run.line("report", `a long playlist's page ${String(n)} of tracks, with include=catalog: ${plural(page.tracks, "track")}, ${String(page.catalog)} with their catalog song, ${String(page.isrc)} of those with its ISRC, and ${String(page.catalogId)} with playParams.catalogId.`);
+      run.line("report", `a long playlist's page ${String(n)} of tracks, with include=catalog: ${share(page.catalog, page.tracks)} with their catalog song, ${share(page.isrc, page.catalog)} of those with its ISRC, and ${share(page.catalogId, page.tracks)} with playParams.catalogId.`);
     run.line("report", `the next link ${keeps ? "keeps" : "drops"} include=catalog.`);
     if (a.catalog === 0) run.line("differs", "include=catalog gave no track on the first page its catalog song. lib-playlists' read takes the ISRC from there, so an export holds none.");
     else if (b.catalog === 0 && b.catalogId === 0) run.line("skipped", "no track on the second page is in the catalog, so whether the next link keeps the catalog songs is not seen");
@@ -379,11 +381,11 @@ async function playlistInclude(run: tRun): Promise<void> {
     else run.line("same", "the tracks past the first page carry their catalog song and its ISRC, as lib-playlists' read takes them.");
 
     const tracks = list(at(list(at(await getLibraryPlaylist(music, id, { include: ["tracks"], signal }), "data"))[0], "relationships", "tracks", "data")).length;
-    if (tracks > 0) run.line("same", `the playlist asked for with include=tracks carries its first ${plural(tracks, "track")}, which read checks a 404 for its tracks against.`);
+    if (tracks > 0) run.line("same", "the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.");
     else run.line("differs", "the playlist asked for with include=tracks carries none of its tracks. read checks a 404 for a playlist's tracks against them, so it would take such a 404 for a playlist with none, and apply would add everything again.");
     return;
   }
-  run.line("skipped", `none of the first ${plural(playlists.length, "playlist")} in the library has more than a page of tracks`);
+  run.line("skipped", "no playlist of the first 25 in the library has more than a page of tracks");
 }
 
 async function userTokenRefused(run: tRun): Promise<void> {
@@ -442,7 +444,7 @@ async function addToLibraryCheck(run: tRun): Promise<void> {
   for (const items of [charts.songs, charts.albums, charts.playlists, charts.musicVideos]) {
     const item = await notInLibrary(run, items);
     if (item === undefined) {
-      if (items[0] !== undefined) answered.push(`${items[0].type} not asked, since the first five in the charts are in the library already`);
+      if (items[0] !== undefined) answered.push(`${items[0].type} not asked, since none of the chart's could be picked`);
       continue;
     }
     const left = { what: item, sure: false };
@@ -474,7 +476,10 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
       break;
     }
   }
-  if (song === undefined) { run.line("skipped", "each of the first ten chart songs is in the library or rated already"); return; }
+  if (song === undefined) {
+    run.line("skipped", "none of the chart's songs could be picked");
+    return;
+  }
   const left = { what: song, sure: false };
   run.left.favorites.push(left);
   await addToFavorites(run.music, { songs: [song.id] }, { signal: run.signal });
@@ -554,7 +559,7 @@ async function playlistCheck(run: tRun): Promise<void> {
   const { ids, albums } = await albumSongs(run);
   const [firstSong] = ids;
   if (firstSong === undefined) {
-    run.line("skipped", "no chart album that is not in the library had songs to add");
+    run.line("skipped", "no chart album's songs could be picked to add");
     return;
   }
   run.left.playlistSongs = { albums, seen: false };
@@ -637,7 +642,7 @@ const UNSURE = " (Apple's answer was lost, so it may not be there)";
 const unsure = (written: tWritten<unknown>) => (written.sure ? "" : UNSURE);
 const DELETE = "and choose Delete from Library from its … menu";
 
-/** The steps that undo what the write checks left, on stdout, numbered; nothing when they left nothing. */
+/** The steps that undo what the write checks left, numbered; nothing when they left nothing. */
 function cleanup(left: tLeft): void {
   const steps: { readonly step: string; readonly items?: readonly string[] }[] = [];
   const playlists = new Map<string, tWritten<string>[]>();
@@ -657,11 +662,13 @@ function cleanup(left: tLeft): void {
       items: songs.albums.map((album) => `${label(album)}: ${link(album)}`),
     });
   if (steps.length === 0) return;
-  out("");
-  out("To undo what check left in your library, which Apple's API cannot delete, use the Music app on any device signed in to this Apple Account:");
+  // On stderr: the steps are said to the person, and in naming what was not in their library they say what was,
+  // which has no place in the report on stdout that goes into an issue.
+  say("");
+  say("To undo what check left in your library, which Apple's API cannot delete, use the Music app on any device signed in to this Apple Account:");
   steps.forEach(({ step, items = [] }, i) => {
-    out(`  ${String(i + 1)}. ${step}`);
-    for (const item of items) out(`     - ${item}`);
+    say(`  ${String(i + 1)}. ${step}`);
+    for (const item of items) say(`     - ${item}`);
   });
 }
 
