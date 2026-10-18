@@ -761,7 +761,18 @@ async function folderTrip(r: tRun): Promise<void> {
     diffs.push(...diffsOf(schemas.libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship, body));
     parent = idsIn(body)[0];
   }
-  const listed = await seconds(r, "the new folder to be among the root folder's", async () => (await idsOf(sdk.getLibraryPlaylistFolderRelationship(r.music, root, "children", { limit: 100, ...signal }))).includes(id), madeAt);
+  // Every page of the root's children, a thousand at most, and a second's wait for each page walked, as the playlist's poll.
+  let pages = 1;
+  const among = async () => {
+    let seen = 0;
+    for await (const child of r.music.user.getLibraryPlaylistFolderRelationship(root, "children", { limit: 100, maxPages: 10, ...signal })) {
+      seen += 1;
+      if (idOf(child) === id) return true;
+    }
+    pages = Math.max(1, Math.ceil(seen / 100));
+    return false;
+  };
+  const listed = await seconds(r, "the new folder to be among the root folder's", among, madeAt, () => pages * 1000);
   if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`, diffs);
   const wrong = [
     readable === undefined ? "it could not be read by its id within a minute" : undefined,

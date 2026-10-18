@@ -356,7 +356,16 @@ async function anything(req: Request, url: URL): Promise<Response> {
     if (rel === undefined) return json(valid(schemas.libraryPlaylistFoldersResponse, { data: [folder(known)] }));
     if (rel === "parent") return id === ROOT ? refuse(404) : json(valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship"), { data: [folder({ id: ROOT, name: "Playlists" })] }));
     if (id !== ROOT) return refuse(404);
-    return json(valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship"), { data: [...apple.folders.map(folder), ...apple.listener.slice(0, 1).map((playlist) => asPlaylist(playlist, false))] }));
+    // The root's children, a page at a time: the listener's first playlist, then the folders, the newest last.
+    const children = [...apple.listener.slice(0, 1).map((playlist) => asPlaylist(playlist, false)), ...apple.folders.map(folder)];
+    const [from, size] = [Number(query.get("offset") ?? "0"), Number(query.get("limit") ?? "25")];
+    const more = from + size < children.length;
+    return json(
+      valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship"), {
+        data: children.slice(from, from + size),
+        ...(more ? { next: `${path}?offset=${String(from + size)}&limit=${String(size)}` } : {}),
+      }),
+    );
   }
   // The listener's playlists are the handlers' above, but for their relationships other than their tracks.
   if (library && (library[1] !== "playlists" || (library[3] !== undefined && library[3] !== "tracks"))) return resources(`library-${library[1] ?? ""}`, library[2], library[3], undefined);
@@ -2221,6 +2230,28 @@ describe("createLibraryPlaylistFolder: a folder made, read back, and its parent 
     expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
     expect(linesOf("createLibraryPlaylistFolder")).toEqual(["✓ createLibraryPlaylistFolder: a folder was made, could be read by its id after 0 seconds, was among the root folder's children after 0 seconds, and has the root for its parent."]);
     expect(cleanupOf()).toMatch(/1\. Delete the playlist folder named "open-music-sdk check .* UTC": it is among your playlists in the Music app on a Mac, iPhone or iPad/);
+  });
+
+  test("a folder made in a root of more than a page of children is looked for on every page", async () => {
+    apple.folders.push(...Array.from({ length: 150 }, (_, i) => ({ id: `p.had${String(i)}`, name: `Had ${String(i)}` })));
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
+    expect(marksOf("createLibraryPlaylistFolder")).toEqual(["✓"]);
+    expect(asked.some((req) => new URL(req.url).pathname.endsWith("/children") && new URL(req.url).searchParams.get("offset") === "100")).toBe(true);
+  });
+
+  test("a folder that shows among the root's children late is waited for, a walk at a time", async () => {
+    let walks = 0;
+    const real = answer;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const res = await real(req);
+      if (!new URL(req.url).pathname.endsWith("/p.playlistsroot/children") || ++walks > 3) return res;
+      // The first three walks of the root find the folder not yet there.
+      const body = (await res.json()) as { data: tBody[] };
+      return Response.json({ ...body, data: body.data.filter((child) => child.id !== "p.f1") });
+    });
+    expect(await finish(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("createLibraryPlaylistFolder")[0]).toMatch(/was among the root folder's children after [1-9]\d* seconds?/);
   });
 
   test("a folder Apple refuses to make is ✗, and leaves nothing to undo", async () => {
