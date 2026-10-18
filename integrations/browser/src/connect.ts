@@ -220,8 +220,8 @@ function appOf(app: unknown): tConnectApp {
  * `ready` or `connect()`.
  *
  * The helper stores nothing, but Apple's script keeps its own copy of the listener's token in browser storage, where
- * any script on your origin can read it: a cross-site scripting hole exposes the token on later visits too. In one
- * browser on 18 October 2026 that was the page's local storage, under `music.<your team id in small
+ * any script on your origin can read it: a cross-site scripting hole exposes the token on later visits too. In
+ * Firefox on 18 October 2026 that was the page's local storage, under `music.<your team id in small
  * letters>.media-user-token`, beside two short keys of the same prefix, `itre` and `itua`; it kept nothing in
  * cookies, the indexed database or the cache storage.
  *

@@ -3,7 +3,7 @@
 The types and validators are generated from Apple's documentation, and each client's tests hold every function
 to it: the method, the path, every documented parameter and the answer of each endpoint. Where Apple's
 documentation is silent, the SDK has met the live API twice: the CLI's first sign-in on 16 October 2026, and its
-`check` on 18 October 2026, in one storefront, with the sign-in's questions run by hand in one browser on Windows.
+`check` on 18 October 2026, in one storefront, with the sign-in's questions run by hand in Firefox on Windows.
 This page lists, package by package, where the SDK differs from the documentation, what those runs settled, and
 what it still takes on trust. One run is one sample: what was seen once may not hold every day, in every storefront.
 
@@ -52,7 +52,7 @@ again, and `open-music-sdk check <name>` one question, to see whether it still h
 Settled for the CLI itself:
 
 - What the page puts back after a sign-in, cookies, `localStorage` and `sessionStorage`, covers where the script
-  kept its copy in the browser tried.
+  kept its copy in Firefox.
 - With `--port` fixed and a second `login`, the page restores nothing for a returning listener: Apple asks again.
 
 Still open:

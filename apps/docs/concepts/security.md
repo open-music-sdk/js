@@ -124,7 +124,7 @@ What's left to you: never write the token to `localStorage`, `sessionStorage` or
 
 ::: warning Apple's script keeps a copy of the token
 Apple's script keeps its own copy of the token in `localStorage`, under `music.<your team id in small
-letters>.media-user-token`, beside two short keys of the same prefix, as seen in one browser on 18 October 2026.
+letters>.media-user-token`, beside two short keys of the same prefix, as seen in Firefox on 18 October 2026.
 It kept nothing in cookies, IndexedDB or Cache Storage there. That's how a returning listener is still signed in.
 The SDK leaves that copy alone, except through `disconnect()`.
 
