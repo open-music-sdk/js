@@ -313,7 +313,9 @@ export interface tUserFunctions {
    * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
    * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
    * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
-   * here limits its size, so limit it yourself if it comes from outside your app.
+   * here limits its size, so limit it yourself if it comes from outside your app. Against the live API on 18 October
+   * 2026, a folder made with no parent was in the root: it could be read by its id at once, and was among the children
+   * of `p.playlistsroot`, its parent, a second later.
    *
    * @param folder - The folder to make: its name under `attributes`, and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
@@ -844,7 +846,7 @@ export interface tUserFunctions {
    */
   readonly getLibraryResources: typeof library.getLibraryResources;
   /**
-   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
+   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and within 20 in a second run; the playlist's songs did not go into the library with it either time.
    *
    * @param ids - The ids of the catalog resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
@@ -882,12 +884,12 @@ export interface tUserFunctions {
   readonly addLibraryPlaylistTracks: typeof library.addLibraryPlaylistTracks;
   /**
    * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
-   * Against the live API on 18 October 2026, a listener with no folder was answered with none: `data` was empty, and so
-   * was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot` was answered `404` by its id, and its
-   * `children` were the listener's playlists.
+   * Against the live API on 18 October 2026, the root was answered with none, for a listener with no folder and for
+   * one with a folder: `data` was empty, and so was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot`
+   * was answered `404` by its id, and its `children` were the listener's playlists and folders.
    *
    * @param options - What to send beside the folder.
-   * @returns The root folder, out of `data`. A listener with no folder was answered with none, which this rejects.
+   * @returns The root folder, out of `data`. It was answered with none, with folders or without, which this rejects.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
    * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.

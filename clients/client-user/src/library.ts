@@ -111,7 +111,7 @@ export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "pla
 export type tAddOptions = tReadOptions<void>;
 
 /**
- * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
+ * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and within 20 in a second run; the playlist's songs did not go into the library with it either time.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -198,14 +198,14 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 
 /**
  * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
- * Against the live API on 18 October 2026, a listener with no folder was answered with none: `data` was empty, and so
- * was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot` was answered `404` by its id, and its
- * `children` were the listener's playlists.
+ * Against the live API on 18 October 2026, the root was answered with none, for a listener with no folder and for
+ * one with a folder: `data` was empty, and so was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot`
+ * was answered `404` by its id, and its `children` were the listener's playlists and folders.
  *
  * @function
  * @param client - The listener's client to ask with.
  * @param options - What to send beside the folder.
- * @returns What Apple answered: the root folder under `data`, which was empty for a listener with no folder.
+ * @returns What Apple answered: the root folder under `data`, which was empty, with folders or without.
  * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
  * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.

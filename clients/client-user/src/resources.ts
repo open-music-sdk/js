@@ -412,7 +412,9 @@ export type tCreateLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistF
  * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
  * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
  * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
- * here limits its size, so limit it yourself if it comes from outside your app.
+ * here limits its size, so limit it yourself if it comes from outside your app. Against the live API on 18 October
+ * 2026, a folder made with no parent was in the root: it could be read by its id at once, and was among the children
+ * of `p.playlistsroot`, its parent, a second later.
  *
  * @function
  * @param client - The listener's client to ask with.

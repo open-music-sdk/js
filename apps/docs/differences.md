@@ -100,19 +100,29 @@ Where it differs from the documentation:
 Against the live API on 18 October 2026:
 
 - A song never rated is answered `404`, so `getSongRating` rejects with an `ApiError` of status `404`. The ratings
-  of several songs leave out those never rated. The other types of rating are taken to answer the same way.
+  of several songs leave out those never rated.
+- **Ratings, of each of the nine types that take one:** a dislike set on a song, an album, a music video, a
+  playlist, a station, and on a library song, album, music video and playlist was read back at once, alone and in a
+  batch. Taken away, it was gone at once.
+- **A library copy's rating:** a library song's, album's or music video's rating was its catalog item's too, and
+  went with it.
 - `listRecentlyPlayed` and `listRecentlyPlayedTracks` answer without `types`, with what was played, as they do with
   every type named.
-- `addToLibrary` took a song, an album, a catalog playlist and a music video, and each showed in the library
-  within 4 seconds. The catalog playlist's songs didn't go into the library with it.
+- **Additions:** `addToLibrary` took a song, an album, a catalog playlist and a music video. In one run each showed
+  in the library within 4 seconds. In another, the song took 20 seconds and the album 16. Neither time did the
+  catalog playlist's songs go into the library with it.
+- **An album held in part:** an album counted as in the library once one song of it was. Its `library`
+  relationship answered with the listener's copy.
 - `addToFavorites` gave the song a rating of 1 at once, as a like does, and put it in the library.
+- **A playlist folder:** `createLibraryPlaylistFolder` made one in the root. It could be read by its id at once,
+  and was among the root's children after a second, with `p.playlistsroot` for its parent.
 - Every function that reads, and was asked, answered as its generated type has it, once the [types](#types) were
   corrected, but for the root folder below. A listener with no music video in their library was asked none of the
   functions for music videos.
-- `getRootLibraryPlaylistFolder` answered with no folder for a listener with none: `data` was empty, and so was
-  `meta.filters.identity.playlistsroot`. So `user(client).getRootLibraryPlaylistFolder()` rejects, as it does for an
-  answer that holds no folder, and `check` marks it `≠`. The folder `p.playlistsroot` was answered `404` by its id,
-  while its `children` answered with the listener's playlists.
+- `getRootLibraryPlaylistFolder` answered with no folder, for a listener with none and for one with a folder:
+  `data` was empty, and so was `meta.filters.identity.playlistsroot`. So `user(client).getRootLibraryPlaylistFolder()`
+  rejects, as it does for an answer that holds no folder, and `check` marks it `≠`. The folder `p.playlistsroot` was
+  answered `404` by its id, while its `children` answered with the listener's playlists and folders.
 - `searchLibrary` found nothing for the whole name of a song of three words or more that was in the library, while
   the first word of it found the song. A name of one or two words found it.
 
@@ -153,13 +163,15 @@ Against the live API on 18 October 2026, a playlist was made, given 300 tracks, 
 - The tracks of a playlist with none are answered `404`, and `read` takes it for empty. A playlist with tracks,
   asked for with `include=tracks`, carries them, which is what a `404` for its tracks is checked against.
 - A track added by its catalog id is held under that id: 300 of 300, in the order they were added.
-- A new playlist could be read by its id at once, and was among the listener's playlists after 4 seconds. 300
-  tracks added to it showed after 2. `settle` gives a write ten reads a second apart.
+- A new playlist could be read by its id at once, and was among the listener's playlists after 4 seconds, and after
+  5 in a second run. 300 tracks added to it showed after 2. `settle` gives a write ten reads a second apart.
+- The 300 songs added to a playlist went into the listener's library with it in one run, and not in another.
 - One request took 300 tracks, which `chunk` defaults to.
 - A playlist's name and description came back as they were sent, and `apply` with the same plan found the
   playlist and added nothing.
 - `resolve`, given the name, artist and album of 50 chart songs and no ISRC, found a song for every one. 32 were
-  the chart's own song, and 18 another release of it, as the same song on another album is.
+  the chart's own song, and 18 another release of it, as the same song on another album is; 30 and 20 in a second
+  run.
 
 It still takes these on trust:
 
