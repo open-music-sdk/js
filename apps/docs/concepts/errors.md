@@ -61,7 +61,7 @@ Each tag is one kind of failure:
 | `RateLimited` | Apple answers `429`. | Yes, after waiting for `Retry-After` |
 | `ApiError` | Apple answers any other failing status, such as `404`, with `status` and Apple's `errors`. Also an answer that isn't what was expected: a success whose body isn't JSON, or a bound function's answer that holds no resource. | A `5xx` other than `501` |
 | `ValidationError` | You passed a `schema`, and Apple's answer doesn't match it. The `issues` say where. | No |
-| `NetworkError` | `fetch` failed, or the connection dropped while the answer was being read. | Yes |
+| `NetworkError` | `fetch` failed, Apple answered with a redirect, which the client refuses, or the connection dropped while the answer was being read. | Yes |
 
 A few tags have more than one source:
 
