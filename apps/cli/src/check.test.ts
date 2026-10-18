@@ -1202,10 +1202,10 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(cleanupOf()).toContain(", all 2 of that name");
   });
 
-  test("a playlist with an id that is never listed is read on, but its name and description are not seen, and apply is not run", async () => {
+  test("a playlist that is never listed is ≠, since apply would make another every time, and the rest is still asked by its id", async () => {
     apple.lag.listed = 1000;
-    expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(0);
-    expect(linesOf("playlist")).toContain("- playlist: the playlist was not listed within a minute, so whether its name and description come back as sent is not seen");
+    expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("playlist")).toContain("≠ playlist: the playlist was not among the library's playlists within a minute. apply's settle waits about 4 seconds, so apply would make another every time it ran.");
     expect(linesOf("playlist")).toContain("· playlist: one request took 300 tracks.");
     expect(marksOf("playlist").at(-1)).toBe("-");
   });

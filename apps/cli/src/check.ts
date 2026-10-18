@@ -571,7 +571,8 @@ async function playlistCheck(run: tRun): Promise<void> {
   } else [readAfter, listAfter] = await Promise.all([readable(id), listing()]);
   run.line("report", `the new playlist could be read by its id after ${took(readAfter)}, and was among the library's playlists after ${took(listAfter)}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
   const asSent = found !== undefined && text(at(found, "attributes", "name")) === name && text(at(found, "attributes", "description", "standard")) === description;
-  if (found === undefined) run.line("skipped", "the playlist was not listed within a minute, so whether its name and description come back as sent is not seen");
+  // apply looks for its playlist in the listing, for as long as its settle waits, and makes it when it is not there.
+  if (found === undefined) run.line("differs", `the playlist was not among the library's playlists within a minute. apply's settle waits about ${String(SETTLE_S)} seconds, so apply would make another every time it ran.`);
   else if (asSent) run.line("same", "its name and description came back as they were sent, which apply finds a playlist by.");
   else run.line("differs", `its description came back as "${printable(text(at(found, "attributes", "description", "standard")) ?? "none")}". apply finds a playlist by its name and description, so a run by this plan would make another.`);
 
