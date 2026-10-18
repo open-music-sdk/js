@@ -513,7 +513,8 @@ async function playlistCheck(run: tRun): Promise<void> {
   // each timed from when Apple took it. Without an id in the answer, the id is the one the listing gives.
   const madeAt = Date.now();
   let found: unknown;
-  const readable = (known: string) => seconds(run, "the new playlist to be read by its id", async () => (await getLibraryPlaylist(music, known, { signal }), true), madeAt);
+  let read: unknown;
+  const readable = (known: string) => seconds(run, "the new playlist to be read by its id", async () => ((read = list(at(await getLibraryPlaylist(music, known, { signal }), "data"))[0]), true), madeAt);
   let pages = 1;
   const among = async () => {
     const walked = await listed(run, name);
@@ -533,6 +534,12 @@ async function playlistCheck(run: tRun): Promise<void> {
     readAfter = await readable(id);
   } else [readAfter, listAfter] = await Promise.all([readable(id), listing()]);
   run.line("report", `the new playlist could be read by its id after ${took(readAfter)}, and was among the library's playlists after ${took(listAfter)}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
+  // Nothing is written to a playlist by the id Apple gave until it is seen to be the one made: by its name read by
+  // that id, or by that id among the library's playlists.
+  if (text(at(read, "attributes", "name")) !== name && idOf(found) !== id) {
+    run.line("differs", "the playlist read by the id Apple gave has another name, and the one made was not among the library's by that id, so nothing is added to it.");
+    return;
+  }
   const asSent = found !== undefined && text(at(found, "attributes", "name")) === name && text(at(found, "attributes", "description", "standard")) === description;
   // apply looks for its playlist in the listing, for as long as its settle waits, and makes it when it is not there.
   if (found === undefined) run.line("differs", `the playlist was not among the library's playlists within a minute. apply's settle waits about ${String(SETTLE_S)} seconds, so apply would make another every time it ran.`);

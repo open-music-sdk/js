@@ -606,12 +606,16 @@ async function ownCopy(r: tRun, type: "songs" | "albums" | "music-videos"): Prom
   return id === undefined ? `the ${type} added did not show in your library within a minute` : { item: addition.item, id, catalog: addition.item.id };
 }
 
-/** The run's own empty playlist, once it can be read by its id. */
+/** The run's own empty playlist, once it can be read by its id, and is seen by its name to be the one made. */
 async function ownPlaylistCopy(r: tRun): Promise<tRatable | string> {
   const id = await ownPlaylist(r);
   if (id === undefined) return "the answer to making a playlist held none to rate";
-  const readable = await seconds(r, "the new playlist to be read by its id", async () => (await sdk.getLibraryPlaylist(r.music, id, { signal: r.signal }), true));
-  return readable === undefined ? "the playlist made could not be read by its id within a minute" : { item: { type: "playlists", id, name: `${r.name} (for a rating)`, by: undefined, url: undefined, attributes: undefined }, id };
+  const name = `${r.name} (for a rating)`;
+  let read: unknown;
+  const readable = await seconds(r, "the new playlist to be read by its id", async () => ((read = list(at(await sdk.getLibraryPlaylist(r.music, id, { signal: r.signal }), "data"))[0]), true));
+  if (readable === undefined) return "the playlist made could not be read by its id within a minute";
+  if (text(at(read, "attributes", "name")) !== name) return "the playlist read by the id Apple gave has another name, so it is not rated";
+  return { item: { type: "playlists", id, name, by: undefined, url: undefined, attributes: undefined }, id };
 }
 
 /**

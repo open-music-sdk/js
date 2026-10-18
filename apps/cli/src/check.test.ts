@@ -1623,6 +1623,14 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
+  test("a playlist that reads by the id Apple gave as another, and is not listed by that id, is given nothing: it may be the listener's", async () => {
+    apple.answers["/v1/me/library/playlists/p.made2"] = { data: [asPlaylist(had("p.made2", [], "Theirs"), false)] };
+    apple.lag.listed = 1000;
+    expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: the playlist read by the id Apple gave has another name, and the one made was not among the library's by that id, so nothing is added to it.");
+    expect(posts()).toEqual(["/v1/me/library/playlists"]);
+  });
+
   test("an answer that holds no playlist is found among the listener's playlists by its name", async () => {
     apple.madeWithId = false;
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(0);
@@ -2191,6 +2199,13 @@ describe("rating round trips: a dislike set on what the listener had not rated, 
     await finish(["check", "setLibraryPlaylistRating", "--write", "--no-color"]);
     expect(linesOf("setLibraryPlaylistRating")).toEqual([`- setLibraryPlaylistRating: ${words}`]);
     expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC \(for a rating\)"/);
+  });
+
+  test("a playlist made to rate that reads by its id as another is not rated: nothing is written to what may be the listener's", async () => {
+    apple.answers["/v1/me/library/playlists/p.made2"] = { data: [asPlaylist(had("p.made2", [], "Theirs"), false)] };
+    await main(["check", "setLibraryPlaylistRating", "--write", "--no-color"]);
+    expect(linesOf("setLibraryPlaylistRating")).toEqual(["- setLibraryPlaylistRating: the playlist read by the id Apple gave has another name, so it is not rated"]);
+    expect(asked.filter((req) => req.method === "PUT")).toEqual([]);
   });
 
   test("a playlist made to rate whose making Apple refuses leaves nothing to undo, and the round trip is ✗", async () => {
