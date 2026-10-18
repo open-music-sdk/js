@@ -123,26 +123,25 @@ What the SDK does:
 What's left to you: never write the token to `localStorage`, `sessionStorage` or a cookie.
 
 ::: warning Apple's script keeps a copy of the token
-Apple's script keeps its own copy of the token in the browser's storage, under a key ending `media-user-token` as
-seen on 10 October 2026. That's how a returning listener is still signed in. The SDK leaves that copy alone,
-except through `disconnect()`.
+Apple's script keeps its own copy of the token in `localStorage`, under `music.<your team id in small
+letters>.media-user-token`, beside two short keys of the same prefix, as seen in one browser on 18 October 2026.
+It kept nothing in cookies, IndexedDB or Cache Storage there. That's how a returning listener is still signed in.
+The SDK leaves that copy alone, except through `disconnect()`.
 
 Any script running on your origin can read that copy. A cross-site scripting hole therefore exposes the
 listener's token on any later visit, not only while a page that holds it is open.
 
-While you develop on `localhost`, keep in mind that a cookie there is shared by every port. If the script keeps a
-copy in a cookie, every server you run on your machine is sent it.
+Other browsers haven't been looked at. While you develop on `localhost`, keep in mind that a cookie there is shared
+by every port: if a browser's copy of the script kept the token in a cookie, every server you run on your machine
+would be sent it.
 :::
 
 Signing out is `disconnect()`. It's Apple's own sign-out, through the script, and it ends the sign-in in the script
-and the copy it kept, so the next page load restores nothing. It does nothing where the script has no sign-out, or
-where the page holds no configuration of the script because loading or configuring it failed. Forgetting the token
-in your page alone isn't a sign-out: the script would restore it next time.
-
-::: info Still open
-Whether `disconnect()` also ends the token at Apple, and with it a copy your server stored, wasn't settled by the
-first live sign-in: see [Differences from Apple's documentation](../differences#browser).
-:::
+and the copy it kept, so the next page load restores nothing. It ends the token at Apple too, and with it any copy
+your server stored: against the live API on 18 October 2026, Apple refused the token as soon as the sign-out was
+done. It does nothing where the script has no sign-out, or where the page holds no configuration of the script
+because loading or configuring it failed. Forgetting the token in your page alone isn't a sign-out: the script
+would restore it next time.
 
 ### Apple's script
 
@@ -243,7 +242,8 @@ safe:
   developer tokens live fifteen minutes and are bound to the page's origin.
 - Apple's copy doesn't outlive the page. A cookie set on `localhost` is shared by every port, so after every try,
   and when the tab closes, the page deletes the cookies and storage entries Apple's script added, and puts back the
-  ones it overwrote. It doesn't call `disconnect()`, since whether that ends the token at Apple isn't known yet.
+  ones it overwrote. It doesn't call `disconnect()`, which would end at Apple the very token `login` is there to
+  keep.
 - Its headers. `cache-control: no-store`, `x-content-type-options: nosniff`, and a content security policy that
   lets in Apple's script and nothing but Apple's hosts.
 - No secret in a message. No message repeats the key, a token, or anything that might be one, such as an argument

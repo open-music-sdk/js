@@ -141,7 +141,8 @@ export interface tUseConnect {
   readonly connect: () => Promise<string | undefined>;
   /**
    * Signs out: Apple's own sign-out through the script, so a later page load restores nothing, and the provider
-   * forgets the token. Whether the script's sign-out also ends the token at Apple is a live check. Rejects with what
+   * forgets the token. The script's sign-out ends the token at Apple too, as it did against the live API on 18
+   * October 2026, and with it any copy your server stored. Rejects with what
    * the helper's `disconnect()` rejects with, and the token is then kept; called before the component mounted or
    * after it unmounted, it is a `TypeError`.
    */

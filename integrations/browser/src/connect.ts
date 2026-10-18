@@ -32,7 +32,7 @@ export interface tMusicKitInstance {
    * hands it on as it came.
    */
   authorize(): Promise<string | null | undefined>;
-  /** Apple's own sign-out, where the instance has one: ends the sign-in in the script, and the copy of the token it kept. */
+  /** Apple's own sign-out, where the instance has one: ends the sign-in in the script, the copy of the token it kept, and the token at Apple. */
   unauthorize?: (() => unknown) | undefined;
 }
 
@@ -79,8 +79,9 @@ export interface tConnect {
   readonly connect: () => Promise<string | undefined>;
   /**
    * Apple's own sign-out, through the script's `unauthorize()`: ends the sign-in in the script and the copy of the
-   * token it kept, so that a later page load does not restore it. Whether it also ends the token at Apple, and with
-   * it a copy your server stored, is a live check. Does nothing where the script has no such function, or where the
+   * token it kept, so that a later page load does not restore it. It ends the token at Apple too, and with it any
+   * copy your server stored: against the live API on 18 October 2026, Apple refused the token as soon as
+   * `unauthorize()` resolved, and five minutes later. Does nothing where the script has no such function, or where the
    * page holds no configuration. Rejects with what the configuration failed with, or what `unauthorize()` throws,
    * as it came. Called after `dispose()` it is a `TypeError`.
    */
@@ -206,7 +207,9 @@ function appOf(app: unknown): tConnectApp {
  * `ready` or `connect()`.
  *
  * The helper stores nothing, but Apple's script keeps its own copy of the listener's token in browser storage, where
- * any script on your origin can read it: a cross-site scripting hole exposes the token on later visits too.
+ * any script on your origin can read it: a cross-site scripting hole exposes the token on later visits too. In one
+ * browser on 18 October 2026 that was `localStorage`, under `music.<your team id in small letters>.media-user-token`,
+ * beside two short keys of the same prefix, `itre` and `itua`; it kept nothing in cookies, IndexedDB or Cache Storage.
  *
  * @param music - The client from `createBrowserClient`, or anything with a `developerToken` provider on it.
  * @param options - The app as Apple's script is configured with it, and the page's own `MusicKit` where it loaded the script itself.

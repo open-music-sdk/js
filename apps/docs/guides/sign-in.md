@@ -114,8 +114,10 @@ signOutButton.onclick = () => void signIn.disconnect().catch(showWhyNot);
 ```
 
 `disconnect()` is Apple's own sign-out, run through the script. It ends the sign-in in the script and the copy of
-the token the script kept, so the next page load restores nothing. Forgetting the token in your page alone isn't
-a sign-out: the script would restore it on the next visit.
+the token the script kept, so the next page load restores nothing. It also ends the token at Apple, so a copy your
+server stored stops working too: tried against the live API on 18 October 2026, Apple refused the token as soon as
+the sign-out was done. Forgetting the token in your page alone isn't a sign-out: the script would restore it on the
+next visit.
 
 `disconnect()` does nothing where Apple's script has no sign-out function, or where the page holds no
 configuration, as after a `ready` that failed.
