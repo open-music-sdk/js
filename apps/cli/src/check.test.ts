@@ -680,11 +680,33 @@ describe("the limit on each request", () => {
 
 describe("the owner's two rules for a run that writes, over a whole run", () => {
   test("every write that may have been carried out is in the cleanup, and nothing the listener had before is", async () => {
-    apple.library = new Set(["songs/s1", "albums/a1", "playlists/pl.chart2"]);
+    // What the listener had: a song, an album, a playlist, a track of another album, and ratings of every type.
+    apple.library = new Set(["songs/s1", "albums/a1", "playlists/pl.chart2", "songs/a3t1"]);
     apple.rated.set("s2", 1);
+    apple.rated.set("albums/a2", -1);
+    apple.rated.set("playlists/pl.chart1", 1);
     apple.catalogPlaylistSongsInLibrary = true;
+    const before = new Map(apple.rated);
     await main(["check", "--write", "--no-color"]);
     const steps = cleanupOf();
+    const pathOf = (req: Request) => new URL(req.url).pathname;
+
+    // Every rating set was of something not rated before, and was taken away again: what is rated now is what was
+    // before, and the favorite, which is a step of its own.
+    const sets = asked.filter((req) => req.method === "PUT").map(pathOf);
+    expect(sets.length).toBeGreaterThan(0);
+    for (const path of sets) {
+      const [, type = "", id = ""] = /^\/v1\/me\/ratings\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
+      expect(before.has(type === "songs" ? id : `${type}/${id}`), path).toBe(false);
+      expect(asked.some((req) => req.method === "DELETE" && pathOf(req) === path), path).toBe(true);
+    }
+    const favorites = asked.filter((req) => req.method === "POST" && pathOf(req) === "/v1/me/favorites").flatMap((req) => new URL(req.url).searchParams.get("ids[songs]")?.split(",") ?? []);
+    expect([...apple.rated.keys()].filter((key) => !favorites.includes(key))).toEqual([...before.keys()]);
+    expect(steps).not.toContain("Take away the dislike");
+    // The folder made is a step, and no album or playlist of which the listener held a track is one.
+    expect(asked.some((req) => req.method === "POST" && pathOf(req) === "/v1/me/library/playlist-folders")).toBe(true);
+    expect(steps).toContain("Delete the playlist folder named");
+    expect(steps).not.toContain('"Name of a3"');
     // What the steps link to, by the id each link ends in: a song's own page, or the page Apple gave the rest.
     const linked = new Set(Array.from(steps.matchAll(/https:\/\/music\.apple\.com\/gb\/(?:x|song)\/([\w.-]+)/g), (m) => m[1]));
 
