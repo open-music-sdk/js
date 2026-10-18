@@ -309,12 +309,13 @@ const WRITES = CHECKS.filter((each) => each.writes).map((each) => each.id);
 describe("brief: what Apple failed with, from its tag, status and code alone", () => {
   const timeout = new AppleMusicError("NetworkError", "GET /v1/me/library/playlists/p.secret: aborted", { cause: new DOMException("timed out", "TimeoutError") });
   test.each([
-    ["a request the CLI's limit cut off", timeout, "Apple did not answer within 30 seconds"],
+    ["a request the CLI's limit cut off, which a read tries twice", timeout, "Apple did not answer, each try given 30 seconds"],
     ["no answer at all", new AppleMusicError("NetworkError", "GET /v1/me/library/playlists/p.secret: fetch failed"), "Apple could not be reached"],
     ["a rate limit", new AppleMusicError("RateLimited", "GET /p.secret: 429", { status: 429 }), "Apple is limiting requests for this key (429)"],
     ["the developer token refused", new AppleMusicError("DeveloperTokenInvalid", "GET /p.secret: 401", { status: 401 }), "Apple refused the developer token (401)"],
     ["no developer token to ask with", new AppleMusicError("DeveloperTokenUnavailable", "the minter failed on p.secret"), "Apple could not be asked"],
-    ["a Music User Token refused before it was sent, with no status", new AppleMusicError("UserTokenInvalid", "/v1/me/p.secret needs a Music User Token"), "Apple refused the Music User Token"],
+    ["no Music User Token to ask with, which is no refusal: nothing was sent", new AppleMusicError("UserTokenInvalid", "/v1/me/p.secret needs a Music User Token"), "Apple could not be asked"],
+    ["a success the SDK found wanting", new AppleMusicError("ApiError", "getSongRating: Apple answered with no resource", { status: 200 }), "Apple answered 200, with what the SDK could not read"],
     ["an answer without a code", new AppleMusicError("ApiError", "GET /p.secret: 503", { status: 503 }), "Apple answered 503"],
     ["an answer with Apple's code",new AppleMusicError("ApiError", "GET /p.secret: 500", { status: 500, errors: [{ id: "e", status: "500", code: "50000", title: "Oops" }] }), "Apple answered 500, code 50000"],
   ])("%s", (_what, error, words) => {

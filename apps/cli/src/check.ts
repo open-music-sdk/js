@@ -142,21 +142,23 @@ function notFound(e: unknown): void {
  * which for a listener's things holds the ids of their library.
  */
 export function brief(e: AppleMusicError): string {
-  const timedOut = e.cause instanceof DOMException && e.cause.name === "TimeoutError";
-  if (timedOut) return `Apple did not answer within ${String(TIMEOUT_MS / 1000)} seconds`;
+  // A read is tried again after a timeout, so the wait was longer than one try's.
+  if (e.cause instanceof DOMException && e.cause.name === "TimeoutError") return `Apple did not answer, each try given ${String(TIMEOUT_MS / 1000)} seconds`;
+  if (e._tag === "NetworkError") return "Apple could not be reached";
+  // With no status there was no answer, as when there was no token to ask with: nothing was refused.
+  if (e.status === undefined) return "Apple could not be asked";
   const code = text(e.errors?.[0]?.code);
-  const status = e.status === undefined ? "" : ` (${String(e.status)}${code === undefined ? "" : `, code ${printable(code)}`})`;
+  const status = `${String(e.status)}${code === undefined ? "" : `, code ${printable(code)}`}`;
   switch (e._tag) {
-    case "NetworkError":
-      return "Apple could not be reached";
     case "RateLimited":
-      return `Apple is limiting requests for this key${status}`;
+      return `Apple is limiting requests for this key (${status})`;
     case "DeveloperTokenInvalid":
-      return `Apple refused the developer token${status}`;
+      return `Apple refused the developer token (${status})`;
     case "UserTokenInvalid":
-      return `Apple refused the Music User Token${status}`;
+      return `Apple refused the Music User Token (${status})`;
     default:
-      return e.status === undefined ? "Apple could not be asked" : `Apple answered ${String(e.status)}${code === undefined ? "" : `, code ${printable(code)}`}`;
+      // A success the SDK found wanting, such as an answer with no resource in it.
+      return e.status < 300 ? `Apple answered ${status}, with what the SDK could not read` : `Apple answered ${status}`;
   }
 }
 
