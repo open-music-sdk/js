@@ -22,7 +22,8 @@ The two runs, from the CLI's page on `localhost`, settled these:
 - The content security policy in [Sign a listener in](./guides/sign-in#_6-let-apple-s-script-through-your-security-headers)
   let everything the sign-in needed through.
 - A listener who declines, by closing Apple's window or by declining in it, makes the script's `authorize()`
-  reject, not answer with nothing. The CLI's page read what it rejected with as `Unauthorized`.
+  reject, not answer with nothing: with an `Error` named `AUTHORIZATION_ERROR`, its `errorCode` the same and its
+  message `Unauthorized`. `connect()` takes that for a decline, and resolves to `undefined`.
 - The script keeps its copy of the Music User Token in `localStorage`, under `music.<your team id in small
   letters>.media-user-token`, beside two short keys of the same prefix, `itre` and `itua`. It kept nothing in
   cookies, IndexedDB or Cache Storage. See the [security model](./concepts/security#in-a-page).

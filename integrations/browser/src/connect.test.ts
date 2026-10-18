@@ -243,9 +243,28 @@ describe("createConnect: ready and connect()", () => {
     expect(await helper.connect()).toBe(expected);
   });
 
-  test("what the script throws is handed on as it came: its shape is Apple's, and undocumented", async () => {
-    const boom = { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" };
-    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script rejects with an object of its own, not an Error
+  /** What the script rejected with when the listener declined, or closed its window, in Firefox on 18 October 2026: an Error of its own, its code a getter. */
+  const mkError = (code: string, message: string) =>
+    Object.defineProperty(Object.assign(new Error(message), { name: code, isMKError: true, reason: code, description: message }), "errorCode", { get: () => code });
+
+  test.each<[string, unknown]>([
+    ["the script's own error for it", mkError("AUTHORIZATION_ERROR", "Unauthorized")],
+    ["an object with its code alone", { errorCode: "AUTHORIZATION_ERROR" }],
+    ["an object with its name alone", { name: "AUTHORIZATION_ERROR" }],
+  ])("a listener who declines, or closes Apple's window, makes the script reject with AUTHORIZATION_ERROR: connect() resolves to undefined, given %s", async (_what, declined) => {
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script may reject with an object of its own
+    const { helper } = made({ authorize: () => Promise.reject(declined) });
+    await helper.ready;
+    expect(await helper.connect()).toBeUndefined();
+  });
+
+  test.each<[string, unknown]>([
+    ["the script's error for a developer token Apple refuses", mkError("UNAUTHORIZED_ERROR", "Unauthorized")],
+    ["an object of Apple's shape with another code", { errorCode: "NETWORK_ERROR", message: "offline" }],
+    ["an error of the page's own", new TypeError("popup blocked")],
+    ["no object at all", "AUTHORIZATION_ERROR"],
+  ])("anything else the script throws is handed on as it came, such as %s", async (_what, boom) => {
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Apple's script may reject with an object of its own
     const { helper } = made({ authorize: () => Promise.reject(boom) });
     await helper.ready;
     await expect(helper.connect()).rejects.toBe(boom);

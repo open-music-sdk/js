@@ -27,9 +27,10 @@ export interface tMusicKitInstance {
   /**
    * Apple's own: opens the sign-in window.
    *
-   * @returns The Music User Token, or nothing when the listener declined.
-   * @throws Whatever Apple's script rejects with when the window cannot be opened or the sign-in fails; the helper
-   * hands it on as it came.
+   * @returns The Music User Token, or nothing.
+   * @throws An error named `AUTHORIZATION_ERROR` when the listener declines or closes the window, which the helper
+   * takes for a decline; and whatever else Apple's script rejects with when the window cannot be opened or the
+   * sign-in fails, which the helper hands on as it came.
    */
   authorize(): Promise<string | null | undefined>;
   /** Apple's own sign-out, where the instance has one: ends the sign-in in the script, the copy of the token it kept, and the token at Apple. */
@@ -70,10 +71,11 @@ export interface tConnect {
   readonly ready: Promise<string | undefined>;
   /**
    * Opens Apple's sign-in window, to be called inside the listener's click, and resolves to the Music User Token,
-   * or to `undefined` when the script answers with nothing, which is taken for a decline. Waits on nothing but
+   * or to `undefined` when the listener declines: when the script rejects with its `AUTHORIZATION_ERROR`, as
+   * declining and closing its window both did against the live API, or answers with nothing. Waits on nothing but
    * `ready`, which is settled by the time there is a button to click. After a `ready` that failed, the script is
    * loaded and configured afresh, so a page whose endpoint was down when it loaded can still sign in; what that
-   * fails with, it rejects with, as `ready` would. What the script's `authorize()` throws is handed on as it came.
+   * fails with, it rejects with, as `ready` would. What else the script's `authorize()` throws is handed on as it came.
    * Called after `dispose()` it is a `TypeError`.
    */
   readonly connect: () => Promise<string | undefined>;
@@ -183,6 +185,17 @@ function loaded(page: tPage, state: tPageState): Promise<tMusicKit> {
     state.loading = undefined;
   });
   return attempt;
+}
+
+/**
+ * Whether what the script's `authorize()` rejected with is the listener declining: its error named
+ * `AUTHORIZATION_ERROR`, which closing Apple's window and declining in it both gave in Firefox on 18 October 2026.
+ * The script's `UNAUTHORIZED_ERROR`, for a developer token Apple will not take, is another error, and handed on.
+ */
+function declined(e: unknown): boolean {
+  if (typeof e !== "object" || e === null) return false;
+  const { name, errorCode } = e as { readonly name?: unknown; readonly errorCode?: unknown };
+  return name === "AUTHORIZATION_ERROR" || errorCode === "AUTHORIZATION_ERROR";
 }
 
 /** The app as the window will show it, checked: a name with something in it, and a build that is a string where it is given. */
@@ -309,7 +322,12 @@ export function createConnect(music: { readonly developerToken: tTokenProvider }
     const record = configure();
     const instance = await record.instance;
     if (record !== first && !isDisposed()) schedule();
-    return parseToken(await instance.authorize());
+    try {
+      return parseToken(await instance.authorize());
+    } catch (e) {
+      if (declined(e)) return undefined;
+      throw e;
+    }
   };
   const disconnect = async (): Promise<void> => {
     if (disposed) throw new TypeError("createConnect: disconnect() was called after dispose()");

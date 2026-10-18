@@ -101,8 +101,9 @@ button.onclick = async () => {
 
 `connect()` opens Apple's sign-in window and resolves to the listener's Music User Token.
 
-When Apple's script answers with nothing, `connect()` resolves to `undefined`, which the SDK takes for a decline.
-Leave the listener signed out.
+When the listener declines, or closes Apple's window, `connect()` resolves to `undefined`. Leave the listener
+signed out. Apple's script rejects with an error named `AUTHORIZATION_ERROR` then, as it did in Firefox on 18
+October 2026, and `connect()` takes that, or an answer of nothing, for a decline.
 
 Anything else Apple's script throws reaches you as it came. Its shape is Apple's and isn't documented, so show
 it to the listener, and never print it to a log where a token might end up.
