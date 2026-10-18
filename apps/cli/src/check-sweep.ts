@@ -19,6 +19,7 @@ import {
   list,
   once,
   ownPlaylist,
+  unpicked,
   refused,
   resourcesIn,
   seconds,
@@ -548,13 +549,13 @@ async function unrated(r: tRun, items: readonly tItem[], get: tGet, library: boo
     if (library && (await inLibrary(r, item))) continue;
     if (!(await ratingIn(() => get(r.music, item.id, { signal: r.signal }))).held) return { item, id: item.id };
   }
-  return "none of the chart's could be picked";
+  return unpicked(r, `none of the first five could be picked: each was rated${library ? ", or in your library" : ""}`);
 }
 
 /** One of the run's own additions to the library, by its library id, once it shows there. */
 async function ownCopy(r: tRun, type: "songs" | "albums" | "music-videos"): Promise<tRatable | string> {
   const addition = await added(r, type);
-  if (addition === undefined) return `none of the chart's ${type} could be picked to add to your library`;
+  if (addition === undefined) return unpicked(r, `none of the chart's first five ${type} could be picked to add to your library: each was there, or rated, or held something of yours`);
   if ("refused" in addition) return `Apple refused to add one to your library: ${addition.refused}`;
   const { id } = await shown(r, addition);
   return id === undefined ? `the ${type} added did not show in your library within a minute` : { item: addition.item, id, catalog: addition.item.id };

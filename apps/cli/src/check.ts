@@ -361,7 +361,7 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
         };
         say(`Asking: ${each.id}…`);
         try {
-          await each.run({ music, storefront, signal: stop.signal, left, line, charts: fromCharts, memo, name, fetch: timed });
+          await each.run({ id: each.id, music, storefront, signal: stop.signal, left, line, charts: fromCharts, memo, name, fetch: timed });
         } catch (e) {
           if (stop.signal.aborted) throw stop.signal.reason as Error;
           if (isAppleMusicError(e)) line("failed", `${brief(e)} (at ${whereOf(e)}), so this was not answered.`);

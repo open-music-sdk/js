@@ -49,6 +49,7 @@ import {
   text,
   took,
   tracksOf,
+  unpicked,
   tokenRefusal,
   type tAdded,
   type tItem,
@@ -148,31 +149,36 @@ async function isrcNext(run: tRun): Promise<void> {
   else run.line("same", `${found}, with no next page, even asked for one a page. resolve reads one page, which is all there is.`);
 }
 
+/**
+ * What a rating never set answers, alone and as one of several: of one chart song the listener never rated, found by
+ * asking for each in turn, so that no line says what they rated of the others.
+ */
 async function ratingUnset(run: tRun): Promise<void> {
   const songs = (await run.charts()).songs.slice(0, 25);
   if (songs.length === 0) { run.line("skipped", "the charts held no songs"); return; }
-  let rated: string[];
-  try {
-    rated = list(at(await getSongRatings(run.music, songs.map((song) => song.id), { signal: run.signal }), "data"))
-      .map(idOf)
-      .filter(defined);
-    run.line("report", `the ratings of ${plural(songs.length, "chart song")}: Apple answered 200, and left out the songs with none.`);
-  } catch (e) {
-    notFound(e);
-    rated = [];
-    run.line("differs", `the ratings of ${plural(songs.length, "chart song")}, none of them rated: Apple answered 404. getSongRatings rejects, where client-user says it resolves to an empty list.`);
+  let unrated: { readonly id: string; readonly answered: string } | undefined;
+  for (const song of songs) {
+    try {
+      const body = await getSongRating(run.music, song.id, { signal: run.signal });
+      if (list(at(body, "data")).length > 0) continue;
+      unrated = { id: song.id, answered: "200 with 0 ratings. music.user.getSongRating rejects an answer with none as an ApiError of status 200." };
+    } catch (e) {
+      notFound(e);
+      unrated = { id: song.id, answered: "404, which getSongRating rejects as an ApiError of status 404." };
+    }
+    break;
   }
-  const unrated = songs.find((song) => !rated.includes(song.id));
   if (unrated === undefined) {
-    run.line("skipped", "every one of the chart's songs is rated");
+    run.line("skipped", unpicked(run, `every one of the chart's first ${plural(songs.length, "song")} is rated`));
     return;
   }
+  run.line("report", `the rating of a song never rated: Apple answered ${unrated.answered}`);
   try {
-    const body = await getSongRating(run.music, unrated.id, { signal: run.signal });
-    run.line("report", `the rating of a song never rated: Apple answered 200 with ${plural(list(at(body, "data")).length, "rating")}. music.user.getSongRating rejects an answer with none as an ApiError of status 200.`);
+    const body = await getSongRatings(run.music, [unrated.id], { signal: run.signal });
+    run.line("report", `the ratings of songs none of which is rated, asked for as several: Apple answered 200 with ${plural(list(at(body, "data")).length, "rating")}, which getSongRatings resolves to as it is.`);
   } catch (e) {
     notFound(e);
-    run.line("report", "the rating of a song never rated: Apple answered 404, which getSongRating rejects as an ApiError of status 404.");
+    run.line("differs", "the ratings of songs none of which is rated, asked for as several: Apple answered 404. getSongRatings rejects, where client-user says it resolves to an empty list.");
   }
 }
 
@@ -390,7 +396,10 @@ async function addToLibraryCheck(run: tRun): Promise<void> {
     // A type the charts hold none of is passed over.
     if ({ songs: charts.songs, albums: charts.albums, playlists: charts.playlists, "music-videos": charts.musicVideos }[type].length === 0) continue;
     const addition = await added(run, type);
-    if (addition === undefined) answered.push(`${type} not asked, since none of the chart's could be picked`);
+    if (addition === undefined) {
+      unpicked(run, `none of the chart's first five ${type} could be picked: each was in your library, or rated, or held something of yours`);
+      answered.push(`${type} not asked (stderr says why)`);
+    }
     else if ("refused" in addition) answered.push(`${type}: ${addition.refused}`);
     else taken.push(addition);
   }
@@ -429,7 +438,7 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
     }
   }
   if (song === undefined) {
-    run.line("skipped", "none of the chart's songs could be picked");
+    run.line("skipped", unpicked(run, "none of the chart's first ten songs could be picked: each was in your library or rated"));
     return;
   }
   const left = { what: song, sure: false, inLibrary: false };
@@ -550,7 +559,7 @@ async function playlistCheck(run: tRun): Promise<void> {
   const songs = await albumSongs(run);
   const [firstSong] = songs;
   if (firstSong === undefined) {
-    run.line("skipped", "no chart album's songs could be picked to add");
+    run.line("skipped", unpicked(run, "no chart album's songs could be picked to add: you held each album, or something of it, or it had none to play"));
     return;
   }
   run.left.playlistSongs = { albums: albumsOf(songs, songs.length), seen: false };

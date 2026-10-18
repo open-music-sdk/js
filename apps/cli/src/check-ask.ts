@@ -78,6 +78,8 @@ export interface tCharts {
 
 /** What a check is run with. */
 export interface tRun {
+  /** The check's name, as its lines begin. */
+  readonly id: string;
   /** The listener's client: the kept token, their storefront, and the CLI's limit on each request. */
   readonly music: tMusic;
   readonly storefront: string;
@@ -141,6 +143,18 @@ export function tokenRefusal(e: unknown): AppleMusicError {
 /** Nothing, for Apple's 404. */
 export function notFound(e: unknown): void {
   if (!isNotFound(e)) throw e;
+}
+
+/** What stdout says of something not asked for a reason that would say what the listener holds or rated. */
+export const NOT_PICKED = "not asked, since nothing could be picked to ask it of (stderr says why)";
+/**
+ * Says on stderr, to the person, why nothing could be picked, and gives what stdout says instead: the charts are
+ * public, so "none of the first five could be picked" would tell a reader of the report that the listener holds or
+ * rated those five.
+ */
+export function unpicked(run: Pick<tRun, "id">, why: string): string {
+  say(`  ${run.id}: ${why}.`);
+  return NOT_PICKED;
 }
 
 /** What the run makes once and shares: made by the first check to ask for it, and the same promise for the rest. */

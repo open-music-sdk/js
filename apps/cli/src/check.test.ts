@@ -924,22 +924,24 @@ describe("isrc-next: whether songs looked up by ISRC come in pages, since resolv
   });
 });
 
-describe("rating-unset: what Apple answers for a rating never set", () => {
-  test("the songs never rated are left out of the ratings of several, and one is answered 404", async () => {
+describe("rating-unset: what Apple answers for a rating never set, asked of one song the listener never rated, so that nothing is said of what they rated", () => {
+  test("one never rated is answered 404 alone, and with nothing among several", async () => {
     expect(await main(["check", "rating-unset", "--no-color"])).toBe(0);
     expect(linesOf("rating-unset")).toEqual([
-      "· rating-unset: the ratings of 25 chart songs: Apple answered 200, and left out the songs with none.",
       "· rating-unset: the rating of a song never rated: Apple answered 404, which getSongRating rejects as an ApiError of status 404.",
+      "· rating-unset: the ratings of songs none of which is rated, asked for as several: Apple answered 200 with 0 ratings, which getSongRatings resolves to as it is.",
     ]);
+    // s1 is rated, so s2 is the one asked about, alone and as one of several.
+    expect(asked.filter((req) => new URL(req.url).pathname === "/v1/me/ratings/songs").map((req) => new URL(req.url).searchParams.get("ids"))).toEqual(["s2"]);
   });
 
   test("an empty answer for one never rated is what the bound function rejects as an ApiError of status 200", async () => {
     apple.unrated = "empty";
     await main(["check", "rating-unset", "--no-color"]);
-    expect(linesOf("rating-unset")[1]).toBe("· rating-unset: the rating of a song never rated: Apple answered 200 with 0 ratings. music.user.getSongRating rejects an answer with none as an ApiError of status 200.");
+    expect(linesOf("rating-unset")[0]).toBe("· rating-unset: the rating of a song never rated: Apple answered 200 with 0 ratings. music.user.getSongRating rejects an answer with none as an ApiError of status 200.");
   });
 
-  test.each(["/v1/me/ratings/songs", "/v1/me/ratings/songs/s2"])("a failure other than a 404 for %s fails the check", async (path) => {
+  test.each(["/v1/me/ratings/songs", "/v1/me/ratings/songs/s1"])("a failure other than a 404 for %s fails the check", async (path) => {
     apple.failing[path] = 400;
     expect(await main(["check", "rating-unset", "--no-color"])).toBe(1);
     expect(marksOf("rating-unset").at(-1)).toBe("✗");
@@ -952,16 +954,16 @@ describe("rating-unset: what Apple answers for a rating never set", () => {
   });
 
   test("a 404 for the ratings of songs none of them rated is ≠: getSongRatings is documented to resolve to an empty list", async () => {
-    apple.rated.clear();
     apple.noneRated = "404";
     expect(await main(["check", "rating-unset", "--no-color"])).toBe(1);
-    expect(marksOf("rating-unset")).toEqual(["≠", "·"]);
+    expect(marksOf("rating-unset")).toEqual(["·", "≠"]);
   });
 
-  test("every chart song rated already is not asked about", async () => {
+  test("every chart song rated already is not asked about, and stdout says nothing of it, which stderr does", async () => {
     for (const song of apple.songs) apple.rated.set(song.id as string, 1);
     await main(["check", "rating-unset", "--no-color"]);
-    expect(marksOf("rating-unset")).toEqual(["·", "-"]);
+    expect(linesOf("rating-unset")).toEqual(["- rating-unset: not asked, since nothing could be picked to ask it of (stderr says why)"]);
+    expect(stderr).toContain("  rating-unset: every one of the chart's first 25 songs is rated.");
   });
 });
 
@@ -1360,7 +1362,9 @@ describe("add-to-library and add-to-favorites", () => {
     apple.videos = [catalogItem("music-videos", "mv1")];
     apple.library.add("music-videos/mv1");
     await main(["check", "add-to-library", "--write", "--no-color"]);
-    expect(linesOf("add-to-library")[0]).toContain("music-videos not asked, since none of the chart's could be picked");
+    // stdout says nothing of why: that the chart's first five are in the library says what is in it, which stderr says.
+    expect(linesOf("add-to-library")[0]).toContain("music-videos not asked (stderr says why)");
+    expect(stderr).toContain("  add-to-library: none of the chart's first five music-videos could be picked: each was in your library, or rated, or held something of yours.");
   });
 
   test("an addition whose answer was lost is in the cleanup as one that may not be there, and the check is ✗", async () => {
@@ -1663,7 +1667,8 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     for (const album of apple.albums.slice(1)) apple.library.add(`albums/${album.id as string}`);
     apple.songless.add("a1");
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(0);
-    expect(linesOf("playlist").at(-1)).toBe("- playlist: no chart album's songs could be picked to add");
+    expect(linesOf("playlist").at(-1)).toBe("- playlist: not asked, since nothing could be picked to ask it of (stderr says why)");
+    expect(stderr).toContain("  playlist: no chart album's songs could be picked to add: you held each album, or something of it, or it had none to play.");
     expect(cleanupOf()).not.toContain("albums they are from");
   });
 
@@ -2023,7 +2028,14 @@ describe("rating round trips: a dislike set on what the listener had not rated, 
   test("none of the first five to be picked is -, and nothing is set", async () => {
     for (const song of apple.songs.slice(0, 5)) apple.rated.set(String(song.id), 1);
     await main(["check", "setSongRating", "--write", "--no-color"]);
-    expect(linesOf("setSongRating")).toEqual(["- setSongRating: none of the chart's could be picked"]);
+    expect(linesOf("setSongRating")).toEqual(["- setSongRating: not asked, since nothing could be picked to ask it of (stderr says why)"]);
+    expect(stderr).toContain("  setSongRating: none of the first five could be picked: each was rated, or in your library.");
+  });
+
+  test("a station is never in a library, so one is passed over for being rated alone", async () => {
+    apple.rated.set("stations/stations.f", 1);
+    await main(["check", "setStationRating", "--write", "--no-color"]);
+    expect(stderr).toContain("  setStationRating: none of the first five could be picked: each was rated.");
     expect(asked.filter((req) => req.method === "PUT")).toEqual([]);
   });
 
@@ -2124,7 +2136,7 @@ describe("rating round trips: a dislike set on what the listener had not rated, 
   });
 
   test.each([
-    ["the charts hold no song to add", () => (apple.songs = []), "none of the chart's songs could be picked to add to your library"],
+    ["the charts hold no song to add", () => (apple.songs = []), "not asked, since nothing could be picked to ask it of (stderr says why)"],
     ["Apple refuses to add one", () => (apple.addStatus.songs = 400), "Apple refused to add one to your library: Apple answered 400, code 40001"],
     ["what was added never shows", () => (apple.addedUnseen = true), "the songs added did not show in your library within a minute"],
   ])("a library copy is not rated when %s: -", async (_what, arrange, words) => {
@@ -2280,7 +2292,7 @@ describe("add-to-library, as the sweep's own additions are made", () => {
     apple.rated.clear();
     for (const n of [1, 2, 3, 4, 5]) apple.library.add(`albums/s${String(n)}al`);
     await main(["check", "add-to-library", "--write", "--no-color"]);
-    expect(linesOf("add-to-library")[0]).toContain("songs not asked, since none of the chart's could be picked");
+    expect(linesOf("add-to-library")[0]).toContain("songs not asked (stderr says why)");
     expect(linesOf("add-to-library").some((line) => line.includes("album of the song"))).toBe(false);
   });
 
