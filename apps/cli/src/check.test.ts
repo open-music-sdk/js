@@ -1803,6 +1803,12 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(lines.slice(1)).toEqual(["≠ getArtistView:top-songs: types: attributes.title: required; songs href: required."]);
   });
 
+  test("a view whose page 1 comes without the attributes asked for is ≠: the type leaves them optional, since Apple sends them only when asked", async () => {
+    apple.answers["/v1/catalog/gb/artists/x/view/top-songs"] = { data: [item("songs", "s1")] };
+    expect(await main(["check", "getArtistView:top-songs", "--no-color"])).toBe(1);
+    expect(rowsOf("getArtistView")).toEqual(['≠ getArtistView:top-songs: Apple sent no attributes on page 1, though they were asked for with with: ["attributes"].']);
+  });
+
   test("one name of a function is asked alone by function:name, its next page too", async () => {
     expect(await main(["check", "getArtistView:top-songs", "--no-color"])).toBe(0);
     expect(stdout.split(LF).filter((line) => /^. get/.test(line))).toEqual(["✓ getArtistView:top-songs: as the types have it, and page 2 too, by its next link, which carries offset."]);

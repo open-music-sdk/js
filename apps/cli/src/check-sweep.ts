@@ -189,6 +189,8 @@ interface tOptions {
    * is: a 404 or nothing for it is no "none here" but a difference, as a request the SDK makes wrongly would answer.
    */
   readonly holds?: string;
+  /** What page 1 has to carry because it was asked for: a view's own `attributes`, asked for with `with`, which the type leaves optional since Apple sends them only then. */
+  readonly asked?: string;
 }
 /** What a function asked by ids Apple gave has to hold. */
 const GIVEN = { holds: "what it gave the ids of in another answer" } as const;
@@ -222,6 +224,7 @@ async function attempt<T>(a: tAsk, what: string, tries: readonly T[], call: (inp
     }
     const diffs = diffsOf(schema, body);
     if (diffs.length > 0) return { mark: "differs", words: `types: ${someOf(diffs)}.`, diffs };
+    if (options.asked !== undefined && at(body, options.asked) === undefined) return { mark: "differs", words: `Apple sent no ${options.asked} on page 1, though they were asked for with with: ["${options.asked}"].`, diffs: [] };
     const next = text(at(body, "next"));
     if (options.paged !== true || next === undefined) return { mark: "same", words: "as the types have it.", diffs: [] };
     // The next link as Apple gave it, as core's paginate sends it: a page 2 that differs where page 1 did not is the
@@ -311,7 +314,8 @@ const named = <K extends string>(
   names: Object.keys(shapes),
   ask: async (a, name) => {
     const each = seeds?.[name as K] ?? from;
-    return attempt(a, each.what, await each.get(a), (id) => call(a, id, name as K), shapes[name as K], { paged: true });
+    // A view is asked for with its own attributes, which are the only thing to say page 1 is the view's.
+    return attempt(a, each.what, await each.get(a), (id) => call(a, id, name as K), shapes[name as K], noun === "views" ? { paged: true, asked: "attributes" } : { paged: true });
   },
 });
 const paged = { paged: true } as const;
