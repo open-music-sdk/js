@@ -1,7 +1,7 @@
 {
   "name": "@open-music-sdk/cli",
   "version": "0.0.0",
-  "description": "A Music User Token for your own Apple Music account, through Apple's sign-in in your browser, and a check of your MusicKit key, from the command line.",
+  "description": "A Music User Token for your own Apple Music account, through Apple's sign-in in your browser, a check of your MusicKit key, and live checks of what the SDK takes on trust about Apple's API, from the command line.",
   "license": "MIT",
   "keywords": [
     "apple-music-api",

@@ -418,7 +418,10 @@ describe("which checks run: by name, in the list's order, and the write checks o
       .map((line) => /^. ([\w-]+): /.exec(line)?.[1])
       .filter((id): id is string => id !== undefined && CHECKS.some((each) => each.id === id));
     expect([...new Set(order)]).toEqual(CHECKS.map((each) => each.id));
-    expect(stderr.indexOf("Apple's API can delete none of it")).toBeLessThan(stderr.indexOf("Asking: add-to-library"));
+    const warning = stderr.indexOf("--write: what these checks add stays");
+    expect(warning).toBeGreaterThan(-1);
+    expect(warning).toBeLessThan(stderr.indexOf("Asking: add-to-library"));
+    expect(stderr).toContain("an album's songs with it, one song made a favorite, and a playlist of up to 300 songs");
   });
 
   test("help lists every check by name, and marks those that write", async () => {
@@ -689,42 +692,41 @@ describe("rating-unset: what Apple answers for a rating never set", () => {
 });
 
 describe("playlist-include: a long playlist's tracks, as lib-playlists' read reads them", () => {
-  test("the next link keeps include=catalog and the tracks past the first page carry ISRCs, and include=tracks carries tracks", async () => {
+  test("the next link keeps include=catalog, and the tracks on both pages carry their catalog song and its ISRC", async () => {
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
     expect(linesOf("playlist-include")).toEqual([
       "· playlist-include: a long playlist's page 1 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: a long playlist's page 2 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: the next link keeps include=catalog.",
       "✓ playlist-include: the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.",
-      "✓ playlist-include: the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.",
     ]);
   });
 
   test("a next link that drops include=catalog loses the ISRCs after the first page", async () => {
     apple.nextKeepsInclude = false;
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(1);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "≠", "✓"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "≠"]);
     expect(linesOf("playlist-include")[2]).toContain("the next link drops include=catalog");
   });
 
   test("include=catalog that gives no track its song is ≠ on the first page already", async () => {
     apple.includeCatalog = false;
     await main(["check", "playlist-include", "--no-color"]);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "≠", "✓"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "≠"]);
     expect(linesOf("playlist-include")[3]).toContain("gave no track on the first page its catalog song");
   });
 
   test("tracks past the first page that are none of them in the catalog say nothing of the link", async () => {
     apple.listener[1]?.tracks.splice(100, 50, ...Array.from({ length: 50 }, () => ({ catalogId: "", isrc: undefined })));
     await main(["check", "playlist-include", "--no-color"]);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-", "✓"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-"]);
   });
 
   test("tracks no longer in the storefront, with a catalog id and no catalog song, are no finding on either page", async () => {
     const long = apple.listener[1];
     for (const i of [3, 120, 140]) if (long?.tracks[i]) long.tracks[i] = { catalogId: `gone${String(i)}`, isrc: undefined };
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "✓", "✓"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "✓"]);
     expect(linesOf("playlist-include")[0]).toContain("some with their catalog song, all of those with its ISRC, and all with playParams.catalogId");
   });
 
@@ -739,13 +741,7 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
     const long = apple.listener[1];
     long?.tracks.splice(0, 100, ...Array.from({ length: 100 }, () => ({ catalogId: "", isrc: undefined })));
     await main(["check", "playlist-include", "--no-color"]);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-", "✓"]);
-  });
-
-  test("include=tracks that carries none is ≠: read would take a 404 for the tracks for a playlist with none", async () => {
-    apple.includeTracks = false;
-    expect(await main(["check", "playlist-include", "--no-color"])).toBe(1);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "✓", "≠"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-"]);
   });
 
   test("a playlist's tracks Apple fails to answer for, other than a 404, fail the check", async () => {
@@ -759,6 +755,37 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
     apple.listener = [had("p.empty", [])];
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
     expect(linesOf("playlist-include")).toEqual(["- playlist-include: no playlist of the first 25 in the library has more than a page of tracks"]);
+  });
+});
+
+describe("playlist-include-tracks: what read checks a 404 for a playlist's tracks against", () => {
+  test("a playlist with tracks, asked for with include=tracks, carries them", async () => {
+    expect(await main(["check", "playlist-include-tracks", "--no-color"])).toBe(0);
+    expect(linesOf("playlist-include-tracks")).toEqual(["✓ playlist-include-tracks: a playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against."]);
+  });
+
+  test("include=tracks that carries none is ≠: read would take a 404 for the tracks for a playlist with none", async () => {
+    apple.includeTracks = false;
+    expect(await main(["check", "playlist-include-tracks", "--no-color"])).toBe(1);
+    expect(marksOf("playlist-include-tracks")).toEqual(["≠"]);
+  });
+
+  test("an empty playlist is passed over for one with tracks", async () => {
+    apple.listener = [had("p.empty", []), had("p.short", tracksOf(4))];
+    await main(["check", "playlist-include-tracks", "--no-color"]);
+    expect(marksOf("playlist-include-tracks")).toEqual(["✓"]);
+  });
+
+  test("a library of empty playlists is not asked about", async () => {
+    apple.listener = [had("p.empty", [])];
+    await main(["check", "playlist-include-tracks", "--no-color"]);
+    expect(linesOf("playlist-include-tracks")).toEqual(["- playlist-include-tracks: no playlist of the first 25 in the library has tracks"]);
+  });
+
+  test("a playlist's tracks failing other than with a 404 fail the check", async () => {
+    apple.failing["/v1/me/library/playlists/p.short/tracks"] = 500;
+    expect(await finish(["check", "playlist-include-tracks", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(marksOf("playlist-include-tracks")).toEqual(["✗"]);
   });
 });
 

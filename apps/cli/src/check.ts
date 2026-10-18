@@ -405,13 +405,27 @@ async function playlistInclude(run: tRun): Promise<void> {
     else if (b.catalog === 0) run.line("differs", "past the first page, no track comes with its catalog song. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.");
     else if (a.isrc < a.catalog || b.isrc < b.catalog) run.line("differs", "catalog songs come without their ISRC. lib-playlists' read takes the ISRC from there, so an export loses it for them.");
     else run.line("same", "the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.");
-
-    const tracks = list(at(list(at(await getLibraryPlaylist(music, id, { include: ["tracks"], signal }), "data"))[0], "relationships", "tracks", "data")).length;
-    if (tracks > 0) run.line("same", "the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.");
-    else run.line("differs", "the playlist asked for with include=tracks carries none of its tracks. read checks a 404 for a playlist's tracks against them, so it would take such a 404 for a playlist with none, and apply would add everything again.");
     return;
   }
   run.line("skipped", "no playlist of the first 25 in the library has more than a page of tracks");
+}
+
+async function playlistIncludeTracks(run: tRun): Promise<void> {
+  const { music, signal } = run;
+  // Any playlist with tracks: lib-playlists' read asks for one this way when its tracks answer 404.
+  for (const id of list(at(await listLibraryPlaylists(music, { limit: 25, signal }), "data")).map(idOf).filter(defined)) {
+    try {
+      await getLibraryPlaylistRelationship(music, id, "tracks", { signal });
+    } catch (e) {
+      notFound(e);
+      continue;
+    }
+    const tracks = list(at(list(at(await getLibraryPlaylist(music, id, { include: ["tracks"], signal }), "data"))[0], "relationships", "tracks", "data")).length;
+    if (tracks > 0) run.line("same", "a playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.");
+    else run.line("differs", "a playlist asked for with include=tracks carries none of its tracks. read checks a 404 for a playlist's tracks against them, so it would take such a 404 for a playlist with none, and apply would add everything again.");
+    return;
+  }
+  run.line("skipped", "no playlist of the first 25 in the library has tracks");
 }
 
 async function userTokenRefused(run: tRun): Promise<void> {
@@ -740,6 +754,7 @@ export const CHECKS: readonly tCheck[] = [
   { id: "isrc-next", about: "Whether songs looked up by ISRC come in pages", writes: false, run: isrcNext },
   { id: "rating-unset", about: "What Apple answers for a rating never set", writes: false, run: ratingUnset },
   { id: "playlist-include", about: "Whether a long playlist's tracks keep their catalog songs and ISRCs past the first page", writes: false, run: playlistInclude },
+  { id: "playlist-include-tracks", about: "Whether a playlist asked for with include=tracks carries its tracks", writes: false, run: playlistIncludeTracks },
   { id: "user-token-refused", about: "What Apple answers for a Music User Token it never gave", writes: false, run: userTokenRefused },
   { id: "preview-hosts", about: "Which hosts serve the preview clips", writes: false, run: previewHosts },
   { id: "artwork-placeholders", about: "Which placeholders artwork templates hold", writes: false, run: artworkPlaceholders },
@@ -799,7 +814,7 @@ function cleanup(left: tLeft): void {
   // On stderr: the steps are said to the person, and in naming what was not in their library they say what was,
   // which has no place in the report on stdout that goes into an issue.
   say("");
-  say("To undo what check left in your library, which Apple's API cannot delete, use the Music app on any device signed in to this Apple Account:");
+  say("To undo what check left in your library, which Apple's API has no way to take out again, use the Music app on any device signed in to this Apple Account:");
   steps.forEach(({ step, items = [] }, i) => {
     say(`  ${String(i + 1)}. ${step}`);
     for (const item of items) say(`     - ${item}`);
@@ -844,7 +859,10 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
   const marks = new Set<tMark>();
   try {
     if (names.length === 0 && flags.write !== true) say("The checks that write to your library are left out; --write adds them.");
-    if (checks.some((each) => each.writes)) say("--write: what these checks add stays in your library, since Apple's API can delete none of it. The steps to remove it are printed at the end.");
+    if (checks.some((each) => each.writes))
+      say(
+        "--write: what these checks add stays, since Apple's API has no way to take it out of the library again: up to four things added to it, an album's songs with it, one song made a favorite, and a playlist of up to 300 songs, which may put them in the library too. The steps to remove it are printed at the end.",
+      );
     for (const each of checks) {
       const line = (mark: tMark, words: string) => {
         marks.add(mark);

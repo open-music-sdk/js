@@ -54,7 +54,7 @@ API, `GET /v1/test` and `GET /v1/me/storefront`. Still open for the CLI itself:
   token;
 - whether a browser ever asks for the page twice of its own accord, which the one-time address would turn away.
 
-The CLI's `check` asks the live API what this page lists that a server can ask, and prints what Apple did:
+The CLI's `check` asks the live API much of what this page lists that a server can ask, and prints what Apple did:
 `open-music-sdk check`, or `open-music-sdk check <name>` for one question. Its findings go here. It hasn't been run
 yet.
 

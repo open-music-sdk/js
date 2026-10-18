@@ -123,15 +123,15 @@ script names an app by the page's host.
 ## `check`
 
 Apple's documentation is silent or wrong in places, and the SDK takes some things on trust there. `check` asks the
-live API about each of them, through the SDK's own functions, signed in as you with the token `login` kept. It
-starts with `doctor`'s two questions, then prints a line for each answer:
+live API about those a server can ask, through the SDK's own functions, signed in as you with the token `login`
+kept. It starts with `doctor`'s two questions, then prints a line for each answer:
 
 | Mark | Means |
 | --- | --- |
 | `✓` | Apple did what the SDK assumes. |
 | `≠` | It didn't. The line says which package assumes otherwise. |
 | `·` | What Apple did, where the SDK assumes nothing, such as how long a write takes to show. |
-| `-` | Your account can't be asked this, for example when no playlist of yours is long enough. |
+| `-` | Not asked: your account can't be asked it, for example when no playlist of yours is long enough, or what it would be asked after didn't hold. |
 | `✗` | Apple failed, so the question wasn't answered. |
 
 It exits `1` for a `≠` or a `✗`. What it prints on stdout is the report, for an issue as it is, inside a code block.
@@ -146,9 +146,10 @@ open-music-sdk check --write                   # the checks that write too
 open-music-sdk help check                      # every check, by name
 ```
 
-The checks that write run only with `--write`, since what they add stays in your library: Apple's API can't delete
-it. They add up to four things to your library, make one song a favorite, and make a playlist of up to 300 songs,
-which may put those songs in your library too. Each is something you didn't have, and the run ends with numbered
+The checks that write run only with `--write`, since what they add stays: Apple's API has no way to take a playlist
+or anything else out of your library, and `check` doesn't take its favorite back. They add up to four things to
+your library, an album's songs with it, make one song a favorite, and make a playlist of up to 300 songs, which may
+put those songs in your library too. Each is something you didn't have, and the run ends with numbered
 steps that remove them in the Music app, with a link to each, and what to look for where a write may or may not have
 carried something else in with it. They're printed whatever happens, Ctrl+C and a SIGTERM included, and a second
 Ctrl+C waits for them. Run them on an account you don't mind cluttering, with an Apple Music subscription.
