@@ -808,6 +808,16 @@ describe("add-to-library and add-to-favorites", () => {
     expect(posts()).toEqual([]);
   });
 
+  test.each([".", ".."])("a chart id of %s, which a URL reads as a step in the path, is passed over and never asked about", async (id) => {
+    apple.songs = [{ ...chartSong(1), id }, chartSong(2)];
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    const paths = asked.map((req) => new URL(req.url).pathname);
+    // Where `songs/./library` and `songs/../library` would have gone.
+    expect(paths).not.toContain("/v1/catalog/gb/songs/library");
+    expect(paths).not.toContain("/v1/catalog/gb/library");
+    expect(paths).toContain("/v1/catalog/gb/songs/s2/library");
+  });
+
   test("a type Apple refuses is reported, and is not in the cleanup, since nothing was added", async () => {
     apple.addStatus.playlists = 400;
     await main(["check", "add-to-library", "--write", "--no-color"]);

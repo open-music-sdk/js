@@ -111,10 +111,10 @@ const at = (value: unknown, ...keys: readonly (string | number)[]): unknown =>
   keys.reduce<unknown>((v, k) => (typeof v === "object" && v !== null && Object.hasOwn(v, k) ? (v as Record<string | number, unknown>)[k] : undefined), value);
 const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : []);
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined);
-/** An id as Apple's are, and nothing that could be read as more than one segment of a path. */
+/** An id as Apple's are, and nothing that could be read as more than one segment of a path: no `.` or `..`, which a URL reads as "here" and "one up". */
 const idOf = (value: unknown): string | undefined => {
   const id = at(value, "id");
-  return typeof id === "string" && /^[\w.-]{1,64}$/.test(id) ? id : undefined;
+  return typeof id === "string" && /^(?!\.{1,2}$)[\w.-]{1,64}$/.test(id) ? id : undefined;
 };
 const defined = <T>(value: T | undefined): value is T => value !== undefined;
 const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`;
@@ -205,10 +205,14 @@ function itemsOf(type: tItem["type"], data: unknown): tItem[] {
   });
 }
 
-/** Whether a catalog resource is in the listener's library: its `library` relationship, which needs their token. */
+/**
+ * Whether a catalog resource is in the listener's library: its `library` relationship, which needs their token and
+ * which no client function asks for, so the path is put together here, each segment encoded as core's are.
+ */
 async function inLibrary(run: tRun, { type, id }: Pick<tItem, "type" | "id">): Promise<boolean> {
   try {
-    return list(at(await run.music.request(`v1/catalog/${run.storefront}/${type}/${id}/library`, { user: true, signal: run.signal }), "data")).length > 0;
+    const path = `v1/catalog/${encodeURIComponent(run.storefront)}/${type}/${encodeURIComponent(id)}/library`;
+    return list(at(await run.music.request(path, { user: true, signal: run.signal }), "data")).length > 0;
   } catch (e) {
     notFound(e);
     return false;
