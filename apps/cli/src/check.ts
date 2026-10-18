@@ -388,8 +388,9 @@ async function playlistInclude(run: tRun): Promise<void> {
     const next = text(at(first, "next"));
     if (next === undefined) continue;
 
-    // Read as lib-playlists' `read` reads it: the first page by the client's function, the rest by the links.
-    const second = await music.request(next, { signal });
+    // Read as lib-playlists' `read` reads it: the first page by the client's function, the rest by the links, with
+    // include=catalog put back, which the link of a playlist's tracks was seen to leave out on 18 October 2026.
+    const second = await music.request(next, { signal, params: { include: ["catalog"] } });
     const keeps = new URL(next, ORIGIN).searchParams.get("include")?.split(",").includes("catalog") === true;
     const [a, b] = [catalogOf(first), catalogOf(second)];
     for (const [n, page] of [
@@ -397,13 +398,13 @@ async function playlistInclude(run: tRun): Promise<void> {
       [2, b],
     ] as const)
       run.line("report", `a long playlist's page ${String(n)} of tracks, with include=catalog: ${share(page.catalog, page.tracks)} with their catalog song, ${share(page.isrc, page.catalog)} of those with its ISRC, and ${share(page.catalogId, page.tracks)} with playParams.catalogId.`);
-    run.line("report", `the next link ${keeps ? "keeps" : "drops"} include=catalog.`);
+    run.line("report", `the next link ${keeps ? "keeps" : "drops"} include=catalog, which read puts back.`);
     // Judged page by page on whether include=catalog was honoured at all, and whether the songs it gave carry their
     // ISRC: a track no longer in the storefront has a catalog id and no catalog song on any page, and is no finding.
     if (a.catalog === 0 && a.catalogId === 0) run.line("skipped", "no track on the first page is in the catalog, so what include=catalog gives is not seen");
     else if (a.catalog === 0) run.line("differs", "include=catalog gave no track on the first page its catalog song. lib-playlists' read takes the ISRC from there, so an export holds none.");
     else if (b.catalog === 0 && b.catalogId === 0) run.line("skipped", "no track on the second page is in the catalog, so whether the next link keeps the catalog songs is not seen");
-    else if (b.catalog === 0) run.line("differs", "past the first page, no track comes with its catalog song. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.");
+    else if (b.catalog === 0) run.line("differs", "past the first page, no track comes with its catalog song, though include=catalog is asked for again. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.");
     else if (a.isrc < a.catalog || b.isrc < b.catalog) run.line("differs", "catalog songs come without their ISRC. lib-playlists' read takes the ISRC from there, so an export loses it for them.");
     else run.line("same", "the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.");
     return;
@@ -754,7 +755,7 @@ export const CHECKS: readonly tCheck[] = [
   { id: "charts-next", about: "What a chart's next link answers with", writes: false, run: chartsNext },
   { id: "isrc-next", about: "Whether songs looked up by ISRC come in pages", writes: false, run: isrcNext },
   { id: "rating-unset", about: "What Apple answers for a rating never set", writes: false, run: ratingUnset },
-  { id: "playlist-include", about: "Whether a long playlist's tracks keep their catalog songs and ISRCs past the first page", writes: false, run: playlistInclude },
+  { id: "playlist-include", about: "Whether a long playlist's tracks keep their catalog songs and ISRCs past the first page, as read asks for them", writes: false, run: playlistInclude },
   { id: "playlist-include-tracks", about: "Whether a playlist asked for with include=tracks carries its tracks", writes: false, run: playlistIncludeTracks },
   { id: "user-token-refused", about: "What Apple answers for a Music User Token it never gave", writes: false, run: userTokenRefused },
   { id: "preview-hosts", about: "Which hosts serve the preview clips", writes: false, run: previewHosts },

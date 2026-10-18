@@ -82,6 +82,8 @@ let apple: {
   /** Whether a playlist asked for with include=tracks carries them, and whether include=catalog gives tracks their song. */
   includeTracks: boolean;
   includeCatalog: boolean;
+  /** Whether include=catalog is honoured on the first page of a playlist's tracks alone, however a later one is asked for. */
+  catalogOnFirstPageOnly: boolean;
   /** Whether the answer to a new playlist holds it, and what its description comes back as. */
   madeWithId: boolean;
   descriptionBack: (sent: string) => string;
@@ -134,6 +136,7 @@ beforeEach(async () => {
     nextKeepsInclude: true,
     includeTracks: true,
     includeCatalog: true,
+    catalogOnFirstPageOnly: false,
     madeWithId: true,
     descriptionBack: (sent) => sent,
     lag: { readable: 0, listed: 0, tracks: 0 },
@@ -186,7 +189,7 @@ const nothing = (status: number) => new Response(null, { status });
 /** A page of a playlist's tracks, as Apple gives one: a hundred at a time, each with its catalog song when asked for. */
 function tracksPage(playlist: tPlaylist, url: URL) {
   const offset = Number(url.searchParams.get("offset") ?? "0");
-  const catalog = apple.includeCatalog && url.searchParams.get("include")?.split(",").includes("catalog") === true;
+  const catalog = apple.includeCatalog && (offset === 0 || !apple.catalogOnFirstPageOnly) && url.searchParams.get("include")?.split(",").includes("catalog") === true;
   const tracks = playlist.tracks.slice(0, playlist.shown);
   if (tracks.length === 0) return refuse(404);
   // A track with no catalog id, such as one the listener uploaded, has no catalog song either.
@@ -750,16 +753,25 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
     expect(linesOf("playlist-include")).toEqual([
       "· playlist-include: a long playlist's page 1 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: a long playlist's page 2 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
-      "· playlist-include: the next link keeps include=catalog.",
+      "· playlist-include: the next link keeps include=catalog, which read puts back.",
       "✓ playlist-include: the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.",
     ]);
   });
 
-  test("a next link that drops include=catalog loses the ISRCs after the first page", async () => {
+  test("a next link that drops include=catalog, as Apple's do, is asked with it put back, as read asks, and its tracks keep their ISRCs", async () => {
     apple.nextKeepsInclude = false;
+    expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "✓"]);
+    expect(linesOf("playlist-include")[2]).toBe("· playlist-include: the next link drops include=catalog, which read puts back.");
+    expect(asked.some((req) => req.url.includes("offset=100") && new URL(req.url).searchParams.get("include") === "catalog")).toBe(true);
+  });
+
+  test("no catalog song past the first page, with include=catalog asked for again, is ≠: read loses the ISRCs there", async () => {
+    apple.catalogOnFirstPageOnly = true;
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(1);
-    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "≠"]);
-    expect(linesOf("playlist-include")[2]).toContain("the next link drops include=catalog");
+    expect(linesOf("playlist-include")[3]).toBe(
+      "≠ playlist-include: past the first page, no track comes with its catalog song, though include=catalog is asked for again. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.",
+    );
   });
 
   test("include=catalog that gives no track its song is ≠ on the first page already", async () => {
