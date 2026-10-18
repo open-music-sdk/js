@@ -808,6 +808,18 @@ describe("add-to-library and add-to-favorites", () => {
     expect(posts()).toEqual([]);
   });
 
+  test("a link is offered only when it is an https address of Apple Music, and a name loses what would turn how it reads", async () => {
+    const override = String.fromCharCode(0x202e);
+    apple.songs = [catalogItem("songs", "s1", { name: `Hit${override}lanigiro`, url: "javascript:alert(1)" })];
+    apple.albums = [catalogItem("albums", "a1", { url: "https://music.apple.com.evil.example/gb/album/1" })];
+    apple.playlists = [catalogItem("playlists", "pl.1", { url: "http://music.apple.com/gb/playlist/1" })];
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).toContain('- the song "Hitlanigiro" by Artist of s1: search for it in the Music app');
+    expect(cleanupOf()).toContain('- the album "Name of a1" by Artist of a1, with its songs: search for it in the Music app');
+    expect(cleanupOf()).toContain('- the playlist "Name of pl.1" by Artist of pl.1: search for it in the Music app');
+    expect(cleanupOf()).toContain('- the music video "Name of mv1" by Artist of mv1: https://music.apple.com/gb/x/mv1');
+  });
+
   test.each([".", ".."])("a chart id of %s, which a URL reads as a step in the path, is passed over and never asked about", async (id) => {
     apple.songs = [{ ...chartSong(1), id }, chartSong(2)];
     await main(["check", "add-to-library", "--write", "--no-color"]);

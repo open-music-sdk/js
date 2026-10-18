@@ -21,14 +21,12 @@ export class CliError extends Error {
 /** A mistake in how the CLI was run: exit status 2. */
 export const usage = (message: string): CliError => new CliError(message, 2);
 
-/** Text from outside, from Apple, the network or a path, without the control characters a terminal would act on rather than show. */
-export const printable = (text: string): string =>
-  Array.from(text)
-    .filter((c) => {
-      const code = c.charCodeAt(0);
-      return code > 0x1f && (code < 0x7f || code > 0x9f);
-    })
-    .join("");
+/**
+ * Text from outside, from Apple, the network or a path, without the control characters a terminal would act on rather
+ * than show, and without the format characters that change how the text around them reads, such as a right-to-left
+ * override, which can turn what a line tells the reader to do around. A joiner inside an emoji goes with them.
+ */
+export const printable = (text: string): string => text.replace(/[\p{Cc}\p{Cf}]/gu, "");
 
 /** The environment, as far as the CLI reads it. */
 export type tEnv = Readonly<Record<string, string | undefined>>;

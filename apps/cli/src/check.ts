@@ -25,6 +25,7 @@ import {
   type AppleMusicError,
   type tMusic,
 } from "@open-music-sdk/server";
+import { isOnHost } from "@open-music-sdk/core";
 import { NAME, TIMEOUT_MS, examine, out, paint, say, type tContext, type tFlags } from "./commands";
 import { CliError, printable, usage } from "./files";
 
@@ -628,7 +629,8 @@ const label = (item: tItem) => {
   const word = { songs: "song", albums: "album", playlists: "playlist", "music-videos": "music video" }[item.type];
   return `the ${word} "${printable(item.name)}"${item.by === undefined ? "" : ` by ${printable(item.by)}`}${item.type === "albums" ? ", with its songs" : ""}`;
 };
-const link = (item: tItem) => (item.url === undefined ? "search for it in the Music app" : printable(item.url));
+/** Apple's link to a resource, offered to open only when it is an https address of Apple Music's own: it came in an answer, and the person is told to follow it. */
+const link = ({ url }: tItem) => (url !== undefined && isOnHost(url, ["music.apple.com"]) ? printable(url) : "search for it in the Music app");
 const UNSURE = " (Apple's answer was lost, so it may not be there)";
 const unsure = (written: tWritten<unknown>) => (written.sure ? "" : UNSURE);
 const DELETE = "and choose Delete from Library from its … menu";

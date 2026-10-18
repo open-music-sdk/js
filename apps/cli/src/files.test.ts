@@ -56,6 +56,12 @@ describe("printable: text from outside, without what a terminal would act on rat
     const text = `Café ${String.fromCodePoint(0x1f3b5)}${control(0xa0)}`;
     expect(printable(text)).toBe(text);
   });
+
+  test("the format characters that turn how text reads are dropped: overrides, isolates and marks of direction, and invisible ones", () => {
+    const format = (code: number) => String.fromCharCode(code);
+    // U+202E shows what follows it right to left; the others change direction or are not seen at all.
+    for (const code of [0x202e, 0x202a, 0x2066, 0x2069, 0x200e, 0x200f, 0x200b, 0xfeff]) expect(printable(`a${format(code)}b`), code.toString(16)).toBe("ab");
+  });
 });
 
 describe("configDir: where the CLI keeps what it keeps, by each system's own path rules, whichever system the tests run on", () => {
