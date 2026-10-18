@@ -61,7 +61,10 @@ export interface tRestrictOption {
 
 /** The option of a function for a view: what to send beside its resources. */
 export interface tWithOption {
-  /** What to send beside the resources: `["attributes"]` for the view's own, such as its title. Default: nothing. */
+  /**
+   * What to send beside the resources: `["attributes"]` for the view's own, such as its title, which come on the
+   * first page alone, since a view's `next` link keeps only its offset. Default: nothing.
+   */
   readonly with?: readonly "attributes"[] | undefined;
 }
 
@@ -80,7 +83,7 @@ export type tViewAttributesOf<Views, K extends keyof Views> = NonNullable<Views[
 export type tViewPage<Views, K extends keyof Views> = Omit<tRelationshipViewResponse, "data" | "attributes"> & {
   /** What the view holds, this page of it: the resources the name asked for decides. */
   data: tRelated<Views, K>[];
-  /** The view's own attributes, such as its title: there when `with: ["attributes"]` asked for them. */
+  /** The view's own attributes, such as its title: there when `with: ["attributes"]` asked for them, on the first page alone. */
   attributes?: tViewAttributesOf<Views, K>;
 };
 

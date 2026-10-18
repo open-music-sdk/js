@@ -46,8 +46,9 @@ holds. Its validator is named for the resource and the relationship or view:
 - a view's, such as `albumViewsAlbumOtherVersionsView` for an album's `other-versions`.
 - a library relationship's, such as `libraryAlbumRelationshipsLibraryAlbumTracksRelationship`.
 
-A view's validator expects the view's own attributes, such as its title, so ask for them with
-`with: ["attributes"]`:
+A view's own attributes, such as its title, come only when you ask for them with `with: ["attributes"]`, and only
+on the first page: a view's `next` link keeps nothing but its offset. Its validator takes a page without them, so
+look for them yourself on a first page you asked for them on:
 
 ```ts
 for await (const version of music.catalog.getAlbumView("1613600183", "other-versions", {

@@ -107,10 +107,12 @@ Against the live API on 18 October 2026:
   within 4 seconds. The catalog playlist's songs didn't go into the library with it.
 - `addToFavorites` gave the song a rating of 1 at once, as a like does, and put it in the library.
 - Every function that reads, and was asked, answered as its generated type has it, once the [types](#types) were
-  corrected. A listener with no music video in their library was asked none of those functions.
+  corrected, but for the root folder below. A listener with no music video in their library was asked none of the
+  functions for music videos.
 - `getRootLibraryPlaylistFolder` answered with no folder for a listener with none: `data` was empty, and so was
-  `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot` was answered `404` by its id, while its
-  `children` answered with the listener's playlists.
+  `meta.filters.identity.playlistsroot`. So `user(client).getRootLibraryPlaylistFolder()` rejects, as it does for an
+  answer that holds no folder, and `check` marks it `≠`. The folder `p.playlistsroot` was answered `404` by its id,
+  while its `children` answered with the listener's playlists.
 - `searchLibrary` found nothing for the whole name of a song of three words or more that was in the library, while
   the first word of it found the song. A name of one or two words found it.
 

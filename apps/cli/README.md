@@ -154,9 +154,9 @@ Each line is marked:
 | Mark | For a function | For a question |
 | --- | --- | --- |
 | `✓` | Apple answered, and what it held was what the types say. An empty answer is never a `✓`. | Apple did what the SDK assumes. |
-| `≠` | The answer differs from the types: up to three fields, each with the resource type Apple named, and what the type expected. | It didn't. The line says which package assumes otherwise. |
+| `≠` | The answer differs from the types: up to three fields, each with the resource type Apple named, and what the type expected. Or Apple answered 404, or with nothing, for an id it gave in another answer, or for what there always is, such as the genres or your root folder. Or a view came without the attributes it was asked for with. | It didn't. The line says which package assumes otherwise. |
 | `·` | | What Apple did, where the SDK assumes nothing, such as how long a write takes to show. |
-| `-` | Nothing was seen. A 404 or an empty answer is asked again with the next of five things to ask with, and then it's a `-`. With nothing found to ask with, stderr says what. | Not asked: your account can't be asked it, or what it would be asked after didn't hold. |
+| `-` | Nothing was seen. A relationship, a view or a search answered with a 404 or nothing is asked again with the next of five things to ask with, and then it's a `-`. With nothing found to ask with, stderr says what. | Not asked: your account can't be asked it, or what it would be asked after didn't hold. Where the reason would say what you hold or rated, stderr says it. |
 | `✗` | Apple failed. The line names the request, with its ids left out. | The same. |
 
 A difference on page 2 only is put down to the `next` link, since the SDK sends the link as Apple gives it, and the
@@ -171,7 +171,8 @@ your team's and your storefront.
 - Progress, why something wasn't asked, and the cleanup steps below go to stderr, which is for you.
 
 It asks ten requests at a time, ten a second, since your key is most likely your app's too and Apple counts its
-limit by the key. A read-only run makes about 300 requests and takes a minute or so.
+limit by the key. It stops at the first `429`, with exit status `1`, rather than keep the key limited for your app's
+listeners. A read-only run makes about 300 requests and takes a minute or so.
 
 ### `--write`
 
@@ -182,8 +183,10 @@ What writes runs only with `--write`. Each write is of something you didn't have
 - **Ratings:** a dislike set on nine things, one of each type that takes a rating, read back, and taken away again.
 
 What it adds stays: Apple's API has no way to take a playlist, a folder or anything else out of your library, and
-`check` doesn't take its favorite back. So it picks only what you didn't have and hadn't rated, records each write
-before it sends it, and ends with numbered steps on stderr that remove what's left.
+`check` doesn't take its favorite back. So it picks only what you didn't have and hadn't rated, and an album or a
+catalog playlist only when you hold none of its songs, since deleting it takes them all. It records each write
+before it sends it, writes to a playlist it made only once it has seen that playlist is the one it made, and ends
+with numbered steps on stderr that remove what's left.
 - **Links.** Each step links to the thing's own page in Apple Music, whose … menu takes it out: the library's own
   lists don't. A song's link is its own page, not its album's, where Delete from Library takes out the whole album.
 - **Ratings** are taken away through the API as the run ends, and a step names any that couldn't be.
