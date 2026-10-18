@@ -1838,6 +1838,19 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(pathsOf(asked).filter((path) => path.endsWith("/composers"))).toHaveLength(5);
   });
 
+  test("a function asked by an id Apple gave in another answer, answered 404 for it, is ≠ at once: the request the SDK made may be wrong", async () => {
+    apple.failing["/v1/catalog/gb/songs/s1"] = 404;
+    expect(await main(["check", "getSong", "--no-color"])).toBe(1);
+    expect(rowsOf("getSong")).toEqual(["≠ getSong: Apple answered 404 for what it gave the ids of in another answer."]);
+    expect(pathsOf(asked).filter((path) => /^\/v1\/catalog\/gb\/songs\/s\d+$/.test(path))).toEqual(["/v1/catalog/gb/songs/s1"]);
+  });
+
+  test("what there always is, such as the genres, answered with nothing is ≠", async () => {
+    apple.answers["/v1/catalog/gb/genres"] = { data: [] };
+    expect(await main(["check", "listGenres", "--no-color"])).toBe(1);
+    expect(rowsOf("listGenres")).toEqual(["≠ listGenres: Apple answered with nothing for the genres."]);
+  });
+
   test("an answer with nothing in it is no ✓: the next is asked, and the first that holds something is held to the type", async () => {
     for (const n of [1, 2, 3]) apple.answers[`/v1/catalog/gb/songs/s${String(n)}/composers`] = { data: [] };
     expect(await main(["check", "getSongRelationship:composers", "--no-color"])).toBe(0);

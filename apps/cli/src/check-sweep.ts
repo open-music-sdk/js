@@ -181,7 +181,14 @@ interface tOptions {
   readonly paged?: boolean;
   /** How many things the answer holds, where they are not resources: a hint's terms, a tag. */
   readonly seen?: (body: unknown) => number;
+  /**
+   * What the answer has to hold, for a function asked for what Apple gave in another answer, or for what there always
+   * is: a 404 or nothing for it is no "none here" but a difference, as a request the SDK makes wrongly would answer.
+   */
+  readonly holds?: string;
 }
+/** What a function asked by ids Apple gave has to hold. */
+const GIVEN = { holds: "what it gave the ids of in another answer" } as const;
 
 /** The names of the query a next link carries, without their values, which may be a listener's. */
 const carries = (next: string) => {
@@ -202,10 +209,14 @@ async function attempt<T>(a: tAsk, what: string, tries: readonly T[], call: (inp
     try {
       body = await call(input);
     } catch (e) {
-      if (isNotFound(e)) continue;
-      throw e;
+      if (!isNotFound(e)) throw e;
+      if (options.holds !== undefined) return { mark: "differs", words: `Apple answered 404 for ${options.holds}.`, diffs: [] };
+      continue;
     }
-    if ((options.seen ?? resourcesIn)(body) === 0) continue;
+    if ((options.seen ?? resourcesIn)(body) === 0) {
+      if (options.holds !== undefined) return { mark: "differs", words: `Apple answered with nothing for ${options.holds}.`, diffs: [] };
+      continue;
+    }
     const diffs = diffsOf(schema, body);
     if (diffs.length > 0) return { mark: "differs", words: `types: ${someOf(diffs)}.`, diffs };
     const next = text(at(body, "next"));
@@ -267,9 +278,9 @@ type tNames<T, Without extends string = never> = Exclude<keyof T, Without> & str
 
 /** Every function client-catalog exports: a key missing here, or one too many, is a type error. */
 export const CATALOG = {
-  getSong: one(SONGS, async (a, id) => sdk.getSong(a.music, id, { extend: ["artistUrl"], language: (await LANGUAGES.get(a))[0], ...o(a) }), schemas.songsResponse),
-  getSongs: all(SONGS, (a, ids) => sdk.getSongs(a.music, ids, o(a)), schemas.songsResponse),
-  getSongsByIsrc: all(ISRCS, (a, isrcs) => sdk.getSongsByIsrc(a.music, isrcs, o(a)), schemas.songsResponse),
+  getSong: one(SONGS, async (a, id) => sdk.getSong(a.music, id, { extend: ["artistUrl"], language: (await LANGUAGES.get(a))[0], ...o(a) }), schemas.songsResponse, GIVEN),
+  getSongs: all(SONGS, (a, ids) => sdk.getSongs(a.music, ids, o(a)), schemas.songsResponse, GIVEN),
+  getSongsByIsrc: all(ISRCS, (a, isrcs) => sdk.getSongsByIsrc(a.music, isrcs, o(a)), schemas.songsResponse, GIVEN),
   getSongsByEquivalents: all(SONGS, (a, ids) => sdk.getSongsByEquivalents(a.music, ids, { restrict: ["explicit"], ...o(a) }), schemas.songsResponse),
   getSongRelationship: named<tNames<sdk.tSongRelationships, "library">>("relationships", SONGS, (a, id, name) => sdk.getSongRelationship(a.music, id, name, o(a)), {
     albums: schemas.songRelationshipsSongAlbumsRelationship,
@@ -279,9 +290,9 @@ export const CATALOG = {
     "music-videos": schemas.songRelationshipsSongMusicVideosRelationship,
     station: schemas.songRelationshipsSongStationRelationship,
   }),
-  getAlbum: one(ALBUMS, (a, id) => sdk.getAlbum(a.music, id, { include: ["artists"], ...o(a) }), schemas.albumsResponse),
-  getAlbums: all(ALBUMS, (a, ids) => sdk.getAlbums(a.music, ids, o(a)), schemas.albumsResponse),
-  getAlbumsByUpc: all(UPCS, (a, upcs) => sdk.getAlbumsByUpc(a.music, upcs, o(a)), schemas.albumsResponse),
+  getAlbum: one(ALBUMS, (a, id) => sdk.getAlbum(a.music, id, { include: ["artists"], ...o(a) }), schemas.albumsResponse, GIVEN),
+  getAlbums: all(ALBUMS, (a, ids) => sdk.getAlbums(a.music, ids, o(a)), schemas.albumsResponse, GIVEN),
+  getAlbumsByUpc: all(UPCS, (a, upcs) => sdk.getAlbumsByUpc(a.music, upcs, o(a)), schemas.albumsResponse, GIVEN),
   getAlbumsByEquivalents: all(ALBUMS, (a, ids) => sdk.getAlbumsByEquivalents(a.music, ids, o(a)), schemas.albumsResponse),
   getAlbumRelationship: named<tNames<sdk.tAlbumRelationships, "library">>("relationships", ALBUMS, (a, id, name) => sdk.getAlbumRelationship(a.music, id, name, o(a)), {
     artists: schemas.albumRelationshipsAlbumArtistsRelationship,
@@ -295,8 +306,8 @@ export const CATALOG = {
     "related-albums": schemas.albumViewsAlbumRelatedAlbumsView,
     "related-videos": schemas.albumViewsAlbumRelatedVideosView,
   }),
-  getArtist: one(ARTISTS, (a, id) => sdk.getArtist(a.music, id, { views: ["top-songs"], ...o(a) }), schemas.artistsResponse),
-  getArtists: all(ARTISTS, (a, ids) => sdk.getArtists(a.music, ids, o(a)), schemas.artistsResponse),
+  getArtist: one(ARTISTS, (a, id) => sdk.getArtist(a.music, id, { views: ["top-songs"], ...o(a) }), schemas.artistsResponse, GIVEN),
+  getArtists: all(ARTISTS, (a, ids) => sdk.getArtists(a.music, ids, o(a)), schemas.artistsResponse, GIVEN),
   getArtistRelationship: named<tNames<sdk.tArtistRelationships>>("relationships", ARTISTS, (a, id, name) => sdk.getArtistRelationship(a.music, id, name, o(a)), {
     albums: schemas.artistRelationshipsArtistAlbumsRelationship,
     genres: schemas.artistRelationshipsArtistGenresRelationship,
@@ -318,8 +329,8 @@ export const CATALOG = {
     "top-music-videos": schemas.artistViewsArtistTopMusicVideosView,
     "top-songs": schemas.artistViewsArtistTopSongsView,
   }),
-  getPlaylist: one(PLAYLISTS, (a, id) => sdk.getPlaylist(a.music, id, o(a)), schemas.playlistsResponse),
-  getPlaylists: all(PLAYLISTS, (a, ids) => sdk.getPlaylists(a.music, ids, o(a)), schemas.playlistsResponse),
+  getPlaylist: one(PLAYLISTS, (a, id) => sdk.getPlaylist(a.music, id, o(a)), schemas.playlistsResponse, GIVEN),
+  getPlaylists: all(PLAYLISTS, (a, ids) => sdk.getPlaylists(a.music, ids, o(a)), schemas.playlistsResponse, GIVEN),
   getPlaylistsByStorefrontChart: all(STOREFRONTS, (a, ids) => sdk.getPlaylistsByStorefrontChart(a.music, ids, o(a)), schemas.playlistsResponse),
   getPlaylistRelationship: named<tNames<sdk.tPlaylistRelationships, "library">>("relationships", PLAYLISTS, (a, id, name) => sdk.getPlaylistRelationship(a.music, id, name, o(a)), {
     curator: schemas.playlistRelationshipsPlaylistCuratorRelationship,
@@ -329,9 +340,9 @@ export const CATALOG = {
     "featured-artists": schemas.playlistViewsPlaylistFeaturedArtistsView,
     "more-by-curator": schemas.playlistViewsPlaylistMoreByCuratorView,
   }),
-  getMusicVideo: one(MUSIC_VIDEOS, (a, id) => sdk.getMusicVideo(a.music, id, o(a)), schemas.musicVideosResponse),
-  getMusicVideos: all(MUSIC_VIDEOS, (a, ids) => sdk.getMusicVideos(a.music, ids, o(a)), schemas.musicVideosResponse),
-  getMusicVideosByIsrc: all(VIDEO_ISRCS, (a, isrcs) => sdk.getMusicVideosByIsrc(a.music, isrcs, o(a)), schemas.musicVideosResponse),
+  getMusicVideo: one(MUSIC_VIDEOS, (a, id) => sdk.getMusicVideo(a.music, id, o(a)), schemas.musicVideosResponse, GIVEN),
+  getMusicVideos: all(MUSIC_VIDEOS, (a, ids) => sdk.getMusicVideos(a.music, ids, o(a)), schemas.musicVideosResponse, GIVEN),
+  getMusicVideosByIsrc: all(VIDEO_ISRCS, (a, isrcs) => sdk.getMusicVideosByIsrc(a.music, isrcs, o(a)), schemas.musicVideosResponse, GIVEN),
   getMusicVideosByEquivalents: all(MUSIC_VIDEOS, (a, ids) => sdk.getMusicVideosByEquivalents(a.music, ids, o(a)), schemas.musicVideosResponse),
   getMusicVideoRelationship: named<tNames<sdk.tMusicVideoRelationships, "library">>("relationships", MUSIC_VIDEOS, (a, id, name) => sdk.getMusicVideoRelationship(a.music, id, name, o(a)), {
     albums: schemas.musicVideoRelationshipsMusicVideoAlbumsRelationship,
@@ -343,44 +354,44 @@ export const CATALOG = {
     "more-by-artist": schemas.musicVideoViewsMusicVideoMoreByArtistView,
     "more-in-genre": schemas.musicVideoViewsMusicVideoMoreInGenreView,
   }),
-  getStation: one(STATIONS, (a, id) => sdk.getStation(a.music, id, o(a)), schemas.stationsResponse),
-  getStations: all(STATIONS, (a, ids) => sdk.getStations(a.music, ids, o(a)), schemas.stationsResponse),
+  getStation: one(STATIONS, (a, id) => sdk.getStation(a.music, id, o(a)), schemas.stationsResponse, GIVEN),
+  getStations: all(STATIONS, (a, ids) => sdk.getStations(a.music, ids, o(a)), schemas.stationsResponse, GIVEN),
   getStationRelationship: named<tNames<sdk.tStationRelationships>>("relationships", STATIONS, (a, id, name) => sdk.getStationRelationship(a.music, id, name, o(a)), {
     "radio-show": schemas.stationRelationshipsStationRadioShowRelationship,
   }),
-  getStationGenre: one(STATION_GENRES, (a, id) => sdk.getStationGenre(a.music, id, o(a)), schemas.stationGenresResponse),
-  getStationGenres: all(STATION_GENRES, (a, ids) => sdk.getStationGenres(a.music, ids, o(a)), schemas.stationGenresResponse),
-  listStationGenres: bare((a) => sdk.listStationGenres(a.music, o(a)), schemas.stationGenresResponse, paged),
+  getStationGenre: one(STATION_GENRES, (a, id) => sdk.getStationGenre(a.music, id, o(a)), schemas.stationGenresResponse, GIVEN),
+  getStationGenres: all(STATION_GENRES, (a, ids) => sdk.getStationGenres(a.music, ids, o(a)), schemas.stationGenresResponse, GIVEN),
+  listStationGenres: bare((a) => sdk.listStationGenres(a.music, o(a)), schemas.stationGenresResponse, { ...paged, holds: "the station genres" }),
   getStationGenreRelationship: named<tNames<sdk.tStationGenreRelationships>>("relationships", STATION_GENRES, (a, id, name) => sdk.getStationGenreRelationship(a.music, id, name, o(a)), {
     stations: schemas.stationGenreRelationshipsStationGenreStationsRelationship,
   }),
-  getGenre: one(GENRES, (a, id) => sdk.getGenre(a.music, id, o(a)), schemas.genresResponse),
-  getGenres: all(GENRES, (a, ids) => sdk.getGenres(a.music, ids, o(a)), schemas.genresResponse),
-  listGenres: bare((a) => sdk.listGenres(a.music, o(a)), schemas.genresResponse, paged),
-  getCurator: one(CURATORS, (a, id) => sdk.getCurator(a.music, id, o(a)), schemas.curatorsResponse),
-  getCurators: all(CURATORS, (a, ids) => sdk.getCurators(a.music, ids, o(a)), schemas.curatorsResponse),
+  getGenre: one(GENRES, (a, id) => sdk.getGenre(a.music, id, o(a)), schemas.genresResponse, GIVEN),
+  getGenres: all(GENRES, (a, ids) => sdk.getGenres(a.music, ids, o(a)), schemas.genresResponse, GIVEN),
+  listGenres: bare((a) => sdk.listGenres(a.music, o(a)), schemas.genresResponse, { ...paged, holds: "the genres" }),
+  getCurator: one(CURATORS, (a, id) => sdk.getCurator(a.music, id, o(a)), schemas.curatorsResponse, GIVEN),
+  getCurators: all(CURATORS, (a, ids) => sdk.getCurators(a.music, ids, o(a)), schemas.curatorsResponse, GIVEN),
   getCuratorRelationship: named<tNames<sdk.tCuratorRelationships>>("relationships", CURATORS, (a, id, name) => sdk.getCuratorRelationship(a.music, id, name, o(a)), {
     playlists: schemas.curatorRelationshipsCuratorPlaylistsRelationship,
   }),
-  getAppleCurator: one(APPLE_CURATORS, (a, id) => sdk.getAppleCurator(a.music, id, o(a)), schemas.appleCuratorsResponse),
-  getAppleCurators: all(APPLE_CURATORS, (a, ids) => sdk.getAppleCurators(a.music, ids, o(a)), schemas.appleCuratorsResponse),
+  getAppleCurator: one(APPLE_CURATORS, (a, id) => sdk.getAppleCurator(a.music, id, o(a)), schemas.appleCuratorsResponse, GIVEN),
+  getAppleCurators: all(APPLE_CURATORS, (a, ids) => sdk.getAppleCurators(a.music, ids, o(a)), schemas.appleCuratorsResponse, GIVEN),
   getAppleCuratorRelationship: named<tNames<sdk.tAppleCuratorRelationships>>("relationships", APPLE_CURATORS, (a, id, name) => sdk.getAppleCuratorRelationship(a.music, id, name, o(a)), {
     playlists: schemas.appleCuratorRelationshipsAppleCuratorPlaylistsRelationship,
   }),
-  getActivity: one(ACTIVITIES, (a, id) => sdk.getActivity(a.music, id, o(a)), schemas.activitiesResponse),
-  getActivities: all(ACTIVITIES, (a, ids) => sdk.getActivities(a.music, ids, o(a)), schemas.activitiesResponse),
+  getActivity: one(ACTIVITIES, (a, id) => sdk.getActivity(a.music, id, o(a)), schemas.activitiesResponse, GIVEN),
+  getActivities: all(ACTIVITIES, (a, ids) => sdk.getActivities(a.music, ids, o(a)), schemas.activitiesResponse, GIVEN),
   getActivityRelationship: named<tNames<sdk.tActivityRelationships>>("relationships", ACTIVITIES, (a, id, name) => sdk.getActivityRelationship(a.music, id, name, o(a)), {
     playlists: schemas.activityRelationshipsActivityPlaylistsRelationship,
   }),
-  getRecordLabel: one(LABELS, (a, id) => sdk.getRecordLabel(a.music, id, o(a)), schemas.recordLabelsResponse),
-  getRecordLabels: all(LABELS, (a, ids) => sdk.getRecordLabels(a.music, ids, o(a)), schemas.recordLabelsResponse),
+  getRecordLabel: one(LABELS, (a, id) => sdk.getRecordLabel(a.music, id, o(a)), schemas.recordLabelsResponse, GIVEN),
+  getRecordLabels: all(LABELS, (a, ids) => sdk.getRecordLabels(a.music, ids, o(a)), schemas.recordLabelsResponse, GIVEN),
   getRecordLabelView: named<tNames<sdk.tRecordLabelViews>>("views", LABELS, (a, id, name) => sdk.getRecordLabelView(a.music, id, name, { with: ["attributes"], ...o(a) }), {
     "latest-releases": schemas.recordLabelViewsRecordLabelLatestReleasesView,
     "top-releases": schemas.recordLabelViewsRecordLabelTopReleasesView,
   }),
-  getStorefront: one(STOREFRONTS, (a, id) => sdk.getStorefront(a.music, id, o(a)), schemas.storefrontsResponse),
-  getStorefronts: all(STOREFRONTS, (a, ids) => sdk.getStorefronts(a.music, ids, o(a)), schemas.storefrontsResponse),
-  listStorefronts: bare((a) => sdk.listStorefronts(a.music, o(a)), schemas.storefrontsResponse, paged),
+  getStorefront: one(STOREFRONTS, (a, id) => sdk.getStorefront(a.music, id, o(a)), schemas.storefrontsResponse, GIVEN),
+  getStorefronts: all(STOREFRONTS, (a, ids) => sdk.getStorefronts(a.music, ids, o(a)), schemas.storefrontsResponse, GIVEN),
+  listStorefronts: bare((a) => sdk.listStorefronts(a.music, o(a)), schemas.storefrontsResponse, { ...paged, holds: "the storefronts" }),
   searchCatalog: one(
     TERMS,
     (a, term) =>
@@ -392,46 +403,46 @@ export const CATALOG = {
     seen: (body) => list(at(body, "results", "suggestions")).length,
   }),
   getCharts: all(GENRES, (a, [genre]) => sdk.getCharts(a.music, { types: ["songs", "albums", "playlists", "music-videos"], genre, with: ["dailyGlobalTopCharts"], ...o(a) }), schemas.chartResponse),
-  getCatalogResources: all(SONGS, async (a, songs) => sdk.getCatalogResources(a.music, { songs, albums: await ALBUMS.get(a) }, o(a)), schemas.resourceCollectionResponse),
+  getCatalogResources: all(SONGS, async (a, songs) => sdk.getCatalogResources(a.music, { songs, albums: await ALBUMS.get(a) }, o(a)), schemas.resourceCollectionResponse, GIVEN),
   getLiveRadioStations: bare((a) => sdk.getLiveRadioStations(a.music, o(a)), schemas.stationsResponse),
   getLanguageTag: one(LANGUAGES, (a, tag) => sdk.getLanguageTag(a.music, [tag, "en"], o(a)), schemas.langageTagResponse, { seen: (body) => (text(at(body, "results", "tag")) === undefined ? 0 : 1) }),
 } satisfies Record<keyof tCatalogFunctions, tEntry>;
 
 /** Every function client-user exports: a key missing here, or one too many, is a type error. */
 export const USER = {
-  getLibrarySong: one(LIBRARY_SONGS, (a, id) => sdk.getLibrarySong(a.music, id, o(a)), schemas.librarySongsResponse),
-  getLibrarySongs: all(LIBRARY_SONGS, (a, ids) => sdk.getLibrarySongs(a.music, ids, o(a)), schemas.librarySongsResponse),
+  getLibrarySong: one(LIBRARY_SONGS, (a, id) => sdk.getLibrarySong(a.music, id, o(a)), schemas.librarySongsResponse, GIVEN),
+  getLibrarySongs: all(LIBRARY_SONGS, (a, ids) => sdk.getLibrarySongs(a.music, ids, o(a)), schemas.librarySongsResponse, GIVEN),
   listLibrarySongs: bare((a) => sdk.listLibrarySongs(a.music, o(a)), schemas.librarySongsResponse, paged),
   getLibrarySongRelationship: named<tNames<sdk.tLibrarySongRelationships>>("relationships", LIBRARY_SONGS, (a, id, name) => sdk.getLibrarySongRelationship(a.music, id, name, o(a)), {
     albums: schemas.librarySongRelationshipsLibrarySongAlbumsRelationship,
     artists: schemas.librarySongRelationshipsLibrarySongArtistsRelationship,
     catalog: schemas.librarySongRelationshipsLibrarySongCatalogRelationship,
   }),
-  getLibraryAlbum: one(LIBRARY_ALBUMS, (a, id) => sdk.getLibraryAlbum(a.music, id, o(a)), schemas.libraryAlbumsResponse),
-  getLibraryAlbums: all(LIBRARY_ALBUMS, (a, ids) => sdk.getLibraryAlbums(a.music, ids, o(a)), schemas.libraryAlbumsResponse),
+  getLibraryAlbum: one(LIBRARY_ALBUMS, (a, id) => sdk.getLibraryAlbum(a.music, id, o(a)), schemas.libraryAlbumsResponse, GIVEN),
+  getLibraryAlbums: all(LIBRARY_ALBUMS, (a, ids) => sdk.getLibraryAlbums(a.music, ids, o(a)), schemas.libraryAlbumsResponse, GIVEN),
   listLibraryAlbums: bare((a) => sdk.listLibraryAlbums(a.music, o(a)), schemas.libraryAlbumsResponse, paged),
   getLibraryAlbumRelationship: named<tNames<sdk.tLibraryAlbumRelationships>>("relationships", LIBRARY_ALBUMS, (a, id, name) => sdk.getLibraryAlbumRelationship(a.music, id, name, o(a)), {
     artists: schemas.libraryAlbumRelationshipsLibraryAlbumArtistsRelationship,
     catalog: schemas.libraryAlbumRelationshipsLibraryAlbumCatalogRelationship,
     tracks: schemas.libraryAlbumRelationshipsLibraryAlbumTracksRelationship,
   }),
-  getLibraryArtist: one(LIBRARY_ARTISTS, (a, id) => sdk.getLibraryArtist(a.music, id, o(a)), schemas.libraryArtistsResponse),
-  getLibraryArtists: all(LIBRARY_ARTISTS, (a, ids) => sdk.getLibraryArtists(a.music, ids, o(a)), schemas.libraryArtistsResponse),
+  getLibraryArtist: one(LIBRARY_ARTISTS, (a, id) => sdk.getLibraryArtist(a.music, id, o(a)), schemas.libraryArtistsResponse, GIVEN),
+  getLibraryArtists: all(LIBRARY_ARTISTS, (a, ids) => sdk.getLibraryArtists(a.music, ids, o(a)), schemas.libraryArtistsResponse, GIVEN),
   listLibraryArtists: bare((a) => sdk.listLibraryArtists(a.music, o(a)), schemas.libraryArtistsResponse, paged),
   getLibraryArtistRelationship: named<tNames<sdk.tLibraryArtistRelationships>>("relationships", LIBRARY_ARTISTS, (a, id, name) => sdk.getLibraryArtistRelationship(a.music, id, name, o(a)), {
     albums: schemas.libraryArtistRelationshipsLibraryArtistAlbumsRelationship,
     catalog: schemas.libraryArtistRelationshipsLibraryArtistCatalogRelationship,
   }),
-  getLibraryMusicVideo: one(LIBRARY_VIDEOS, (a, id) => sdk.getLibraryMusicVideo(a.music, id, o(a)), schemas.libraryMusicVideosResponse),
-  getLibraryMusicVideos: all(LIBRARY_VIDEOS, (a, ids) => sdk.getLibraryMusicVideos(a.music, ids, o(a)), schemas.libraryMusicVideosResponse),
+  getLibraryMusicVideo: one(LIBRARY_VIDEOS, (a, id) => sdk.getLibraryMusicVideo(a.music, id, o(a)), schemas.libraryMusicVideosResponse, GIVEN),
+  getLibraryMusicVideos: all(LIBRARY_VIDEOS, (a, ids) => sdk.getLibraryMusicVideos(a.music, ids, o(a)), schemas.libraryMusicVideosResponse, GIVEN),
   listLibraryMusicVideos: bare((a) => sdk.listLibraryMusicVideos(a.music, o(a)), schemas.libraryMusicVideosResponse, paged),
   getLibraryMusicVideoRelationship: named<tNames<sdk.tLibraryMusicVideoRelationships>>("relationships", LIBRARY_VIDEOS, (a, id, name) => sdk.getLibraryMusicVideoRelationship(a.music, id, name, o(a)), {
     albums: schemas.libraryMusicVideoRelationshipsLibraryMusicVideoAlbumsRelationship,
     artists: schemas.libraryMusicVideoRelationshipsLibraryMusicVideoArtistsRelationship,
     catalog: schemas.libraryMusicVideoRelationshipsLibraryMusicVideoCatalogRelationship,
   }),
-  getLibraryPlaylist: one(LIBRARY_PLAYLISTS, (a, id) => sdk.getLibraryPlaylist(a.music, id, o(a)), schemas.libraryPlaylistsResponse),
-  getLibraryPlaylists: all(LIBRARY_PLAYLISTS, (a, ids) => sdk.getLibraryPlaylists(a.music, ids, o(a)), schemas.libraryPlaylistsResponse),
+  getLibraryPlaylist: one(LIBRARY_PLAYLISTS, (a, id) => sdk.getLibraryPlaylist(a.music, id, o(a)), schemas.libraryPlaylistsResponse, GIVEN),
+  getLibraryPlaylists: all(LIBRARY_PLAYLISTS, (a, ids) => sdk.getLibraryPlaylists(a.music, ids, o(a)), schemas.libraryPlaylistsResponse, GIVEN),
   listLibraryPlaylists: bare((a) => sdk.listLibraryPlaylists(a.music, o(a)), schemas.libraryPlaylistsResponse, paged),
   getLibraryPlaylistRelationship: named<tNames<sdk.tLibraryPlaylistRelationships>>("relationships", LIBRARY_PLAYLISTS, (a, id, name) => sdk.getLibraryPlaylistRelationship(a.music, id, name, o(a)), {
     catalog: schemas.libraryPlaylistRelationshipsLibraryPlaylistCatalogRelationship,
@@ -452,14 +463,14 @@ export const USER = {
     { parent: FOLDERS },
   ),
   createLibraryPlaylistFolder: check("createLibraryPlaylistFolder"),
-  getPersonalRecommendation: one(RECOMMENDATIONS, (a, id) => sdk.getPersonalRecommendation(a.music, id, o(a)), schemas.personalRecommendationResponse),
-  getPersonalRecommendations: all(RECOMMENDATIONS, (a, ids) => sdk.getPersonalRecommendations(a.music, ids, o(a)), schemas.personalRecommendationResponse),
+  getPersonalRecommendation: one(RECOMMENDATIONS, (a, id) => sdk.getPersonalRecommendation(a.music, id, o(a)), schemas.personalRecommendationResponse, GIVEN),
+  getPersonalRecommendations: all(RECOMMENDATIONS, (a, ids) => sdk.getPersonalRecommendations(a.music, ids, o(a)), schemas.personalRecommendationResponse, GIVEN),
   listPersonalRecommendations: bare((a) => sdk.listPersonalRecommendations(a.music, o(a)), schemas.personalRecommendationResponse, paged),
   getPersonalRecommendationRelationship: named<tNames<sdk.tPersonalRecommendationRelationships>>("relationships", RECOMMENDATIONS, (a, id, name) => sdk.getPersonalRecommendationRelationship(a.music, id, name, o(a)), {
     contents: schemas.personalRecommendationRelationshipsPersonalRecommendationContentsRelationship,
   }),
   searchLibrary: one(LIBRARY_TERMS, (a, term) => sdk.searchLibrary(a.music, term, { types: ["library-albums", "library-artists", "library-music-videos", "library-playlists", "library-songs"], ...o(a) }), schemas.librarySearchResponse),
-  getLibraryResources: all(LIBRARY_SONGS, async (a, songs) => sdk.getLibraryResources(a.music, { "library-songs": songs, "library-playlists": await LIBRARY_PLAYLISTS.get(a) }, o(a)), schemas.resourceCollectionResponse),
+  getLibraryResources: all(LIBRARY_SONGS, async (a, songs) => sdk.getLibraryResources(a.music, { "library-songs": songs, "library-playlists": await LIBRARY_PLAYLISTS.get(a) }, o(a)), schemas.resourceCollectionResponse, GIVEN),
   addToLibrary: check("add-to-library"),
   addToFavorites: check("add-to-favorites"),
   addLibraryPlaylistTracks: check("playlist"),
@@ -471,7 +482,7 @@ export const USER = {
   listRecentlyPlayedStations: bare((a) => sdk.listRecentlyPlayedStations(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
   getMusicSummariesByYear: bare((a) => sdk.getMusicSummariesByYear(a.music, ["latest"], { views: ["top-albums", "top-artists", "top-songs"], ...o(a) }), schemas.musicSummariesResponse),
   getPersonalStation: bare((a) => sdk.getPersonalStation(a.music, o(a)), schemas.stationsResponse),
-  getUserStorefront: bare((a) => sdk.getUserStorefront(a.music, o(a)), schemas.storefrontsResponse),
+  getUserStorefront: bare((a) => sdk.getUserStorefront(a.music, o(a)), schemas.storefrontsResponse, { holds: "the listener's storefront" }),
   // Each rating function is its type's round trip, run only with --write: in a read run, a rating's answer would say
   // whether the listener rated a song anyone can name.
   ...ratingEntries("Song"),
