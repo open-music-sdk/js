@@ -417,6 +417,17 @@ describe("marks and the exit status", () => {
     expect(stdout).not.toContain("detail with");
   });
 
+  test("what check did not expect fails that check alone: ✗ on stdout without what was thrown, which goes to stderr, and the next check is still asked", async () => {
+    // A next link that leaves Apple's origin, which core refuses with a TypeError before anything is sent.
+    apple.chartNextLink = "https://elsewhere.example/v1/catalog/gb/charts?offset=50";
+    expect(await main(["check", "charts-next", "isrc-next", "--no-color"])).toBe(1);
+    expect(linesOf("charts-next")).toEqual(["✗ charts-next: something went wrong that check did not expect, so this was not answered. This is a bug: please report it, with what stderr says."]);
+    expect(stdout).not.toContain("elsewhere");
+    expect(stderr).toContain("TypeError");
+    expect(stderr).toContain("elsewhere.example");
+    expect(marksOf("isrc-next")).toEqual(["✓"]);
+  });
+
   test("the charts a failed check could not get are asked for again by the next check that needs them", async () => {
     let once = true;
     const real = answer;

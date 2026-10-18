@@ -2,6 +2,7 @@
 // each answer printed as what Apple did, worded to go into the docs' "Differences from Apple's documentation" as it
 // is. A check is run by its name too, so that one question can be asked again, or asked for in an issue. The checks
 // that write to the listener's library run only with --write, and a run that wrote ends with how to undo it.
+import { inspect } from "node:util";
 import manifest from "../package.json" with { type: "json" };
 import {
   addLibraryPlaylistTracks,
@@ -740,8 +741,15 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
             )),
         });
       } catch (e) {
-        // Ctrl+C is thrown on: core hands on the reason the signal aborted with, as it is.
-        line("failed", `${brief(apples(e))}, so this was not answered.`);
+        // Ctrl+C ends the run: core hands on the reason the signal aborted with, as it is.
+        if (stop.signal.aborted) throw stop.signal.reason as Error;
+        if (isAppleMusicError(e)) line("failed", `${brief(e)}, so this was not answered.`);
+        else {
+          // A bug, of check's or in what it was handed: said, and the checks after it still asked. What it threw may
+          // name a path of the listener's, so it goes to stderr, with the person, not into the report.
+          line("failed", "something went wrong that check did not expect, so this was not answered. This is a bug: please report it, with what stderr says.");
+          say(inspect(e));
+        }
       }
     }
   } finally {
