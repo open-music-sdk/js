@@ -27,7 +27,7 @@ import {
   type AppleMusicError,
   type tMusic,
 } from "@open-music-sdk/server";
-import { isOnHost } from "@open-music-sdk/core";
+import { isOnHost, sleep } from "@open-music-sdk/core";
 import { NAME, TIMEOUT_MS, examine, out, paint, say, type tContext, type tFlags } from "./commands";
 import { CliError, printable, usage } from "./files";
 
@@ -183,29 +183,14 @@ export function whereOf(e: AppleMusicError): string | undefined {
   return /^([a-z][A-Za-z]*): /.exec(e.message)?.[1];
 }
 
-/** Waits `ms`, or rejects with the reason `signal` aborts with. */
-const pause = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    signal.throwIfAborted();
-    let timer: ReturnType<typeof setTimeout> | undefined = undefined;
-    const stop = () => {
-      clearTimeout(timer);
-      reject(signal.reason as Error);
-    };
-    timer = setTimeout(() => {
-      signal.removeEventListener("abort", stop);
-      resolve();
-    }, ms);
-    signal.addEventListener("abort", stop, { once: true });
-  });
-
 /**
  * Asks `shown` once a second, by the clock, until it is true or a minute has gone: resolves to the whole seconds it
- * took, or undefined. A read Apple fails is taken as not shown yet, as `apply`'s own reads take one.
+ * took, or undefined. A read Apple fails is taken as not shown yet, as `apply`'s own reads take one. Once the first
+ * read finds nothing, stderr says what is waited for, so that a minute's quiet is not taken for a hang.
  */
-async function seconds(run: tRun, shown: () => Promise<boolean>): Promise<number | undefined> {
+async function seconds(run: tRun, what: string, shown: () => Promise<boolean>): Promise<number | undefined> {
   const start = Date.now();
-  for (;;) {
+  for (let tries = 1; ; tries++) {
     let yes = false;
     try {
       yes = await shown();
@@ -214,7 +199,8 @@ async function seconds(run: tRun, shown: () => Promise<boolean>): Promise<number
     }
     if (yes) return Math.round((Date.now() - start) / 1000);
     if (Date.now() - start >= POLL_MS) return undefined;
-    await pause(1000, run.signal);
+    if (tries === 1) say(`  Waiting for ${what}, a minute at most…`);
+    await sleep(1000, run.signal);
   }
 }
 const took = (s: number | undefined) => (s === undefined ? "more than a minute" : plural(s, "second"));
@@ -482,7 +468,7 @@ async function addToLibraryCheck(run: tRun): Promise<void> {
   run.line("report", `addToLibrary took ${taken.map((item) => item.type).join(", ") || "none of them"}${answered.length === 0 ? "" : `; ${answered.join("; ")}`}.`);
   if (taken.length === 0) return;
   // Each by itself, at once, so one that never shows does not keep the others waiting.
-  const shown = await Promise.all(taken.map((item) => seconds(run, () => inLibrary(run, item))));
+  const shown = await Promise.all(taken.map((item) => seconds(run, `the ${item.type} added to show in the library`, () => inLibrary(run, item))));
   run.line("report", `each showed in the library after: ${taken.map((item, i) => `${item.type}, ${took(shown[i])}`).join("; ")}.`);
 }
 
@@ -505,7 +491,7 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
   left.sure = true;
   const item = song;
   let value: unknown;
-  const after = await seconds(run, async () => (value = await ratingOf(run, item.id)) !== undefined);
+  const after = await seconds(run, "the favorite to show as a rating", async () => (value = await ratingOf(run, item.id)) !== undefined);
   run.line("report", after === undefined ? "addToFavorites took a song, which had no rating a minute later: a favorite is not a rating." : `addToFavorites took a song, which had a rating of ${printable(String(value))} after ${took(after)}.`);
   if (await inLibrary(run, item)) {
     run.left.library.push({ what: item, sure: true });
@@ -551,10 +537,10 @@ async function playlistCheck(run: tRun): Promise<void> {
   const timings: string[] = [];
   if (id !== undefined) {
     const known = id;
-    timings.push(`could be read by its id after ${took(await seconds(run, async () => (await getLibraryPlaylist(music, known, { signal }), true)))}`);
+    timings.push(`could be read by its id after ${took(await seconds(run, "the new playlist to be read by its id", async () => (await getLibraryPlaylist(music, known, { signal }), true)))}`);
   }
   let found: unknown;
-  timings.push(`was among the library's playlists after ${took(await seconds(run, async () => (found = await listed(run, name)) !== undefined))}`);
+  timings.push(`was among the library's playlists after ${took(await seconds(run, "the new playlist to be among the library's", async () => (found = await listed(run, name)) !== undefined))}`);
   run.line("report", `the new playlist ${timings.join(", and ")}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
   id ??= idOf(found);
   if (id === undefined) { run.line("skipped", "the playlist neither came back with an id nor showed among the library's playlists, so nothing more can be asked of it"); return; }
@@ -602,7 +588,7 @@ async function playlistCheck(run: tRun): Promise<void> {
 
   const playlistId = id;
   let held: readonly (string | undefined)[] = [];
-  const settled = await seconds(run, async () => (held = (await music.playlists.read(playlistId, { signal })).tracks.map((track) => track.catalogId)).length >= tracks.length);
+  const settled = await seconds(run, "the tracks added to show in the playlist", async () => (held = (await music.playlists.read(playlistId, { signal })).tracks.map((track) => track.catalogId)).length >= tracks.length);
   if (settled === undefined) { run.line("differs", `${plural(held.length, "track")} of the ${String(tracks.length)} added showed within a minute; apply's settle waits about ${String(SETTLE_S)} seconds.`); return; }
   run.line("report", `the ${plural(tracks.length, "track")} showed after ${took(settled)}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
   const sent = tracks.map((track) => track.id);

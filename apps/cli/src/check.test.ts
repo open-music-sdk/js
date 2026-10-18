@@ -1022,6 +1022,14 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(0);
     expect(linesOf("playlist")).toContain("· playlist: the new playlist could be read by its id after 2 seconds, and was among the library's playlists after 3 seconds; apply's settle waits about 4 seconds.");
     expect(linesOf("playlist")).toContain("· playlist: the 300 tracks showed after 6 seconds; apply's settle waits about 4 seconds.");
+    // Said once a wait begins, on stderr, so that its quiet is not taken for a hang.
+    for (const what of ["the new playlist to be read by its id", "the new playlist to be among the library's", "the tracks added to show in the playlist"])
+      expect(stderr.split(`Waiting for ${what}, a minute at most…`)).toHaveLength(2);
+  });
+
+  test("what shows at the first read is not waited for, and nothing is said of waiting", async () => {
+    await main(["check", "playlist", "--write", "--no-color"]);
+    expect(stderr).not.toContain("Waiting for");
   });
 
   test("tracks that do not show within a minute are ≠, and the rest is not asked", async () => {
