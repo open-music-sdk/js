@@ -184,12 +184,11 @@ export function whereOf(e: AppleMusicError): string | undefined {
 }
 
 /**
- * Asks `shown` once a second, by the clock, until it is true or a minute has gone: resolves to the whole seconds it
- * took, or undefined. A read Apple fails is taken as not shown yet, as `apply`'s own reads take one. Once the first
+ * Asks `shown` once a second, by the clock, until it is true or a minute has gone since `start`, which is when the
+ * write it waits on was taken: resolves to the whole seconds since then, or undefined. A read Apple fails is taken as not shown yet, as `apply`'s own reads take one. Once the first
  * read finds nothing, stderr says what is waited for, so that a minute's quiet is not taken for a hang.
  */
-async function seconds(run: tRun, what: string, shown: () => Promise<boolean>): Promise<number | undefined> {
-  const start = Date.now();
+async function seconds(run: tRun, what: string, shown: () => Promise<boolean>, start = Date.now()): Promise<number | undefined> {
   for (let tries = 1; ; tries++) {
     let yes = false;
     try {
@@ -444,7 +443,8 @@ async function artworkPlaceholders(run: tRun): Promise<void> {
 
 async function addToLibraryCheck(run: tRun): Promise<void> {
   const charts = await run.charts();
-  const taken: tItem[] = [];
+  /** What was added, and when Apple took it, which is when its wait to show begins. */
+  const taken: { readonly item: tItem; readonly at: number }[] = [];
   const answered: string[] = [];
   for (const items of [charts.songs, charts.albums, charts.playlists, charts.musicVideos]) {
     const item = await notInLibrary(run, items);
@@ -463,13 +463,13 @@ async function addToLibraryCheck(run: tRun): Promise<void> {
       continue;
     }
     left.sure = true;
-    taken.push(item);
+    taken.push({ item, at: Date.now() });
   }
-  run.line("report", `addToLibrary took ${taken.map((item) => item.type).join(", ") || "none of them"}${answered.length === 0 ? "" : `; ${answered.join("; ")}`}.`);
+  run.line("report", `addToLibrary took ${taken.map(({ item }) => item.type).join(", ") || "none of them"}${answered.length === 0 ? "" : `; ${answered.join("; ")}`}.`);
   if (taken.length === 0) return;
   // Each by itself, at once, so one that never shows does not keep the others waiting.
-  const shown = await Promise.all(taken.map((item) => seconds(run, `the ${item.type} added to show in the library`, () => inLibrary(run, item))));
-  run.line("report", `each showed in the library after: ${taken.map((item, i) => `${item.type}, ${took(shown[i])}`).join("; ")}.`);
+  const shown = await Promise.all(taken.map(({ item, at: when }) => seconds(run, `the ${item.type} added to show in the library`, () => inLibrary(run, item), when)));
+  run.line("report", `each showed in the library after: ${taken.map(({ item }, i) => `${item.type}, ${took(shown[i])}`).join("; ")}.`);
 }
 
 async function addToFavoritesCheck(run: tRun): Promise<void> {
@@ -533,17 +533,24 @@ async function playlistCheck(run: tRun): Promise<void> {
   let id = idOf(list(at(answer, "data"))[0]);
   run.line("report", id === undefined ? "the answer to making a playlist held no playlist, so apply has to find it by its name and description." : "the answer to making a playlist held the playlist, with its id.");
 
-  // By its id first, which `read` asks for, then among the listener's playlists, where `apply` looks for it.
-  const timings: string[] = [];
-  if (id !== undefined) {
-    const known = id;
-    timings.push(`could be read by its id after ${took(await seconds(run, "the new playlist to be read by its id", async () => (await getLibraryPlaylist(music, known, { signal }), true)))}`);
-  }
+  // Asked for by its id, as `read` asks, and looked for among the listener's playlists, where `apply` looks: at once,
+  // each timed from when Apple took it. Without an id in the answer, the id is the one the listing gives.
+  const madeAt = Date.now();
   let found: unknown;
-  timings.push(`was among the library's playlists after ${took(await seconds(run, "the new playlist to be among the library's", async () => (found = await listed(run, name)) !== undefined))}`);
-  run.line("report", `the new playlist ${timings.join(", and ")}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
-  id ??= idOf(found);
-  if (id === undefined) { run.line("skipped", "the playlist neither came back with an id nor showed among the library's playlists, so nothing more can be asked of it"); return; }
+  const readable = (known: string) => seconds(run, "the new playlist to be read by its id", async () => (await getLibraryPlaylist(music, known, { signal }), true), madeAt);
+  const listing = () => seconds(run, "the new playlist to be among the library's", async () => (found = await listed(run, name)) !== undefined, madeAt);
+  let readAfter: number | undefined;
+  let listAfter: number | undefined;
+  if (id === undefined) {
+    listAfter = await listing();
+    id = idOf(found);
+    if (id === undefined) {
+      run.line("skipped", "the playlist neither came back with an id nor showed among the library's playlists, so nothing more can be asked of it");
+      return;
+    }
+    readAfter = await readable(id);
+  } else [readAfter, listAfter] = await Promise.all([readable(id), listing()]);
+  run.line("report", `the new playlist could be read by its id after ${took(readAfter)}, and was among the library's playlists after ${took(listAfter)}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
   const asSent = found !== undefined && text(at(found, "attributes", "name")) === name && text(at(found, "attributes", "description", "standard")) === description;
   if (found === undefined) run.line("skipped", "the playlist was not listed within a minute, so whether its name and description come back as sent is not seen");
   else if (asSent) run.line("same", "its name and description came back as they were sent, which apply finds a playlist by.");

@@ -31,13 +31,16 @@ interface tPlaylist {
   readonly name: string;
   readonly description: string;
   readonly tracks: tTrack[];
-  /** Reads before the playlist answers by its id, and before it is listed. */
-  readable: number;
-  listed: number;
-  /** Reads of its tracks before the last tracks added show. */
-  hidden: number;
+  /** When, by the clock, the playlist answers by its id, when it is listed, and when the tracks last added show. */
+  readonly readableAt: number;
+  readonly listedAt: number;
+  shownAt: number;
+  /** How many of its tracks show. */
   shown: number;
 }
+
+/** A playlist the listener had before the run, there in every way. */
+const had = (id: string, tracks: tTrack[], name = id): tPlaylist => ({ id, name, description: "", tracks, readableAt: 0, listedAt: 0, shownAt: 0, shown: tracks.length });
 
 const catalogItem = (type: tType, id: string, attributes: Record<string, unknown> = {}) => ({
   id,
@@ -69,6 +72,8 @@ let apple: {
   /** What is in the listener's library, as `type/id`. */
   library: Set<string>;
   addStatus: Partial<Record<tType, number>>;
+  /** How long Apple takes to answer an addition of each type, in milliseconds. */
+  addDelay: Partial<Record<tType, number>>;
   /** Whether a favorite becomes a rating of 1, and goes into the library. */
   favoriteRates: boolean;
   favoriteInLibrary: boolean;
@@ -116,11 +121,12 @@ beforeEach(async () => {
     recent: { played: 3, tracks: 5, without: "same" },
     library: new Set(),
     addStatus: {},
+    addDelay: {},
     favoriteRates: true,
     favoriteInLibrary: false,
     listener: [
-      { id: "p.short", name: "Short", description: "", tracks: tracksOf(4), readable: 0, listed: 0, hidden: 0, shown: 4 },
-      { id: "p.long", name: "Long", description: "", tracks: tracksOf(150), readable: 0, listed: 0, hidden: 0, shown: 150 },
+      had("p.short", tracksOf(4), "Short"),
+      had("p.long", tracksOf(150), "Long"),
     ],
     nextKeepsInclude: true,
     includeTracks: true,
@@ -259,6 +265,8 @@ async function answer(req: Request): Promise<Response> {
       const type = /^ids\[(.+)\]$/.exec(key)?.[1] as tType;
       const status = apple.addStatus[type];
       if (status !== undefined) return refuse(status);
+      const delay = apple.addDelay[type];
+      if (delay !== undefined) await new Promise((resolve) => setTimeout(resolve, delay));
       for (const id of ids.split(",")) apple.library.add(`${type}/${id}`);
     }
     return nothing(202);
@@ -273,24 +281,33 @@ async function answer(req: Request): Promise<Response> {
   if (path === "/v1/me/library/playlists") {
     if (method === "POST") {
       const { attributes } = (await req.json()) as { attributes: { name: string; description: string } };
-      const made: tPlaylist = { id: `p.made${String(apple.listener.length)}`, name: attributes.name, description: apple.descriptionBack(attributes.description), tracks: [], readable: apple.lag.readable, listed: apple.lag.listed, hidden: 0, shown: 0 };
+      const made: tPlaylist = {
+        id: `p.made${String(apple.listener.length)}`,
+        name: attributes.name,
+        description: apple.descriptionBack(attributes.description),
+        tracks: [],
+        readableAt: Date.now() + apple.lag.readable * 1000,
+        listedAt: Date.now() + apple.lag.listed * 1000,
+        shownAt: 0,
+        shown: 0,
+      };
       apple.listener.push(made);
       return json({ data: apple.madeWithId ? [asPlaylist(made, false)] : [] }, 201);
     }
     const offset = Number(query.get("offset") ?? "0");
     const limit = Number(query.get("limit") ?? "25");
-    const listed = apple.listener.filter((playlist) => (playlist.listed-- <= 0 ? true : false));
+    const listed = apple.listener.filter((playlist) => Date.now() >= playlist.listedAt);
     return json({ data: listed.slice(offset, offset + limit).map((playlist) => asPlaylist(playlist, false)), ...(offset + limit < listed.length ? { next: `/v1/me/library/playlists?offset=${String(offset + limit)}&limit=${String(limit)}` } : {}) });
   }
   const playlistPath = /^\/v1\/me\/library\/playlists\/([^/]+)(\/tracks)?$/.exec(path);
   const playlist = apple.listener.find((each) => each.id === playlistPath?.[1]);
   if (playlistPath && playlist) {
-    if (playlistPath[2] === undefined) return playlist.readable-- > 0 ? refuse(404) : json({ data: [asPlaylist(playlist, query.get("include") === "tracks")] });
+    if (playlistPath[2] === undefined) return Date.now() < playlist.readableAt ? refuse(404) : json({ data: [asPlaylist(playlist, query.get("include") === "tracks")] });
     if (method === "POST") {
       const { data } = (await req.json()) as { data: { id: string }[] };
       if (data.length > apple.appendMost) return refuse(400);
       playlist.tracks.push(...data.map(({ id }) => ({ catalogId: apple.heldAs(id), isrc: `ISRC${id}` })));
-      playlist.hidden = apple.lag.tracks;
+      playlist.shownAt = Date.now() + apple.lag.tracks * 1000;
       if (apple.playlistSongsInLibrary) for (const { id } of data) apple.library.add(`songs/${id}`);
       if (apple.appendLost) {
         apple.appendLost = false;
@@ -298,7 +315,7 @@ async function answer(req: Request): Promise<Response> {
       }
       return nothing(204);
     }
-    if (playlist.hidden-- <= 0) playlist.shown = playlist.tracks.length;
+    if (Date.now() >= playlist.shownAt) playlist.shown = playlist.tracks.length;
     return tracksPage(playlist, url);
   }
   return refuse(404);
@@ -406,7 +423,7 @@ describe("the pace of a run: the key is likely the app's too, and Apple counts i
   });
 
   test("the listener's playlists are walked to the thousandth at most, each time a new one is looked for", async () => {
-    apple.listener.push(...Array.from({ length: 2000 }, (_, i): tPlaylist => ({ id: `p.n${String(i)}`, name: `Other ${String(i)}`, description: "", tracks: [], readable: 0, listed: 0, hidden: 0, shown: 0 })));
+    apple.listener.push(...Array.from({ length: 2000 }, (_, i) => had(`p.n${String(i)}`, [])));
     await finish(["check", "playlist", "--write", "--no-color"]);
     const lists = asked.filter((req) => req.method === "GET" && new URL(req.url).pathname === "/v1/me/library/playlists");
     expect(lists.length).toBeGreaterThan(10);
@@ -691,7 +708,7 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
   });
 
   test("a library with no playlist of more than a page of tracks is not asked about, and an empty one is passed over", async () => {
-    apple.listener = [{ id: "p.empty", name: "Empty", description: "", tracks: [], readable: 0, listed: 0, hidden: 0, shown: 0 }];
+    apple.listener = [had("p.empty", [])];
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
     expect(linesOf("playlist-include")).toEqual(["- playlist-include: no playlist of the first 25 in the library has more than a page of tracks"]);
   });
@@ -892,6 +909,13 @@ describe("add-to-library and add-to-favorites", () => {
     expect(paths).toContain("/v1/catalog/gb/songs/s2/library");
   });
 
+  test("each type's wait to show is counted from when Apple took it, not from when the last type was taken", async () => {
+    apple.addDelay.albums = 3000;
+    expect(await finish(["check", "add-to-library", "--write", "--no-color"])).toBe(0);
+    // The song was taken three seconds before the album, and showed at the first look, made once all four were taken.
+    expect(linesOf("add-to-library")[1]).toBe("· add-to-library: each showed in the library after: songs, 3 seconds; albums, 0 seconds; playlists, 0 seconds; music-videos, 0 seconds.");
+  });
+
   test("a type Apple refuses is reported, and is not in the cleanup, since nothing was added", async () => {
     apple.addStatus.playlists = 400;
     await main(["check", "add-to-library", "--write", "--no-color"]);
@@ -1044,7 +1068,8 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(0);
     expect(linesOf("playlist").slice(0, 2)).toEqual([
       "· playlist: the answer to making a playlist held no playlist, so apply has to find it by its name and description.",
-      "· playlist: the new playlist was among the library's playlists after 0 seconds; apply's settle waits about 4 seconds.",
+      // Read by the id the listing gave.
+      "· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 0 seconds; apply's settle waits about 4 seconds.",
     ]);
   });
 
