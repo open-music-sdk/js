@@ -381,7 +381,7 @@ export interface tAdded {
 const RATINGS: Readonly<Record<tAddedType, typeof getSongRating | undefined>> = { songs: getSongRating, albums: getAlbumRating, "music-videos": getMusicVideoRating, playlists: undefined };
 
 /** Whether the listener has rated a catalog resource: a rating set on its library copy may be its rating too, and must take nothing of theirs. */
-async function rated(run: tRun, type: tAddedType, id: string): Promise<boolean> {
+export async function rated(run: tRun, type: tAddedType, id: string): Promise<boolean> {
   const get = RATINGS[type];
   if (get === undefined) return false;
   try {

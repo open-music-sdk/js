@@ -39,6 +39,7 @@ import {
   notFound,
   plural,
   ratingOf,
+  rated,
   refusal,
   refused,
   seconds,
@@ -422,7 +423,7 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
   // A song neither in the library nor rated, so the steps that undo the favorite take away nothing the listener had.
   let song: tItem | undefined;
   for (const candidate of (await run.charts()).songs.slice(0, 10)) {
-    if (!(await inLibrary(run, candidate)) && (await ratingOf(run, candidate.id)) === undefined) {
+    if (!(await inLibrary(run, candidate)) && !(await rated(run, "songs", candidate.id))) {
       song = candidate;
       break;
     }

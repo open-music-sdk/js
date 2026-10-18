@@ -8,7 +8,7 @@ import { inspect } from "node:util";
 import manifest from "../package.json" with { type: "json" };
 import { createRateLimiter, createServerClient, getCharts, isAppleMusicError } from "@open-music-sdk/server";
 import { isOnHost } from "@open-music-sdk/core";
-import { PACE, at, brief, itemsOf, list, plural, said, text, whereOf, type tCharts, type tItem, type tLeft, type tMark, type tWritten } from "./check-ask";
+import { PACE, at, brief, isNotFound, itemsOf, list, plural, said, text, whereOf, type tCharts, type tItem, type tLeft, type tMark, type tWritten } from "./check-ask";
 import { CHECKS, PACKAGES, type tCheck } from "./check-questions";
 import { ROWS, TRIPS, type tAsk, type tOutcome, type tRow } from "./check-sweep";
 import { NAME, TIMEOUT_MS, examine, out, paint, say, type tContext, type tFlags } from "./commands";
@@ -196,15 +196,18 @@ function cleanup(left: tLeft): void {
   });
 }
 
-/** Takes away, through the API, every rating the run set and has not taken away: those it cannot are left for the steps. */
+/**
+ * Takes away, through the API, every rating the run set and has not taken away: those it cannot are left for the
+ * steps. A 404 is a rating not there to take away, as after a set whose answer was lost and did not land.
+ */
 async function undoRatings(left: tLeft): Promise<void> {
   const ratings = left.ratings.splice(0);
   if (ratings.length > 0) say("Taking away the ratings check set…");
   for (const rating of ratings) {
     try {
       await rating.undo();
-    } catch {
-      left.ratings.push(rating);
+    } catch (e) {
+      if (!isNotFound(e)) left.ratings.push(rating);
     }
   }
 }

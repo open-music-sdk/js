@@ -507,13 +507,23 @@ type tGets = (music: sdk.tMusic, ids: readonly string[], options: { readonly sig
 type tSet = (music: sdk.tMusic, id: string, value: -1, options: { readonly signal: AbortSignal }) => Promise<unknown>;
 type tDelete = (music: sdk.tMusic, id: string, options?: { readonly signal?: AbortSignal }) => Promise<unknown>;
 
-/** The value of the rating Apple answers with, or undefined for none: a 404, as a rating never set answered on 18 October 2026. */
-async function valueOf(get: () => Promise<unknown>): Promise<{ readonly value: unknown; readonly body: unknown }> {
+/** A rating as Apple answers for it, if at all. */
+interface tRating {
+  /** Whether Apple answered with a rating, whatever it holds: a rating there in a shape not foreseen is still one. */
+  readonly held: boolean;
+  readonly value: unknown;
+  readonly body: unknown;
+}
+const NONE: tRating = { held: false, value: undefined, body: undefined };
+
+/** The rating Apple answers with, or none: a 404, as a rating never set answered on 18 October 2026, or an empty list. */
+async function ratingIn(get: () => Promise<unknown>): Promise<tRating> {
   try {
     const body = await get();
-    return { value: at(list(at(body, "data"))[0], "attributes", "value"), body };
+    const [first] = list(at(body, "data"));
+    return { held: first !== undefined, value: at(first, "attributes", "value"), body };
   } catch (e) {
-    if (isNotFound(e)) return { value: undefined, body: undefined };
+    if (isNotFound(e)) return NONE;
     throw e;
   }
 }
@@ -522,7 +532,7 @@ async function valueOf(get: () => Promise<unknown>): Promise<{ readonly value: u
 async function unrated(r: tRun, items: readonly tItem[], get: tGet, library: boolean): Promise<tRatable | string> {
   for (const item of items.slice(0, 5)) {
     if (library && (await inLibrary(r, item))) continue;
-    if ((await valueOf(() => get(r.music, item.id, { signal: r.signal }))).value === undefined) return { item, id: item.id };
+    if (!(await ratingIn(() => get(r.music, item.id, { signal: r.signal }))).held) return { item, id: item.id };
   }
   return "none of the chart's could be picked";
 }
@@ -566,7 +576,7 @@ function ratingTrip(type: tRatedType, fns: { readonly get: tGet; readonly gets: 
       // A library copy's rating may be its catalog item's too. The copy was added as one the listener had not rated,
       // and is not rated if its catalog item now is: a rating set on it, and taken away, could take theirs with it.
       const catalog = twin === undefined ? undefined : picked.catalog;
-      if (twin !== undefined && catalog !== undefined && (await valueOf(() => twin.get(r.music, catalog, signal))).value !== undefined) {
+      if (twin !== undefined && catalog !== undefined && (await ratingIn(() => twin.get(r.music, catalog, signal))).held) {
         r.line("skipped", "the catalog item of what check added is rated, so its copy is not: a rating of the one may be the other's");
         return;
       }
@@ -585,15 +595,15 @@ function ratingTrip(type: tRatedType, fns: { readonly get: tGet; readonly gets: 
       rated.sure = true;
       const diffs: tDiff[] = [];
       if (resourcesIn(set) > 0) diffs.push(...diffsOf(schemas.ratingsResponse, set));
-      let alone: { readonly value: unknown; readonly body: unknown } = { value: undefined, body: undefined };
-      const showed = await seconds(r, "the rating to show", async () => (alone = await valueOf(() => fns.get(r.music, id, signal))).value !== undefined);
+      let alone = NONE;
+      const showed = await seconds(r, "the rating to show", async () => (alone = await ratingIn(() => fns.get(r.music, id, signal))).held);
       if (alone.body !== undefined) diffs.push(...diffsOf(schemas.ratingsResponse, alone.body));
-      const batch = await valueOf(() => fns.gets(r.music, [id], signal));
+      const batch = await ratingIn(() => fns.gets(r.music, [id], signal));
       if (batch.body !== undefined) diffs.push(...diffsOf(schemas.ratingsResponse, batch.body));
-      const linked = twin === undefined || catalog === undefined ? undefined : (await valueOf(() => twin.get(r.music, catalog, signal))).value;
+      const linked = twin === undefined || catalog === undefined ? undefined : (await ratingIn(() => twin.get(r.music, catalog, signal))).value;
 
       await fns.del(r.music, id, signal);
-      const gone = await seconds(r, "the rating to be taken away", async () => (await valueOf(() => fns.get(r.music, id, signal))).value === undefined);
+      const gone = await seconds(r, "the rating to be taken away", async () => !(await ratingIn(() => fns.get(r.music, id, signal))).held);
       if (gone !== undefined) r.left.ratings.splice(r.left.ratings.indexOf(rated), 1);
       if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`);
 
@@ -608,9 +618,9 @@ function ratingTrip(type: tRatedType, fns: { readonly get: tGet; readonly gets: 
       // Whether the copy's rating was its catalog item's too, which had none before: one it still has is the run's,
       // and the run takes it away itself.
       if (twin !== undefined && catalog !== undefined) {
-        const after = (await valueOf(() => twin.get(r.music, catalog, signal))).value;
-        r.line("report", `the catalog item it is a copy of ${linked === -1 ? "took the rating too" : "did not take the rating"}${after === undefined ? "" : ", and kept it once the copy's was taken away"}.`);
-        if (after !== undefined) r.left.ratings.push({ what: item, sure: true, undo: () => twin.del(r.music, catalog) });
+        const after = (await ratingIn(() => twin.get(r.music, catalog, signal))).held;
+        r.line("report", `the catalog item it is a copy of ${linked === -1 ? "took the rating too" : "did not take the rating"}${after ? ", and kept it once the copy's was taken away" : ""}.`);
+        if (after) r.left.ratings.push({ what: item, sure: true, undo: () => twin.del(r.music, catalog) });
       }
     },
   };

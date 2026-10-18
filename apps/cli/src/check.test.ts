@@ -1986,6 +1986,21 @@ describe("rating round trips: a dislike set on what the listener had not rated, 
     expect(asked.filter((req) => req.method === "PUT").map((req) => new URL(req.url).pathname)).toEqual(["/v1/me/ratings/songs/s4"]);
   });
 
+  test("a rating Apple answers in a shape not foreseen is still a rating, so nothing the listener rated is rated over or made a favorite", async () => {
+    apple.answers["/v1/me/ratings/songs/s2"] = { data: [{ id: "s2", type: "ratings", attributes: {} }] };
+    await main(["check", "setSongRating", "add-to-favorites", "--write", "--no-color"]);
+    // s1 is rated, s2 answered with a rating of no value, and s3 made the favorite first, so s4 is rated.
+    expect(asked.filter((req) => req.method === "PUT").map((req) => new URL(req.url).pathname)).toEqual(["/v1/me/ratings/songs/s4"]);
+    expect(asked.filter((req) => req.method === "POST" && new URL(req.url).pathname === "/v1/me/favorites").map((req) => new URL(req.url).searchParams.get("ids[songs]"))).toEqual(["s3"]);
+  });
+
+  test("a rating whose taking away is answered 404 is no rating left for the steps", async () => {
+    apple.rating.deleteFails = 404;
+    await main(["check", "setSongRating", "--write", "--no-color"]);
+    expect(stderr).toContain("Taking away the ratings check set…");
+    expect(stderr).not.toContain("Take away the dislike");
+  });
+
   test("none of the first five to be picked is -, and nothing is set", async () => {
     for (const song of apple.songs.slice(0, 5)) apple.rated.set(String(song.id), 1);
     await main(["check", "setSongRating", "--write", "--no-color"]);
