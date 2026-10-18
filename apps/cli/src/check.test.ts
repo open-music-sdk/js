@@ -1902,18 +1902,20 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(marksOf("searchLibrary")).toEqual(["-"]);
   });
 
-  test("no root folder is nothing to ask a folder's parent with either", async () => {
+  test("a root folder Apple answers none for by its identity is -, and the root its children were found under is asked for them", async () => {
     apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
-    expect(await main(["check", "getLibraryPlaylistFolderRelationship:parent", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(0);
-    expect(marksOf("getLibraryPlaylistFolderRelationship:parent")).toEqual(["-"]);
+    expect(await main(["check", "getLibraryPlaylistFolderRelationship", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(0);
     expect(marksOf("getRootLibraryPlaylistFolder")).toEqual(["-"]);
+    expect(rowsOf("getLibraryPlaylistFolderRelationship")).toEqual(["✓ getLibraryPlaylistFolderRelationship: 2 of 2 relationships as the types have them."]);
+    expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.playlistsroot/children");
   });
 
   test("a read run's report says nothing of the listener's library: no id, no name and no search term, only whether each answer held to its type", async () => {
-    apple.answers["/v1/me/library/songs/i.library-songs.1"] = { data: [item("library-songs", "i.library-songs.1", { name: "A song of the listener's" })] };
+    apple.answers["/v1/me/library/songs?limit=5"] = { data: [item("library-songs", "i.s1", { name: "Theirs alone" })] };
     await main(["check", "--no-color"]);
-    expect(asked.some((req) => new URL(req.url).searchParams.get("term") === "A song of the listener's")).toBe(true);
-    expect(stdout).not.toContain("A song of the listener's");
+    // The library is searched for the first word of a song's name, as a whole name of several words found nothing.
+    expect(asked.some((req) => new URL(req.url).pathname === "/v1/me/library/search" && new URL(req.url).searchParams.get("term") === "Theirs")).toBe(true);
+    expect(stdout).not.toContain("Theirs");
     expect(stdout).not.toMatch(/\b[pil]\.\w/);
     expect(stdout).not.toMatch(/library-\w+\.\d/);
   });
@@ -2269,7 +2271,7 @@ describe("what the sweep and its round trips say when Apple answers otherwise", 
   });
 
   test("a song in the library with no name is no term to search the library for", async () => {
-    apple.answers["/v1/me/library/songs/i.library-songs.1"] = { data: [{ id: "i.library-songs.1", type: "library-songs", attributes: {} }] };
+    apple.answers["/v1/me/library/songs?limit=5"] = { data: [{ id: "i.1", type: "library-songs", attributes: {} }] };
     expect(await main(["check", "searchLibrary", "--no-color"])).toBe(0);
     expect(marksOf("searchLibrary")).toEqual(["-"]);
   });
@@ -2334,10 +2336,10 @@ describe("what the sweep and its round trips say when Apple answers otherwise", 
     expect(cleanupOf()).toMatch(/Delete the playlist folder named .*\(Apple's answer was lost, so it may not be there\)/);
   });
 
-  test("with no root folder to be among, a folder made is not seen there, and its parent is not the root", async () => {
+  test("with no root folder answered for by its identity, a folder made is looked for under the root its children were found under", async () => {
     apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
-    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but it was not among the root folder's children within a minute; its parent was not the root folder."]);
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
+    expect(marksOf("createLibraryPlaylistFolder")).toEqual(["✓"]);
   });
 
   test("a playlist whose making is answered unlike its type is ≠ for that, and the question goes on", async () => {

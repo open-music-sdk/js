@@ -102,7 +102,13 @@ const related = (ids: tSeed<string>, ask: (a: tAsk, id: string) => Promise<unkno
   }
   return [];
 };
-const ARTISTS = seed("artist of a chart song", related(SONGS, (a, id) => sdk.getSongRelationship(a.music, id, "artists", o(a))));
+// The first artist of each chart song, not every artist of one: one artist alone had few of the twelve views on 18
+// October 2026.
+const ARTISTS = seed("artist of a chart song", async (a) => {
+  const firsts: string[] = [];
+  for (const id of await SONGS.get(a)) firsts.push(...(await idsOf(sdk.getSongRelationship(a.music, id, "artists", o(a)))).slice(0, 1));
+  return unique(firsts);
+});
 const LABELS = seed("record label", async (a) => {
   const labels = await related(ALBUMS, (b, id) => sdk.getAlbumRelationship(b.music, id, "record-labels", o(b)))(a);
   return labels.length > 0 ? labels : searched("record-labels", "records")(a);
@@ -145,26 +151,30 @@ const LANGUAGES = seed("language of the storefront", async (a) => {
 });
 
 // The listener's library, first of each list, for the reads a read run makes of it: none of it is printed.
-const LIBRARY_SONGS = seed("song in your library", async (a) => idsIn(await sdk.listLibrarySongs(a.music, { limit: 5, ...o(a) })));
+const librarySongs = (a: tAsk) => once(a, "library songs", async () => list(at(await sdk.listLibrarySongs(a.music, { limit: 5, ...o(a) }), "data")));
+const LIBRARY_SONGS = seed("song in your library", async (a) => (await librarySongs(a)).map(idOf).filter(defined));
 const LIBRARY_ALBUMS = seed("album in your library", async (a) => idsIn(await sdk.listLibraryAlbums(a.music, { limit: 5, ...o(a) })));
 const LIBRARY_ARTISTS = seed("artist in your library", async (a) => idsIn(await sdk.listLibraryArtists(a.music, { limit: 5, ...o(a) })));
 const LIBRARY_VIDEOS = seed("music video in your library", async (a) => idsIn(await sdk.listLibraryMusicVideos(a.music, { limit: 5, ...o(a) })));
 const LIBRARY_PLAYLISTS = seed("playlist in your library", async (a) => idsIn(await sdk.listLibraryPlaylists(a.music, { limit: 5, ...o(a) })));
-const ROOT = seed("root playlist folder", async (a) => idsIn(await sdk.getRootLibraryPlaylistFolder(a.music, o(a))));
+/**
+ * The id of the root playlist folder, as Apple answers for it, or the one its children were found under on 18 October
+ * 2026, when the identity filter answered with none for a listener with no folder.
+ */
+const ROOT_ID = "p.playlistsroot";
+const rootOf = async (a: tAsk) => (await idsOf(sdk.getRootLibraryPlaylistFolder(a.music, o(a))))[0] ?? ROOT_ID;
+const ROOT = seed("root playlist folder", async (a) => [await rootOf(a)]);
 /** The folders in the root folder, which have a parent to ask for, as the root does not. */
 const FOLDERS = seed("playlist folder in your library", async (a) => {
-  const [root] = await ROOT.get(a);
-  if (root === undefined) return [];
-  const children = list(at(await sdk.getLibraryPlaylistFolderRelationship(a.music, root, "children", { limit: 100, ...o(a) }), "data"));
+  const children = list(at(await sdk.getLibraryPlaylistFolderRelationship(a.music, await rootOf(a), "children", { limit: 100, ...o(a) }), "data"));
   return children.filter((child) => at(child, "type") === "library-playlist-folders").map(idOf).filter(defined);
 });
 const RECOMMENDATIONS = seed("recommendation for you", async (a) => idsIn(await sdk.listPersonalRecommendations(a.music, { limit: 5, ...o(a) })));
-const LIBRARY_TERMS = seed("name of a song in your library", async (a) => {
-  const [id] = await LIBRARY_SONGS.get(a);
-  if (id === undefined) return [];
-  const name = text(at(list(at(await sdk.getLibrarySong(a.music, id, o(a)), "data"))[0], "attributes", "name"));
-  return name === undefined ? [] : [name];
-});
+// The first word of a song's name: a library search for a whole name of three words or more found nothing on 18
+// October 2026, where its first word found the song.
+const LIBRARY_TERMS = seed("name of a song in your library", async (a) =>
+  unique((await librarySongs(a)).map((song) => text(at(song, "attributes", "name"))?.split(/\s+/)[0]).filter((word): word is string => word !== undefined && word !== "")),
+);
 
 /** How a row is asked beyond what it is asked with: whether its next page is asked too, and where its answer holds what it finds. */
 interface tOptions {
@@ -670,17 +680,14 @@ async function folderTrip(r: tRun): Promise<void> {
   let folder: unknown;
   const readable = await seconds(r, "the new folder to be read by its id", async () => ((folder = await sdk.getLibraryPlaylistFolder(r.music, id, signal)), true), madeAt);
   if (readable !== undefined) diffs.push(...diffsOf(schemas.libraryPlaylistFoldersResponse, folder));
-  const [root] = idsIn(await sdk.getRootLibraryPlaylistFolder(r.music, signal));
+  const root = await rootOf(r);
   let parent: string | undefined;
   if (readable !== undefined) {
     const body = await sdk.getLibraryPlaylistFolderRelationship(r.music, id, "parent", signal);
     diffs.push(...diffsOf(schemas.libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship, body));
     parent = idsIn(body)[0];
   }
-  const listed =
-    root === undefined
-      ? undefined
-      : await seconds(r, "the new folder to be among the root folder's", async () => (await idsOf(sdk.getLibraryPlaylistFolderRelationship(r.music, root, "children", { limit: 100, ...signal }))).includes(id), madeAt);
+  const listed = await seconds(r, "the new folder to be among the root folder's", async () => (await idsOf(sdk.getLibraryPlaylistFolderRelationship(r.music, root, "children", { limit: 100, ...signal }))).includes(id), madeAt);
   if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`);
   const wrong = [
     readable === undefined ? "it could not be read by its id within a minute" : undefined,
