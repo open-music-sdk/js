@@ -2,7 +2,7 @@
 // status: 0 done, 1 failed, 2 not run as it should be, 130 stopped with Ctrl+C.
 import { parseArgs } from "node:util";
 import manifest from "../package.json" with { type: "json" };
-import { CHECKS, check } from "./check";
+import { check, checkHelp } from "./check";
 import { NAME, describe, doctor, login, logout, paint, token, type tContext, type tFlags } from "./commands";
 import { CliError, configDir, usage, type tEnv } from "./files";
 import { VARIABLES } from "./key";
@@ -65,8 +65,6 @@ interface tCommand {
   readonly run: (flags: tFlags, ctx: tContext, args: readonly string[]) => Promise<number>;
 }
 
-const CHECK_WIDTH = Math.max(...CHECKS.map((each) => each.id.length)) + 2;
-
 const COMMANDS: Readonly<Record<string, tCommand>> = {
   login: {
     summary: "Sign in at Apple in your browser, and keep the Music User Token",
@@ -109,26 +107,36 @@ const COMMANDS: Readonly<Record<string, tCommand>> = {
     run: doctor,
   },
   check: {
-    summary: "Ask the live API what the SDK takes on trust, and print what Apple did",
-    usage: "check [<check>...] [--write] [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input]",
+    summary: "Ask the live API every function of the SDK and what it takes on trust, and print what Apple did",
+    usage: "check [<name>...] [--write] [--key-file <path>] [--team-id <id>] [--key-id <id>] [--no-input]",
     about: [
-      "Asks Apple, as the kept Music User Token's listener, what the SDK's packages take on trust, through their own",
-      "functions, after doctor's two questions. Named checks are asked alone; with none named, every one that reads.",
-      "Each line is marked ✓ where Apple does what the SDK assumes, ≠ where it does not, · for what Apple did, - for a",
-      "question not asked, as when this account cannot be asked it, and ✗ where Apple failed. Exits 1 for a ≠ or a ✗.",
-      "What it prints on stdout is the report, for an issue as it is, in a code block; stderr is for you.",
+      "Asks Apple, as the kept Music User Token's listener, after doctor's two questions: every endpoint function of",
+      "client-catalog and client-user, each answer held to its generated type, and what the SDK's packages take on",
+      "trust about how Apple behaves, through their own functions. Named ones are asked alone, each by a package, a",
+      "function, <function>:<name> or a question; with none named, every one that reads.",
+      "Each line is marked ✓ where Apple does what the SDK assumes, ≠ where it does not, · for what Apple did, - for",
+      "what was not asked, or not seen, and ✗ where Apple failed. Exits 1 for a ≠ or a ✗. What it prints on stdout is",
+      "the report, for an issue as it is, in a code block; stderr is for you.",
       "",
-      "The checks marked --write run only with it. What they add stays: Apple's API has no way to take a playlist or",
-      "anything else out of the library, and check does not take its favorite back. They add up to four things to your",
-      "library, an album's songs with it, make one song a favorite, and make a playlist of up to 300 songs, which may",
-      "put those songs in your library too. Each is something you did not have, and the run ends with the steps that",
-      "remove it in the Music app, on stderr.",
+      "What writes runs only with --write. What it adds stays: Apple's API has no way to take a playlist, a folder or",
+      "anything else out of the library, and check does not take its favorite back. It adds up to four things to your",
+      "library, an album's songs with it, makes one song a favorite, makes a playlist of up to 300 songs, which may put",
+      "those songs in your library too, an empty playlist and a playlist folder, and sets a dislike on nine things,",
+      "which it takes away again. Each is something you did not have, and the run ends with the steps that remove it in",
+      "the Music app, on stderr.",
       "",
-      ...CHECKS.map((each) => `  ${each.id.padEnd(CHECK_WIDTH)}${each.about}${each.writes ? " (--write)" : ""}`),
+      ...checkHelp(),
     ],
     options: [...KEY_OPTIONS, "write"],
-    optionHelp: [...KEY_HELP, "      --write            Run the checks that write to your library too"],
-    examples: [`${NAME} check`, `${NAME} check isrc-next rating-unset`, `${NAME} check --write`, `${NAME} check playlist --write`],
+    optionHelp: [...KEY_HELP, "      --write            Run what writes to your library too"],
+    examples: [
+      `${NAME} check`,
+      `${NAME} check client-catalog`,
+      `${NAME} check getSong getArtistView:top-songs`,
+      `${NAME} check isrc-next rating-unset`,
+      `${NAME} check --write`,
+      `${NAME} check setSongRating --write`,
+    ],
     takesArguments: true,
     run: check,
   },

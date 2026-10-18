@@ -3,8 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { AppleMusicError, createRateLimiter } from "@open-music-sdk/server";
+import { AppleMusicError, createRateLimiter, schemas } from "@open-music-sdk/server";
 import { CHECKS, PACE, brief, whereOf } from "./check";
+import { ROWS } from "./check-sweep";
 import { FileUserTokenStore } from "./files";
 import { main } from "./main";
 
@@ -42,11 +43,60 @@ interface tPlaylist {
 /** A playlist the listener had before the run, there in every way. */
 const had = (id: string, tracks: tTrack[], name = id): tPlaylist => ({ id, name, description: "", tracks, readableAt: 0, listedAt: 0, shownAt: 0, shown: tracks.length });
 
-const catalogItem = (type: tType, id: string, attributes: Record<string, unknown> = {}) => ({
-  id,
-  type,
-  attributes: { name: `Name of ${id}`, artistName: `Artist of ${id}`, url: `https://music.apple.com/gb/x/${id}`, artwork: { url: `https://is1-ssl.mzstatic.com/${id}/{w}x{h}bb.jpg` }, ...attributes },
-});
+type tSchema = schemas.tSchema<unknown>;
+type tBody = Record<string, unknown>;
+
+/** What fills what a validator says is missing or wrong: from its message alone, which only ever says what it expected. */
+function fill(message: string): unknown {
+  if (message === "required") return null;
+  const expected = message.slice("expected ".length);
+  const scalars: Record<string, unknown> = { string: "x", number: 1, boolean: false, object: {}, array: [null] };
+  return expected in scalars ? structuredClone(scalars[expected]) : JSON.parse(expected.split(" | ")[0] ?? "null");
+}
+
+/**
+ * `start` made into what `schema` takes, by putting in what its issues say is missing or wrong until it has none: so
+ * every answer of the fake is one the real validators pass, whatever of it a test sets.
+ */
+function valid(schema: tSchema, start: unknown): tBody {
+  let value = structuredClone(start);
+  for (let round = 0; round < 60; round++) {
+    const { issues } = schema["~standard"].validate(value);
+    if (issues === undefined) return value as tBody;
+    for (const { path = [], message } of issues) {
+      if (path.length === 0) {
+        value = fill(message);
+        continue;
+      }
+      const parent = path.slice(0, -1).reduce<unknown>((node, key) => (node as Record<string | number, unknown>)[key], value) as Record<string | number, unknown>;
+      parent[path.at(-1) ?? ""] = fill(message);
+    }
+  }
+  throw new Error(`the fake could not make a valid answer of ${JSON.stringify(start)}`);
+}
+
+const camel = (s: string) => s.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
+const pascal = (s: string) => camel(s).replace(/^\w/, (c) => c.toUpperCase());
+const singular = (s: string) => s.replace(/ies$/, "y").replace(/s$/, "");
+/** The generated validator of this name, as the fake picks one by the path it answers. */
+function shape(name: string): tSchema {
+  const found = (schemas as unknown as Record<string, tSchema | undefined>)[name];
+  if (found === undefined) throw new Error(`the fake has no validator ${name}`);
+  return found;
+}
+const templates = new Map<string, tBody>();
+/** A resource of a type, valid, with its id and the attributes given. */
+function item(type: string, id: string, attributes: Record<string, unknown> = {}): tBody {
+  const name = camel(singular(type));
+  let template = templates.get(name);
+  if (template === undefined) templates.set(name, (template = valid(shape(name), { type })));
+  return valid(shape(name), { ...template, id, attributes: { ...(template.attributes as tBody | undefined), ...attributes } });
+}
+/** A relationship's or a view's page, with one resource of the type it holds, and a next page where it is the first. */
+const pageOf = (validator: string, url: URL, extra: tBody = {}) => valid(shape(validator), { data: [null], ...extra, ...(url.searchParams.has("offset") ? {} : { next: `${url.pathname}?offset=1` }) });
+
+const catalogItem = (type: tType, id: string, attributes: Record<string, unknown> = {}) =>
+  item(type, id, { name: `Name of ${id}`, artistName: `Artist of ${id}`, url: `https://music.apple.com/gb/x/${id}`, artwork: { url: `https://is1-ssl.mzstatic.com/${id}/{w}x{h}bb.jpg`, width: 1000, height: 1000 }, ...attributes });
 const chartSong = (n: number) =>
   catalogItem("songs", `s${String(n)}`, { isrc: `GBAAA26000${String(n).padStart(2, "0")}`, previews: [{ url: `https://audio-ssl.itunes.apple.com/clip/${String(n)}.m4a` }] });
 
@@ -100,6 +150,21 @@ let apple: {
   madeUpToken: 401 | 403 | 200;
   /** A path that fails with this status, whatever it is. */
   failing: Record<string, number>;
+  /** The listener's playlist folders, in the root folder, and those a run made. */
+  folders: { readonly id: string; readonly name: string }[];
+  /** Whether an album counts as in the library once one song of it is. */
+  partlyHeldCounts: boolean;
+  /** What Apple's image server sends for each extension asked for: its Content-Type, or a status it fails with. */
+  images: Record<string, string | number>;
+  /** A body answered as it is for a GET of this path, with its query or without: what a test makes differ from the types. */
+  answers: Record<string, unknown>;
+  /** How ratings are set and taken away: refused, never shown, left out of a batch, kept or refused once taken away, and whether a library copy's is its catalog item's too. */
+  rating: { refuse?: number; hidden?: boolean; batchLeavesOut?: boolean; deleteStays?: boolean; deleteFails?: number; linked?: boolean; setsSilently?: boolean };
+  /** Whether a song added to the library is rated as it goes in, and whether what is added never shows there. */
+  ratedOnAdd: boolean;
+  addedUnseen: boolean;
+  /** How a folder is made: refused, with no folder in the answer, or never shown. */
+  folder: { refuse?: number; withId: boolean; unseen: boolean };
 };
 let asked: Request[] = [];
 const responses: Response[] = [];
@@ -111,10 +176,10 @@ beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "omsdk-check-"));
   apple = {
     songs: Array.from({ length: 30 }, (_, i) => chartSong(i + 1)),
-    albums: Array.from({ length: 30 }, (_, i) => catalogItem("albums", `a${String(i + 1)}`)),
+    albums: Array.from({ length: 30 }, (_, i) => catalogItem("albums", `a${String(i + 1)}`, { upc: `0000000000${String(i + 1).padStart(2, "0")}` })),
     // A playlist is by its curator, not an artist.
-    playlists: ["pl.chart1", "pl.chart2"].map((id) => ({ id, type: "playlists", attributes: { name: `Name of ${id}`, curatorName: `Curator of ${id}`, url: `https://music.apple.com/gb/x/${id}`, artwork: { url: "https://is1-ssl.mzstatic.com/{w}x{h}.jpg" } } })),
-    videos: [catalogItem("music-videos", "mv1")],
+    playlists: ["pl.chart1", "pl.chart2"].map((id) => item("playlists", id, { name: `Name of ${id}`, curatorName: `Curator of ${id}`, url: `https://music.apple.com/gb/x/${id}`, artwork: { url: "https://is1-ssl.mzstatic.com/{w}x{h}.jpg", width: 1000, height: 1000 } })),
+    videos: [catalogItem("music-videos", "mv1", { isrc: "GBAAA2690001" })],
     chartNext: "by type",
     chartNextLink: "/v1/catalog/gb/charts?chart=most-played&types=songs&limit=50&offset=50",
     songless: new Set(),
@@ -148,6 +213,14 @@ beforeEach(async () => {
     catalogPlaylistSongsInLibrary: false,
     madeUpToken: 401,
     failing: {},
+    folders: [{ id: "p.folder", name: "Folder" }],
+    partlyHeldCounts: false,
+    images: { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif" },
+    answers: {},
+    rating: {},
+    ratedOnAdd: false,
+    addedUnseen: false,
+    folder: { withId: true, unseen: false },
   };
   asked = [];
   stdout = "";
@@ -201,15 +274,94 @@ function tracksPage(playlist: tPlaylist, url: URL) {
     ...(catalog && track.catalogId !== "" && !track.catalogId.startsWith("gone") ? { relationships: { catalog: { data: [{ id: track.catalogId, type: "songs", attributes: { isrc: track.isrc } }] } } } : {}),
   }));
   const more = offset + 100 < tracks.length;
-  return json({ data: page, ...(more ? { next: `/v1/me/library/playlists/${playlist.id}/tracks?offset=${String(offset + 100)}${apple.nextKeepsInclude && catalog ? "&include=catalog" : ""}` } : {}) });
+  return json(
+    valid(shape("libraryPlaylistRelationshipsLibraryPlaylistTracksRelationship"), {
+      data: page,
+      ...(more ? { next: `/v1/me/library/playlists/${playlist.id}/tracks?offset=${String(offset + 100)}${apple.nextKeepsInclude && catalog ? "&include=catalog" : ""}` } : {}),
+    }),
+  );
 }
 
-const asPlaylist = (playlist: tPlaylist, tracks: boolean) => ({
-  id: playlist.id,
-  type: "library-playlists",
-  attributes: { name: playlist.name, description: { standard: playlist.description }, canEdit: true },
-  ...(tracks ? { relationships: { tracks: { data: apple.includeTracks ? playlist.tracks.slice(0, Math.min(playlist.shown, 100)).map((_, i) => ({ id: `i.${String(i)}`, type: "library-songs" })) : [] } } } : {}),
-});
+const asPlaylist = (playlist: tPlaylist, tracks: boolean) =>
+  valid(shape("libraryPlaylist"), {
+    id: playlist.id,
+    type: "library-playlists",
+    attributes: { name: playlist.name, description: { standard: playlist.description }, canEdit: true },
+    ...(tracks ? { relationships: { tracks: { data: apple.includeTracks ? playlist.tracks.slice(0, Math.min(playlist.shown, 100)).map((_, i) => ({ id: `i.${String(i)}`, type: "library-songs" })) : [] } } } : {}),
+  });
+
+/** The id the root playlist folder goes by, as Apple's documentation has it. */
+const ROOT = "p.playlistsroot";
+
+/** The resources a request asks for by id, one for each, typed by `type`. */
+const byIds = (type: string, ids: string | null) => (ids ?? "").split(",").filter((id) => id !== "").map((id) => item(type, id));
+
+/**
+ * What the fake answers for the paths the sweep asks that no handler above answers: a resource, several by their ids,
+ * one a filter finds, a list's page, a relationship's page or a view's, each of the type the path names and valid by
+ * the validator of it.
+ */
+async function anything(req: Request, url: URL): Promise<Response> {
+  const path = url.pathname;
+  const query = url.searchParams;
+  const catalog = /^\/v1\/catalog\/gb(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path);
+  const library = /^\/v1\/me\/library\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path);
+  const recommendation = /^\/v1\/me\/recommendations(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path);
+  const storefront = /^\/v1\/storefronts(?:\/([^/]+))?$/.exec(path);
+  const resources = (type: string, id: string | undefined, rel: string | undefined, view: string | undefined) => {
+    const named = camel(singular(type));
+    if (rel === "view" && view !== undefined) return json(pageOf(`${named}Views${pascal(singular(type))}${pascal(view)}View`, url, { attributes: {} }));
+    if (rel !== undefined) return json(pageOf(`${named}Relationships${pascal(singular(type))}${pascal(rel)}Relationship`, url));
+    const collection = shape(`${camel(type)}Response`);
+    if (id !== undefined) return json(valid(collection, { data: [item(type, id)] }));
+    if (query.has("ids")) return json(valid(collection, { data: byIds(type, query.get("ids")) }));
+    if ([...query.keys()].some((key) => key.startsWith("filter["))) return json(valid(collection, { data: [item(type, `${type}.f`)] }));
+    // A list: its first page, with a next page. What is the listener's has an id as theirs have, which the report never shows.
+    const offset = query.has("offset");
+    const theirs = path.startsWith("/v1/me/") ? "i." : "";
+    return json(valid(collection, { data: [item(type, `${theirs}${type}.${offset ? "2" : "1"}`)], ...(offset ? {} : { next: `${path}?offset=1` }) }));
+  };
+  if (path === "/v1/catalog/gb/search/hints") return json(valid(schemas.searchHintsResponse, { results: { terms: ["x"] } }));
+  if (path === "/v1/catalog/gb/search/suggestions") return json(valid(schemas.searchSuggestionsResponse, { results: { suggestions: [null] } }));
+  if (path === "/v1/language/gb/tag") return json(valid(schemas.langageTagResponse, { results: { tag: "en-GB" } }));
+  if (catalog && catalog[1] === undefined) {
+    const data = [...query].flatMap(([key, ids]) => byIds(/^ids\[(.+)\]$/.exec(key)?.[1] ?? "", ids));
+    return json(valid(schemas.resourceCollectionResponse, { data }));
+  }
+  if (catalog) return resources(catalog[1] ?? "", catalog[2], catalog[3], catalog[4]);
+  if (storefront) return storefront[1] === undefined ? resources("storefronts", undefined, undefined, undefined) : resources("storefronts", storefront[1], undefined, undefined);
+  if (path === "/v1/me/library" && req.method === "GET") return json(valid(schemas.resourceCollectionResponse, { data: [...query].flatMap(([key, ids]) => byIds(/^ids\[(.+)\]$/.exec(key)?.[1] ?? "", ids)) }));
+  if (path === "/v1/me/library/search") return json(valid(schemas.librarySearchResponse, { results: Object.fromEntries((query.get("types") ?? "").split(",").map((type) => [type, { data: [item(type, `i.${type}`)] }])) }));
+  if (path === "/v1/me/library/recently-added") return json(valid(schemas.resourceCollectionResponse, { data: [item("library-albums", "l.recent")] }));
+  if (path === "/v1/me/history/heavy-rotation" || path === "/v1/me/recent/radio-stations")
+    return json(valid(schemas.paginatedResourceCollectionResponse, { data: [item("albums", "a.heavy")], ...(query.has("offset") ? {} : { next: `${path}?offset=1` }) }));
+  if (path === "/v1/me/music-summaries") return json(valid(schemas.musicSummariesResponse, { data: [null] }));
+  if (recommendation) return resources("personal-recommendation", recommendation[1], recommendation[2], undefined);
+  if (library?.[1] === "playlist-folders") {
+    const [, , id, rel] = library;
+    const folder = (one: { readonly id: string; readonly name: string }) => item("library-playlist-folders", one.id, { name: one.name });
+    if (req.method === "POST") {
+      if (apple.folder.refuse !== undefined) return refuse(apple.folder.refuse);
+      const { attributes } = (await req.json()) as { attributes: { name: string } };
+      const one = { id: `p.f${String(apple.folders.length)}`, name: attributes.name };
+      if (!apple.folder.unseen) apple.folders.push(one);
+      return json(valid(schemas.libraryPlaylistFoldersResponse, { data: apple.folder.withId ? [folder(one)] : [] }), 201);
+    }
+    const named = (one: string) => (one === ROOT ? { id: ROOT, name: "Playlists" } : apple.folders.find((each) => each.id === one));
+    if (id === undefined && query.has("ids"))
+      return json(valid(schemas.libraryPlaylistFoldersResponse, { data: (query.get("ids") ?? "").split(",").map(named).filter((one) => one !== undefined).map(folder) }));
+    if (id === undefined) return query.get("filter[identity]") === "playlistsroot" ? json(valid(schemas.libraryPlaylistFoldersResponse, { data: [folder({ id: ROOT, name: "Playlists" })] })) : refuse(404);
+    const known = named(id);
+    if (known === undefined) return refuse(404);
+    if (rel === undefined) return json(valid(schemas.libraryPlaylistFoldersResponse, { data: [folder(known)] }));
+    if (rel === "parent") return id === ROOT ? refuse(404) : json(valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship"), { data: [folder({ id: ROOT, name: "Playlists" })] }));
+    if (id !== ROOT) return refuse(404);
+    return json(valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderChildrenRelationship"), { data: [...apple.folders.map(folder), ...apple.listener.slice(0, 1).map((playlist) => asPlaylist(playlist, false))] }));
+  }
+  // The listener's playlists are the handlers' above, but for their relationships other than their tracks.
+  if (library && (library[1] !== "playlists" || (library[3] !== undefined && library[3] !== "tracks"))) return resources(`library-${library[1] ?? ""}`, library[2], library[3], undefined);
+  return refuse(404);
+}
 
 async function answer(req: Request): Promise<Response> {
   asked.push(req);
@@ -219,26 +371,41 @@ async function answer(req: Request): Promise<Response> {
   const method = req.method;
   const failing = apple.failing[path];
   if (failing !== undefined) return refuse(failing);
+  const fixed = method === "GET" ? (apple.answers[path + url.search] ?? apple.answers[path]) : undefined;
+  if (fixed !== undefined) return json(fixed);
+  // Apple's image server, which answers for artwork by the extension a URL asks for.
+  if (url.hostname.endsWith("mzstatic.com")) {
+    const sent = apple.images[path.split(".").at(-1) ?? ""] ?? 404;
+    return typeof sent === "number" ? new Response(null, { status: sent }) : new Response("image", { headers: { "content-type": sent } });
+  }
   if (path === "/v1/test") return nothing(200);
   if (path === "/v1/me/storefront") {
     if (req.headers.get("music-user-token") === MADE_UP) return apple.madeUpToken === 200 ? json({ data: [{ id: "gb" }] }) : refuse(apple.madeUpToken);
-    return json({ data: [{ id: "gb", type: "storefronts" }] });
+    return json(valid(schemas.storefrontsResponse, { data: [item("storefronts", "gb")] }));
   }
   if (path === "/v1/catalog/gb/charts") {
     if (url.search === new URL(apple.chartNextLink, url).search)
       return json(apple.chartNext === "page" ? { data: apple.songs.slice(1, 2) } : apple.chartNext === "neither" ? {} : { results: { songs: [{ chart: "most-played", data: apple.songs.slice(1, 2) }] } });
     const chart = (data: unknown[], next?: string) => [{ chart: "most-played", name: "Top", data, ...(next === undefined ? {} : { next }) }];
-    return json({
+    // The questions' charts as the test made them, artwork taken away and all; the sweep's, which it asks with a genre, valid.
+    const body = {
       results: {
         songs: chart(apple.songs, apple.chartNext === "none" ? undefined : apple.chartNextLink),
         albums: chart(apple.albums),
         playlists: chart(apple.playlists),
         "music-videos": chart(apple.videos),
       },
-    });
+    };
+    return json(query.has("genre") ? valid(schemas.chartResponse, body) : body);
   }
   if (path === "/v1/catalog/gb/search") {
-    if (!query.has("offset")) return json({ results: { songs: { data: apple.songs.slice(0, 1), ...(apple.searchNext === "none" ? {} : { next: "/v1/catalog/gb/search?offset=1&term=love&types=songs" }) } } });
+    const types = (query.get("types") ?? "songs").split(",");
+    // The songs of the name searched for, as a search finds them; the first chart song for a term no song is called.
+    const term = query.get("term") ?? "";
+    const named = apple.songs.filter((song) => term.includes(String((song.attributes as tBody).name)));
+    const songs = { data: named.length > 0 ? named.slice(0, 1) : apple.songs.slice(0, 1), ...(apple.searchNext === "none" ? {} : { next: "/v1/catalog/gb/search?offset=1&term=love&types=songs" }) };
+    const first = (type: string) => (type === "songs" ? songs : { data: [item(type, `${type}.s`)] });
+    if (!query.has("offset")) return json(valid(schemas.searchResponse, { results: Object.fromEntries(types.map((type) => [type, first(type)])) }));
     return json(apple.searchNext === "page" ? { data: apple.songs.slice(1, 2) } : apple.searchNext === "neither" ? {} : { results: { songs: { data: apple.songs.slice(1, 2) } } });
   }
   if (path === "/v1/catalog/gb/songs" && query.has("filter[isrc]")) {
@@ -253,28 +420,52 @@ async function answer(req: Request): Promise<Response> {
     const album = albumTracks[1] ?? "";
     // Twelve songs that play, one not yet out, which has no playParams, and a music video.
     const songs = apple.songless.has(album) ? [] : Array.from({ length: 12 }, (_, i) => catalogItem("songs", `${album}t${String(i + 1)}`, { playParams: { id: `${album}t${String(i + 1)}`, kind: "song" } }));
-    return json({ data: [...songs, catalogItem("songs", `${album}soon`), catalogItem("music-videos", `${album}v`)] });
+    return json(valid(shape("albumRelationshipsAlbumTracksRelationship"), { data: [...songs, catalogItem("songs", `${album}soon`), catalogItem("music-videos", `${album}v`)] }));
   }
   const playlistTracks = /^\/v1\/catalog\/gb\/playlists\/([^/]+)\/tracks$/.exec(path);
-  if (playlistTracks) return json({ data: [catalogItem("music-videos", `${playlistTracks[1] ?? ""}v`), ...songsOfPlaylist(playlistTracks[1] ?? "").map((id) => catalogItem("songs", id))] });
+  if (playlistTracks)
+    return json(valid(shape("playlistRelationshipsPlaylistTracksRelationship"), { data: [catalogItem("music-videos", `${playlistTracks[1] ?? ""}v`), ...songsOfPlaylist(playlistTracks[1] ?? "").map((id) => catalogItem("songs", id))] }));
+  // A song's album is one of its own, which no chart holds: `s1al` for s1.
+  const songAlbums = /^\/v1\/catalog\/gb\/songs\/([^/]+)\/albums$/.exec(path);
+  if (songAlbums) return json(valid(shape("songRelationshipsSongAlbumsRelationship"), { data: [catalogItem("albums", `${songAlbums[1] ?? ""}al`)] }));
   const inLibrary = /^\/v1\/catalog\/gb\/([^/]+)\/([^/]+)\/library$/.exec(path);
-  if (inLibrary) return apple.library.has(`${inLibrary[1] ?? ""}/${inLibrary[2] ?? ""}`) ? json({ data: [{ id: "l.held", type: "library-songs" }] }) : refuse(404);
-  if (path === "/v1/me/ratings/songs") {
-    const ids = query.get("ids")?.split(",") ?? [];
-    const data = ids.filter((id) => apple.rated.has(id)).map((id) => ({ id, type: "ratings", attributes: { value: apple.rated.get(id) } }));
-    return data.length === 0 && apple.noneRated === "404" ? refuse(404) : json({ data });
+  if (inLibrary) {
+    const [, type = "", id = ""] = inLibrary;
+    if (!apple.library.has(`${type}/${id}`)) return refuse(404);
+    return json(valid(shape(`${camel(singular(type))}Relationships${pascal(singular(type))}LibraryRelationship`), { data: [item(`library-${type}`, `l.${id}`)] }));
   }
-  const rating = /^\/v1\/me\/ratings\/songs\/([^/]+)$/.exec(path);
+  // The listener's ratings, of every type: a song's by its id, as the tests set them, any other's by its type too.
+  const rating = /^\/v1\/me\/ratings\/([^/]+)(?:\/([^/]+))?$/.exec(path);
   if (rating) {
-    const id = rating[1] ?? "";
-    if (apple.rated.has(id)) return json({ data: [{ id, type: "ratings", attributes: { value: apple.rated.get(id) } }] });
+    const [, type = "", one] = rating;
+    const key = (id: string) => (type === "songs" ? id : `${type}/${id}`);
+    const rated = (id: string) => item("ratings", id, { value: apple.rated.get(key(id)) });
+    if (one === undefined) {
+      const ids = query.get("ids")?.split(",") ?? [];
+      const data = apple.rating.batchLeavesOut === true ? [] : ids.filter((id) => apple.rated.has(key(id))).map(rated);
+      return data.length === 0 && apple.noneRated === "404" ? refuse(404) : json(valid(schemas.ratingsResponse, { data }));
+    }
+    if (method === "PUT") {
+      if (apple.rating.refuse !== undefined) return refuse(apple.rating.refuse);
+      const { attributes } = (await req.json()) as { attributes: { value: number } };
+      apple.rated.set(key(one), attributes.value);
+      // A library copy's id is `l.` and its catalog item's.
+      if (apple.rating.linked === true && type.startsWith("library-")) apple.rated.set(type === "library-songs" ? one.slice(2) : `${type.slice(8)}/${one.slice(2)}`, attributes.value);
+      return apple.rating.setsSilently === true ? nothing(204) : json(valid(schemas.ratingsResponse, { data: [rated(one)] }));
+    }
+    if (method === "DELETE") {
+      if (apple.rating.deleteFails !== undefined) return refuse(apple.rating.deleteFails);
+      if (apple.rating.deleteStays !== true) apple.rated.delete(key(one));
+      return nothing(204);
+    }
+    if (apple.rated.has(key(one)) && apple.rating.hidden !== true) return json(valid(schemas.ratingsResponse, { data: [rated(one)] }));
     return apple.unrated === "404" ? refuse(404) : json({ data: [] });
   }
   if (path === "/v1/me/recent/played" || path === "/v1/me/recent/played/tracks") {
     const n = path.endsWith("tracks") ? apple.recent.tracks : apple.recent.played;
     if (!query.has("types") && apple.recent.without === 400) return refuse(400);
     if (query.has("types") && apple.recent.withTypes !== undefined) return refuse(apple.recent.withTypes);
-    return json({ data: Array.from({ length: !query.has("types") && apple.recent.without === "empty" ? 0 : n }, (_, i) => ({ id: `r${String(i)}`, type: "albums" })) });
+    return json(valid(schemas.paginatedResourceCollectionResponse, { data: Array.from({ length: !query.has("types") && apple.recent.without === "empty" ? 0 : n }, (_, i) => item("albums", `r${String(i)}`)) }));
   }
   if (path === "/v1/me/library" && method === "POST") {
     for (const [key, ids] of query) {
@@ -284,8 +475,11 @@ async function answer(req: Request): Promise<Response> {
       const delay = apple.addDelay[type];
       if (delay !== undefined) await new Promise((resolve) => setTimeout(resolve, delay));
       for (const id of ids.split(",")) {
+        if (apple.ratedOnAdd && type === "songs") apple.rated.set(id, 1);
+        if (apple.addedUnseen) continue;
         apple.library.add(`${type}/${id}`);
         if (type === "playlists" && apple.catalogPlaylistSongsInLibrary) for (const song of songsOfPlaylist(id)) apple.library.add(`songs/${song}`);
+        if (type === "songs" && apple.partlyHeldCounts) apple.library.add(`albums/${id}al`);
       }
     }
     return nothing(202);
@@ -338,7 +532,7 @@ async function answer(req: Request): Promise<Response> {
     if (Date.now() >= playlist.shownAt) playlist.shown = playlist.tracks.length;
     return tracksPage(playlist, url);
   }
-  return refuse(404);
+  return anything(req, url);
 }
 
 /** The lines on stdout of one check, without their marks' colors. */
@@ -382,7 +576,7 @@ describe("which checks run: by name, in the list's order, and the write checks o
     for (const id of READS) expect(linesOf(id).length, id).toBeGreaterThan(0);
     for (const id of WRITES) expect(linesOf(id), id).toEqual([]);
     expect(posts()).toEqual([]);
-    expect(stderr).toContain("--write adds them");
+    expect(stderr).toContain("What writes to your library is left out; --write adds it.");
   });
 
   test("named checks run alone, in the list's order whatever the order named, and each once", async () => {
@@ -393,13 +587,12 @@ describe("which checks run: by name, in the list's order, and the write checks o
       .filter((id) => id !== undefined && CHECKS.some((each) => each.id === id));
     expect([...new Set(ran)]).toEqual(["search-next", "rating-unset"]);
     expect(asked.some((req) => new URL(req.url).pathname.startsWith("/v1/me/recent"))).toBe(false);
-    expect(stderr).not.toContain("--write adds them");
+    expect(stderr).not.toContain("--write adds it");
   });
 
-  test("a check that is not there is a mistake in how the CLI was run, and Apple is not asked", async () => {
+  test("a name that is not there is a mistake in how the CLI was run, which says where every name is listed, and Apple is not asked", async () => {
     expect(await main(["check", "nothing-like-it"])).toBe(2);
-    expect(stderr).toContain("There is no check 'nothing-like-it'");
-    for (const id of CHECKS.map((each) => each.id)) expect(stderr).toContain(id);
+    expect(stderr).toContain("There is no check 'nothing-like-it'. 'open-music-sdk help check' lists every one.");
     expect(asked).toEqual([]);
   });
 
@@ -414,17 +607,33 @@ describe("which checks run: by name, in the list's order, and the write checks o
     expect(asked).toEqual([]);
   });
 
-  test("--write with none named runs the write checks after every one that reads, and says first what they leave", async () => {
+  test("--write with none named runs every question, package by package, the reads of each before its writes, and says first what they leave", async () => {
     expect(await main(["check", "--write", "--no-color"])).toBe(0);
     const order = stdout
       .split(LF)
       .map((line) => /^. ([\w-]+): /.exec(line)?.[1])
       .filter((id): id is string => id !== undefined && CHECKS.some((each) => each.id === id));
-    expect([...new Set(order)]).toEqual(CHECKS.map((each) => each.id));
-    const warning = stderr.indexOf("--write: what these checks add stays");
+    expect([...new Set(order)]).toEqual([
+      "search-next",
+      "charts-next",
+      "isrc-next",
+      "recently-played-types",
+      "rating-unset",
+      "add-to-library",
+      "add-to-favorites",
+      "playlist-include",
+      "playlist-include-tracks",
+      "resolve-misses",
+      "playlist",
+      "artwork-placeholders",
+      "artwork-formats",
+      "preview-hosts",
+      "user-token-refused",
+    ]);
+    const warning = stderr.indexOf("--write: what is added stays");
     expect(warning).toBeGreaterThan(-1);
     expect(warning).toBeLessThan(stderr.indexOf("Asking: add-to-library"));
-    expect(stderr).toContain("an album's songs with it, one song made a favorite, and a playlist of up to 300 songs");
+    expect(stderr).toContain("an album's songs with it, one song made a favorite, a playlist of up to 300 songs, which may put them in the library too, an empty playlist and a playlist folder. Ratings set are taken away again.");
   });
 
   test("help lists every check by name, and marks those that write", async () => {
@@ -1044,6 +1253,7 @@ describe("add-to-library and add-to-favorites", () => {
     expect(linesOf("add-to-library")).toEqual([
       "· add-to-library: addToLibrary took songs, albums, playlists, music-videos.",
       "· add-to-library: each showed in the library after: songs, 0 seconds; albums, 0 seconds; playlists, 0 seconds; music-videos, 0 seconds.",
+      "· add-to-library: the album of the song added does not count as in the library, though one song of it is there.",
       "· add-to-library: adding the playlist had not put its songs in the library when check looked.",
     ]);
     expect(posts()).toEqual(["/v1/me/library", "/v1/me/library", "/v1/me/library", "/v1/me/library"]);
@@ -1091,7 +1301,8 @@ describe("add-to-library and add-to-favorites", () => {
 
   test("a link is offered only when it is an https address of Apple Music, and a name loses what would turn how it reads", async () => {
     const override = String.fromCharCode(0x202e);
-    // A song's link is its own page, made from its id, whatever its url holds.
+    // A song's link is its own page, made from its id, whatever its url holds. The one song is one never rated, as a song added is.
+    apple.rated.clear();
     apple.songs = [catalogItem("songs", "s1", { name: `Hit${override}lanigiro`, url: "javascript:alert(1)" })];
     apple.albums = [catalogItem("albums", "a1", { url: "https://music.apple.com.evil.example/gb/album/1" })];
     apple.playlists = [catalogItem("playlists", "pl.1", { url: "http://music.apple.com/gb/playlist/1" })];
@@ -1144,7 +1355,8 @@ describe("add-to-library and add-to-favorites", () => {
     });
     expect(await main(["check", "add-to-library", "--write", "--no-color"])).toBe(1);
     expect(linesOf("add-to-library")).toEqual(["✗ add-to-library: Apple could not be reached (at /v1/me/library), so this was not answered."]);
-    expect(cleanupOf()).toContain("Name of s1\" by Artist of s1: https://music.apple.com/gb/song/s1 (Apple's answer was lost, so it may not be there)");
+    // s1 is rated, so s2 was the song sent.
+    expect(cleanupOf()).toContain("Name of s2\" by Artist of s2: https://music.apple.com/gb/song/s2 (Apple's answer was lost, so it may not be there)");
   });
 
   test("a favorite that shows as a rating, made of a song neither in the library nor rated, is undone in the cleanup", async () => {
@@ -1473,7 +1685,6 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(await running).toBe(130);
     expect(cleanupOf()).toContain("Delete every playlist named");
   });
-
   test.each(["SIGINT", "SIGTERM"] as const)("%s stops it, pressed once or twice: exit 130, and the cleanup is printed for what was written so far", async (signal) => {
     apple.lag.listed = 1000;
     const before = new Set(process.listeners(signal));
@@ -1492,5 +1703,655 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(stderr).toContain("Stopped.");
     expect(process.listeners(signal)).toHaveLength(before.size);
     expect(cleanupOf()).toContain("Delete every playlist named");
+  });
+});
+
+const pathsOf = (requests: readonly Request[]) => requests.map((req) => new URL(req.url).pathname);
+/** The lines of the sweep's rows for one function, its names' among them. */
+const rowsOf = (fn: string) => stdout.split(LF).filter((line) => line.slice(2).startsWith(`${fn}: `) || line.slice(2).startsWith(`${fn}:`));
+
+describe("the sweep: every function of client-catalog and client-user, each answer held to its generated type", () => {
+  test("a read run asks every function that reads, and every name of one, and none that writes: no rating and no folder", async () => {
+    expect(await main(["check", "--no-color"])).toBe(0);
+    for (const { fn, entry } of ROWS) expect(rowsOf(fn).length > 0, fn).toBe(entry.kind === "row");
+    expect(asked.filter((req) => req.method !== "GET")).toEqual([]);
+    // The one rating a read run asks for is rating-unset's, of the chart's songs.
+    expect(pathsOf(asked).filter((path) => path.startsWith("/v1/me/ratings/") && !path.startsWith("/v1/me/ratings/songs"))).toEqual([]);
+    expect(stdout.split(LF).filter((line) => line.startsWith("Asked "))).toEqual(["Asked 96 functions and 12 checks: 106 ✓, 0 ≠, 0 ✗, 0 -, 12 ·."]);
+    expect(stdout).not.toContain("Differences from the types");
+  });
+
+  test("each package is a heading, the rows of its functions under it, then its questions", async () => {
+    await main(["check", "--no-color"]);
+    const headings = stdout.split(LF).filter((line) => /^[a-z-]+$/.test(line));
+    expect(headings).toEqual(["client-catalog", "client-user", "lib-playlists", "util-artwork", "lib-preview-player", "user-token"]);
+    const catalog = stdout.slice(stdout.indexOf(`${LF}client-catalog${LF}`), stdout.indexOf(`${LF}client-user${LF}`));
+    expect(catalog.indexOf("getLanguageTag: ")).toBeLessThan(catalog.indexOf("search-next: "));
+  });
+
+  test("an answer that differs from its type is ≠: the resource's type, the field below it, and what the type expected; and each way it differs is listed once at the end, with every function that met it", async () => {
+    const song = item("songs", "s1");
+    (song.attributes as tBody).name = 7;
+    apple.answers["/v1/catalog/gb/songs/s1"] = { data: [song] };
+    apple.answers["/v1/catalog/gb/songs"] = { data: [song] };
+    expect(await main(["check", "getSong", "getSongs", "--no-color"])).toBe(1);
+    expect(rowsOf("getSong")).toEqual(["≠ getSong: types: songs attributes.name: expected string."]);
+    expect(rowsOf("getSongs")).toEqual(["≠ getSongs: types: songs attributes.name: expected string."]);
+    expect(stdout.slice(stdout.indexOf("Differences from the types"))).toBe(["Differences from the types (1):", "  songs attributes.name: expected string", "    getSong, getSongs", ""].join(LF));
+  });
+
+  test("more than three ways are said as the first three and how many more; a type Apple names that no answer documents is a resource; and what differs outside any resource names none", async () => {
+    apple.answers["/v1/catalog/gb/songs/s1"] = { data: [{ id: "s1", type: "songs", attributes: {} }] };
+    apple.answers["/v1/catalog/gb/albums/a1"] = { data: [{ ...item("albums", "a1"), type: "mystery" }] };
+    apple.answers["/v1/catalog/gb/playlists/pl.chart1"] = { data: "none", also: item("playlists", "pl.chart1") };
+    expect(await main(["check", "getSong", "getAlbum", "getPlaylist", "--no-color"])).toBe(1);
+    expect(rowsOf("getSong")[0]).toMatch(/^≠ getSong: types: songs [\w.]+: required; songs [\w.]+: required; songs [\w.]+: required \(and \d+ more\)\.$/);
+    expect(rowsOf("getAlbum")).toEqual(['≠ getAlbum: types: resource type: expected "albums".']);
+    expect(rowsOf("getPlaylist")).toEqual(["≠ getPlaylist: types: data: expected array."]);
+  });
+
+  test("a function with names gives one ✓ line for those that held, and a line of its own for each that did not", async () => {
+    apple.answers["/v1/catalog/gb/artists/x/view/top-songs"] = { data: [{ id: "s1", type: "songs" }], attributes: {} };
+    expect(await main(["check", "getArtistView", "--no-color"])).toBe(1);
+    const lines = rowsOf("getArtistView");
+    expect(lines[0]).toBe("✓ getArtistView: 11 of 12 views as the types have them.");
+    // The view's own attributes are in no resource, and the song's href is in the song.
+    expect(lines.slice(1)).toEqual(["≠ getArtistView:top-songs: types: attributes.title: required; songs href: required."]);
+  });
+
+  test("one name of a function is asked alone by function:name, its next page too", async () => {
+    expect(await main(["check", "getArtistView:top-songs", "--no-color"])).toBe(0);
+    expect(stdout.split(LF).filter((line) => /^. get/.test(line))).toEqual(["✓ getArtistView:top-songs: as the types have it, and page 2 too, by its next link, which carries offset."]);
+    expect(pathsOf(asked).filter((path) => path.includes("/view/"))).toEqual(["/v1/catalog/gb/artists/x/view/top-songs", "/v1/catalog/gb/artists/x/view/top-songs"]);
+  });
+
+  test.each(["getArtistView:nothing", "getSong:albums", "addToLibrary:albums", "nothing:at-all"])("%s is not a name: exit 2, before Apple is asked", async (name) => {
+    expect(await main(["check", name])).toBe(2);
+    expect(stderr).toContain(`There is no check '${name}'`);
+    expect(asked).toEqual([]);
+  });
+
+  test("a package named is its functions and its questions, and no other package's", async () => {
+    expect(await main(["check", "client-catalog", "--no-color"])).toBe(0);
+    expect(rowsOf("getSong")).toHaveLength(1);
+    expect(marksOf("search-next")).not.toEqual([]);
+    expect(rowsOf("getLibrarySong")).toEqual([]);
+    expect(marksOf("recently-played-types")).toEqual([]);
+    expect(stdout).not.toContain(`${LF}client-user${LF}`);
+  });
+
+  test("a package named without --write runs its reads alone, and says nothing of a mistake", async () => {
+    expect(await main(["check", "client-user", "--no-color"])).toBe(0);
+    expect(rowsOf("getLibrarySong")).toHaveLength(1);
+    expect(marksOf("recently-played-types")).not.toEqual([]);
+    expect(marksOf("add-to-library")).toEqual([]);
+    expect(marksOf("setSongRating")).toEqual([]);
+    expect(asked.filter((req) => req.method !== "GET")).toEqual([]);
+  });
+
+  test("a package named with --write runs its writes too: its questions that write, and its round trips", async () => {
+    expect(await main(["check", "client-user", "--write", "--no-color"])).toBe(0);
+    expect(marksOf("add-to-library")).not.toEqual([]);
+    for (const id of ["setSongRating", "setLibraryPlaylistRating", "createLibraryPlaylistFolder"]) expect(marksOf(id), id).toContain("✓");
+    expect(marksOf("playlist")).toEqual([]);
+  });
+
+  test.each([
+    ["addToLibrary", "add-to-library"],
+    ["getSongRating", "setSongRating"],
+    ["deleteLibraryAlbumRating", "setLibraryAlbumRating"],
+    ["createLibraryPlaylistFolder", "createLibraryPlaylistFolder"],
+  ])("%s runs %s, which writes, so without --write it is refused before Apple is asked", async (fn, to) => {
+    expect(await main(["check", fn])).toBe(2);
+    expect(stderr).toContain(`${to} writes to your library, and runs only with --write.`);
+    expect(asked).toEqual([]);
+  });
+
+  test("a function a check asks runs that check alone, with --write", async () => {
+    expect(await main(["check", "deleteSongRating", "--write", "--no-color"])).toBe(0);
+    expect(marksOf("setSongRating")).toEqual(["✓"]);
+    expect(marksOf("add-to-library")).toEqual([]);
+    expect(stdout).not.toMatch(/^. get/m);
+  });
+
+  test("a 404 is asked again with the next of five, and five 404s are -, not ✗: Apple holds none here", async () => {
+    for (const n of [1, 2, 3, 4, 5]) apple.failing[`/v1/catalog/gb/songs/s${String(n)}/composers`] = 404;
+    expect(await main(["check", "getSongRelationship:composers", "--no-color"])).toBe(0);
+    expect(rowsOf("getSongRelationship")).toEqual(["- getSongRelationship:composers: Apple held none here: it answered 404, or with nothing, for each one asked, so its shape was not seen."]);
+    expect(pathsOf(asked).filter((path) => path.endsWith("/composers"))).toHaveLength(5);
+  });
+
+  test("an answer with nothing in it is no ✓: the next is asked, and the first that holds something is held to the type", async () => {
+    for (const n of [1, 2, 3]) apple.answers[`/v1/catalog/gb/songs/s${String(n)}/composers`] = { data: [] };
+    expect(await main(["check", "getSongRelationship:composers", "--no-color"])).toBe(0);
+    expect(marksOf("getSongRelationship:composers")).toEqual(["✓"]);
+    expect(pathsOf(asked).filter((path) => path.endsWith("/composers"))).toEqual(["/v1/catalog/gb/songs/s1/composers", "/v1/catalog/gb/songs/s2/composers", "/v1/catalog/gb/songs/s3/composers", "/v1/catalog/gb/songs/s4/composers", "/v1/catalog/gb/songs/s4/composers"]);
+  });
+
+  test("a function Apple fails is ✗, naming the request, and the rows after it are still asked", async () => {
+    apple.failing["/v1/me/history/heavy-rotation"] = 500;
+    expect(await finish(["check", "listHeavyRotation", "listRecentlyAdded", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(rowsOf("listHeavyRotation")).toEqual(["✗ listHeavyRotation: Apple answered 500, code 50001 (at /v1/me/history/heavy-rotation), so this was not answered."]);
+    expect(marksOf("listRecentlyAdded")).toEqual(["✓"]);
+  });
+
+  test("what the sweep did not expect is ✗ on stdout without what was thrown, which goes to stderr", async () => {
+    // A next link that leaves Apple's origin, which core refuses with a TypeError before anything is sent.
+    apple.answers["/v1/catalog/gb/genres"] = valid(schemas.genresResponse, { data: [item("genres", "g1")], next: "https://elsewhere.example/v1/catalog/gb/genres?offset=1" });
+    expect(await main(["check", "listGenres", "--no-color"])).toBe(1);
+    expect(rowsOf("listGenres")).toEqual(["✗ listGenres: something went wrong that check did not expect, so this was not answered. This is a bug: please report it, with what stderr says."]);
+    expect(stdout).not.toContain("elsewhere");
+    expect(stderr).toContain("elsewhere.example");
+  });
+
+  test("a page 2 that differs where page 1 does not is put down to its next link, and is no difference of the types'", async () => {
+    const genre = item("genres", "g2");
+    (genre.attributes as tBody).name = 7;
+    apple.answers["/v1/catalog/gb/genres?offset=1"] = { data: [genre] };
+    expect(await main(["check", "listGenres", "--no-color"])).toBe(1);
+    expect(rowsOf("listGenres")).toEqual([
+      "≠ listGenres: page 1 is as the types have it, and page 2, by its next link, which carries offset, is not: genres attributes.name: expected string. The link may leave out what page 1 was asked with, and core's paginate sends it as Apple gave it.",
+    ]);
+    expect(stdout).not.toContain("Differences from the types");
+  });
+
+  test("a function the run found nothing to ask with is -, and stderr says what was not found", async () => {
+    for (const album of apple.albums) delete (album.attributes as tBody).upc;
+    expect(await main(["check", "getAlbumsByUpc", "--no-color"])).toBe(0);
+    expect(rowsOf("getAlbumsByUpc")).toEqual(["- getAlbumsByUpc: not asked, since there was nothing to ask it with (stderr says why)"]);
+    expect(stderr).toContain("  getAlbumsByUpc: no UPC of a chart album was found to ask it with.");
+  });
+
+  test("record labels, curators and activities the charts lead to none of are found by a search of their own", async () => {
+    for (const album of apple.albums.slice(0, 5)) apple.failing[`/v1/catalog/gb/albums/${String(album.id)}/record-labels`] = 404;
+    for (const playlist of apple.playlists) apple.failing[`/v1/catalog/gb/playlists/${String(playlist.id)}/curator`] = 404;
+    expect(await main(["check", "getRecordLabel", "getCurator", "getAppleCurator", "getActivity", "--no-color"])).toBe(0);
+    for (const type of ["record-labels", "curators", "apple-curators", "activities"]) {
+      expect(asked.some((req) => new URL(req.url).pathname === "/v1/catalog/gb/search" && new URL(req.url).searchParams.get("types") === type), type).toBe(true);
+      expect(pathsOf(asked), type).toContain(`/v1/catalog/gb/${type}/${type}.s`);
+    }
+  });
+
+  test("a curator the chart's playlists lead to is asked by its type, and the other type is searched for", async () => {
+    for (const playlist of apple.playlists) apple.answers[`/v1/catalog/gb/playlists/${String(playlist.id)}/curator`] = { data: [item("apple-curators", "ac1")] };
+    expect(await main(["check", "getAppleCurator", "getCurator", "--no-color"])).toBe(0);
+    expect(pathsOf(asked)).toContain("/v1/catalog/gb/apple-curators/ac1");
+    expect(pathsOf(asked)).toContain("/v1/catalog/gb/curators/curators.s");
+  });
+
+  test("live radio stations that answer none are found by a search", async () => {
+    apple.answers["/v1/catalog/gb/stations?filter%5Bfeatured%5D=apple-music-live-radio"] = { data: [] };
+    expect(await main(["check", "getStation", "--no-color"])).toBe(0);
+    expect(pathsOf(asked)).toContain("/v1/catalog/gb/stations/stations.s");
+  });
+
+  test("a storefront with no language of its own, a root folder holding no folder and an empty library are not asked about where they lead", async () => {
+    const storefront = item("storefronts", "gb");
+    delete (storefront.attributes as tBody).defaultLanguageTag;
+    apple.answers["/v1/storefronts/gb"] = { data: [storefront] };
+    apple.folders = [];
+    apple.answers["/v1/me/library/songs"] = { data: [] };
+    expect(await main(["check", "getLanguageTag", "getSong", "getLibraryPlaylistFolderRelationship", "searchLibrary", "--no-color"])).toBe(0);
+    expect(marksOf("getLanguageTag")).toEqual(["-"]);
+    expect(asked.find((req) => new URL(req.url).pathname === "/v1/catalog/gb/songs/s1")?.url).not.toContain("l=");
+    expect(rowsOf("getLibraryPlaylistFolderRelationship")).toEqual([
+      "✓ getLibraryPlaylistFolderRelationship: 1 of 2 relationships as the types have them.",
+      "- getLibraryPlaylistFolderRelationship:parent: not asked, since there was nothing to ask it with (stderr says why)",
+    ]);
+    expect(stderr).toContain("getLibraryPlaylistFolderRelationship:parent: no playlist folder in your library was found to ask it with.");
+    expect(marksOf("searchLibrary")).toEqual(["-"]);
+  });
+
+  test("no root folder is nothing to ask a folder's parent with either", async () => {
+    apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
+    expect(await main(["check", "getLibraryPlaylistFolderRelationship:parent", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(0);
+    expect(marksOf("getLibraryPlaylistFolderRelationship:parent")).toEqual(["-"]);
+    expect(marksOf("getRootLibraryPlaylistFolder")).toEqual(["-"]);
+  });
+
+  test("a read run's report says nothing of the listener's library: no id, no name and no search term, only whether each answer held to its type", async () => {
+    apple.answers["/v1/me/library/songs/i.library-songs.1"] = { data: [item("library-songs", "i.library-songs.1", { name: "A song of the listener's" })] };
+    await main(["check", "--no-color"]);
+    expect(asked.some((req) => new URL(req.url).searchParams.get("term") === "A song of the listener's")).toBe(true);
+    expect(stdout).not.toContain("A song of the listener's");
+    expect(stdout).not.toMatch(/\b[pil]\.\w/);
+    expect(stdout).not.toMatch(/library-\w+\.\d/);
+  });
+
+  test("Ctrl+C while the sweep is under way stops it: exit 130, and nothing left unhandled", async () => {
+    const before = new Set(process.listeners("SIGINT"));
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (new URL(req.url).pathname === "/v1/catalog/gb/genres") {
+        asked.push(req);
+        return new Promise<Response>((_resolve, reject) => {
+          req.signal.addEventListener("abort", () => {
+            reject(req.signal.reason as Error);
+          });
+        });
+      }
+      return real(req);
+    });
+    const running = main(["check", "client-catalog", "--no-color"]);
+    await vi.waitFor(() => {
+      expect(pathsOf(asked)).toContain("/v1/catalog/gb/genres");
+    });
+    process.listeners("SIGINT").find((listener) => !before.has(listener))?.("SIGINT");
+    expect(await running).toBe(130);
+    expect(stderr).toContain("Stopped.");
+  });
+
+  test("help lists every function by its package, the round trips, the functions a question asks, and the packages", async () => {
+    expect(await main(["help", "check"])).toBe(0);
+    for (const { fn, entry } of ROWS) expect(stdout, fn).toContain(entry.kind === "row" ? `${fn},` : fn);
+    expect(stdout).toContain("addToLibrary (add-to-library),");
+    expect(stdout).toContain("Packages, each its functions and its questions: client-catalog, client-user, lib-playlists, util-artwork, lib-preview-player, user-token.");
+  });
+});
+
+describe("rating round trips: a dislike set on what the listener had not rated, read back, and taken away again", () => {
+  test("each type's is ✓ when Apple keeps it as client-user has it, and nothing is left to undo", async () => {
+    expect(await main(["check", "setSongRating", "setStationRating", "setLibraryPlaylistRating", "--write", "--no-color"])).toBe(0);
+    for (const id of ["setSongRating", "setStationRating", "setLibraryPlaylistRating"])
+      expect(linesOf(id), id).toEqual([`✓ ${id}: a rating of -1 was set, and read back alone and in a batch after 0 seconds, and was gone after 0 seconds once taken away, as client-user has it.`]);
+    expect(stderr).not.toContain("Take away the dislike");
+    // Only what check set was set, and it is gone again.
+    expect([...apple.rated.keys()]).toEqual(["s1"]);
+  });
+
+  test("a catalog item is picked only when it is neither rated nor in the library", async () => {
+    apple.rated.set("s2", -1);
+    apple.library.add("songs/s3");
+    await main(["check", "setSongRating", "--write", "--no-color"]);
+    expect(asked.filter((req) => req.method === "PUT").map((req) => new URL(req.url).pathname)).toEqual(["/v1/me/ratings/songs/s4"]);
+  });
+
+  test("none of the first five to be picked is -, and nothing is set", async () => {
+    for (const song of apple.songs.slice(0, 5)) apple.rated.set(String(song.id), 1);
+    await main(["check", "setSongRating", "--write", "--no-color"]);
+    expect(linesOf("setSongRating")).toEqual(["- setSongRating: none of the chart's could be picked"]);
+    expect(asked.filter((req) => req.method === "PUT")).toEqual([]);
+  });
+
+  test("a rating Apple refuses to set is ✗, and leaves nothing to undo", async () => {
+    apple.rating.refuse = 400;
+    expect(await main(["check", "setAlbumRating", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("setAlbumRating")).toEqual(["✗ setAlbumRating: Apple refused a rating of -1: Apple answered 400, code 40001 (at /v1/me/ratings/albums/{id})."]);
+    expect(asked.filter((req) => req.method === "DELETE")).toEqual([]);
+    expect(stderr).not.toContain("To undo");
+  });
+
+  test("a rating that never shows, and is left out of a batch, is ≠, each way said", async () => {
+    apple.rating = { hidden: true, batchLeavesOut: true };
+    expect(await finish(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("setSongRating")).toEqual(["≠ setSongRating: a rating of -1 was set, but it did not show within a minute; a batch of its ratings left it out."]);
+  });
+
+  test("a rating still there a minute after it was taken away is ≠, and the run takes it away again as it ends", async () => {
+    apple.rating = { deleteStays: true };
+    expect(await finish(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("setSongRating")).toEqual(["≠ setSongRating: a rating of -1 was set, but it was still there a minute after it was taken away."]);
+    expect(stderr).toContain("Taking away the ratings check set…");
+    expect(asked.filter((req) => req.method === "DELETE")).toHaveLength(2);
+  });
+
+  test("a rating read back as something else is ≠, and what Apple answered that differs from the types is a line of its own", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      // Once set, the rating reads back as a like, with an href that is no string.
+      if (req.method === "GET" && apple.rated.has("s2") && new URL(req.url).pathname === "/v1/me/ratings/songs/s2") {
+        asked.push(req);
+        return Promise.resolve(json({ data: [{ ...item("ratings", "s2", { value: 1 }), href: 7 }] }));
+      }
+      return real(req);
+    });
+    expect(await main(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("setSongRating")).toEqual(["≠ setSongRating: types: ratings href: expected string.", "≠ setSongRating: a rating of -1 was set, but it was read back as 1."]);
+  });
+
+  test("a rating the run could not take away is taken away when the run ends, and one that cannot be is a step of the cleanup", async () => {
+    apple.rating.deleteFails = 500;
+    expect(await finish(["check", "setSongRating", "--write", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(marksOf("setSongRating")).toEqual(["✗"]);
+    expect(stderr).toContain("Taking away the ratings check set…");
+    expect(asked.filter((req) => req.method === "DELETE").length).toBeGreaterThan(1);
+    expect(cleanupOf()).toContain('Take away the dislike check set on each of these, which it could not take away itself: open each, and take it away from the … menu on its page.');
+    expect(cleanupOf()).toContain('- the song "Name of s2" by Artist of s2: https://music.apple.com/gb/song/s2');
+  });
+
+  test("Ctrl+C after a rating is set takes it away through the API before the run ends", async () => {
+    const before = new Set(process.listeners("SIGINT"));
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      // The rating set is never read back, until the request is aborted.
+      if (req.method === "GET" && apple.rated.has("s2") && new URL(req.url).pathname === "/v1/me/ratings/songs/s2")
+        return new Promise<Response>((_resolve, reject) => {
+          req.signal.addEventListener("abort", () => {
+            reject(req.signal.reason as Error);
+          });
+        });
+      return real(req);
+    });
+    const running = main(["check", "setSongRating", "--write", "--no-color"]);
+    await vi.waitFor(() => {
+      expect(apple.rated.get("s2")).toBe(-1);
+    });
+    process.listeners("SIGINT").find((listener) => !before.has(listener))?.("SIGINT");
+    expect(await running).toBe(130);
+    expect(apple.rated.has("s2")).toBe(false);
+    expect(stderr).not.toContain("Take away the dislike");
+  });
+
+  test("a library copy is one check added, which is rated, read back and taken away, and its catalog item is looked at too", async () => {
+    expect(await main(["check", "setLibrarySongRating", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("setLibrarySongRating")).toEqual([
+      "✓ setLibrarySongRating: a rating of -1 was set, and read back alone and in a batch after 0 seconds, and was gone after 0 seconds once taken away, as client-user has it.",
+      "· setLibrarySongRating: the catalog item it is a copy of did not take the rating.",
+    ]);
+    // s1 is rated, so s2 was added, and its copy rated.
+    expect(asked.filter((req) => req.method === "PUT").map((req) => new URL(req.url).pathname)).toEqual(["/v1/me/ratings/library-songs/l.s2"]);
+    expect(cleanupOf()).toContain('- the song "Name of s2" by Artist of s2: https://music.apple.com/gb/song/s2');
+  });
+
+  test("a catalog item that takes the copy's rating, and keeps it, has it taken away by the run, since it had none before", async () => {
+    apple.rating.linked = true;
+    expect(await main(["check", "setLibraryAlbumRating", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("setLibraryAlbumRating")[1]).toBe("· setLibraryAlbumRating: the catalog item it is a copy of took the rating too, and kept it once the copy's was taken away.");
+    expect([...apple.rated.keys()]).toEqual(["s1"]);
+  });
+
+  test("a copy whose catalog item is rated by the time it is asked about is not rated, so nothing of the listener's goes with it", async () => {
+    apple.ratedOnAdd = true;
+    expect(await main(["check", "setLibrarySongRating", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("setLibrarySongRating")).toEqual(["- setLibrarySongRating: the catalog item of what check added is rated, so its copy is not: a rating of the one may be the other's"]);
+    expect(asked.filter((req) => req.method === "PUT")).toEqual([]);
+  });
+
+  test.each([
+    ["the charts hold no song to add", () => (apple.songs = []), "none of the chart's songs could be picked to add to your library"],
+    ["Apple refuses to add one", () => (apple.addStatus.songs = 400), "Apple refused to add one to your library: Apple answered 400, code 40001"],
+    ["what was added never shows", () => (apple.addedUnseen = true), "the songs added did not show in your library within a minute"],
+  ])("a library copy is not rated when %s: -", async (_what, arrange, words) => {
+    arrange();
+    await finish(["check", "setLibrarySongRating", "--write", "--no-color"]);
+    expect(linesOf("setLibrarySongRating")).toEqual([`- setLibrarySongRating: ${words}`]);
+  });
+
+  test.each([
+    ["holds no playlist in its answer", () => (apple.madeWithId = false), "the answer to making a playlist held none to rate"],
+    ["cannot be read by its id within a minute", () => (apple.lag.readable = 1000), "the playlist made could not be read by its id within a minute"],
+  ])("the playlist made to rate that %s is not rated: -", async (_what, arrange, words) => {
+    arrange();
+    await finish(["check", "setLibraryPlaylistRating", "--write", "--no-color"]);
+    expect(linesOf("setLibraryPlaylistRating")).toEqual([`- setLibraryPlaylistRating: ${words}`]);
+    expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC \(for a rating\)"/);
+  });
+
+  test("a playlist made to rate whose making Apple refuses leaves nothing to undo, and the round trip is ✗", async () => {
+    apple.failing["/v1/me/library/playlists"] = 400;
+    expect(await main(["check", "setLibraryPlaylistRating", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("setLibraryPlaylistRating")).toEqual(["✗"]);
+    expect(stderr).not.toContain("To undo");
+  });
+});
+
+describe("createLibraryPlaylistFolder: a folder made, read back, and its parent asked for", () => {
+  test("one made in the root, read by its id and among the root's children, with the root for its parent, is ✓, and the cleanup says to delete it", async () => {
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["✓ createLibraryPlaylistFolder: a folder was made, could be read by its id after 0 seconds, was among the root folder's children after 0 seconds, and has the root for its parent."]);
+    expect(cleanupOf()).toMatch(/1\. Delete the playlist folder named "open-music-sdk check .* UTC": it is among your playlists in the Music app on a Mac, iPhone or iPad/);
+  });
+
+  test("a folder Apple refuses to make is ✗, and leaves nothing to undo", async () => {
+    apple.folder.refuse = 400;
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["✗ createLibraryPlaylistFolder: Apple refused to make a playlist folder: Apple answered 400, code 40001 (at /v1/me/library/playlist-folders)."]);
+    expect(stderr).not.toContain("To undo");
+  });
+
+  test("an answer that holds no folder cannot be asked more of, and the folder is still in the cleanup", async () => {
+    apple.folder.withId = false;
+    await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"]);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["- createLibraryPlaylistFolder: the answer to making a playlist folder held none, so nothing more can be asked of it"]);
+    expect(cleanupOf()).toContain("Delete the playlist folder named");
+  });
+
+  test("a folder that never shows is ≠, each way said", async () => {
+    apple.folder.unseen = true;
+    expect(await finish(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but it could not be read by its id within a minute; it was not among the root folder's children within a minute."]);
+  });
+
+  test("a folder whose making is answered unlike its type is ≠ for that, as a line of its own", async () => {
+    const folder = item("library-playlist-folders", "p.f1", { name: "made" });
+    (folder.attributes as tBody).name = 7;
+    apple.answers["/v1/me/library/playlist-folders/p.f1"] = { data: [folder] };
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual([
+      "≠ createLibraryPlaylistFolder: types: library-playlist-folders attributes.name: expected string.",
+      "✓ createLibraryPlaylistFolder: a folder was made, could be read by its id after 0 seconds, was among the root folder's children after 0 seconds, and has the root for its parent.",
+    ]);
+  });
+
+  test("a folder whose parent is not the root is ≠", async () => {
+    apple.answers["/v1/me/library/playlist-folders/p.f1/parent"] = { data: [item("library-playlist-folders", "p.folder", { name: "Folder" })] };
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but its parent was not the root folder."]);
+  });
+});
+
+describe("add-to-library, as the sweep's own additions are made", () => {
+  test("an album counts as in the library once one song of it is, or does not, and either is said", async () => {
+    apple.partlyHeldCounts = true;
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(linesOf("add-to-library")).toContain("· add-to-library: the album of the song added counts as in the library, with that one song of it there.");
+  });
+
+  test("a song whose album is in the library already is not the one added, so what the album counts as is the song's doing alone", async () => {
+    apple.rated.clear();
+    apple.library.add("albums/s1al");
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(asked.filter((req) => req.method === "POST").map((req) => new URL(req.url).searchParams.get("ids[songs]"))).toContain("s2");
+  });
+
+  test("no song whose album was not held already is no song added, and nothing is said of the album", async () => {
+    apple.rated.clear();
+    for (const n of [1, 2, 3, 4, 5]) apple.library.add(`albums/s${String(n)}al`);
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(linesOf("add-to-library")[0]).toContain("songs not asked, since none of the chart's could be picked");
+    expect(linesOf("add-to-library").some((line) => line.includes("album of the song"))).toBe(false);
+  });
+
+  test("the first library relationship of a type that differs from its type is ≠, once", async () => {
+    // s1 is the listener's, its copy answered unlike the type; s2 is not, and is added.
+    apple.rated.clear();
+    apple.library.add("songs/s1");
+    apple.answers["/v1/catalog/gb/songs/s1/library"] = { data: [{ id: "l.s1", type: "library-songs" }] };
+    expect(await main(["check", "add-to-library", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("add-to-library").filter((line) => line.startsWith("≠"))).toEqual([expect.stringMatching(/^≠ add-to-library: the songs library relationship, which check asks by hand: types: library-songs \w+: required/)]);
+  });
+});
+
+describe("artwork-formats and resolve-misses", () => {
+  test("a format Apple's image server sends as another, or not at all, is ≠, naming each", async () => {
+    apple.images.webp = "image/jpeg";
+    apple.images.heic = 404;
+    expect(await main(["check", "artwork-formats", "--no-color"])).toBe(1);
+    expect(linesOf("artwork-formats")).toEqual([
+      "· artwork-formats: one chart artwork, at 100 pixels in each format util-artwork offers: jpg, 200 image/jpeg; jpeg, 200 image/jpeg; png, 200 image/png; webp, 200 image/jpeg; heic, 404 no content type; heif, 200 image/heif.",
+      "≠ artwork-formats: Apple's image server does not send webp, heic as asked, though util-artwork's FORMATS offers them.",
+    ]);
+  });
+
+  test("an image server that does not answer is said so for each format", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (new URL(req.url).hostname.endsWith("mzstatic.com")) return Promise.reject(new TypeError("fetch failed"));
+      return real(req);
+    });
+    expect(await main(["check", "artwork-formats", "--no-color"])).toBe(1);
+    expect(linesOf("artwork-formats")[0]).toContain("jpg, no answer; jpeg, no answer");
+    expect(linesOf("artwork-formats")[1]).toBe("≠ artwork-formats: Apple's image server does not send jpg, jpeg, png, webp, heic, heif as asked, though util-artwork's FORMATS offers them.");
+  });
+
+  test("one format alone sent wrong is said as it", async () => {
+    apple.images.png = 500;
+    await main(["check", "artwork-formats", "--no-color"]);
+    expect(linesOf("artwork-formats")[1]).toBe("≠ artwork-formats: Apple's image server does not send png as asked, though util-artwork's FORMATS offers it.");
+  });
+
+  test("charts with no artwork are not asked about", async () => {
+    for (const each of [...apple.songs, ...apple.albums, ...apple.playlists, ...apple.videos]) delete (each.attributes as tBody).artwork;
+    await main(["check", "artwork-formats", "--no-color"]);
+    expect(linesOf("artwork-formats")).toEqual(["- artwork-formats: nothing in the charts had artwork"]);
+  });
+
+  test("resolve, given the chart's songs by name, artist and album, reports how many it found and missed", async () => {
+    await main(["check", "resolve-misses", "--no-color"]);
+    expect(linesOf("resolve-misses")).toEqual([expect.stringMatching(/^· resolve-misses: resolve, given the name, artist and album of 30 chart songs and no ISRC, found \d+, \d+ of them the very song, and missed \d+\.$/)]);
+  });
+
+  test("charts with no song by an artist are not asked about", async () => {
+    apple.songs = [];
+    await main(["check", "resolve-misses", "--no-color"]);
+    expect(linesOf("resolve-misses")).toEqual(["- resolve-misses: the charts held no song with an artist"]);
+  });
+
+  test("Ctrl+C while an image is asked for stops the question: exit 130", async () => {
+    const before = new Set(process.listeners("SIGINT"));
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (!new URL(req.url).hostname.endsWith("mzstatic.com")) return real(req);
+      asked.push(req);
+      return new Promise<Response>((_resolve, reject) => {
+        req.signal.addEventListener("abort", () => {
+          reject(req.signal.reason as Error);
+        });
+      });
+    });
+    const running = main(["check", "artwork-formats", "--no-color"]);
+    await vi.waitFor(() => {
+      expect(asked.some((req) => new URL(req.url).hostname.endsWith("mzstatic.com"))).toBe(true);
+    });
+    process.listeners("SIGINT").find((listener) => !before.has(listener))?.("SIGINT");
+    expect(await running).toBe(130);
+  });
+});
+
+describe("what the sweep and its round trips say when Apple answers otherwise", () => {
+  test("a field inside a list of a resource is said with [] for the list, and an answer that is no object at all is the answer", async () => {
+    const song = item("songs", "s1");
+    (song.attributes as tBody).previews = [{ url: 7 }];
+    apple.answers["/v1/catalog/gb/songs/s1"] = { data: [song] };
+    apple.answers["/v1/catalog/gb/albums/a1"] = [item("albums", "a1")];
+    expect(await main(["check", "getSong", "getAlbum", "--no-color"])).toBe(1);
+    expect(rowsOf("getSong")).toEqual(["≠ getSong: types: songs attributes.previews[].url: expected string."]);
+    expect(rowsOf("getAlbum")).toEqual(["≠ getAlbum: types: the answer: expected object."]);
+  });
+
+  test("a next link that carries no query says so, and a page 2 with nothing in it is no difference", async () => {
+    apple.answers["/v1/catalog/gb/genres"] = valid(schemas.genresResponse, { data: [item("genres", "g1")], next: "/v1/catalog/gb/genres/more" });
+    apple.answers["/v1/catalog/gb/station-genres?offset=1"] = { data: [] };
+    expect(await main(["check", "listGenres", "listStationGenres", "--no-color"])).toBe(0);
+    expect(rowsOf("listGenres")).toEqual(["✓ listGenres: as the types have it, and page 2 too, by its next link, which carries nothing."]);
+    expect(rowsOf("listStationGenres")).toEqual(["✓ listStationGenres: as the types have it, and page 2 too, by its next link, which carries offset."]);
+  });
+
+  test("a language tag Apple does not give is nothing seen: -", async () => {
+    apple.answers["/v1/language/gb/tag"] = { results: {} };
+    expect(await main(["check", "getLanguageTag", "--no-color"])).toBe(0);
+    expect(marksOf("getLanguageTag")).toEqual(["-"]);
+  });
+
+  test("a song in the library with no name is no term to search the library for", async () => {
+    apple.answers["/v1/me/library/songs/i.library-songs.1"] = { data: [{ id: "i.library-songs.1", type: "library-songs", attributes: {} }] };
+    expect(await main(["check", "searchLibrary", "--no-color"])).toBe(0);
+    expect(marksOf("searchLibrary")).toEqual(["-"]);
+  });
+
+  test.each([
+    ["the artists of a chart song", "/v1/catalog/gb/songs/s1/artists", "getArtist", "/v1/catalog/gb/songs/{id}/artists"],
+    ["the curator of a chart playlist", "/v1/catalog/gb/playlists/pl.chart1/curator", "getCurator", "/v1/catalog/gb/playlists/{id}/curator"],
+  ])("Apple failing for %s, other than with a 404, fails the rows that need it: ✗, naming that request", async (_what, path, fn, where) => {
+    apple.failing[path] = 500;
+    expect(await finish(["check", fn, "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(rowsOf(fn)).toEqual([`✗ ${fn}: Apple answered 500, code 50001 (at ${where}), so this was not answered.`]);
+  });
+
+  test("a rating set whose answer is lost is ✗, taken away all the same as the run ends, and not left for the steps", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "PUT") return Promise.reject(new TypeError("fetch failed"));
+      return real(req);
+    });
+    expect(await main(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("setSongRating")).toEqual(["✗"]);
+    expect(asked.filter((req) => req.method === "DELETE").map((req) => new URL(req.url).pathname)).toEqual(["/v1/me/ratings/songs/s2"]);
+    expect(stderr).not.toContain("Take away the dislike");
+  });
+
+  test("a rating whose answer was lost and which cannot be taken away is a step, as one that may not be there", async () => {
+    apple.rating.deleteFails = 500;
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "PUT") return Promise.reject(new TypeError("fetch failed"));
+      return real(req);
+    });
+    await finish(["check", "setSongRating", "--write", "--no-color"], ["setTimeout", "clearTimeout"]);
+    expect(cleanupOf()).toContain("- the song \"Name of s2\" by Artist of s2: https://music.apple.com/gb/song/s2 (Apple's answer was lost, so it may not be there)");
+  });
+
+  test("a rating set with no answer to hold to its type is read back all the same, and a batch Apple answers 404 is one that left it out", async () => {
+    apple.rating.setsSilently = true;
+    apple.rating.batchLeavesOut = true;
+    apple.noneRated = "404";
+    expect(await main(["check", "setSongRating", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("setSongRating")).toEqual(["≠ setSongRating: a rating of -1 was set, but a batch of its ratings left it out."]);
+  });
+
+  test("a playlist to rate whose making is answered with Apple failing stays in the steps as one that may be there", async () => {
+    apple.failing["/v1/me/library/playlists"] = 500;
+    expect(await finish(["check", "setLibraryPlaylistRating", "--write", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC \(for a rating\)".*\(Apple's answer was lost, so it may not be there\)/);
+  });
+
+  test("a folder whose making is answered with nothing may have been made: ✗, and in the steps as one that may be there", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "POST") return Promise.reject(new TypeError("fetch failed"));
+      return real(req);
+    });
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("createLibraryPlaylistFolder")).toEqual(["✗"]);
+    expect(cleanupOf()).toMatch(/Delete the playlist folder named .*\(Apple's answer was lost, so it may not be there\)/);
+  });
+
+  test("with no root folder to be among, a folder made is not seen there, and its parent is not the root", async () => {
+    apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but it was not among the root folder's children within a minute; its parent was not the root folder."]);
+  });
+
+  test("a playlist whose making is answered unlike its type is ≠ for that, and the question goes on", async () => {
+    const real = answer;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const res = await real(req);
+      if (req.method !== "POST" || new URL(req.url).pathname !== "/v1/me/library/playlists") return res;
+      const body = (await res.json()) as { data: tBody[] };
+      for (const playlist of body.data) (playlist.attributes as tBody).name = 7;
+      return Response.json(body, { status: 201 });
+    });
+    expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("playlist")).toContain("≠ playlist: createLibraryPlaylist's answer: types: library-playlists attributes.name: expected string.");
+    expect(marksOf("playlist").at(-1)).toBe("✓");
   });
 });
