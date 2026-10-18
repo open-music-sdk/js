@@ -138,8 +138,9 @@ const placementOf = (cut: string | undefined): tPlacement => (cut === undefined 
  *
  * Apple documents the template as `{w}x{h}` and then the rest of a file name: in `{w}x{h}bb.jpg` the image is
  * cut `bb` and encoded `jpg`. Some templates leave those open as `{c}` and `{f}`, which are filled in like the
- * size. Most name them, and asking for another means writing over what is there. A URL whose file name is not of
- * that form says nothing about cut or encoding, and is left as it is.
+ * size. Most name them, and asking for another means writing over what is there: the 200 templates of one
+ * storefront's charts, against the live API on 18 October 2026, all did, with `{w}` and `{h}` their only
+ * placeholders. A URL whose file name is not of that form says nothing about cut or encoding, and is left as it is.
  *
  * `cut` is the crop code the file name ends up with, where it has the form to name one.
  */

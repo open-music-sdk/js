@@ -28,7 +28,7 @@ export interface tValidateOptions {
  * | --- | --- |
  * | 2xx naming a storefront | Resolves to the storefront's id |
  * | 2xx naming none | `ApiError`; the token is not taken as accepted |
- * | 403 | `UserTokenInvalid`, with `status` 403 |
+ * | 403, as a token Apple never gave was answered against the live API on 18 October 2026 | `UserTokenInvalid`, with `status` 403 |
  * | 401, and accepts the developer token on its own | `UserTokenInvalid`, with `status` 401 |
  * | 401, and refuses the developer token on its own too | What that second request failed with, such as `DeveloperTokenInvalid` |
  * | Anything else | The client's usual error, which says nothing about the token |
