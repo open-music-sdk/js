@@ -331,8 +331,8 @@ const LIBRARY_SHAPES: Readonly<Partial<Record<tItem["type"], schemas.tSchema<unk
  * The library's id for a catalog resource the listener holds, or undefined for one they do not: its `library`
  * relationship, which needs their token and which no client function asks for, so the path is put together here,
  * each segment encoded as core's are. Against the live API on 18 October 2026 it answered 404 for each of a run's
- * picks, none of which the listener had, and with the listener's copy once one was added. What it answers for an
- * album of which they hold some songs alone, `add-to-library` asks. The first answer of each type with a copy in it is
+ * picks, none of which the listener had, and with the listener's copy once one was added. An album answered with its
+ * copy once one song of it was added, as `add-to-library` asks. The first answer of each type with a copy in it is
  * held to its generated type too, and a difference is a line of the check that asked.
  */
 export async function libraryIdOf(run: tRun, { type, id }: Pick<tItem, "type" | "id">): Promise<string | undefined> {

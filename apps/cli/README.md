@@ -195,8 +195,8 @@ with numbered steps on stderr that remove what's left.
 - **When they print.** The steps are printed whatever happens, Ctrl+C and a SIGTERM included, and a second Ctrl+C
   waits for them.
 
-Run it on an account you don't mind cluttering, with an Apple Music subscription. Where a playlist folder can be
-deleted is yet to be confirmed by a live run; the step looks for it in the Music app on a Mac, iPhone or iPad.
+Run it on an account you don't mind cluttering, with an Apple Music subscription. The playlist folder it makes is
+deleted in the Music app, under Playlists in the Library tab, as it was on an iPhone on 18 October 2026.
 
 What `check` finds goes into [Differences from Apple's
 documentation](https://open-music-sdk.github.io/js/differences). A difference of the types goes into the corrections

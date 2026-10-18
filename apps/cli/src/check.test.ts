@@ -2263,7 +2263,7 @@ describe("createLibraryPlaylistFolder: a folder made, read back, and its parent 
   test("one made in the root, read by its id and among the root's children, with the root for its parent, is ✓, and the cleanup says to delete it", async () => {
     expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
     expect(linesOf("createLibraryPlaylistFolder")).toEqual(["✓ createLibraryPlaylistFolder: a folder was made, could be read by its id after 0 seconds, was among the root folder's children after 0 seconds, and has the root for its parent."]);
-    expect(cleanupOf()).toMatch(/1\. Delete the playlist folder named "open-music-sdk check .* UTC": it is among your playlists in the Music app on a Mac, iPhone or iPad/);
+    expect(cleanupOf()).toMatch(/1\. Delete the playlist folder named "open-music-sdk check .* UTC": in the Music app, it is in Playlists, in the Library tab, and it is deleted from there\./);
   });
 
   test("a folder made in a root of more than a page of children is looked for on every page", async () => {

@@ -162,9 +162,9 @@ function cleanup(left: tLeft): void {
     const sure = left.playlists.some((each) => each.what === name && each.sure);
     steps.push({ step: `Delete every playlist named "${printable(name)}": open each from your playlists, and choose Delete from Library from the … menu on its page.${sure ? "" : UNSURE}` });
   }
-  // Where a folder is deleted in the Music app is to be confirmed by a live run.
+  // Where it was deleted on 18 October 2026: in the Music app on an iPhone, under the Library tab's Playlists.
   for (const folder of left.folders)
-    steps.push({ step: `Delete the playlist folder named "${printable(folder.what)}": it is among your playlists in the Music app on a Mac, iPhone or iPad; choose Delete from Library from its … menu, or Control-click or touch and hold it.${unsure(folder)}` });
+    steps.push({ step: `Delete the playlist folder named "${printable(folder.what)}": in the Music app, it is in Playlists, in the Library tab, and it is deleted from there.${unsure(folder)}` });
   if (left.library.length > 0) steps.push({ step: `Delete these from your library: open each, ${DELETE}.`, items: left.library.map((each) => `${label(each.what)}: ${link(each.what)}${unsure(each)}`) });
   for (const { playlist, seen } of left.playlistsSongs) {
     // A playlist is added only when none of its songs was in the library, so every song on its page is one to delete.
