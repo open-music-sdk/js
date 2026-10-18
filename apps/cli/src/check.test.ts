@@ -2382,6 +2382,17 @@ describe("artwork-formats and resolve-misses", () => {
     expect(linesOf("artwork-formats")[1]).toBe("≠ artwork-formats: Apple's image server does not send jpg, jpeg, png, webp, heic, heif as asked, though util-artwork's FORMATS offers them.");
   });
 
+  test("the image server is asked with redirects refused, and with no token, so a URL on its host goes nowhere else", async () => {
+    await main(["check", "artwork-formats", "--no-color"]);
+    const images = asked.filter((req) => new URL(req.url).hostname.endsWith("mzstatic.com"));
+    expect(images).toHaveLength(6);
+    for (const req of images) {
+      expect(req.redirect).toBe("error");
+      expect(req.headers.get("authorization")).toBeNull();
+      expect(req.headers.get("music-user-token")).toBeNull();
+    }
+  });
+
   test("one format alone sent wrong is said as it", async () => {
     apple.images.png = 500;
     await main(["check", "artwork-formats", "--no-color"]);

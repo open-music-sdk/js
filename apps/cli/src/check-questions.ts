@@ -352,7 +352,8 @@ async function artworkFormats(run: tRun): Promise<void> {
     const url = artworkUrl(artwork as Parameters<typeof artworkUrl>[0], 100, { format, hosts: [ARTWORK_HOST] });
     let res: Response;
     try {
-      res = await run.fetch(url, { signal: run.signal });
+      // A redirect is refused, as core refuses one, so that a URL on the image server's host is asked of that host alone.
+      res = await run.fetch(url, { signal: run.signal, redirect: "error" });
     } catch (e) {
       if (run.signal.aborted) throw e;
       answers.push(`${format}, no answer`);
