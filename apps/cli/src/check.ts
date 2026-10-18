@@ -110,8 +110,8 @@ interface tCheck {
 const ORIGIN = "https://api.music.apple.com";
 /** How long a poll waits for a write to show: a read a second, by the clock, for this long at most. */
 const POLL_MS = 60_000;
-/** How long `apply`'s `settle` waits by default: five reads, the first at once and a second between each. */
-const SETTLE_S = 4;
+/** How long `apply`'s `settle` waits by default: ten reads, the first at once and a second between each. */
+const SETTLE_S = 9;
 /** The most tracks one request takes, as the client's function and lib-playlists' `chunk` allow. */
 const MOST_TRACKS = 300;
 /** How fast a run asks Apple: ten requests at once, then ten a second. Apple does not say what a key may make. */
@@ -716,7 +716,7 @@ async function playlistCheck(run: tRun): Promise<void> {
         throw again;
       }
       run.left.playlistSongs = sentAlbums;
-      run.line("differs", `${first}; one of 100 was taken. lib-playlists lets chunk be ${String(MOST_TRACKS)}.`);
+      run.line("differs", `${first}; one of 100 was taken. lib-playlists' apply sends ${String(MOST_TRACKS)} to a request by default.`);
     }
   }
 

@@ -288,10 +288,10 @@ describe("apply: tracks go in order, chunk to a request", () => {
     expect(holds("p.1")).toEqual(["a", "b", "c", "d", "e"]);
   });
 
-  test("left alone, a request carries a hundred", async () => {
+  test("left alone, a request carries three hundred, the most one does, as one did against the live API", async () => {
     const { music, posted } = apple([{ id: "p.1" }]);
-    await apply(music, forId("p.1", ...numbered(250)));
-    expect(posted.map((ids) => ids.length)).toEqual([100, 100, 50]);
+    await apply(music, forId("p.1", ...numbered(650)));
+    expect(posted.map((ids) => ids.length)).toEqual([300, 300, 50]);
   });
 
   test("three hundred is the most one may carry, which is the most the client's function takes", async () => {
@@ -726,16 +726,17 @@ describe("apply: verified says whether what was written showed before the run re
     expect(answered).toHaveBeenCalledWith({ id: "p.1", created: false, appended: 1, verified: true });
   });
 
-  test("left alone, a write is given five reads a second apart", async () => {
+  test("left alone, a write is given ten reads a second apart, room past the 4 seconds a new playlist took to be listed against the live API", async () => {
     vi.useFakeTimers();
     const { music, lines } = apple([{ id: "p.1", holds: ["0"] }], { lag: 99 });
     const answered = vi.fn();
     void apply(music, forId("p.1", "0", "a")).then(answered);
-    await vi.advanceTimersByTimeAsync(3999);
+    await vi.advanceTimersByTimeAsync(8999);
     expect(answered).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(answered).toHaveBeenCalledWith(expect.objectContaining({ verified: false }));
-    expect(lines().filter((line) => line === "GET /v1/me/library/playlists/p.1/tracks")).toHaveLength(6);
+    // The read before the writes, and the ten after them.
+    expect(lines().filter((line) => line === "GET /v1/me/library/playlists/p.1/tracks")).toHaveLength(11);
   });
 });
 

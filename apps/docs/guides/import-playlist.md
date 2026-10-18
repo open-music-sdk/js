@@ -93,7 +93,8 @@ const { id, created, appended, verified } = await listener.playlists.apply(plan)
    plan's name and description. If there is none, it makes one, and only then.
 2. It reads the playlist and works out again what is missing, since the playlist may have changed since you
    planned. A playlist it has just made holds nothing, and isn't read.
-3. It adds what is missing to the end, in order, `chunk` tracks to a request: 100 by default, 300 at most.
+3. It adds what is missing to the end, in order, `chunk` tracks to a request: 300 by default, which is also the
+   most.
 4. Where it added anything, it reads the playlist once more to see the tracks. For a playlist it made, it also
    looks for the playlist among the listener's playlists, where the next run will look.
 
@@ -102,7 +103,8 @@ wrote showed within the reads `settle` allows. That doesn't mean a write failed.
 [`tAppliedPlan`](../reference/@open-music-sdk/lib-playlists/interfaces/tAppliedPlan).
 
 `settle` is an option of `apply`: `{ tries, waitMs }`, how many times the playlist is read to see a write, and how
-long to wait between reads. It defaults to 5 tries, 1,000 milliseconds apart.
+long to wait between reads. It defaults to 10 tries, 1,000 milliseconds apart. Against the live API, a new
+playlist took 4 seconds to show among the listener's playlists, and its tracks 2 seconds to show in it.
 
 ### A write is sent once
 
@@ -203,10 +205,11 @@ underneath `delayMs`. These options set how hard one call pushes; the client set
   `401` instead, which arrives as `DeveloperTokenInvalid`. Its message names the path that was asked for, so it holds the playlist's id or the storefront.
   See [Handle errors](./errors).
 
-::: info Not yet run against the live API
-Don't count on `settle`'s defaults being long enough for a write to show, or on finding a playlist again by its
-name and description: neither has been tried against the live API. See
-[Differences from Apple's documentation](../differences#lib-playlists) for everything these functions take on trust.
+::: info Run once against the live API
+On 18 October 2026, in one storefront, a playlist was made, given 300 tracks in one request, read back with every
+track under the catalog id it was added by, and found again by its name and description, and `apply` with the same
+plan added nothing. One run is one sample: `settle`'s defaults leave room past what it took, not a promise. See
+[Differences from Apple's documentation](../differences#lib-playlists) for what these functions still take on trust.
 :::
 
 ## Next steps

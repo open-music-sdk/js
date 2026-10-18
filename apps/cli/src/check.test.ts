@@ -1187,12 +1187,12 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     const lines = linesOf("playlist").map((line) => line.replace(/\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/, "<time>"));
     expect(lines).toEqual([
       "· playlist: the answer to making a playlist held the playlist, with its id.",
-      "· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 0 seconds; apply's settle waits about 4 seconds.",
+      "· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 0 seconds; apply's settle waits about 9 seconds.",
       "✓ playlist: its name and description came back as they were sent, which apply finds a playlist by.",
       "· playlist: its tracks, while it had none: Apple answered 404, code 40401.",
       "✓ playlist: lib-playlists' read takes it for a playlist with no tracks.",
       "· playlist: one request took 300 tracks.",
-      "· playlist: the 300 tracks showed after 0 seconds; apply's settle waits about 4 seconds.",
+      "· playlist: the 300 tracks showed after 0 seconds; apply's settle waits about 9 seconds.",
       "✓ playlist: read gives back the catalog id each track was added by, in order, which plan goes by.",
       "· playlist: adding songs to the playlist put them in the library too.",
       "✓ playlist: apply with the same plan found the playlist, added nothing, and saw it whole.",
@@ -1242,8 +1242,8 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("300 tracks refused in one request and 100 taken, which is safe to send after a refusal, is ≠: it was the size", async () => {
     apple.appendMost = 100;
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("playlist")).toContain("≠ playlist: one request of 300 tracks: Apple answered 400, code 40001; one of 100 was taken. lib-playlists lets chunk be 300.");
-    expect(linesOf("playlist")).toContain("· playlist: the 100 tracks showed after 0 seconds; apply's settle waits about 4 seconds.");
+    expect(linesOf("playlist")).toContain("≠ playlist: one request of 300 tracks: Apple answered 400, code 40001; one of 100 was taken. lib-playlists' apply sends 300 to a request by default.");
+    expect(linesOf("playlist")).toContain("· playlist: the 100 tracks showed after 0 seconds; apply's settle waits about 9 seconds.");
   });
 
   test("100 refused as well is no finding of size, since a track Apple will not take would have both refused: ✗", async () => {
@@ -1334,8 +1334,8 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("how long each step takes to show is counted by the clock, a read a second", async () => {
     apple.lag = { readable: 2, listed: 3, tracks: 6 };
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(0);
-    expect(linesOf("playlist")).toContain("· playlist: the new playlist could be read by its id after 2 seconds, and was among the library's playlists after 3 seconds; apply's settle waits about 4 seconds.");
-    expect(linesOf("playlist")).toContain("· playlist: the 300 tracks showed after 6 seconds; apply's settle waits about 4 seconds.");
+    expect(linesOf("playlist")).toContain("· playlist: the new playlist could be read by its id after 2 seconds, and was among the library's playlists after 3 seconds; apply's settle waits about 9 seconds.");
+    expect(linesOf("playlist")).toContain("· playlist: the 300 tracks showed after 6 seconds; apply's settle waits about 9 seconds.");
     // Said once a wait begins, on stderr, so that its quiet is not taken for a hang.
     for (const what of ["the new playlist to be read by its id", "the new playlist to be among the library's", "the tracks added to show in the playlist"])
       expect(stderr.split(`Waiting for ${what}, a minute at most…`)).toHaveLength(2);
@@ -1349,7 +1349,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("tracks that do not show within a minute are ≠, and the rest is not asked", async () => {
     apple.lag.tracks = 1000;
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: none of the 300 tracks added showed within a minute; apply's settle waits about 4 seconds.");
+    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: none of the 300 tracks added showed within a minute; apply's settle waits about 9 seconds.");
     expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
@@ -1359,7 +1359,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(linesOf("playlist").slice(0, 2)).toEqual([
       "· playlist: the answer to making a playlist held no playlist, so apply has to find it by its name and description.",
       // Read by the id the listing gave.
-      "· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 0 seconds; apply's settle waits about 4 seconds.",
+      "· playlist: the new playlist could be read by its id after 0 seconds, and was among the library's playlists after 0 seconds; apply's settle waits about 9 seconds.",
     ]);
   });
 
@@ -1394,7 +1394,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("a playlist that is never listed is ≠, since apply would make another every time, and the rest is still asked by its id", async () => {
     apple.lag.listed = 1000;
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("playlist")).toContain("≠ playlist: the playlist was not among the library's playlists within a minute. apply's settle waits about 4 seconds, so apply would make another every time it ran.");
+    expect(linesOf("playlist")).toContain("≠ playlist: the playlist was not among the library's playlists within a minute. apply's settle waits about 9 seconds, so apply would make another every time it ran.");
     expect(linesOf("playlist")).toContain("· playlist: one request took 300 tracks.");
     expect(marksOf("playlist").at(-1)).toBe("-");
   });
