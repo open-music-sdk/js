@@ -167,7 +167,8 @@ function cleanup(left: tLeft): void {
     steps.push({ step: `Delete the playlist folder named "${printable(folder.what)}": it is among your playlists in the Music app on a Mac, iPhone or iPad; choose Delete from Library from its … menu, or Control-click or touch and hold it.${unsure(folder)}` });
   if (left.library.length > 0) steps.push({ step: `Delete these from your library: open each, ${DELETE}.`, items: left.library.map((each) => `${label(each.what)}: ${link(each.what)}${unsure(each)}`) });
   for (const { playlist, seen } of left.playlistsSongs) {
-    const each = `open ${link(playlist)}, and choose Delete from Library from the … menu of each song on that page.`;
+    // A playlist is added only when none of its songs was in the library, so every song on its page is one to delete.
+    const each = `open ${link(playlist)}, and choose Delete from Library from the … menu of each song on that page. None of them was in your library before.`;
     steps.push({ step: seen ? `Adding ${label(playlist)} put its songs in your library as well. Delete them: ${each}` : `If adding ${label(playlist)} put its songs in your library, delete them: ${each}` });
   }
   for (const favorite of left.favorites) {

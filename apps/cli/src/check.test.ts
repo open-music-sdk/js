@@ -1273,8 +1273,28 @@ describe("add-to-library and add-to-favorites", () => {
     await main(["check", "add-to-library", "--write", "--no-color"]);
     expect(linesOf("add-to-library").at(-1)).toBe("· add-to-library: adding the playlist put its songs in the library too.");
     expect(cleanupOf()).toContain(
-      'Adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library as well. Delete them: open https://music.apple.com/gb/x/pl.chart1, and choose Delete from Library from the … menu of each song on that page.',
+      'Adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library as well. Delete them: open https://music.apple.com/gb/x/pl.chart1, and choose Delete from Library from the … menu of each song on that page. None of them was in your library before.',
     );
+  });
+
+  test("a catalog playlist one of whose songs the listener holds is not the one added, so deleting its songs takes nothing of theirs", async () => {
+    apple.library.add("songs/pl.chart1s2");
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).not.toContain('"Name of pl.chart1"');
+    expect(cleanupOf()).toContain('- the playlist "Name of pl.chart2" by Curator of pl.chart2: https://music.apple.com/gb/x/pl.chart2');
+  });
+
+  test("a catalog playlist of more than a page of tracks is passed over, since what of it the listener holds is not read whole", async () => {
+    apple.answers["/v1/catalog/gb/playlists/pl.chart1/tracks"] = { data: [item("songs", "u1")], next: "/v1/catalog/gb/playlists/pl.chart1/tracks?offset=100" };
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).not.toContain('"Name of pl.chart1"');
+    expect(cleanupOf()).toContain('"Name of pl.chart2"');
+  });
+
+  test("a catalog playlist whose tracks Apple answers 404 for holds none of the listener's, and may be added", async () => {
+    apple.failing["/v1/catalog/gb/playlists/pl.chart1/tracks"] = 404;
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).toContain('- the playlist "Name of pl.chart1" by Curator of pl.chart1');
   });
 
   test("a playlist is named by its curator, and a resource with no name, artist or link by its id, to be searched for", async () => {

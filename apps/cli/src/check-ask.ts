@@ -7,6 +7,7 @@ import {
   getAlbumRating,
   getAlbumRelationship,
   getMusicVideoRating,
+  getPlaylistRelationship,
   getSongRating,
   getSongRelationship,
   isAppleMusicError,
@@ -408,11 +409,31 @@ export async function anyHeld(run: tRun, tracks: readonly unknown[]): Promise<bo
   return false;
 }
 
-/** The first of the first five that is neither in the library nor rated, and, for an album, none of whose tracks is either. */
+/**
+ * Whether a catalog playlist may be added: one page of tracks, none of which the listener holds. Adding it may put
+ * its songs in the library, and the cleanup then says to delete every song on its page.
+ */
+async function songsUnheld(run: tRun, playlist: string): Promise<boolean> {
+  let page: unknown;
+  try {
+    page = await getPlaylistRelationship(run.music, playlist, "tracks", { signal: run.signal });
+  } catch (e) {
+    notFound(e);
+    return true;
+  }
+  // ponytail: a playlist of more than a page is passed over, rather than every page of it read.
+  return text(at(page, "next")) === undefined && !(await anyHeld(run, list(at(page, "data"))));
+}
+
+/**
+ * The first of the first five that is neither in the library nor rated; for an album, none of whose tracks is either;
+ * and for a playlist, none of whose songs is.
+ */
 async function unheld(run: tRun, type: tAddedType, items: readonly tItem[]): Promise<tItem | undefined> {
   for (const item of items.slice(0, 5)) {
     if ((await inLibrary(run, item)) || (await rated(run, type, item.id))) continue;
     if (type === "albums" && (await anyHeld(run, await tracksOf(run, item.id)))) continue;
+    if (type === "playlists" && !(await songsUnheld(run, item.id))) continue;
     return item;
   }
   return undefined;
