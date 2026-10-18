@@ -308,9 +308,10 @@ of one, with no port and no credentials, is refused:
   before you settle the list. See [Show artwork](../guides/artwork).
 - The preview player skips the track, with the reason `"host"`. See [Play song previews](../guides/previews).
 
-::: info Not yet run against the live API
-Apple doesn't document which host preview clips come from, so look at what your own answers hold before you set
-`hosts`: see [Differences from Apple's documentation](../differences#lib-preview-player).
+::: info Seen once against the live API
+Apple doesn't document which host preview clips come from. In one run against the live API they were all on
+`audio-ssl.itunes.apple.com`, but look at what your own answers hold before you set `hosts`: see
+[Differences from Apple's documentation](../differences#lib-preview-player).
 :::
 
 An artwork function returns a URL, not markup. Assigned to an element's property, or given to React, it's escaped
