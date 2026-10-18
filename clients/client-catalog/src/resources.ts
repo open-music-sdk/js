@@ -310,7 +310,8 @@ export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsRespo
  */
 export const getAlbumRelationship = /*#__PURE__*/ relationshipGetter<Omit<tAlbumRelationships, "library">, tStorefrontOption>("getAlbumRelationship", albums);
 /**
- * One view of an album, such as `other-versions`, a page at a time.
+ * One view of an album, such as `other-versions`, a page at a time. Its `next` link kept only its offset against the
+ * live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -379,7 +380,8 @@ export const getArtists = /*#__PURE__*/ resourcesGetter<tArtistsResponse, tStore
  */
 export const getArtistRelationship = /*#__PURE__*/ relationshipGetter<tArtistRelationships, tStorefrontOption>("getArtistRelationship", artists);
 /**
- * One view of an artist, such as `top-songs`, a page at a time.
+ * One view of an artist, such as `top-songs`, a page at a time. Its `next` link kept only its offset against the
+ * live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -463,7 +465,8 @@ export const getPlaylistsByStorefrontChart = /*#__PURE__*/ resourcesFinder<tPlay
  */
 export const getPlaylistRelationship = /*#__PURE__*/ relationshipGetter<Omit<tPlaylistRelationships, "library">, tStorefrontOption>("getPlaylistRelationship", playlists);
 /**
- * One view of a playlist, such as `featured-artists`, a page at a time.
+ * One view of a playlist, such as `featured-artists`, a page at a time. Its `next` link kept only its offset against
+ * the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -564,7 +567,8 @@ export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicV
  */
 export const getMusicVideoRelationship = /*#__PURE__*/ relationshipGetter<Omit<tMusicVideoRelationships, "library">, tStorefrontOption>("getMusicVideoRelationship", musicVideos);
 /**
- * One view of a music video, such as `more-by-artist`, a page at a time.
+ * One view of a music video, such as `more-by-artist`, a page at a time. Its `next` link kept only its offset
+ * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -924,7 +928,8 @@ export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse
  */
 export const getRecordLabels = /*#__PURE__*/ resourcesGetter<tRecordLabelsResponse, tStorefrontOption>("getRecordLabels", recordLabels);
 /**
- * One view of a record label, such as `latest-releases`, a page at a time.
+ * One view of a record label, such as `latest-releases`, a page at a time. Its `next` link kept only its offset
+ * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.

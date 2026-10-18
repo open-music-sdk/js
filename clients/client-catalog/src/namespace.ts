@@ -166,7 +166,8 @@ export interface tCatalogFunctions {
    */
   readonly getAlbumRelationship: typeof resources.getAlbumRelationship;
   /**
-   * One view of an album, such as `other-versions`, a page at a time.
+   * One view of an album, such as `other-versions`, a page at a time. Its `next` link kept only its offset against the
+   * live API on 18 October 2026, so the view's own attributes come on the first page alone.
    *
    * @param id - The album's id.
    * @param name - The view's name, one of the album's as the type has them; Apple says whether there is such a one.
@@ -228,7 +229,8 @@ export interface tCatalogFunctions {
    */
   readonly getArtistRelationship: typeof resources.getArtistRelationship;
   /**
-   * One view of an artist, such as `top-songs`, a page at a time.
+   * One view of an artist, such as `top-songs`, a page at a time. Its `next` link kept only its offset against the
+   * live API on 18 October 2026, so the view's own attributes come on the first page alone.
    *
    * @param id - The artist's id.
    * @param name - The view's name, one of the artist's as the type has them; Apple says whether there is such a one.
@@ -304,7 +306,8 @@ export interface tCatalogFunctions {
    */
   readonly getPlaylistRelationship: typeof resources.getPlaylistRelationship;
   /**
-   * One view of a playlist, such as `featured-artists`, a page at a time.
+   * One view of a playlist, such as `featured-artists`, a page at a time. Its `next` link kept only its offset against
+   * the live API on 18 October 2026, so the view's own attributes come on the first page alone.
    *
    * @param id - The playlist's id.
    * @param name - The view's name, one of the playlist's as the type has them; Apple says whether there is such a one.
@@ -396,7 +399,8 @@ export interface tCatalogFunctions {
    */
   readonly getMusicVideoRelationship: typeof resources.getMusicVideoRelationship;
   /**
-   * One view of a music video, such as `more-by-artist`, a page at a time.
+   * One view of a music video, such as `more-by-artist`, a page at a time. Its `next` link kept only its offset
+   * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
    *
    * @param id - The music video's id.
    * @param name - The view's name, one of the music video's as the type has them; Apple says whether there is such a
@@ -724,7 +728,8 @@ export interface tCatalogFunctions {
    */
   readonly getRecordLabels: typeof resources.getRecordLabels;
   /**
-   * One view of a record label, such as `latest-releases`, a page at a time.
+   * One view of a record label, such as `latest-releases`, a page at a time. Its `next` link kept only its offset
+   * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
    *
    * @param id - The record label's id.
    * @param name - The view's name, one of the record label's as the type has them; Apple says whether there is such a

@@ -54,6 +54,8 @@ export interface tSearchLibraryOptions extends tReadOptions<tLibrarySearchRespon
  * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
  * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
  * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
+ * Against the live API on 18 October 2026, the whole name of a song of three words or more found nothing, while
+ * the first word of it found the song.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -196,11 +198,14 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 
 /**
  * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
+ * Against the live API on 18 October 2026, a listener with no folder was answered with none: `data` was empty, and so
+ * was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot` was answered `404` by its id, and its
+ * `children` were the listener's playlists.
  *
  * @function
  * @param client - The listener's client to ask with.
  * @param options - What to send beside the folder.
- * @returns What Apple answered: the root folder under `data`.
+ * @returns What Apple answered: the root folder under `data`, which was empty for a listener with no folder.
  * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
  * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.

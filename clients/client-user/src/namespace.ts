@@ -819,6 +819,8 @@ export interface tUserFunctions {
    * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
    * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
    * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
+   * Against the live API on 18 October 2026, the whole name of a song of three words or more found nothing, while
+   * the first word of it found the song.
    *
    * @param term - What to search for, 1 to 256 characters.
    * @param options - The types to look for, which have to be given; how many of each to send and where to start; and what to send beside each.
@@ -880,9 +882,12 @@ export interface tUserFunctions {
   readonly addLibraryPlaylistTracks: typeof library.addLibraryPlaylistTracks;
   /**
    * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
+   * Against the live API on 18 October 2026, a listener with no folder was answered with none: `data` was empty, and so
+   * was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot` was answered `404` by its id, and its
+   * `children` were the listener's playlists.
    *
    * @param options - What to send beside the folder.
-   * @returns The root folder, out of `data`.
+   * @returns The root folder, out of `data`. A listener with no folder was answered with none, which this rejects.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
    * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.
