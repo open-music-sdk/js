@@ -1,21 +1,18 @@
 # Differences from Apple's documentation
 
 The types and validators are generated from Apple's documentation, and each client's tests hold every function
-to it: the method, the path, every documented parameter and the answer of each endpoint. Little has been run
-against the live API yet: one sign-in, through the CLI, and the requests around it. So what Apple does where its
-documentation is silent is mostly not known. This page lists, package by package, where the SDK differs from the
-documentation, and what it takes on trust.
+to it: the method, the path, every documented parameter and the answer of each endpoint. Where Apple's
+documentation is silent, the SDK has met the live API twice: the CLI's first sign-in on 16 October 2026, and its
+`check` on 18 October 2026, in one storefront, with the sign-in's questions run by hand in Firefox on Windows.
+This page lists, package by package, where the SDK differs from the documentation, what those runs settled, and
+what it still takes on trust. One run is one sample: what was seen once may not hold every day, in every storefront.
 
 ## [browser](./reference/@open-music-sdk/browser/)
 
-Sign-in runs Apple's own script, whose behaviour Apple doesn't fully document:
+Sign-in runs Apple's own script, whose behaviour Apple doesn't fully document. What the script throws is
+undocumented, so `createConnect` hands it on as it came.
 
-- What the script throws is undocumented, so `createConnect` hands it on as it came.
-- The script keeps a copy of the Music User Token in the browser's storage, under a key ending `media-user-token`
-  as seen on 10 October 2026. See the [security model](./concepts/security#in-a-page).
-
-The first live sign-in, on 16 October 2026, ran from the CLI's page on `localhost`, on Windows, in one browser.
-It settled these:
+The two runs, from the CLI's page on `localhost`, settled these:
 
 - Apple's sign-in takes a page on `http://localhost:<port>`, with a developer token bound to that origin, and the
   token it gives is one `userTokenIntake` accepts.
@@ -24,39 +21,57 @@ It settled these:
 - The window's icon comes from the page's `apple-music-app-icon` link, and shows once that is an HTTPS address.
 - The content security policy in [Sign a listener in](./guides/sign-in#_6-let-apple-s-script-through-your-security-headers)
   let everything the sign-in needed through.
+- A listener who declines, by closing Apple's window or by declining in it, makes the script's `authorize()`
+  reject, not answer with nothing: with an `Error` named `AUTHORIZATION_ERROR`, its `errorCode` the same and its
+  message `Unauthorized`. `connect()` takes that for a decline, and resolves to `undefined`.
+- The script keeps its copy of the Music User Token in `localStorage`, under `music.<your team id in small
+  letters>.media-user-token`, beside two short keys of the same prefix, `itre` and `itua`. It kept nothing in
+  cookies, IndexedDB or Cache Storage. See the [security model](./concepts/security#in-a-page).
+- `disconnect()`, which runs the script's own sign-out, ends the token at Apple, and with it a copy your server
+  stored: Apple refused the token as soon as the sign-out was done, and five minutes later.
 
 These are still open:
 
 - how sign-in goes in other browsers, Safari first, and on macOS and Linux, including whether loading the script
-  ahead of the click keeps the window inside the click everywhere;
-- whether a listener who declines is the script answering with nothing, or a rejection, and with what;
-- what a configured instance holds for a returning listener, and whether it takes a new developer token;
+  ahead of the click keeps the window inside the click everywhere, and where they keep the script's copy;
+- what a configured instance holds for a returning listener on a page that keeps the script's copy, and whether it
+  takes a new developer token. On the CLI's page, which clears that copy, it held no token, and Apple's window
+  asked again as it did the first time;
 - whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event;
-- where else Apple's script keeps its copy of the token, beside the storage key seen above: whether in cookies,
-  which on `localhost` every port shares, or in IndexedDB;
 - whether a `Cross-Origin-Opener-Policy` of `same-origin` cuts the sign-in window off, as expected, where
   `same-origin-allow-popups` keeps it;
-- whether `disconnect()`, which runs the script's own sign-out, also ends the token at Apple, and with it a copy
-  your server stored;
 - whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
   token.
 
 ## [cli](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)
 
-The CLI's `login` is where the first live sign-in above ran, and its `doctor` asked both its questions of the live
-API, `GET /v1/test` and `GET /v1/me/storefront`. Still open for the CLI itself:
+The CLI's `login` is where the sign-ins above ran, and its `check` asked the live API everything it asks, reads and
+writes, on 18 October 2026: its findings are in the sections below, by package. `open-music-sdk check` asks it all
+again, and `open-music-sdk check <name>` one question, to see whether it still holds.
+
+Settled for the CLI itself:
+
+- What the page puts back after a sign-in, cookies, `localStorage` and `sessionStorage`, covers where the script
+  kept its copy in Firefox.
+- With `--port` fixed and a second `login`, the page restores nothing for a returning listener: Apple asks again.
+
+Still open:
 
 - how `login` goes in other browsers, and on macOS and Linux;
-- whether Apple's script keeps a copy where the page doesn't look: the page puts back cookies, `localStorage` and
-  `sessionStorage` after a sign-in, not IndexedDB;
-- with `--port` fixed and a second `login`, what the page restores for a returning listener;
 - whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
   token;
 - whether a browser ever asks for the page twice of its own accord, which the one-time address would turn away.
 
-`check`, the CLI's live checks of what Apple documents and what it doesn't, comes next.
-
 ## [client-catalog](./reference/@open-music-sdk/client-catalog/)
+
+Against the live API on 18 October 2026:
+
+- A search's `next` link answers with results by type, as the search does, not with a page, so `paginate` stops
+  after the first page. The link keeps the term and the types, and leaves out `limit`.
+- A chart's `next` link answers with charts by type as well, and keeps the types and the limit.
+- 25 ISRCs gave 663 songs in one page, with no `next`, even asked for one to a page.
+
+Where it differs from the documentation:
 
 - Every function takes the same options, so most take some that their endpoint isn't documented with: `limit` and
   `offset` where resources are asked for by id or by a filter, `offset` on a relationship or a view, and
@@ -73,17 +88,25 @@ API, `GET /v1/test` and `GET /v1/me/storefront`. Still open for the CLI itself:
 
 ## [client-user](./reference/@open-music-sdk/client-user/)
 
-What Apple answers for a rating that was never set, or for ids it has no rating of, isn't known. Neither is how
-long an addition takes to show: `addToLibrary` and `addToFavorites` resolve once Apple has accepted the request,
-which is before the resources appear.
+Against the live API on 18 October 2026:
+
+- A song never rated is answered `404`, so `getSongRating` rejects with an `ApiError` of status `404`. The ratings
+  of several songs leave out those never rated. The other types of rating are taken to answer the same way.
+- `listRecentlyPlayed` and `listRecentlyPlayedTracks` answer without `types`, with what was played, as they do with
+  every type named.
+- `addToLibrary` took a song, an album, a catalog playlist and a music video, and each showed in the library
+  within 4 seconds. The catalog playlist's songs didn't go into the library with it.
+- `addToFavorites` gave the song a rating of 1 at once, as a like does, and put it in the library.
+
+Where it differs from the documentation:
 
 - Every function takes the same options, so most take some that their endpoint isn't documented with: `limit` and
   `offset` where resources are asked for by id or by a filter, `offset` on a relationship, `include` and `extend`
   on a search, and all four on a write and on `listRecentlyAdded`, which are documented with `language` alone. An
   option you give is sent, and Apple decides what to make of it.
 - `types` is optional for `listRecentlyPlayed` and `listRecentlyPlayedTracks`. The documentation marks it as
-  required, while its own example asks without one and its sample answer holds several types. A call without it
-  is sent as it is.
+  required, while its own example asks without one and its sample answer holds several types, and Apple answers
+  without it.
 - `getUserStorefront` resolves to a `tStorefrontsResponse`. The documentation names a collection of any resource
   as its answer, and what that holds is the listener's storefront.
 - `delete<X>Rating`, `addToLibrary` and `addToFavorites` resolve to nothing. The documentation names an empty
@@ -91,9 +114,10 @@ which is before the resources appear.
 - `addLibraryPlaylistTracks` resolves to nothing as well. The documentation names the playlist's tracks as its
   answer, for a `204`, which is a success with no body.
 - `addToLibrary` and `addToFavorites` take ids of any type. The documentation lists no types for either, so a
-  type is any name that could be one, and Apple says whether it is.
+  type is any name that could be one, and Apple says whether it is. The library took each of `songs`, `albums`,
+  `playlists` and `music-videos`.
 - The generated type for a playlist to create wants `tracks` and `parent` together under `relationships`, because
-  the documentation marks both as required there.
+  the documentation marks both as required there. Apple made one with neither.
 
 ## [lib-playlists](./reference/@open-music-sdk/lib-playlists/)
 
@@ -101,35 +125,39 @@ Apple documents making a library playlist, adding tracks to the end of one, and 
 documents that `filter[isrc]` takes 25 values at most, and that one ISRC may come back as several songs. It
 documents no way to take a track out, move one, or rename or delete a playlist, so this package can't do those.
 
-It takes these on trust:
+Against the live API on 18 October 2026, a playlist was made, given 300 tracks, read back and planned for again:
 
-- That a playlist's tracks can be asked for with `include=catalog`, and that each then carries its catalog song,
-  which is where the ISRC is. Where an answer has no such relationship, the package uses the id Apple puts under
-  `attributes.playParams.catalogId`. The documentation doesn't list that field, but Apple's answers carry it.
-- That a `next` link keeps what the first page was asked with. If it drops `include`, tracks after the first
-  hundred are read with their catalog id and without their ISRC.
-- That a `404` for the tracks of a playlist that exists means it has none. Before the package believes that, it
-  asks for the playlist once more, with `include=tracks`. A playlist that then shows a track isn't empty, and the
-  `404` is what the verb rejects with. A playlist wrongly taken for empty would have everything it holds added
-  again.
-- That a playlist asked for with `include=tracks` carries its first tracks, which is what a `404` for its tracks
-  is checked against.
-- That a track added by its catalog id is then held under that id. `plan` goes by it. If the library answers with
-  another id for the same recording, the track will look missing.
-- How long a write takes to show, which the defaults of `settle` are a guess at.
-- How many tracks one request takes. `chunk` is held to 300 because that's the most the client's function takes.
-- That a playlist's name and description come back as they were sent, which finding a playlist by them needs. If
-  Apple changes either, a playlist a run made is never found again by its plan: the run resolves with
-  `verified: false`, and the `id` it resolved with is the way back to the playlist.
+- A playlist's tracks asked for with `include=catalog` carry their catalog song, which is where the ISRC is. A
+  track with none had a catalog id under `attributes.playParams.catalogId`, which the documentation doesn't list
+  and the package reads instead.
+- A `next` link of a playlist's tracks keeps nothing but its offset, so it drops `include`. `read` puts
+  `include=catalog` back on every link, which gives the tracks after the first hundred their catalog songs again.
+- The tracks of a playlist with none are answered `404`, and `read` takes it for empty. A playlist with tracks,
+  asked for with `include=tracks`, carries them, which is what a `404` for its tracks is checked against.
+- A track added by its catalog id is held under that id: 300 of 300, in the order they were added.
+- A new playlist could be read by its id at once, and was among the listener's playlists after 4 seconds. 300
+  tracks added to it showed after 2. `settle` gives a write ten reads a second apart.
+- One request took 300 tracks, which `chunk` defaults to.
+- A playlist's name and description came back as they were sent, and `apply` with the same plan found the
+  playlist and added nothing.
+
+It still takes these on trust:
+
+- That a write shows as soon on another day, with a larger library, or in another storefront. If a playlist a run
+  made isn't listed within `settle`'s reads, the run resolves with `verified: false`, and a run of the same plan
+  before it is listed makes a second one.
+- That a `404` for the tracks of a playlist that exists always means it has none. The package still asks for the
+  playlist once more, with `include=tracks`, before it believes that.
+- How many real tracks the exact-match rule of `resolve`'s search misses.
 
 ## [lib-preview-player](./reference/@open-music-sdk/lib-preview-player/)
 
 Apple documents that a song and a music video have `previews`, each with a `url`, and that a preview may be
 available with or without an Apple Music subscription.
 
-It doesn't document which host the clips are served from. The host the player's errors name as an example,
-`itunes.apple.com`, is a guess from clips seen on `audio-ssl.itunes.apple.com`, and hasn't been checked against
-the live API. Look at what your own answers hold before you set `hosts`.
+It doesn't document which host the clips are served from. Against the live API on 18 October 2026, the clips of
+50 chart songs in one storefront were all on `audio-ssl.itunes.apple.com`, which `hosts: ["itunes.apple.com"]`
+allows. Apple may serve others elsewhere: look at what your own answers hold before you set `hosts`.
 
 Nothing here has been run in a browser against a clip from the live API. The player takes on trust how browsers
 behave: that the first sound may follow a click, that one clip may follow another on the same element without a
@@ -147,6 +175,10 @@ signed in or has no Apple Music subscription. The answer doesn't say which. So a
 makes one more request with the developer token alone, `GET /v1/test`. If Apple accepts it, the listener was the
 problem, and the error is `UserTokenInvalid`. If that request fails in any way, its error is the one you get.
 
+A token Apple never gave was answered `403`, which `validateUserToken` calls `UserTokenInvalid`, against the live
+API on 18 October 2026. A token after the script's sign-out came out as `UserTokenInvalid` too. What an expired
+token is answered isn't known.
+
 ## [util-artwork](./reference/@open-music-sdk/util-artwork/)
 
 Apple's reference documents `{w}x{h}` in an artwork template, and nothing else. The rest is what Apple's own pages
@@ -159,6 +191,9 @@ and image server were seen to do when the package was written:
 - the crop codes, such as `bb`, `cc` and `sr`, and how each one fills or fits the box. They're undocumented, so
   the package accepts any code of the right shape.
 - the limit of 10,000 pixels a side.
+
+Against the live API on 18 October 2026, the 200 artwork templates of one storefront's charts all named their crop
+and format, with `{w}` and `{h}` their only placeholders, and were all on `mzstatic.com`.
 
 ## [types](./reference/@open-music-sdk/types/)
 

@@ -49,22 +49,25 @@ function trackOf(fn: string, track: unknown): tPlaylistSnapshotTrack {
 /**
  * The playlist with `id`, read whole. For a verb that has already checked what it was handed: `report` is told how
  * many tracks have been read after each page of them, and the total is not known until the last page. The first
- * page of tracks is asked for by the client's function, and the rest by the links Apple gives.
+ * page of tracks is asked for by the client's function, and the rest by the links Apple gives, each with its catalog
+ * songs asked for again, since Apple's links leave that out.
  */
 export async function taken(client: tAppleMusicClient, id: string, walk: tWalk, report: (done: number, total: undefined) => void = () => undefined): Promise<tPlaylistSnapshot> {
   const { fn, signal } = walk;
   const playlist = await getLibraryPlaylist.bound(client)(id, { signal });
   const { name, description, canEdit } = held(held(playlist).attributes);
   const tracks: tPlaylistSnapshotTrack[] = [];
+  const include = ["catalog"];
   try {
-    for await (const page of pagesOf(client, () => getLibraryPlaylistRelationship(client, id, "tracks", { include: ["catalog"], signal }), walk)) {
+    for await (const page of pagesOf(client, () => getLibraryPlaylistRelationship(client, id, "tracks", { include, signal }), { ...walk, include })) {
       for (const track of page) tracks.push(trackOf(fn, track));
       if (page.length > 0) report(tracks.length, undefined);
     }
   } catch (error) {
     if (!(tracks.length === 0 && isAppleMusicError(error, "ApiError") && error.status === 404)) throw error;
     // The playlist is there: it was just read. A 404 for its tracks before any of them came is taken to mean it
-    // has none, which Apple's documentation does not say. So the playlist is asked once more, with its tracks,
+    // has none, which Apple's documentation does not say, though a new playlist with no tracks was answered so
+    // against the live API on 18 October 2026. So the playlist is asked once more, with its tracks,
     // and has to bear that out: a playlist that then shows a track is not empty, and the 404 stands. What is read
     // here decides what `apply` adds, and a playlist wrongly taken for empty would have all of it added again.
     const again = await getLibraryPlaylist.bound(client)(id, { include: ["tracks"], signal });

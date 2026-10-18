@@ -14,11 +14,12 @@ import { pagesOf, type tWalk } from "./walk";
 
 /**
  * How long a write is given to show in a read. Apple takes a write in and carries it out afterwards, so a read made
- * at once may not show it. The defaults are a guess: how long a write takes to show has not been measured against
- * the live API.
+ * at once may not show it. The defaults come from one run against the live API, on 18 October 2026: a new playlist
+ * could be read by its id at once and was among the listener's playlists after 4 seconds, and 300 tracks added to it
+ * showed after 2. Ten reads a second apart leave room for a slower day than that one.
  */
 export interface tSettleOptions {
-  /** How many times the playlist is read before what was written is taken not to show: a whole number from 1. Default 5. */
+  /** How many times the playlist is read before what was written is taken not to show: a whole number from 1. Default 10. */
   readonly tries?: number | undefined;
   /** How long to wait between one such read and the next, in milliseconds. Default 1000. */
   readonly waitMs?: number | undefined;
@@ -26,7 +27,10 @@ export interface tSettleOptions {
 
 /** The options of `apply`. */
 export interface tApplyOptions extends tAskOptions, tPaceOptions, tLimitOptions {
-  /** How many tracks go in one request: a whole number from 1 to 300, the most the client's function takes. Default 100. */
+  /**
+   * How many tracks go in one request: a whole number from 1 to 300, the most the client's function takes. Default
+   * 300, which one request took against the live API on 18 October 2026.
+   */
   readonly chunk?: number | undefined;
   /** How long a write is given to show in a read. */
   readonly settle?: tSettleOptions | undefined;
@@ -53,7 +57,7 @@ const FN = "playlists.apply";
 const OPTIONS = "an options object";
 /** The most tracks the client's function takes in one request. */
 const MAX_CHUNK = 300;
-const DEFAULTS = { chunk: 100, tries: 5, waitMs: 1000 } as const;
+const DEFAULTS = { chunk: MAX_CHUNK, tries: 10, waitMs: 1000 } as const;
 
 /**
  * Whether an error leaves open if Apple carried the write out: the answer was lost, Apple failed part way, or Apple

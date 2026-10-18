@@ -100,7 +100,8 @@ export const getLibraryResources = /*#__PURE__*/ endpoint("getLibraryResources",
 
 /**
  * Ids by type of catalog resource, such as `{ songs: ["1"], albums: ["2"] }`. Apple does not list the types a
- * library or the favorites take, so a type is any name here, and Apple says whether it is one.
+ * library or the favorites take, so a type is any name here, and Apple says whether it is one. The library took each
+ * of the four named here against the live API on 18 October 2026.
  */
 export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "playlists" | "songs", readonly string[] | undefined>> & Record<string, readonly string[] | undefined>>;
 
@@ -108,7 +109,7 @@ export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "pla
 export type tAddOptions = tReadOptions<void>;
 
 /**
- * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+ * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -126,7 +127,7 @@ export const addToLibrary = /*#__PURE__*/ endpoint("addToLibrary", "written", (_
 });
 
 /**
- * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+ * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song made a favorite had a rating of 1 at once, as a like does, and was put in the library too.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -244,7 +245,7 @@ export const listHeavyRotation = /*#__PURE__*/ resourceLister<tPaginatedResource
 
 /** The option of `listRecentlyPlayed`: which types of what was played. */
 export interface tRecentlyPlayedTypesOption {
-  /** The types of resource to keep to, such as `["albums", "playlists"]`. Apple's documentation says to name one at least. */
+  /** The types of resource to keep to, such as `["albums", "playlists"]`. Apple's documentation says to name one at least, though Apple answered without it, against the live API on 18 October 2026, with what it does with all of them. */
   readonly types?: readonly ("albums" | "artists" | "curators" | "library-albums" | "library-playlists" | "playlists" | "stations")[] | undefined;
 }
 
@@ -264,7 +265,7 @@ export const listRecentlyPlayed = /*#__PURE__*/ resourceLister<tPaginatedResourc
 
 /** The option of `listRecentlyPlayedTracks`: which types of track. */
 export interface tRecentlyPlayedTrackTypesOption {
-  /** The types of track to keep to, such as `["songs"]`. Apple's documentation says to name one at least. */
+  /** The types of track to keep to, such as `["songs"]`. Apple's documentation says to name one at least, though Apple answered without it, against the live API on 18 October 2026, with what it does with all of them. */
   readonly types?: readonly ("library-music-videos" | "library-songs" | "music-videos" | "songs")[] | undefined;
 }
 

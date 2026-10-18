@@ -6,7 +6,7 @@ const WALK: tWalk = { fn: "playlists.read", signal: undefined, maxPages: undefin
 
 /** A client that answers each link from a table of pages, and records what it was asked. */
 function linked(pages: Record<string, unknown>) {
-  const request = vi.fn((path: string) => Promise.resolve(pages[path]));
+  const request = vi.fn<(path: string, init?: unknown) => Promise<unknown>>((path) => Promise.resolve(pages[path]));
   return { request, client: { request, paginate: vi.fn(), storefront: vi.fn() } as unknown as tAppleMusicClient };
 }
 
@@ -35,7 +35,22 @@ describe("pagesOf", () => {
     const { signal } = new AbortController();
     const { client, request } = linked({ "/next": { data: [] } });
     await all(pagesOf(client, () => Promise.resolve({ data: [], next: "/next" }), { ...WALK, signal }));
-    expect(request).toHaveBeenCalledWith("/next", { signal });
+    expect(request).toHaveBeenCalledWith("/next", expect.objectContaining({ signal }));
+  });
+
+  test("what the first page was asked to include is asked for again with every page after it, and nothing where it named none", async () => {
+    const { client, request } = linked({ "/2": { data: [], next: "/3" }, "/3": { data: [] } });
+    await all(pagesOf(client, () => Promise.resolve({ data: [], next: "/2" }), { ...WALK, include: ["catalog"] }));
+    expect(request.mock.calls.map(([, init]) => init)).toEqual([
+      { signal: undefined, params: { include: ["catalog"] } },
+      { signal: undefined, params: { include: ["catalog"] } },
+    ]);
+    request.mockClear();
+    await all(pagesOf(client, () => Promise.resolve({ data: [], next: "/2" }), WALK));
+    expect(request.mock.calls.map(([, init]) => init)).toEqual([
+      { signal: undefined, params: { include: undefined } },
+      { signal: undefined, params: { include: undefined } },
+    ]);
   });
 
   test.each<[string, unknown]>([

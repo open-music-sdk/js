@@ -1,4 +1,4 @@
-// The four commands. What a command produces goes to stdout (the token, the doctor's report); everything said to
+// The commands, but `check`, which has a file of its own. What a command produces goes to stdout (the token, the doctor's report); everything said to
 // the person running it goes to stderr, so a pipe gets the one and the terminal still shows the other.
 import { join } from "node:path";
 import { styleText } from "node:util";
@@ -13,7 +13,7 @@ export const NAME = "open-music-sdk";
 const USER_ID = "default";
 const TOKEN_FILE = "user-token.json";
 /** How long a question to Apple may take, retries and all. */
-const TIMEOUT_MS = 30_000;
+export const TIMEOUT_MS = 30_000;
 /** How long `login` waits for the sign-in. */
 const WAIT_MS = 5 * 60_000;
 
@@ -29,12 +29,13 @@ export interface tFlags extends tKeyFlags {
   readonly port?: string | undefined;
   readonly browser?: boolean | undefined;
   readonly developer?: boolean | undefined;
+  readonly write?: boolean | undefined;
 }
 
 type tFormat = Parameters<typeof styleText>[0];
 export const paint = (ctx: tContext, format: tFormat, text: string, stream: NodeJS.WriteStream): string => (ctx.color ? styleText(format, text, { stream }) : text);
-const out = (line: string) => process.stdout.write(`${line}\n`);
-const say = (line: string) => process.stderr.write(`${line}\n`);
+export const out = (line: string) => process.stdout.write(`${line}\n`);
+export const say = (line: string) => process.stderr.write(`${line}\n`);
 
 /** The one file the CLI keeps: the token. */
 const tokenFile = (env: tEnv) => join(configDir(env), TOKEN_FILE);
@@ -157,8 +158,18 @@ export async function login(flags: tFlags, ctx: tContext): Promise<number> {
   return 0;
 }
 
-/** Asks Apple whether the key works, and then whether the kept token does, which tells the two causes of a 401 apart. */
-export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
+/** What `doctor` learns: the key, and the kept token Apple takes, for the listener's storefront. */
+export interface tExamined {
+  readonly key: tKey;
+  readonly token: string;
+  readonly storefront: string;
+}
+
+/**
+ * Asks Apple whether the key works, and then whether the kept token does, which tells the two causes of a 401 apart,
+ * with a line on stdout for each. Resolves to what it learnt, or to undefined once either has failed and said why.
+ */
+export async function examine(flags: tFlags, ctx: tContext): Promise<tExamined | undefined> {
   const key = await loadKey(flags, ctx.env, ctx.terminal);
   const music = serverClient(key);
   const pass = (line: string) => out(`${paint(ctx, "green", "✓", process.stdout)} ${line}`);
@@ -173,24 +184,29 @@ export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
     if (why === undefined) throw e;
     fail(`Key: ${why}`);
     out(`- Music User Token: not asked about, since the key's own question failed.`);
-    return 1;
+    return undefined;
   }
 
   const token = await new FileUserTokenStore(tokenFile(ctx.env)).get(USER_ID);
   if (token === undefined) {
     fail(`Music User Token: none is kept. Run '${NAME} login' to sign in.`);
-    return 1;
+    return undefined;
   }
   try {
     const storefront = await validateUserToken(music, token, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     pass(`Music User Token: Apple takes it, for storefront ${printable(storefront)}.`);
-    return 0;
+    return { key, token, storefront };
   } catch (e) {
     const why = describe(e);
     if (why === undefined) throw e;
     fail(`Music User Token: ${why}`);
-    return 1;
+    return undefined;
   }
+}
+
+/** Asks Apple whether the key works, and then whether the kept token does, which tells the two causes of a 401 apart. */
+export async function doctor(flags: tFlags, ctx: tContext): Promise<number> {
+  return (await examine(flags, ctx)) === undefined ? 1 : 0;
 }
 
 /** Prints the kept token, or with `--developer` mints a developer token and prints that. */

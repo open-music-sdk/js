@@ -37,6 +37,8 @@ do for you yet:
   token from your key instead, which lives an hour.
 - `doctor` asks Apple whether your key works, then whether the kept token does. A `401` can mean either, and this
   tells them apart. It prints nothing secret.
+- `check` asks the live API, as you, what the SDK takes on trust about it, and prints what Apple did. With
+  `--write` it also makes a playlist and adds to your library, and ends with the steps that remove what it added.
 - `logout` forgets the kept token.
 
 It reads your key and its IDs from `APPLE_MUSIC_PRIVATE_KEY`, `APPLE_MUSIC_TEAM_ID` and `APPLE_MUSIC_KEY_ID`, the

@@ -97,7 +97,8 @@ export interface tHeld {
 /**
  * Which of the `wanted` tracks a playlist that holds `held` is missing. A wanted track is held when one of the
  * playlist's tracks has its id, as its catalog id or as its own. Each held track answers for one wanted track at
- * most, so a song wanted twice and held once is missing once.
+ * most, so a song wanted twice and held once is missing once. A track added by its catalog id is held under that
+ * id: against the live API on 18 October 2026, each of 300 came back so, in the order they were added.
  *
  * `reordered` says whether the wanted tracks will be in another order than wanted once the missing ones are at the
  * end: some are held in another order, or one that is missing is wanted before one that is held.

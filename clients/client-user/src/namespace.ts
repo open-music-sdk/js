@@ -373,7 +373,8 @@ export interface tUserFunctions {
    */
   readonly getPersonalRecommendationRelationship: typeof resources.getPersonalRecommendationRelationship;
   /**
-   * The listener's rating of the song with an id.
+   * The listener's rating of the song with an id. A song the listener never rated is answered 404, an `ApiError`, as it
+   * was against the live API on 18 October 2026.
    *
    * @param id - The song's id.
    * @param options - The language to answer in, and what else to send with the request.
@@ -385,7 +386,8 @@ export interface tUserFunctions {
    */
   readonly getSongRating: typeof ratings.getSongRating;
   /**
-   * The listener's ratings of the songs with the ids given.
+   * The listener's ratings of the songs with the ids given. Songs the listener never rated are left out, as they were
+   * against the live API on 18 October 2026.
    *
    * @param ids - The songs' ids, 1 to 300 of them.
    * @param options - The language to answer in, and what else to send with the request.
@@ -840,7 +842,7 @@ export interface tUserFunctions {
    */
   readonly getLibraryResources: typeof library.getLibraryResources;
   /**
-   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
    *
    * @param ids - The ids of the catalog resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
@@ -852,7 +854,7 @@ export interface tUserFunctions {
    */
   readonly addToLibrary: typeof library.addToLibrary;
   /**
-   * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards.
+   * Adds resources to the listener's favorites, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song made a favorite had a rating of 1 at once, as a like does, and was put in the library too.
    *
    * @param ids - The ids of the resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.

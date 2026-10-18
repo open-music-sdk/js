@@ -101,8 +101,9 @@ button.onclick = async () => {
 
 `connect()` opens Apple's sign-in window and resolves to the listener's Music User Token.
 
-When Apple's script answers with nothing, `connect()` resolves to `undefined`, which the SDK takes for a decline.
-Leave the listener signed out.
+When the listener declines, or closes Apple's window, `connect()` resolves to `undefined`. Leave the listener
+signed out. Apple's script rejects with an error named `AUTHORIZATION_ERROR` then, as it did in Firefox on 18
+October 2026, and `connect()` takes that, or an answer of nothing, for a decline.
 
 Anything else Apple's script throws reaches you as it came. Its shape is Apple's and isn't documented, so show
 it to the listener, and never print it to a log where a token might end up.
@@ -114,8 +115,10 @@ signOutButton.onclick = () => void signIn.disconnect().catch(showWhyNot);
 ```
 
 `disconnect()` is Apple's own sign-out, run through the script. It ends the sign-in in the script and the copy of
-the token the script kept, so the next page load restores nothing. Forgetting the token in your page alone isn't
-a sign-out: the script would restore it on the next visit.
+the token the script kept, so the next page load restores nothing. It also ends the token at Apple, so a copy your
+server stored stops working too: tried against the live API on 18 October 2026, Apple refused the token as soon as
+the sign-out was done. Forgetting the token in your page alone isn't a sign-out: the script would restore it on the
+next visit.
 
 `disconnect()` does nothing where Apple's script has no sign-out function, or where the page holds no
 configuration, as after a `ready` that failed.

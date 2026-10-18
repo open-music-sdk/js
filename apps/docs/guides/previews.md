@@ -210,8 +210,10 @@ const player = previewPlayer<tSong>({ hosts: ["itunes.apple.com"] });
 hosts or a subdomain of one, with no port and no credentials, is skipped with the reason `"host"`. Without it,
 where a clip points isn't checked at all.
 
-Apple doesn't document which host serves the clips, so `itunes.apple.com` is
-[a guess](../differences#lib-preview-player). Look at what your own answers hold before you set `hosts`.
+Apple doesn't document which host serves the clips. Against the live API on 18 October 2026, the clips of 50
+chart songs were all on `audio-ssl.itunes.apple.com`, which `itunes.apple.com` allows: see
+[Differences from Apple's documentation](../differences#lib-preview-player). Look at what your own answers hold
+before you set `hosts`.
 
 `previewPlayer` checks `audio` and `hosts` when it makes the player, so a mistake in either is a `TypeError`
 then, not on the first click. Changing your options object afterwards changes nothing.

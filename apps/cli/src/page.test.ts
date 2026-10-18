@@ -132,10 +132,14 @@ describe("the sign-in page", () => {
     asBefore();
   });
 
-  test("a sign-in the listener cancels posts nothing, leaves the origin as it was, and lets them try again", async () => {
+  test.each<[string, () => Promise<undefined>]>([
+    // As Apple's script did in Firefox on 18 October 2026, the listener declining or closing its window.
+    ["rejecting with its AUTHORIZATION_ERROR", () => Promise.reject(Object.assign(new Error("Unauthorized"), { name: "AUTHORIZATION_ERROR", errorCode: "AUTHORIZATION_ERROR" }))],
+    ["answering with nothing", () => Promise.resolve(undefined)],
+  ])("a sign-in the listener cancels, the script %s, says so, posts nothing, leaves the origin as it was, and lets them try again", async (_how, cancel) => {
     authorize = () => {
       keepCopies();
-      return Promise.resolve(undefined);
+      return cancel();
     };
     await ready();
     button().click();
@@ -182,8 +186,8 @@ describe("the sign-in page", () => {
     ["an Error, by its message", new Error("popup blocked"), "popup blocked"],
     ["an Error with no message, by its name", new TypeError(), "TypeError"],
     // Apple's script rejects with an object of its own, whose shape is undocumented.
-    ["the object Apple's script rejects with, by its message", { errorCode: "AUTHORIZATION_ERROR", message: "Unauthorized" }, "Unauthorized"],
-    ["such an object with no message, by its code", { errorCode: "AUTHORIZATION_ERROR" }, "AUTHORIZATION_ERROR"],
+    ["the object Apple's script rejects with, by its message", { errorCode: "UNAUTHORIZED_ERROR", message: "Unauthorized" }, "Unauthorized"],
+    ["such an object with no message, by its code", { errorCode: "UNAUTHORIZED_ERROR" }, "UNAUTHORIZED_ERROR"],
     ["anything else, as text", "popup blocked", "popup blocked"],
   ])("a sign-in that fails with %s says so, leaves the origin as it was, and lets them try again", async (_kind, reason, shown) => {
     authorize = () => {
