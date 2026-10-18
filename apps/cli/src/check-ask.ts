@@ -5,6 +5,7 @@ import {
   addToLibrary,
   createLibraryPlaylist,
   getAlbumRating,
+  getAlbumRelationship,
   getMusicVideoRating,
   getSongRating,
   getSongRelationship,
@@ -383,9 +384,37 @@ async function rated(run: tRun, type: tAddedType, id: string): Promise<boolean> 
   }
 }
 
-/** The first of the first five that is neither in the library nor rated. */
+/** The tracks of a catalog album, songs and music videos: what deleting the album from the library takes with it. */
+export async function tracksOf(run: tRun, album: string): Promise<readonly unknown[]> {
+  try {
+    // ponytail: the first page alone, a hundred tracks; an album of more is rare, and its later tracks go unchecked.
+    return list(at(await getAlbumRelationship(run.music, album, "tracks", { signal: run.signal }), "data"));
+  } catch (e) {
+    notFound(e);
+    return [];
+  }
+}
+
+/**
+ * Whether the listener holds any of these tracks: an album they hold in part may not count as held, and deleting it
+ * from the library, as a cleanup step would, takes their tracks with it.
+ */
+export async function anyHeld(run: tRun, tracks: readonly unknown[]): Promise<boolean> {
+  for (const track of tracks) {
+    const id = idOf(track);
+    const type = at(track, "type");
+    if (id !== undefined && (type === "songs" || type === "music-videos") && (await inLibrary(run, { type, id }))) return true;
+  }
+  return false;
+}
+
+/** The first of the first five that is neither in the library nor rated, and, for an album, none of whose tracks is either. */
 async function unheld(run: tRun, type: tAddedType, items: readonly tItem[]): Promise<tItem | undefined> {
-  for (const item of items.slice(0, 5)) if (!(await inLibrary(run, item)) && !(await rated(run, type, item.id))) return item;
+  for (const item of items.slice(0, 5)) {
+    if ((await inLibrary(run, item)) || (await rated(run, type, item.id))) continue;
+    if (type === "albums" && (await anyHeld(run, await tracksOf(run, item.id)))) continue;
+    return item;
+  }
   return undefined;
 }
 

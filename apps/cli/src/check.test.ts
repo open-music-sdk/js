@@ -2145,6 +2145,34 @@ describe("createLibraryPlaylistFolder: a folder made, read back, and its parent 
   });
 });
 
+describe("an album is added, or its songs, only when the listener holds none of its tracks: deleting it takes every track with it", () => {
+  test("an album one of whose songs the listener holds is not the one added", async () => {
+    apple.library.add("songs/a1t3");
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).not.toContain('"Name of a1"');
+    expect(cleanupOf()).toContain('- the album "Name of a2" by Artist of a2, with its songs');
+  });
+
+  test("an album one of whose music videos the listener holds gives the playlist no songs, and is not among the albums to delete", async () => {
+    apple.library.add("music-videos/a1v");
+    await main(["check", "playlist", "--write", "--no-color"]);
+    expect(cleanupOf()).not.toContain('"Name of a1"');
+    expect(cleanupOf()).toContain('"Name of a26"');
+  });
+
+  test("an album whose tracks Apple answers 404 for has none of them held", async () => {
+    apple.failing["/v1/catalog/gb/albums/a1/tracks"] = 404;
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).toContain('- the album "Name of a1" by Artist of a1, with its songs');
+  });
+
+  test("a track with no id, or of no type a library holds, is none the listener holds", async () => {
+    apple.answers["/v1/catalog/gb/albums/a1/tracks"] = { data: [{ type: "songs" }, { id: "x1", type: "stations" }] };
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(cleanupOf()).toContain('- the album "Name of a1" by Artist of a1, with its songs');
+  });
+});
+
 describe("add-to-library, as the sweep's own additions are made", () => {
   test("an album counts as in the library once one song of it is, or does not, and either is said", async () => {
     apple.partlyHeldCounts = true;

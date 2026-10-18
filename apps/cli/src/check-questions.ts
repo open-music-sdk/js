@@ -7,7 +7,6 @@ import {
   addToFavorites,
   artworkUrl,
   createLibraryPlaylist,
-  getAlbumRelationship,
   getLibraryPlaylist,
   getLibraryPlaylistRelationship,
   getPlaylistRelationship,
@@ -27,6 +26,7 @@ import {
   ORIGIN,
   SETTLE_S,
   added,
+  anyHeld,
   apples,
   at,
   brief,
@@ -47,6 +47,7 @@ import {
   someOf,
   text,
   took,
+  tracksOf,
   tokenRefusal,
   type tAdded,
   type tItem,
@@ -455,17 +456,20 @@ interface tAlbumSong {
   readonly album: tItem;
 }
 
-/** Up to `MOST_TRACKS` songs from the charts' albums that are not in the library, each with its album. */
+/**
+ * Up to `MOST_TRACKS` songs from the charts' albums of which the listener holds nothing, neither the album nor any of
+ * its tracks, each with its album: the cleanup may say to delete those albums, which takes every track with them.
+ */
 async function albumSongs(run: tRun): Promise<readonly tAlbumSong[]> {
   const songs = new Map<string, tAlbumSong>();
   for (const album of (await run.charts()).albums) {
     if (songs.size >= MOST_TRACKS) break;
     if (await inLibrary(run, album)) continue;
+    const all = await tracksOf(run, album.id);
+    if (await anyHeld(run, all)) continue;
     // Songs that can be played, which a song not yet out or no longer to be streamed cannot: Apple may refuse to add
     // one, and the request it was in would be taken for one too large.
-    const tracks = list(at(await getAlbumRelationship(run.music, album.id, "tracks", { signal: run.signal }), "data")).filter(
-      (track) => at(track, "type") === "songs" && at(track, "attributes", "playParams") !== undefined,
-    );
+    const tracks = all.filter((track) => at(track, "type") === "songs" && at(track, "attributes", "playParams") !== undefined);
     for (const id of tracks.map(idOf).filter(defined)) if (!songs.has(id)) songs.set(id, { id, album });
   }
   return [...songs.values()].slice(0, MOST_TRACKS);
