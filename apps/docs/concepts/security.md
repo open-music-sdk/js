@@ -252,6 +252,9 @@ Both tokens are sent only to Apple, and the Music User Token only where it's nee
 - Credentials only go to `https://api.music.apple.com`. `core` refuses a path that resolves anywhere else, such
   as an absolute URL, a scheme-relative one or a downgrade to `http`, with a `TypeError`. It does so before a
   token is asked for or a request is made.
+- An answer can't send a request on. `core` refuses a redirect, which fails as a `NetworkError`. Followed, a
+  redirect to another origin would lose the developer token, but `fetch` would send the Music User Token on with
+  it, and to an `http` address in the clear.
 - The Music User Token goes only where the listener's things are. By default it's sent under `/v1/me` and
   nowhere else. No function of `client-catalog` sends it, whichever client it's handed and wherever a `next` link
   points. Every function of `client-user` does. [Which requests send which token](./tokens#which-requests-send-which-token)

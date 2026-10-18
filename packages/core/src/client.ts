@@ -198,8 +198,8 @@ export interface tAppleMusicClient {
    * @throws AppleMusicError, once the retries are over, with `_tag` `DeveloperTokenInvalid` when Apple answers 401;
    * `UserTokenInvalid` when Apple answers 403, or the path needs a Music User Token and the client has none;
    * `RateLimited` when Apple answers 429; `ApiError` on any other failing status, or a 2xx body that is not JSON;
-   * `ValidationError` when `init.schema` finds issues; `NetworkError` when `fetch` fails or the body cannot be read
-   * while `init.signal` has not fired. A `DeveloperTokenUnavailable` is never made here: it is a token provider's,
+   * `ValidationError` when `init.schema` finds issues; `NetworkError` when `fetch` fails, Apple answers with a
+   * redirect, which is not followed, or the body cannot be read while `init.signal` has not fired. A `DeveloperTokenUnavailable` is never made here: it is a token provider's,
    * passed on.
    * @throws The reason `init.signal` aborted with, when it does.
    * @throws Whatever a token provider, a user token store, a schema's `validate`, an `onRequest` or `onResponse` hook
@@ -413,7 +413,9 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       await options.rateLimit?.acquire(signal);
       if (user && userToken) headers.set("music-user-token", credential("userToken", await userToken({ signal })));
       if (body !== null) headers.set("content-type", "application/json");
-      const req = new Request(url, { method: init.method ?? "GET", headers, body, signal: signal ?? null });
+      // A redirect is refused, not followed: fetch drops `authorization` when one leaves the origin, but sends every
+      // other header on, the Music User Token too, and to an `http:` address in the clear.
+      const req = new Request(url, { method: init.method ?? "GET", headers, body, signal: signal ?? null, redirect: "error" });
       options.onRequest?.(req);
       let res: Response;
       try {
