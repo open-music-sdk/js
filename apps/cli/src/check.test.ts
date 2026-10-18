@@ -1865,6 +1865,14 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(pathsOf(asked).filter((path) => path.endsWith("/composers"))).toHaveLength(5);
   });
 
+  test("an answer of resources of any type holds each to its own type's validator: an album in what was played is held to an album's", async () => {
+    const album = item("albums", "r0");
+    (album.attributes as tBody).name = 7;
+    apple.answers["/v1/me/recent/played"] = { data: [album, { id: "x", type: "no-such-type" }] };
+    expect(await main(["check", "listRecentlyPlayed", "--no-color"])).toBe(1);
+    expect(rowsOf("listRecentlyPlayed")).toEqual(["≠ listRecentlyPlayed: types: albums attributes.name: expected string."]);
+  });
+
   test("a function asked by an id Apple gave in another answer, answered 404 for it, is ≠ at once: the request the SDK made may be wrong", async () => {
     apple.failing["/v1/catalog/gb/songs/s1"] = 404;
     expect(await main(["check", "getSong", "--no-color"])).toBe(1);

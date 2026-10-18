@@ -236,6 +236,47 @@ async function attempt<T>(a: tAsk, what: string, tries: readonly T[], call: (inp
 
 type tSchema<T> = schemas.tSchema<T>;
 
+/** The validator of a resource of each type an answer of resources of any type may hold. */
+const OF_TYPE: Readonly<Record<string, tSchema<unknown> | undefined>> = {
+  activities: schemas.activity,
+  albums: schemas.album,
+  "apple-curators": schemas.appleCurator,
+  artists: schemas.artist,
+  curators: schemas.curator,
+  genres: schemas.genre,
+  "library-albums": schemas.libraryAlbum,
+  "library-artists": schemas.libraryArtist,
+  "library-music-videos": schemas.libraryMusicVideo,
+  "library-playlists": schemas.libraryPlaylist,
+  "library-songs": schemas.librarySong,
+  "music-videos": schemas.musicVideo,
+  playlists: schemas.playlist,
+  "record-labels": schemas.recordLabel,
+  songs: schemas.song,
+  "station-genres": schemas.stationGenre,
+  stations: schemas.station,
+};
+
+/**
+ * A collection's validator that holds each resource in it to its own type's validator too: the collection's own
+ * asks only that each has an id and a type, so it would pass whatever else Apple sent.
+ */
+function eachOfItsType<T>(collection: tSchema<T>): tSchema<T> {
+  return {
+    ...collection,
+    "~standard": {
+      ...collection["~standard"],
+      validate: (value) => {
+        const issues = [...(collection["~standard"].validate(value).issues ?? [])];
+        list(at(value, "data")).forEach((resource, i) => {
+          for (const { path = [], message } of OF_TYPE[String(at(resource, "type"))]?.["~standard"].validate(resource).issues ?? []) issues.push({ message, path: ["data", i, ...path] });
+        });
+        return issues.length > 0 ? { issues } : { value: value as T };
+      },
+    },
+  };
+}
+
 /** A function asked with each of a seed's first five in turn. */
 const one = <T, R>(from: tSeed<T>, call: (a: tAsk, input: T) => Promise<R>, schema: tSchema<NoInfer<R>>, options: tOptions = {}): tRow => ({
   kind: "row",
@@ -406,7 +447,7 @@ export const CATALOG = {
     seen: (body) => list(at(body, "results", "suggestions")).length,
   }),
   getCharts: all(GENRES, (a, [genre]) => sdk.getCharts(a.music, { types: ["songs", "albums", "playlists", "music-videos"], genre, with: ["dailyGlobalTopCharts"], ...o(a) }), schemas.chartResponse),
-  getCatalogResources: all(SONGS, async (a, songs) => sdk.getCatalogResources(a.music, { songs, albums: await ALBUMS.get(a) }, o(a)), schemas.resourceCollectionResponse, GIVEN),
+  getCatalogResources: all(SONGS, async (a, songs) => sdk.getCatalogResources(a.music, { songs, albums: await ALBUMS.get(a) }, o(a)), eachOfItsType(schemas.resourceCollectionResponse), GIVEN),
   getLiveRadioStations: bare((a) => sdk.getLiveRadioStations(a.music, o(a)), schemas.stationsResponse),
   getLanguageTag: one(LANGUAGES, (a, tag) => sdk.getLanguageTag(a.music, [tag, "en"], o(a)), schemas.langageTagResponse, { seen: (body) => (text(at(body, "results", "tag")) === undefined ? 0 : 1) }),
 } satisfies Record<keyof tCatalogFunctions, tEntry>;
@@ -473,17 +514,17 @@ export const USER = {
     contents: schemas.personalRecommendationRelationshipsPersonalRecommendationContentsRelationship,
   }),
   searchLibrary: one(LIBRARY_TERMS, (a, term) => sdk.searchLibrary(a.music, term, { types: ["library-albums", "library-artists", "library-music-videos", "library-playlists", "library-songs"], ...o(a) }), schemas.librarySearchResponse),
-  getLibraryResources: all(LIBRARY_SONGS, async (a, songs) => sdk.getLibraryResources(a.music, { "library-songs": songs, "library-playlists": await LIBRARY_PLAYLISTS.get(a) }, o(a)), schemas.resourceCollectionResponse, GIVEN),
+  getLibraryResources: all(LIBRARY_SONGS, async (a, songs) => sdk.getLibraryResources(a.music, { "library-songs": songs, "library-playlists": await LIBRARY_PLAYLISTS.get(a) }, o(a)), eachOfItsType(schemas.resourceCollectionResponse), GIVEN),
   addToLibrary: check("add-to-library"),
   addToFavorites: check("add-to-favorites"),
   addLibraryPlaylistTracks: check("playlist"),
   // The root is always there, and client-user's bound form rejects an answer without it.
   getRootLibraryPlaylistFolder: bare((a) => sdk.getRootLibraryPlaylistFolder(a.music, o(a)), schemas.libraryPlaylistFoldersResponse, { holds: "the listener's root folder" }),
-  listRecentlyAdded: bare((a) => sdk.listRecentlyAdded(a.music, o(a)), schemas.resourceCollectionResponse, paged),
-  listHeavyRotation: bare((a) => sdk.listHeavyRotation(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
-  listRecentlyPlayed: bare((a) => sdk.listRecentlyPlayed(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
-  listRecentlyPlayedTracks: bare((a) => sdk.listRecentlyPlayedTracks(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
-  listRecentlyPlayedStations: bare((a) => sdk.listRecentlyPlayedStations(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
+  listRecentlyAdded: bare((a) => sdk.listRecentlyAdded(a.music, o(a)), eachOfItsType(schemas.resourceCollectionResponse), paged),
+  listHeavyRotation: bare((a) => sdk.listHeavyRotation(a.music, o(a)), eachOfItsType(schemas.paginatedResourceCollectionResponse), paged),
+  listRecentlyPlayed: bare((a) => sdk.listRecentlyPlayed(a.music, o(a)), eachOfItsType(schemas.paginatedResourceCollectionResponse), paged),
+  listRecentlyPlayedTracks: bare((a) => sdk.listRecentlyPlayedTracks(a.music, o(a)), eachOfItsType(schemas.paginatedResourceCollectionResponse), paged),
+  listRecentlyPlayedStations: bare((a) => sdk.listRecentlyPlayedStations(a.music, o(a)), eachOfItsType(schemas.paginatedResourceCollectionResponse), paged),
   getMusicSummariesByYear: bare((a) => sdk.getMusicSummariesByYear(a.music, ["latest"], { views: ["top-albums", "top-artists", "top-songs"], ...o(a) }), schemas.musicSummariesResponse),
   getPersonalStation: bare((a) => sdk.getPersonalStation(a.music, o(a)), schemas.stationsResponse),
   getUserStorefront: bare((a) => sdk.getUserStorefront(a.music, o(a)), schemas.storefrontsResponse, { holds: "the listener's storefront" }),
