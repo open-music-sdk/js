@@ -138,6 +138,11 @@ function refusal(e: unknown): AppleMusicError {
   if (refused(e)) return e;
   throw e;
 }
+/** `e`, Apple's refusal of a token: a 4xx of any tag but a rate limit, which says nothing of the token. */
+function tokenRefusal(e: unknown): AppleMusicError {
+  if (isAppleMusicError(e) && e._tag !== "RateLimited" && e.status !== undefined && e.status >= 400 && e.status < 500) return e;
+  throw e;
+}
 /** Nothing, for Apple's 404. */
 function notFound(e: unknown): void {
   if (!(isAppleMusicError(e, "ApiError") && e.status === 404)) throw e;
@@ -271,7 +276,14 @@ async function recentlyPlayedTypes(run: tRun): Promise<void> {
       run.line("differs", `${ask.fn} without types: ${brief(refusal(e))}. client-user leaves types optional; Apple needs it.`);
       continue;
     }
-    const withTypes = list(at(await ask.with(), "data")).length;
+    let withTypes: number;
+    try {
+      withTypes = list(at(await ask.with(), "data")).length;
+    } catch (e) {
+      // A finding of its own: the types client-user offers are not all ones Apple takes.
+      run.line("differs", `${ask.fn} with every type client-user lists: ${brief(refusal(e))}. client-user offers a type Apple does not take.`);
+      continue;
+    }
     if (without === 0 && withTypes === 0) run.line("skipped", `${ask.fn}: nothing was played lately, asked with types or without`);
     else if (without === 0) run.line("differs", `${ask.fn} without types: Apple answered with nothing, though with them it answered with what was played. client-user leaves types optional, so a call without them gets nothing.`);
     else run.line("same", `${ask.fn} without types: Apple answered with what was played, as it did with them. types is optional, as client-user has it.`);
@@ -379,10 +391,14 @@ async function playlistInclude(run: tRun): Promise<void> {
     ] as const)
       run.line("report", `a long playlist's page ${String(n)} of tracks, with include=catalog: ${share(page.catalog, page.tracks)} with their catalog song, ${share(page.isrc, page.catalog)} of those with its ISRC, and ${share(page.catalogId, page.tracks)} with playParams.catalogId.`);
     run.line("report", `the next link ${keeps ? "keeps" : "drops"} include=catalog.`);
-    if (a.catalog === 0) run.line("differs", "include=catalog gave no track on the first page its catalog song. lib-playlists' read takes the ISRC from there, so an export holds none.");
+    // Judged page by page on whether include=catalog was honoured at all, and whether the songs it gave carry their
+    // ISRC: a track no longer in the storefront has a catalog id and no catalog song on any page, and is no finding.
+    if (a.catalog === 0 && a.catalogId === 0) run.line("skipped", "no track on the first page is in the catalog, so what include=catalog gives is not seen");
+    else if (a.catalog === 0) run.line("differs", "include=catalog gave no track on the first page its catalog song. lib-playlists' read takes the ISRC from there, so an export holds none.");
     else if (b.catalog === 0 && b.catalogId === 0) run.line("skipped", "no track on the second page is in the catalog, so whether the next link keeps the catalog songs is not seen");
-    else if (b.catalog < b.catalogId || b.isrc < b.catalog) run.line("differs", "past the first page, tracks come without their catalog song or its ISRC. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.");
-    else run.line("same", "the tracks past the first page carry their catalog song and its ISRC, as lib-playlists' read takes them.");
+    else if (b.catalog === 0) run.line("differs", "past the first page, no track comes with its catalog song. lib-playlists' read takes the ISRC from there, so an export loses it after the first page.");
+    else if (a.isrc < a.catalog || b.isrc < b.catalog) run.line("differs", "catalog songs come without their ISRC. lib-playlists' read takes the ISRC from there, so an export loses it for them.");
+    else run.line("same", "the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.");
 
     const tracks = list(at(list(at(await getLibraryPlaylist(music, id, { include: ["tracks"], signal }), "data"))[0], "relationships", "tracks", "data")).length;
     if (tracks > 0) run.line("same", "the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.");
@@ -400,15 +416,14 @@ async function userTokenRefused(run: tRun): Promise<void> {
     run.line("differs", "a Music User Token Apple never gave was answered 200, as if it were one.");
     return;
   } catch (e) {
-    // With no status there was no answer, and so nothing to report: the check is not answered.
-    if (apples(e).status === undefined) throw e;
-    run.line("report", `a Music User Token Apple never gave is answered ${String(apples(e).status)}.`);
+    // Only a refusal is an answer to report: no answer, a rate limit or Apple's own failure leaves it unanswered.
+    run.line("report", `a Music User Token Apple never gave is answered ${String(tokenRefusal(e).status)}.`);
   }
   try {
     await validateUserToken(run.music, madeUp, { signal: run.signal });
     run.line("differs", "validateUserToken took a Music User Token Apple never gave.");
   } catch (e) {
-    const failure = apples(e);
+    const failure = tokenRefusal(e);
     if (failure._tag === "UserTokenInvalid") run.line("same", "validateUserToken rejects it as UserTokenInvalid, as user-token has it.");
     else run.line("differs", `validateUserToken rejects it as ${failure._tag}: ${brief(failure)}. user-token has a refused Music User Token as UserTokenInvalid.`);
   }
@@ -513,7 +528,11 @@ async function albumSongs(run: tRun): Promise<{ readonly ids: readonly string[];
   for (const album of (await run.charts()).albums) {
     if (ids.size >= MOST_TRACKS) break;
     if (await inLibrary(run, album)) continue;
-    const songs = list(at(await getAlbumRelationship(run.music, album.id, "tracks", { signal: run.signal }), "data")).filter((track) => at(track, "type") === "songs");
+    // Songs that can be played, which a song not yet out or no longer to be streamed cannot: Apple may refuse to add
+    // one, and the request it was in would be taken for one too large.
+    const songs = list(at(await getAlbumRelationship(run.music, album.id, "tracks", { signal: run.signal }), "data")).filter(
+      (track) => at(track, "type") === "songs" && at(track, "attributes", "playParams") !== undefined,
+    );
     const before = ids.size;
     for (const id of songs.map(idOf).filter(defined)) ids.add(id);
     if (ids.size > before) albums.push(album);
@@ -556,17 +575,21 @@ async function playlistCheck(run: tRun): Promise<void> {
   else if (asSent) run.line("same", "its name and description came back as they were sent, which apply finds a playlist by.");
   else run.line("differs", `its description came back as "${printable(text(at(found, "attributes", "description", "standard")) ?? "none")}". apply finds a playlist by its name and description, so a run by this plan would make another.`);
 
-  // What an empty playlist's tracks answer, and what `read` makes of it.
-  try {
-    run.line("report", `its tracks, while it had none: Apple answered with ${plural(list(at(await getLibraryPlaylistRelationship(music, id, "tracks", { signal }), "data")).length, "track")}.`);
-  } catch (e) {
-    run.line("report", `its tracks, while it had none: ${brief(refusal(e))}.`);
-  }
-  try {
-    await music.playlists.read(id, { signal });
-    run.line("same", "lib-playlists' read takes it for a playlist with no tracks.");
-  } catch (e) {
-    run.line("differs", `lib-playlists' read rejects a playlist with no tracks: ${brief(apples(e))}. apply reads a playlist before it adds to it, so it cannot fill one it made.`);
+  // What an empty playlist's tracks answer, and what `read` makes of it: once it can be read by its id, so that a 404
+  // is not the new playlist still on its way. A refusal is a finding; Apple failing is not.
+  if (readAfter === undefined) run.line("skipped", "the playlist could not be read by its id within a minute, so what an empty one answers is not seen");
+  else {
+    try {
+      run.line("report", `its tracks, while it had none: Apple answered with ${plural(list(at(await getLibraryPlaylistRelationship(music, id, "tracks", { signal }), "data")).length, "track")}.`);
+    } catch (e) {
+      run.line("report", `its tracks, while it had none: ${brief(refusal(e))}.`);
+    }
+    try {
+      await music.playlists.read(id, { signal });
+      run.line("same", "lib-playlists' read takes it for a playlist with no tracks.");
+    } catch (e) {
+      run.line("differs", `lib-playlists' read rejects a playlist with no tracks: ${brief(refusal(e))}. apply reads a playlist before it adds to it, so it cannot fill one it made.`);
+    }
   }
 
   const { ids, albums } = await albumSongs(run);
@@ -577,26 +600,44 @@ async function playlistCheck(run: tRun): Promise<void> {
   }
   run.left.playlistSongs = { albums, seen: false };
   let tracks = ids.map((song) => ({ id: song, type: "songs" as const }));
+  let lost = false;
   try {
     await addLibraryPlaylistTracks(music, id, tracks, { signal });
     run.line("report", `one request took ${plural(tracks.length, "track")}.`);
   } catch (e) {
-    if (refused(e)) {
-      // Refused, so nothing was added, and a smaller request is safe to send.
-      run.line("differs", `one request of ${plural(tracks.length, "track")}: ${brief(e)}. lib-playlists lets chunk be ${String(MOST_TRACKS)}.`);
-      tracks = tracks.slice(0, 100);
-      await addLibraryPlaylistTracks(music, id, tracks, { signal });
-      run.line("report", `one request of ${plural(tracks.length, "track")} was taken.`);
-    } else {
+    if (!refused(e)) {
       // The answer was lost: the tracks may be there, which the reads below show, and they are not sent again.
       run.line("report", `the answer to adding ${plural(tracks.length, "track")}: ${brief(apples(e))}; whether they were added is read back.`);
+      lost = true;
+    } else {
+      // Refused, so nothing was added, and a smaller request is safe to send. Only if that is taken was it the size
+      // Apple refused; a track it will not take would have both refused.
+      const first = `one request of ${plural(tracks.length, "track")}: ${brief(e)}`;
+      const unanswered = "so how many tracks one request takes is not answered.";
+      if (tracks.length <= 100) {
+        run.line("failed", `${first}, ${unanswered}`);
+        return;
+      }
+      tracks = tracks.slice(0, 100);
+      try {
+        await addLibraryPlaylistTracks(music, id, tracks, { signal });
+      } catch (again) {
+        run.line("failed", `${first}; and one of 100: ${brief(refusal(again))}. Neither was taken, ${unanswered}`);
+        return;
+      }
+      run.line("differs", `${first}; one of 100 was taken. lib-playlists lets chunk be ${String(MOST_TRACKS)}.`);
     }
   }
 
   const playlistId = id;
   let held: readonly (string | undefined)[] = [];
   const settled = await seconds(run, "the tracks added to show in the playlist", async () => (held = (await music.playlists.read(playlistId, { signal })).tracks.map((track) => track.catalogId)).length >= tracks.length);
-  if (settled === undefined) { run.line("differs", `${plural(held.length, "track")} of the ${String(tracks.length)} added showed within a minute; apply's settle waits about ${String(SETTLE_S)} seconds.`); return; }
+  if (settled === undefined) {
+    if (held.length > 0) run.line("report", `${String(held.length)} of the ${plural(tracks.length, "track")} added showed within a minute: Apple may have taken some and not the others.`);
+    else if (lost) run.line("report", "none of the tracks whose answer was lost showed within a minute, so they were most likely not added.");
+    else run.line("differs", `none of the ${plural(tracks.length, "track")} added showed within a minute; apply's settle waits about ${String(SETTLE_S)} seconds.`);
+    return;
+  }
   run.line("report", `the ${plural(tracks.length, "track")} showed after ${took(settled)}; apply's settle waits about ${String(SETTLE_S)} seconds.`);
   const sent = tracks.map((track) => track.id);
   const other = sent.filter((song, i) => held[i] !== song).length;

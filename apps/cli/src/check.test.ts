@@ -68,7 +68,7 @@ let apple: {
   /** What the ratings of songs none of which is rated answer, and what one song never rated answers. */
   noneRated: "empty" | "404";
   unrated: "404" | "empty";
-  recent: { played: number; tracks: number; without: "same" | "empty" | 400 };
+  recent: { played: number; tracks: number; without: "same" | "empty" | 400; withTypes?: 400 };
   /** What is in the listener's library, as `type/id`. */
   library: Set<string>;
   addStatus: Partial<Record<tType, number>>;
@@ -86,9 +86,10 @@ let apple: {
   madeWithId: boolean;
   descriptionBack: (sent: string) => string;
   lag: { readable: number; listed: number; tracks: number };
-  /** The most tracks one append takes, and whether the first one's answer is lost though the tracks land. */
+  /** The most tracks one append takes; whether the first one's answer is lost, and its tracks land all the same; and how many of what is added Apple drops. */
   appendMost: number;
-  appendLost: boolean;
+  appendLost: false | "landed" | "not landed";
+  dropTracks: number;
   /** The catalog id a track added by `id` is held under. */
   heldAs: (id: string) => string;
   playlistSongsInLibrary: boolean;
@@ -136,6 +137,7 @@ beforeEach(async () => {
     lag: { readable: 0, listed: 0, tracks: 0 },
     appendMost: 300,
     appendLost: false,
+    dropTracks: 0,
     heldAs: (id) => id,
     playlistSongsInLibrary: true,
     madeUpToken: 401,
@@ -186,7 +188,8 @@ function tracksPage(playlist: tPlaylist, url: URL) {
     id: `i.${playlist.id}.${String(offset + i)}`,
     type: "library-songs",
     attributes: { name: "Listener's song", playParams: track.catalogId === "" ? {} : { catalogId: track.catalogId } },
-    ...(catalog && track.catalogId !== "" ? { relationships: { catalog: { data: [{ id: track.catalogId, type: "songs", attributes: { isrc: track.isrc } }] } } } : {}),
+    // One no longer in the storefront keeps its catalog id, and has no catalog song to give.
+    ...(catalog && track.catalogId !== "" && !track.catalogId.startsWith("gone") ? { relationships: { catalog: { data: [{ id: track.catalogId, type: "songs", attributes: { isrc: track.isrc } }] } } } : {}),
   }));
   const more = offset + 100 < tracks.length;
   return json({ data: page, ...(more ? { next: `/v1/me/library/playlists/${playlist.id}/tracks?offset=${String(offset + 100)}${apple.nextKeepsInclude && catalog ? "&include=catalog" : ""}` } : {}) });
@@ -239,8 +242,9 @@ async function answer(req: Request): Promise<Response> {
   const albumTracks = /^\/v1\/catalog\/gb\/albums\/([^/]+)\/tracks$/.exec(path);
   if (albumTracks) {
     const album = albumTracks[1] ?? "";
-    const songs = apple.songless.has(album) ? [] : Array.from({ length: 12 }, (_, i) => catalogItem("songs", `${album}t${String(i + 1)}`));
-    return json({ data: [...songs, catalogItem("music-videos", `${album}v`)] });
+    // Twelve songs that play, one not yet out, which has no playParams, and a music video.
+    const songs = apple.songless.has(album) ? [] : Array.from({ length: 12 }, (_, i) => catalogItem("songs", `${album}t${String(i + 1)}`, { playParams: { id: `${album}t${String(i + 1)}`, kind: "song" } }));
+    return json({ data: [...songs, catalogItem("songs", `${album}soon`), catalogItem("music-videos", `${album}v`)] });
   }
   const inLibrary = /^\/v1\/catalog\/gb\/([^/]+)\/([^/]+)\/library$/.exec(path);
   if (inLibrary) return apple.library.has(`${inLibrary[1] ?? ""}/${inLibrary[2] ?? ""}`) ? json({ data: [{ id: "l.held", type: "library-songs" }] }) : refuse(404);
@@ -258,6 +262,7 @@ async function answer(req: Request): Promise<Response> {
   if (path === "/v1/me/recent/played" || path === "/v1/me/recent/played/tracks") {
     const n = path.endsWith("tracks") ? apple.recent.tracks : apple.recent.played;
     if (!query.has("types") && apple.recent.without === 400) return refuse(400);
+    if (query.has("types") && apple.recent.withTypes !== undefined) return refuse(apple.recent.withTypes);
     return json({ data: Array.from({ length: !query.has("types") && apple.recent.without === "empty" ? 0 : n }, (_, i) => ({ id: `r${String(i)}`, type: "albums" })) });
   }
   if (path === "/v1/me/library" && method === "POST") {
@@ -306,13 +311,14 @@ async function answer(req: Request): Promise<Response> {
     if (method === "POST") {
       const { data } = (await req.json()) as { data: { id: string }[] };
       if (data.length > apple.appendMost) return refuse(400);
-      playlist.tracks.push(...data.map(({ id }) => ({ catalogId: apple.heldAs(id), isrc: `ISRC${id}` })));
-      playlist.shownAt = Date.now() + apple.lag.tracks * 1000;
-      if (apple.playlistSongsInLibrary) for (const { id } of data) apple.library.add(`songs/${id}`);
-      if (apple.appendLost) {
-        apple.appendLost = false;
-        throw new TypeError("fetch failed", { cause: Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }) });
+      const lost = apple.appendLost;
+      apple.appendLost = false;
+      if (lost !== "not landed") {
+        playlist.tracks.push(...data.slice(apple.dropTracks).map(({ id }) => ({ catalogId: apple.heldAs(id), isrc: `ISRC${id}` })));
+        playlist.shownAt = Date.now() + apple.lag.tracks * 1000;
+        if (apple.playlistSongsInLibrary) for (const { id } of data) apple.library.add(`songs/${id}`);
       }
+      if (lost !== false) throw new TypeError("fetch failed", { cause: Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }) });
       return nothing(204);
     }
     if (Date.now() >= playlist.shownAt) playlist.shown = playlist.tracks.length;
@@ -538,6 +544,15 @@ describe("recently-played-types: whether recently played needs types", () => {
     expect(marksOf("recently-played-types")).toEqual(["✗"]);
   });
 
+  test("a type client-user lists that Apple refuses is ≠ of its own, and the tracks are still asked about", async () => {
+    apple.recent.withTypes = 400;
+    expect(await main(["check", "recently-played-types", "--no-color"])).toBe(1);
+    expect(linesOf("recently-played-types")).toEqual([
+      "≠ recently-played-types: listRecentlyPlayed with every type client-user lists: Apple answered 400, code 40001. client-user offers a type Apple does not take.",
+      "≠ recently-played-types: listRecentlyPlayedTracks with every type client-user lists: Apple answered 400, code 40001. client-user offers a type Apple does not take.",
+    ]);
+  });
+
   test("nothing played lately is a question this account cannot answer", async () => {
     apple.recent = { played: 0, tracks: 0, without: "same" };
     expect(await main(["check", "recently-played-types", "--no-color"])).toBe(0);
@@ -669,7 +684,7 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
       "· playlist-include: a long playlist's page 1 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: a long playlist's page 2 of tracks, with include=catalog: all with their catalog song, all of those with its ISRC, and all with playParams.catalogId.",
       "· playlist-include: the next link keeps include=catalog.",
-      "✓ playlist-include: the tracks past the first page carry their catalog song and its ISRC, as lib-playlists' read takes them.",
+      "✓ playlist-include: the tracks on both pages carry their catalog song and its ISRC, as lib-playlists' read takes them.",
       "✓ playlist-include: the playlist asked for with include=tracks carries its first tracks, which read checks a 404 for its tracks against.",
     ]);
   });
@@ -690,6 +705,28 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
 
   test("tracks past the first page that are none of them in the catalog say nothing of the link", async () => {
     apple.listener[1]?.tracks.splice(100, 50, ...Array.from({ length: 50 }, () => ({ catalogId: "", isrc: undefined })));
+    await main(["check", "playlist-include", "--no-color"]);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-", "✓"]);
+  });
+
+  test("tracks no longer in the storefront, with a catalog id and no catalog song, are no finding on either page", async () => {
+    const long = apple.listener[1];
+    for (const i of [3, 120, 140]) if (long?.tracks[i]) long.tracks[i] = { catalogId: `gone${String(i)}`, isrc: undefined };
+    expect(await main(["check", "playlist-include", "--no-color"])).toBe(0);
+    expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "✓", "✓"]);
+    expect(linesOf("playlist-include")[0]).toContain("some with their catalog song, all of those with its ISRC, and all with playParams.catalogId");
+  });
+
+  test("catalog songs that come without their ISRC are ≠, on the first page as on the second", async () => {
+    const long = apple.listener[1];
+    if (long?.tracks[5]) long.tracks[5] = { catalogId: "c6", isrc: undefined };
+    expect(await main(["check", "playlist-include", "--no-color"])).toBe(1);
+    expect(linesOf("playlist-include")[3]).toBe("≠ playlist-include: catalog songs come without their ISRC. lib-playlists' read takes the ISRC from there, so an export loses it for them.");
+  });
+
+  test("a first page with no track in the catalog says nothing of include=catalog", async () => {
+    const long = apple.listener[1];
+    long?.tracks.splice(0, 100, ...Array.from({ length: 100 }, () => ({ catalogId: "", isrc: undefined })));
     await main(["check", "playlist-include", "--no-color"]);
     expect(marksOf("playlist-include")).toEqual(["·", "·", "·", "-", "✓"]);
   });
@@ -761,6 +798,33 @@ describe("user-token-refused: what Apple answers for a Music User Token it never
     });
     expect(await main(["check", "user-token-refused", "--no-color"])).toBe(1);
     expect(linesOf("user-token-refused")[1]).toBe("≠ user-token-refused: validateUserToken took a Music User Token Apple never gave.");
+  });
+
+  test.each([
+    [429, "Apple is limiting requests for this key (429, code 42901)"],
+    [500, "Apple answered 500, code 50001"],
+  ])("a %i for the made-up token says nothing of the token: the check is ✗, not an answer", async (status, words) => {
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.headers.get("music-user-token") === MADE_UP) return Promise.resolve(refuse(status));
+      return real(req);
+    });
+    expect(await finish(["check", "user-token-refused", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(linesOf("user-token-refused")).toEqual([`✗ user-token-refused: ${words} (at /v1/me/storefront), so this was not answered.`]);
+  });
+
+  test("validateUserToken failing in a way that is no refusal leaves its question unanswered: ✗, not ≠", async () => {
+    let storefronts = 0;
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      // The first ask with the made-up token is refused; validateUserToken's own then finds Apple failing.
+      if (req.headers.get("music-user-token") === MADE_UP && ++storefronts > 1) return Promise.resolve(refuse(503));
+      return real(req);
+    });
+    expect(await finish(["check", "user-token-refused", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
+    expect(marksOf("user-token-refused")).toEqual(["·", "✗"]);
   });
 
   test("no answer for the made-up token is no answer to report: the check is ✗", async () => {
@@ -1026,16 +1090,56 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(posts()).toHaveLength(2);
   });
 
-  test("300 tracks refused in one request is ≠, and 100, which is safe to send after a refusal, are added instead", async () => {
+  test("300 tracks refused in one request and 100 taken, which is safe to send after a refusal, is ≠: it was the size", async () => {
     apple.appendMost = 100;
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("playlist")).toContain("≠ playlist: one request of 300 tracks: Apple answered 400, code 40001. lib-playlists lets chunk be 300.");
-    expect(linesOf("playlist")).toContain("· playlist: one request of 100 tracks was taken.");
+    expect(linesOf("playlist")).toContain("≠ playlist: one request of 300 tracks: Apple answered 400, code 40001; one of 100 was taken. lib-playlists lets chunk be 300.");
     expect(linesOf("playlist")).toContain("· playlist: the 100 tracks showed after 0 seconds; apply's settle waits about 4 seconds.");
   });
 
+  test("100 refused as well is no finding of size, since a track Apple will not take would have both refused: ✗", async () => {
+    apple.appendMost = 50;
+    expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("playlist").at(-1)).toBe(
+      "✗ playlist: one request of 300 tracks: Apple answered 400, code 40001; and one of 100: Apple answered 400, code 40001. Neither was taken, so how many tracks one request takes is not answered.",
+    );
+  });
+
+  test("fewer than 100 tracks refused is ✗ at once, with nothing smaller to try", async () => {
+    apple.albums = apple.albums.slice(0, 5);
+    apple.appendMost = 50;
+    expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("playlist").at(-1)).toBe("✗ playlist: one request of 60 tracks: Apple answered 400, code 40001, so how many tracks one request takes is not answered.");
+  });
+
+  test("songs that cannot be played, such as one not yet out, are not added", async () => {
+    await main(["check", "playlist", "--write", "--no-color"]);
+    const made = apple.listener.find((playlist) => playlist.id === "p.made2");
+    expect(made?.tracks).toHaveLength(300);
+    expect(made?.tracks.some((track) => track.catalogId.endsWith("soon"))).toBe(false);
+  });
+
+  test("some of the tracks added showing within a minute and not the rest is said as it is, and nothing more asked", async () => {
+    apple.dropTracks = 1;
+    expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("playlist").at(-1)).toBe("· playlist: 299 of the 300 tracks added showed within a minute: Apple may have taken some and not the others.");
+  });
+
+  test("an append whose answer was lost and whose tracks never show was most likely not carried out, which is no finding", async () => {
+    apple.appendLost = "not landed";
+    expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(0);
+    expect(linesOf("playlist").at(-1)).toBe("· playlist: none of the tracks whose answer was lost showed within a minute, so they were most likely not added.");
+  });
+
+  test("a playlist that cannot be read by its id within a minute is not asked what it answers empty, since a 404 then is its lag", async () => {
+    apple.lag.readable = 1000;
+    await finish(["check", "playlist", "--write", "--no-color"]);
+    expect(linesOf("playlist")).toContain("- playlist: the playlist could not be read by its id within a minute, so what an empty one answers is not seen");
+    expect(linesOf("playlist").some((line) => line.includes("while it had none"))).toBe(false);
+  });
+
   test("an append whose answer was lost is read back, not sent again", async () => {
-    apple.appendLost = true;
+    apple.appendLost = "landed";
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(0);
     expect(linesOf("playlist")).toContain("· playlist: the answer to adding 300 tracks: Apple could not be reached; whether they were added is read back.");
     expect(posts().filter((path) => path.endsWith("/tracks"))).toHaveLength(1);
@@ -1059,7 +1163,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("tracks that do not show within a minute are ≠, and the rest is not asked", async () => {
     apple.lag.tracks = 1000;
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: 0 tracks of the 300 added showed within a minute; apply's settle waits about 4 seconds.");
+    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: none of the 300 tracks added showed within a minute; apply's settle waits about 4 seconds.");
     expect(cleanupOf()).toContain("Delete the playlist");
   });
 
