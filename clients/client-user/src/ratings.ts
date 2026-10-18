@@ -1,6 +1,8 @@
 // The functions for a listener's ratings. Nine types of resource can be rated, and each has the same four: the
 // rating of one, the ratings of several, a rating set, and a rating taken away. A rating is 1 for a like and -1
-// for a dislike, and its id is that of the resource it is of.
+// for a dislike, and its id is that of the resource it is of. Against the live API on 18 October 2026, for songs: a
+// rating never set was answered 404, the ratings of several left out the songs with none, and a song made a favorite
+// had a rating of 1 at once. The other types are taken to answer the same way.
 import { endpoint, got, initOf, optionsOf, resourceGetter, resourcesGetter, segmentOf, type tEndpoint, type tItem, type tReadOptions, type tRequestPlan } from "@open-music-sdk/core";
 import type { tRatingRequest, tRatingsResponse } from "@open-music-sdk/types";
 
@@ -52,7 +54,8 @@ const libraryPlaylists = () => "v1/me/ratings/library-playlists";
 // Songs
 
 /**
- * The listener's rating of the song with an id.
+ * The listener's rating of the song with an id. A song the listener never rated is answered 404, an `ApiError`, as it
+ * was against the live API on 18 October 2026.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -66,7 +69,8 @@ const libraryPlaylists = () => "v1/me/ratings/library-playlists";
  */
 export const getSongRating = /*#__PURE__*/ resourceGetter<tRatingsResponse>("getSongRating", songs);
 /**
- * The listener's ratings of the songs with the ids given.
+ * The listener's ratings of the songs with the ids given. Songs the listener never rated are left out, as they were
+ * against the live API on 18 October 2026.
  *
  * @function
  * @param client - The listener's client to ask with.
