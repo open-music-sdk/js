@@ -93,6 +93,8 @@ let apple: {
   /** The catalog id a track added by `id` is held under. */
   heldAs: (id: string) => string;
   playlistSongsInLibrary: boolean;
+  /** Whether a catalog playlist added to the library puts its songs there too. */
+  catalogPlaylistSongsInLibrary: boolean;
   madeUpToken: 401 | 403 | 200;
   /** A path that fails with this status, whatever it is. */
   failing: Record<string, number>;
@@ -140,6 +142,7 @@ beforeEach(async () => {
     dropTracks: 0,
     heldAs: (id) => id,
     playlistSongsInLibrary: true,
+    catalogPlaylistSongsInLibrary: false,
     madeUpToken: 401,
     failing: {},
   };
@@ -164,6 +167,9 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
   for (const res of responses.splice(0)) if (res.body !== null) expect(res.bodyUsed).toBe(true);
 });
+
+/** The songs of a catalog playlist, by id. */
+const songsOfPlaylist = (id: string) => [`${id}s1`, `${id}s2`, `${id}s3`];
 
 function tracksOf(n: number): tTrack[] {
   return Array.from({ length: n }, (_, i) => ({ catalogId: `c${String(i + 1)}`, isrc: `GBBBB26${String(i + 1).padStart(5, "0")}` }));
@@ -246,6 +252,8 @@ async function answer(req: Request): Promise<Response> {
     const songs = apple.songless.has(album) ? [] : Array.from({ length: 12 }, (_, i) => catalogItem("songs", `${album}t${String(i + 1)}`, { playParams: { id: `${album}t${String(i + 1)}`, kind: "song" } }));
     return json({ data: [...songs, catalogItem("songs", `${album}soon`), catalogItem("music-videos", `${album}v`)] });
   }
+  const playlistTracks = /^\/v1\/catalog\/gb\/playlists\/([^/]+)\/tracks$/.exec(path);
+  if (playlistTracks) return json({ data: [catalogItem("music-videos", `${playlistTracks[1] ?? ""}v`), ...songsOfPlaylist(playlistTracks[1] ?? "").map((id) => catalogItem("songs", id))] });
   const inLibrary = /^\/v1\/catalog\/gb\/([^/]+)\/([^/]+)\/library$/.exec(path);
   if (inLibrary) return apple.library.has(`${inLibrary[1] ?? ""}/${inLibrary[2] ?? ""}`) ? json({ data: [{ id: "l.held", type: "library-songs" }] }) : refuse(404);
   if (path === "/v1/me/ratings/songs") {
@@ -272,7 +280,10 @@ async function answer(req: Request): Promise<Response> {
       if (status !== undefined) return refuse(status);
       const delay = apple.addDelay[type];
       if (delay !== undefined) await new Promise((resolve) => setTimeout(resolve, delay));
-      for (const id of ids.split(",")) apple.library.add(`${type}/${id}`);
+      for (const id of ids.split(",")) {
+        apple.library.add(`${type}/${id}`);
+        if (type === "playlists" && apple.catalogPlaylistSongsInLibrary) for (const song of songsOfPlaylist(id)) apple.library.add(`songs/${song}`);
+      }
     }
     return nothing(202);
   }
@@ -919,6 +930,7 @@ describe("add-to-library and add-to-favorites", () => {
     expect(linesOf("add-to-library")).toEqual([
       "· add-to-library: addToLibrary took songs, albums, playlists, music-videos.",
       "· add-to-library: each showed in the library after: songs, 0 seconds; albums, 0 seconds; playlists, 0 seconds; music-videos, 0 seconds.",
+      "· add-to-library: adding the playlist had not put its songs in the library when check looked.",
     ]);
     expect(posts()).toEqual(["/v1/me/library", "/v1/me/library", "/v1/me/library", "/v1/me/library"]);
     const steps = cleanupOf();
@@ -927,6 +939,17 @@ describe("add-to-library and add-to-favorites", () => {
     expect(steps).not.toContain("Name of s1");
     expect(steps).toContain('- the album "Name of a1" by Artist of a1, with its songs: https://music.apple.com/gb/x/a1');
     expect(steps).toContain("choose Delete from Library from its … menu");
+    // The playlist's songs were not seen in the library, but may show up there.
+    expect(steps).toContain('If adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library, delete them: open https://music.apple.com/gb/x/pl.chart1');
+  });
+
+  test("a catalog playlist that put its songs in the library says so, and the cleanup says to delete them", async () => {
+    apple.catalogPlaylistSongsInLibrary = true;
+    await main(["check", "add-to-library", "--write", "--no-color"]);
+    expect(linesOf("add-to-library").at(-1)).toBe("· add-to-library: adding the playlist put its songs in the library too.");
+    expect(cleanupOf()).toContain(
+      'Adding the playlist "Name of pl.chart1" by Curator of pl.chart1 put its songs in your library as well. Delete them: open https://music.apple.com/gb/x/pl.chart1, and choose Delete from Library from each song\'s … menu.',
+    );
   });
 
   test("a playlist is named by its curator, and a resource with no name, artist or link by its id, to be searched for", async () => {
@@ -1011,7 +1034,10 @@ describe("add-to-library and add-to-favorites", () => {
     expect(await main(["check", "add-to-favorites", "--write", "--no-color"])).toBe(0);
     expect(linesOf("add-to-favorites")).toEqual(["· add-to-favorites: addToFavorites took a song, which had a rating of 1 after 0 seconds.", "· add-to-favorites: the song made a favorite was not in the library when check looked."]);
     // s1 is rated and s2 in the library, so s3.
-    expect(cleanupOf()).toContain('Undo the favorite on the song "Name of s3" by Artist of s3: open https://music.apple.com/gb/x/s3, and choose Undo Favorite from its … menu.');
+    // Not seen in the library, but it may show up there later.
+    expect(cleanupOf()).toContain(
+      'Undo the favorite on the song "Name of s3" by Artist of s3: open https://music.apple.com/gb/x/s3, and choose Undo Favorite from its … menu. If it shows up in your library, choose Delete from Library from the same menu as well.',
+    );
     expect(cleanupOf()).not.toContain("Delete these from your library");
   });
 
@@ -1020,7 +1046,7 @@ describe("add-to-library and add-to-favorites", () => {
     apple.favoriteInLibrary = true;
     expect(await finish(["check", "add-to-favorites", "--write", "--no-color"])).toBe(0);
     expect(linesOf("add-to-favorites")).toEqual(["· add-to-favorites: addToFavorites took a song, which had no rating a minute later: a favorite is not a rating.", "· add-to-favorites: the song made a favorite was put in the library too."]);
-    expect(cleanupOf()).toContain('- the song "Name of s2" by Artist of s2');
+    expect(cleanupOf()).toContain('Undo the favorite on the song "Name of s2" by Artist of s2: open https://music.apple.com/gb/x/s2, and choose Undo Favorite from its … menu. It went into your library as well: choose Delete from Library from the same menu.');
   });
 
   test("a favorite Apple refuses leaves nothing to undo, and the check is ✗", async () => {
@@ -1058,7 +1084,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     // One playlist made, one append: apply wrote nothing.
     expect(posts()).toEqual(["/v1/me/library/playlists", "/v1/me/library/playlists/p.made2/tracks"]);
     const steps = cleanupOf();
-    expect(steps).toMatch(/1\. Delete the playlist "open-music-sdk check \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC": find it in Playlists/);
+    expect(steps).toMatch(/1\. Delete every playlist named "open-music-sdk check \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC": find them in Playlists/);
     expect(steps).toContain("2. The playlist's songs went into your library as well.");
     // Twelve songs an album, so 300 songs from 25 albums; a1 to a25.
     expect(steps).toContain('- the album "Name of a25" by Artist of a25, with its songs');
@@ -1123,7 +1149,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
   test("tracks refused at both sizes leave no albums to delete, since nothing was added", async () => {
     apple.appendMost = 50;
     await main(["check", "playlist", "--write", "--no-color"]);
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).toContain("Delete every playlist named");
     expect(cleanupOf()).not.toContain("albums they are from");
   });
 
@@ -1193,7 +1219,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     apple.lag.tracks = 1000;
     expect(await finish(["check", "playlist", "--write", "--no-color"])).toBe(1);
     expect(linesOf("playlist").at(-1)).toBe("≠ playlist: none of the 300 tracks added showed within a minute; apply's settle waits about 4 seconds.");
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
   test("an answer that holds no playlist is found among the listener's playlists by its name", async () => {
@@ -1211,7 +1237,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     apple.lag.listed = 1000;
     await finish(["check", "playlist", "--write", "--no-color"]);
     expect(marksOf("playlist").at(-1)).toBe("-");
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
   test("apply that makes another playlist is ≠, and both are in the cleanup", async () => {
@@ -1228,7 +1254,9 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     });
     expect(await finish(["check", "playlist", "--write", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
     expect(linesOf("playlist").at(-1)).toMatch(/^≠ playlist: apply with the same plan resolved to created true, appended 300, verified (true|false), where it should have found the playlist and added nothing\.$/);
-    expect(cleanupOf()).toContain(", all 2 of that name");
+    // One step for every playlist of the name, the one apply made too, whether or not apply lived to say so.
+    expect(cleanupOf().match(/Delete every playlist named/g)).toHaveLength(1);
+    expect(apple.listener.filter((playlist) => playlist.name.startsWith("open-music-sdk check"))).toHaveLength(2);
   });
 
   test("a playlist that is never listed is ≠, since apply would make another every time, and the rest is still asked by its id", async () => {
@@ -1252,7 +1280,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     apple.failing["/v1/me/library/playlists/p.made2/tracks"] = 500;
     expect(await finish(["check", "playlist", "--write", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
     expect(marksOf("playlist").at(-1)).toBe("✗");
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
   test("albums that are all in the library, or hold no songs, give none to add, and the playlist alone is to be deleted", async () => {
@@ -1272,7 +1300,7 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     });
     expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
     expect(marksOf("playlist")).toEqual(["✗"]);
-    expect(cleanupOf()).toMatch(/Delete the playlist "open-music-sdk check .* UTC": find it in Playlists, and choose Delete from Library from its … menu\. \(Apple's answer was lost, so it may not be there\)/);
+    expect(cleanupOf()).toMatch(/Delete every playlist named "open-music-sdk check .* UTC": find them in Playlists, and choose Delete from Library from each one's … menu\. \(Apple's answer was lost, so it may not be there\)/);
   });
 
   test("Ctrl+C while a request is under way stops it too, and the cleanup is printed", async () => {
@@ -1296,23 +1324,26 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     });
     process.listeners("SIGINT").find((listener) => !before.has(listener))?.("SIGINT");
     expect(await running).toBe(130);
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).toContain("Delete every playlist named");
   });
 
-  test("Ctrl+C stops it: exit 130, and the cleanup is printed for what was written so far", async () => {
+  test.each(["SIGINT", "SIGTERM"] as const)("%s stops it, pressed once or twice: exit 130, and the cleanup is printed for what was written so far", async (signal) => {
     apple.lag.listed = 1000;
-    const before = new Set(process.listeners("SIGINT"));
+    const before = new Set(process.listeners(signal));
     const running = main(["check", "playlist", "--write", "--no-color"]);
     // While it waits for the playlist to be listed.
     await vi.waitFor(() => {
       expect(stdout).toContain("held the playlist");
     });
-    const added = process.listeners("SIGINT").filter((listener) => !before.has(listener));
+    const added = process.listeners(signal).filter((listener) => !before.has(listener));
     expect(added).toHaveLength(1);
-    added[0]?.("SIGINT");
+    // A second press before the steps are printed is let go by, not left to end the process with them unprinted.
+    added[0]?.(signal);
+    added[0]?.(signal);
+    expect(process.listeners(signal)).toHaveLength(before.size + 1);
     expect(await running).toBe(130);
     expect(stderr).toContain("Stopped.");
-    expect(process.listeners("SIGINT")).toHaveLength(before.size);
-    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(process.listeners(signal)).toHaveLength(before.size);
+    expect(cleanupOf()).toContain("Delete every playlist named");
   });
 });

@@ -149,8 +149,9 @@ open-music-sdk help check                      # every check, by name
 The checks that write run only with `--write`, since what they add stays in your library: Apple's API can't delete
 it. They add up to four things to your library, make one song a favorite, and make a playlist of up to 300 songs,
 which may put those songs in your library too. Each is something you didn't have, and the run ends with numbered
-steps that remove them in the Music app, with a link to each. They're printed whatever happens, Ctrl+C included.
-Run them on an account you don't mind cluttering, with an Apple Music subscription.
+steps that remove them in the Music app, with a link to each, and what to look for where a write may or may not have
+carried something else in with it. They're printed whatever happens, Ctrl+C and a SIGTERM included, and a second
+Ctrl+C waits for them. Run them on an account you don't mind cluttering, with an Apple Music subscription.
 
 What `check` finds goes into [Differences from Apple's
 documentation](https://open-music-sdk.github.io/js/differences), and a difference into a fix of the package it

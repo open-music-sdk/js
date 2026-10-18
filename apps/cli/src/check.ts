@@ -15,6 +15,7 @@ import {
   getCharts,
   getLibraryPlaylist,
   getLibraryPlaylistRelationship,
+  getPlaylistRelationship,
   getSongRating,
   getSongRatings,
   getSongsByIsrc,
@@ -63,9 +64,13 @@ interface tWritten<T> {
 
 /** What the write checks left in the library, for the steps that undo it. */
 interface tLeft {
+  /** By name: `apply` may make a second of the same name, and fail before it says so. */
   readonly playlists: tWritten<string>[];
   readonly library: tWritten<tItem>[];
-  readonly favorites: tWritten<tItem>[];
+  /** Each favorite, and whether it was seen in the library afterwards, where it is deleted from too. */
+  readonly favorites: (tWritten<tItem> & { inLibrary: boolean })[];
+  /** Catalog playlists added to the library, and whether their songs were seen there as well. */
+  readonly playlistsSongs: { readonly playlist: tItem; readonly seen: boolean }[];
   /** The albums a playlist's songs were taken from, and whether the songs were seen in the library once added. */
   playlistSongs: { readonly albums: readonly tItem[]; seen: boolean } | undefined;
 }
@@ -485,6 +490,15 @@ async function addToLibraryCheck(run: tRun): Promise<void> {
   // Each by itself, at once, so one that never shows does not keep the others waiting.
   const shown = await Promise.all(taken.map(({ item, at: when }) => seconds(run, `the ${item.type} added to show in the library`, () => inLibrary(run, item), when)));
   run.line("report", `each showed in the library after: ${taken.map(({ item }, i) => `${item.type}, ${took(shown[i])}`).join("; ")}.`);
+
+  // A catalog playlist added may put its songs in the library too, as the Music app's setting for one has it: whether
+  // it did is read off its first song, and the steps say what to undo either way.
+  for (const { item: playlist } of taken.filter(({ item }) => item.type === "playlists")) {
+    const first = idOf(list(at(await getPlaylistRelationship(run.music, playlist.id, "tracks", { signal: run.signal }), "data")).find((track) => at(track, "type") === "songs"));
+    const seen = first !== undefined && (await inLibrary(run, { type: "songs", id: first }));
+    run.left.playlistsSongs.push({ playlist, seen });
+    run.line("report", seen ? "adding the playlist put its songs in the library too." : "adding the playlist had not put its songs in the library when check looked.");
+  }
 }
 
 async function addToFavoritesCheck(run: tRun): Promise<void> {
@@ -500,7 +514,7 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
     run.line("skipped", "none of the chart's songs could be picked");
     return;
   }
-  const left = { what: song, sure: false };
+  const left = { what: song, sure: false, inLibrary: false };
   run.left.favorites.push(left);
   try {
     await addToFavorites(run.music, { songs: [song.id] }, { signal: run.signal });
@@ -514,10 +528,9 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
   let value: unknown;
   const after = await seconds(run, "the favorite to show as a rating", async () => (value = await ratingOf(run, item.id)) !== undefined);
   run.line("report", after === undefined ? "addToFavorites took a song, which had no rating a minute later: a favorite is not a rating." : `addToFavorites took a song, which had a rating of ${printable(String(value))} after ${took(after)}.`);
-  if (await inLibrary(run, item)) {
-    run.left.library.push({ what: item, sure: true });
-    run.line("report", "the song made a favorite was put in the library too.");
-  } else run.line("report", "the song made a favorite was not in the library when check looked.");
+  // Looked at once: one that shows up later is in the steps as one that may.
+  left.inLibrary = await inLibrary(run, item);
+  run.line("report", left.inLibrary ? "the song made a favorite was put in the library too." : "the song made a favorite was not in the library when check looked.");
 }
 
 /** A playlist of the listener's with this name, from all the pages of their playlists. */
@@ -681,7 +694,6 @@ async function playlistCheck(run: tRun): Promise<void> {
     return;
   }
   const result = await music.playlists.apply(music.playlists.plan({ name, description }, tracks), { signal });
-  if (result.created) run.left.playlists.push({ what: name, sure: true });
   if (!result.created && result.appended === 0 && result.verified) run.line("same", "apply with the same plan found the playlist, added nothing, and saw it whole.");
   else run.line("differs", `apply with the same plan resolved to created ${String(result.created)}, appended ${String(result.appended)}, verified ${String(result.verified)}, where it should have found the playlist and added nothing.`);
 }
@@ -727,14 +739,20 @@ const DELETE = "and choose Delete from Library from its … menu";
 /** The steps that undo what the write checks left, numbered; nothing when they left nothing. */
 function cleanup(left: tLeft): void {
   const steps: { readonly step: string; readonly items?: readonly string[] }[] = [];
-  const playlists = new Map<string, tWritten<string>[]>();
-  for (const playlist of left.playlists) playlists.set(playlist.what, [...(playlists.get(playlist.what) ?? []), playlist]);
-  for (const [name, made] of playlists) {
-    const all = made.length > 1 ? `, all ${String(made.length)} of that name` : "";
-    steps.push({ step: `Delete the playlist "${printable(name)}"${all}: find it in Playlists, ${DELETE}.${made.every((each) => !each.sure) ? UNSURE : ""}` });
+  // Every playlist of the name: apply may have made a second, and failed before it said so.
+  for (const name of new Set(left.playlists.map((each) => each.what))) {
+    const sure = left.playlists.some((each) => each.what === name && each.sure);
+    steps.push({ step: `Delete every playlist named "${printable(name)}": find them in Playlists, and choose Delete from Library from each one's … menu.${sure ? "" : UNSURE}` });
   }
   if (left.library.length > 0) steps.push({ step: `Delete these from your library: open each, ${DELETE}.`, items: left.library.map((each) => `${label(each.what)}: ${link(each.what)}${unsure(each)}`) });
-  for (const favorite of left.favorites) steps.push({ step: `Undo the favorite on ${label(favorite.what)}: open ${link(favorite.what)}, and choose Undo Favorite from its … menu.${unsure(favorite)}` });
+  for (const { playlist, seen } of left.playlistsSongs) {
+    const each = `open ${link(playlist)}, and choose Delete from Library from each song's … menu.`;
+    steps.push({ step: seen ? `Adding ${label(playlist)} put its songs in your library as well. Delete them: ${each}` : `If adding ${label(playlist)} put its songs in your library, delete them: ${each}` });
+  }
+  for (const favorite of left.favorites) {
+    const library = favorite.inLibrary ? " It went into your library as well: choose Delete from Library from the same menu." : " If it shows up in your library, choose Delete from Library from the same menu as well.";
+    steps.push({ step: `Undo the favorite on ${label(favorite.what)}: open ${link(favorite.what)}, and choose Undo Favorite from its … menu.${library}${unsure(favorite)}` });
+  }
   const songs = left.playlistSongs;
   if (songs !== undefined)
     steps.push({
@@ -779,13 +797,16 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
   // keeps to a pace that leaves the app room, since a run that drew 429s would draw them for the app's listeners.
   const music = createServerClient({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, userToken: token, storefront, fetch: timed, rateLimit: createRateLimiter(PACE) });
 
+  // Ctrl+C, or a SIGTERM, stops what is under way, and the steps to undo it are printed all the same. Pressed again
+  // before they are, it is let go by, not left to end the process with them unprinted.
   const stop = new AbortController();
   const interrupt = () => {
     stop.abort(new CliError("Stopped.", 130));
   };
-  process.once("SIGINT", interrupt);
+  process.on("SIGINT", interrupt);
+  process.on("SIGTERM", interrupt);
   let charts: Promise<tCharts> | undefined;
-  const left: tLeft = { playlists: [], library: [], favorites: [], playlistSongs: undefined };
+  const left: tLeft = { playlists: [], library: [], favorites: [], playlistsSongs: [], playlistSongs: undefined };
   const marks = new Set<tMark>();
   try {
     if (names.length === 0 && flags.write !== true) say("The checks that write to your library are left out; --write adds them.");
@@ -840,6 +861,7 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
     }
   } finally {
     process.off("SIGINT", interrupt);
+    process.off("SIGTERM", interrupt);
     cleanup(left);
   }
   return marks.has("differs") || marks.has("failed") ? 1 : 0;
