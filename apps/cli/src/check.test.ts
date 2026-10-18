@@ -834,6 +834,24 @@ describe("marks and the exit status", () => {
     expect(marksOf("preview-hosts")).toEqual(["·", "✓"]);
   });
 
+  test("no token and nothing of the key is printed anywhere, and nothing is asked of any host but Apple's API and its image server, which is sent no token", async () => {
+    apple.failing["/v1/me/library/playlists/p.long/tracks"] = 500;
+    await finish(["check", "--write", "--no-color"], ["setTimeout", "clearTimeout"]);
+    const printed = stdout + stderr;
+    expect(printed).not.toContain(TOKEN);
+    // A developer token is a JWT, and the key's body is base64 between its PEM lines.
+    expect(printed).not.toMatch(/eyJ[\w-]{8,}\.eyJ[\w-]{8,}/);
+    for (const line of PEM.split(LF).filter((each) => each !== "" && !each.startsWith("-----"))) expect(printed).not.toContain(line);
+    const hosts = new Set(asked.map((req) => new URL(req.url).hostname));
+    for (const host of hosts) expect(host === "api.music.apple.com" || host.endsWith(".mzstatic.com"), host).toBe(true);
+    for (const req of asked.filter((each) => new URL(each.url).hostname.endsWith(".mzstatic.com"))) {
+      expect(req.headers.get("authorization")).toBeNull();
+      expect(req.headers.get("music-user-token")).toBeNull();
+    }
+    // The API is sent both tokens: the test would hold nothing if it were sent neither.
+    expect(asked.some((req) => req.headers.get("music-user-token") === TOKEN && req.headers.get("authorization")?.startsWith("Bearer eyJ") === true)).toBe(true);
+  });
+
   test("what is printed holds no token, no id of the listener's library, and nothing of Apple's error details", async () => {
     apple.failing["/v1/me/library/playlists/p.long/tracks"] = 500;
     await finish(["check", "--write", "--no-color"], ["setTimeout", "clearTimeout"]);
