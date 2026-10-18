@@ -219,7 +219,9 @@ export async function resolve<D extends tTrackDescription>(client: tAppleMusicCl
     else signal?.throwIfAborted();
   };
 
-  // By ISRC: each code once, however many descriptions have it.
+  // By ISRC: each code once, however many descriptions have it. One page of each answer is read, which is all Apple
+  // sends: against the live API on 18 October 2026, 25 codes came back as 663 songs with no next page, and asked for
+  // one a page, still with none.
   const codes = [...new Set(wanted.flatMap((each) => each.code ?? []))];
   for (let from = 0; from < codes.length; from += MAX_ISRCS) {
     const chunk = codes.slice(from, from + MAX_ISRCS);

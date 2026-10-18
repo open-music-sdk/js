@@ -66,7 +66,8 @@ export async function taken(client: tAppleMusicClient, id: string, walk: tWalk, 
   } catch (error) {
     if (!(tracks.length === 0 && isAppleMusicError(error, "ApiError") && error.status === 404)) throw error;
     // The playlist is there: it was just read. A 404 for its tracks before any of them came is taken to mean it
-    // has none, which Apple's documentation does not say. So the playlist is asked once more, with its tracks,
+    // has none, which Apple's documentation does not say, though a new playlist with no tracks was answered so
+    // against the live API on 18 October 2026. So the playlist is asked once more, with its tracks,
     // and has to bear that out: a playlist that then shows a track is not empty, and the 404 stands. What is read
     // here decides what `apply` adds, and a playlist wrongly taken for empty would have all of it added again.
     const again = await getLibraryPlaylist.bound(client)(id, { include: ["tracks"], signal });
