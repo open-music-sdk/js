@@ -207,7 +207,8 @@ async function seconds(run: tRun, what: string, shown: () => Promise<boolean>, s
     } catch (e) {
       apples(e);
     }
-    if (yes) return Math.round((Date.now() - start) / 1000);
+    // Whole seconds gone: what shows at the first read is 0 however long that read took.
+    if (yes) return Math.floor((Date.now() - start) / 1000);
     if (Date.now() - start >= POLL_MS) return undefined;
     if (tries === 1) say(`  Waiting for ${what}, a minute at most…`);
     await sleep(1000, run.signal);

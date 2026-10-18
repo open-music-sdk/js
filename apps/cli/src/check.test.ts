@@ -431,6 +431,59 @@ describe("which checks run: by name, in the list's order, and the write checks o
   });
 });
 
+describe("the limit on each request", () => {
+  test("a request Apple never answers is given up on at the CLI's limit, each try of it, and the check is ✗, the run going on", async () => {
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    // The limit is asked for at 30 seconds, and waited out here at 5 milliseconds.
+    const asked30 = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => timeout(ms === 30_000 ? 5 : ms));
+    const real = answer;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (new URL(req.url).pathname !== "/v1/catalog/gb/search") return real(req);
+      asked.push(req);
+      return new Promise<Response>((_resolve, reject) => {
+        req.signal.addEventListener("abort", () => {
+          reject(req.signal.reason as Error);
+        });
+      });
+    });
+    expect(await main(["check", "search-next", "isrc-next", "--no-color"])).toBe(1);
+    expect(linesOf("search-next")).toEqual(["✗ search-next: Apple did not answer, each try given 30 seconds (at /v1/catalog/gb/search), so this was not answered."]);
+    // A read is tried twice, each with a limit of its own.
+    expect(asked.filter((req) => new URL(req.url).pathname === "/v1/catalog/gb/search")).toHaveLength(2);
+    expect(asked30).toHaveBeenCalledWith(30_000);
+    expect(marksOf("isrc-next")).toEqual(["✓"]);
+  });
+});
+
+describe("the owner's two rules for a run that writes, over a whole run", () => {
+  test("every write that may have been carried out is in the cleanup, and nothing the listener had before is", async () => {
+    apple.library = new Set(["songs/s1", "albums/a1", "playlists/pl.chart2"]);
+    apple.rated.set("s2", 1);
+    apple.catalogPlaylistSongsInLibrary = true;
+    await main(["check", "--write", "--no-color"]);
+    const steps = cleanupOf();
+    // What the steps link to, each whole.
+    const links = new Set(steps.match(/https:\/\/music\.apple\.com\/gb\/x\/[\w.-]+/g));
+    const link = (id: string) => `https://music.apple.com/gb/x/${id}`;
+
+    // Every addition and every favorite, by the link of what was sent.
+    for (const req of asked.filter((each) => each.method === "POST" && ["/v1/me/library", "/v1/me/favorites"].includes(new URL(each.url).pathname)))
+      for (const ids of new URL(req.url).searchParams.values()) for (const id of ids.split(",")) expect(links.has(link(id)), id).toBe(true);
+    // Every playlist made, by its name, and the album of every song added to one.
+    const made = apple.listener.filter((playlist) => playlist.id.startsWith("p.made"));
+    expect(made.length).toBeGreaterThan(0);
+    for (const playlist of made) {
+      expect(steps).toContain(`Delete every playlist named "${playlist.name}"`);
+      for (const track of playlist.tracks) expect(links.has(link(/^(a\d+)t/.exec(track.catalogId)?.[1] ?? "none")), track.catalogId).toBe(true);
+    }
+    // What was in the library before the run is nowhere in the steps, and a song rated before it is no favorite to undo.
+    for (const id of ["s1", "a1", "pl.chart2"]) expect(links.has(link(id)), id).toBe(false);
+    expect(steps).toMatch(/Undo the favorite on/);
+    expect(steps).not.toMatch(/Undo the favorite on [^\n]*\/x\/s2\b/);
+  });
+});
+
 describe("the pace of a run: the key is likely the app's too, and Apple counts its limit by the key", () => {
   test("every request after doctor's two waits on a limiter of ten at once and ten a second", async () => {
     acquire.mockClear();
@@ -1293,7 +1346,8 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
       return real(req);
     });
     expect(await finish(["check", "playlist", "--write", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
-    expect(linesOf("playlist").at(-1)).toMatch(/^≠ playlist: apply with the same plan resolved to created true, appended 300, verified (true|false), where it should have found the playlist and added nothing\.$/);
+    // Nor does apply find the playlist it made among the library's, which stay empty here, so it cannot say it saw it.
+    expect(linesOf("playlist").at(-1)).toBe("≠ playlist: apply with the same plan resolved to created true, appended 300, verified false, where it should have found the playlist and added nothing.");
     // One step for every playlist of the name, the one apply made too, whether or not apply lived to say so.
     expect(cleanupOf().match(/Delete every playlist named/g)).toHaveLength(1);
     expect(apple.listener.filter((playlist) => playlist.name.startsWith("open-music-sdk check"))).toHaveLength(2);
