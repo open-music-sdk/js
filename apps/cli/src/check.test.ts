@@ -1932,12 +1932,18 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(marksOf("searchLibrary")).toEqual(["-"]);
   });
 
-  test("a root folder Apple answers none for by its identity is -, and the root its children were found under is asked for them", async () => {
+  test("a root folder Apple answers none for by its identity is ≠, since there always is one, and the root its children were found under is asked for them", async () => {
     apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
-    expect(await main(["check", "getLibraryPlaylistFolderRelationship", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(0);
-    expect(marksOf("getRootLibraryPlaylistFolder")).toEqual(["-"]);
+    expect(await main(["check", "getLibraryPlaylistFolderRelationship", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(1);
+    expect(rowsOf("getRootLibraryPlaylistFolder")).toEqual(["≠ getRootLibraryPlaylistFolder: Apple answered with nothing for the listener's root folder."]);
     expect(rowsOf("getLibraryPlaylistFolderRelationship")).toEqual(["✓ getLibraryPlaylistFolderRelationship: 2 of 2 relationships as the types have them."]);
     expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.playlistsroot/children");
+  });
+
+  test("a folder is read by its id as one in the root, before the root itself, which may be a 404 by its id", async () => {
+    expect(await main(["check", "getLibraryPlaylistFolder", "getLibraryPlaylistFolders", "--no-color"])).toBe(0);
+    expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.folder");
+    expect(asked.find((req) => new URL(req.url).searchParams.has("ids") && new URL(req.url).pathname === "/v1/me/library/playlist-folders")?.url).toContain("ids=p.folder%2Cp.playlistsroot");
   });
 
   test("a read run's report says nothing of the listener's library: no id, no name and no search term, only whether each answer held to its type", async () => {

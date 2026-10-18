@@ -169,6 +169,8 @@ const FOLDERS = seed("playlist folder in your library", async (a) => {
   const children = list(at(await sdk.getLibraryPlaylistFolderRelationship(a.music, await rootOf(a), "children", { limit: 100, ...o(a) }), "data"));
   return children.filter((child) => at(child, "type") === "library-playlist-folders").map(idOf).filter(defined);
 });
+/** A folder to read by its id: one in the root, whose id Apple gave, and then the root, which was a 404 by its id on 18 October 2026. */
+const SOME_FOLDERS = seed("playlist folder in your library", async (a) => [...(await FOLDERS.get(a)), ...(await ROOT.get(a))]);
 const RECOMMENDATIONS = seed("recommendation for you", async (a) => idsIn(await sdk.listPersonalRecommendations(a.music, { limit: 5, ...o(a) })));
 // The first word of a song's name: a library search for a whole name of three words or more found nothing on 18
 // October 2026, where its first word found the song.
@@ -449,8 +451,8 @@ export const USER = {
     tracks: schemas.libraryPlaylistRelationshipsLibraryPlaylistTracksRelationship,
   }),
   createLibraryPlaylist: check("playlist"),
-  getLibraryPlaylistFolder: one(ROOT, (a, id) => sdk.getLibraryPlaylistFolder(a.music, id, o(a)), schemas.libraryPlaylistFoldersResponse),
-  getLibraryPlaylistFolders: all(ROOT, (a, ids) => sdk.getLibraryPlaylistFolders(a.music, ids, o(a)), schemas.libraryPlaylistFoldersResponse),
+  getLibraryPlaylistFolder: one(SOME_FOLDERS, (a, id) => sdk.getLibraryPlaylistFolder(a.music, id, o(a)), schemas.libraryPlaylistFoldersResponse),
+  getLibraryPlaylistFolders: all(SOME_FOLDERS, (a, ids) => sdk.getLibraryPlaylistFolders(a.music, ids, o(a)), schemas.libraryPlaylistFoldersResponse),
   getLibraryPlaylistFolderRelationship: named<tNames<sdk.tLibraryPlaylistFolderRelationships>>(
     "relationships",
     ROOT,
@@ -474,7 +476,8 @@ export const USER = {
   addToLibrary: check("add-to-library"),
   addToFavorites: check("add-to-favorites"),
   addLibraryPlaylistTracks: check("playlist"),
-  getRootLibraryPlaylistFolder: bare((a) => sdk.getRootLibraryPlaylistFolder(a.music, o(a)), schemas.libraryPlaylistFoldersResponse),
+  // The root is always there, and client-user's bound form rejects an answer without it.
+  getRootLibraryPlaylistFolder: bare((a) => sdk.getRootLibraryPlaylistFolder(a.music, o(a)), schemas.libraryPlaylistFoldersResponse, { holds: "the listener's root folder" }),
   listRecentlyAdded: bare((a) => sdk.listRecentlyAdded(a.music, o(a)), schemas.resourceCollectionResponse, paged),
   listHeavyRotation: bare((a) => sdk.listHeavyRotation(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
   listRecentlyPlayed: bare((a) => sdk.listRecentlyPlayed(a.music, o(a)), schemas.paginatedResourceCollectionResponse, paged),
