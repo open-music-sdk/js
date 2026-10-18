@@ -168,12 +168,18 @@ describe("read: which catalog song a track is", () => {
     expect((await read(music, "p.1")).tracks[0]).toEqual({ id: "i.1", type: "library-songs", name: "A recording of my own" });
   });
 
-  test("a next link that drops what was asked for with the first page still gives each track its catalog id", async () => {
+  test("a next link that drops include=catalog, as Apple's do, is asked with it again, so the tracks after the first page keep their ISRC", async () => {
     const { music, lines } = apple(songs(4), { page: 2, nextKeeps: false });
     const snapshot = await read(music, "p.1");
-    expect(lines()[2]).toBe("GET /v1/me/library/playlists/p.1/tracks?offset=2");
+    expect(lines()[2]).toBe("GET /v1/me/library/playlists/p.1/tracks?offset=2&include=catalog");
     expect(snapshot.tracks.map((track) => track.catalogId)).toEqual(["1000", "1001", "1002", "1003"]);
-    expect(snapshot.tracks.map((track) => track.isrc)).toEqual(["ISRC0", "ISRC1", undefined, undefined]);
+    expect(snapshot.tracks.map((track) => track.isrc)).toEqual(["ISRC0", "ISRC1", "ISRC2", "ISRC3"]);
+  });
+
+  test("a next link that keeps include=catalog is asked as it is, with include once", async () => {
+    const { music, lines } = apple(songs(4), { page: 2, nextKeeps: true });
+    await read(music, "p.1");
+    expect(lines()[2]).toBe("GET /v1/me/library/playlists/p.1/tracks?offset=2&include=catalog");
   });
 
   test.each<[string, object]>([
