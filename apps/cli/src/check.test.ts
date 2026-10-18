@@ -1023,6 +1023,13 @@ describe("add-to-library and add-to-favorites", () => {
     expect(cleanupOf()).toContain('- the song "Name of s2" by Artist of s2');
   });
 
+  test("a favorite Apple refuses leaves nothing to undo, and the check is ✗", async () => {
+    apple.failing["/v1/me/favorites"] = 400;
+    expect(await main(["check", "add-to-favorites", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("add-to-favorites")).toEqual(["✗"]);
+    expect(stderr).not.toContain("To undo");
+  });
+
   test("ten chart songs each in the library or rated already are not asked about, and nothing is written", async () => {
     for (const song of apple.songs.slice(0, 10)) apple.library.add(`songs/${song.id as string}`);
     await main(["check", "add-to-favorites", "--write", "--no-color"]);
@@ -1103,6 +1110,28 @@ describe("playlist: one made, given songs, read back, and applied again", () => 
     expect(linesOf("playlist").at(-1)).toBe(
       "✗ playlist: one request of 300 tracks: Apple answered 400, code 40001; and one of 100: Apple answered 400, code 40001. Neither was taken, so how many tracks one request takes is not answered.",
     );
+  });
+
+  test("after 300 refused and 100 taken, the albums to delete are those of the 100 alone", async () => {
+    apple.appendMost = 100;
+    await main(["check", "playlist", "--write", "--no-color"]);
+    // Twelve songs an album: the first 100 come from a1 to a9.
+    expect(cleanupOf()).toContain('"Name of a9"');
+    expect(cleanupOf()).not.toContain('"Name of a10"');
+  });
+
+  test("tracks refused at both sizes leave no albums to delete, since nothing was added", async () => {
+    apple.appendMost = 50;
+    await main(["check", "playlist", "--write", "--no-color"]);
+    expect(cleanupOf()).toContain("Delete the playlist");
+    expect(cleanupOf()).not.toContain("albums they are from");
+  });
+
+  test("a playlist Apple refuses to make leaves nothing to undo", async () => {
+    apple.failing["/v1/me/library/playlists"] = 400;
+    expect(await main(["check", "playlist", "--write", "--no-color"])).toBe(1);
+    expect(marksOf("playlist")).toEqual(["✗"]);
+    expect(stderr).not.toContain("To undo");
   });
 
   test("fewer than 100 tracks refused is ✗ at once, with nothing smaller to try", async () => {

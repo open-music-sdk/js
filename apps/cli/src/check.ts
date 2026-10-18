@@ -502,7 +502,13 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
   }
   const left = { what: song, sure: false };
   run.left.favorites.push(left);
-  await addToFavorites(run.music, { songs: [song.id] }, { signal: run.signal });
+  try {
+    await addToFavorites(run.music, { songs: [song.id] }, { signal: run.signal });
+  } catch (e) {
+    // Refused, so nothing to undo; any other failure may have been carried out, and stays in the steps.
+    if (refused(e)) run.left.favorites.splice(run.left.favorites.indexOf(left), 1);
+    throw e;
+  }
   left.sure = true;
   const item = song;
   let value: unknown;
@@ -521,24 +527,30 @@ async function listed(run: tRun, name: string): Promise<unknown> {
   return undefined;
 }
 
-/** Up to `MOST_TRACKS` songs from the charts' albums that are not in the library, and the albums they are from. */
-async function albumSongs(run: tRun): Promise<{ readonly ids: readonly string[]; readonly albums: readonly tItem[] }> {
-  const ids = new Set<string>();
-  const albums: tItem[] = [];
+/** A song to add to the playlist, and the chart album it is from, which the cleanup names. */
+interface tAlbumSong {
+  readonly id: string;
+  readonly album: tItem;
+}
+
+/** Up to `MOST_TRACKS` songs from the charts' albums that are not in the library, each with its album. */
+async function albumSongs(run: tRun): Promise<readonly tAlbumSong[]> {
+  const songs = new Map<string, tAlbumSong>();
   for (const album of (await run.charts()).albums) {
-    if (ids.size >= MOST_TRACKS) break;
+    if (songs.size >= MOST_TRACKS) break;
     if (await inLibrary(run, album)) continue;
     // Songs that can be played, which a song not yet out or no longer to be streamed cannot: Apple may refuse to add
     // one, and the request it was in would be taken for one too large.
-    const songs = list(at(await getAlbumRelationship(run.music, album.id, "tracks", { signal: run.signal }), "data")).filter(
+    const tracks = list(at(await getAlbumRelationship(run.music, album.id, "tracks", { signal: run.signal }), "data")).filter(
       (track) => at(track, "type") === "songs" && at(track, "attributes", "playParams") !== undefined,
     );
-    const before = ids.size;
-    for (const id of songs.map(idOf).filter(defined)) ids.add(id);
-    if (ids.size > before) albums.push(album);
+    for (const id of tracks.map(idOf).filter(defined)) if (!songs.has(id)) songs.set(id, { id, album });
   }
-  return { ids: [...ids].slice(0, MOST_TRACKS), albums };
+  return [...songs.values()].slice(0, MOST_TRACKS);
 }
+
+/** The albums of the first `n` songs, once each, in order: what adding them may have put in the library. */
+const albumsOf = (songs: readonly tAlbumSong[], n: number) => [...new Set(songs.slice(0, n).map((song) => song.album))];
 
 async function playlistCheck(run: tRun): Promise<void> {
   const { music, signal } = run;
@@ -547,7 +559,13 @@ async function playlistCheck(run: tRun): Promise<void> {
 
   const made = { what: name, sure: false };
   run.left.playlists.push(made);
-  const answer = await createLibraryPlaylist(music, { attributes: { name, description } }, { signal });
+  let answer: unknown;
+  try {
+    answer = await createLibraryPlaylist(music, { attributes: { name, description } }, { signal });
+  } catch (e) {
+    if (refused(e)) run.left.playlists.splice(run.left.playlists.indexOf(made), 1);
+    throw e;
+  }
   made.sure = true;
   let id = idOf(list(at(answer, "data"))[0]);
   run.line("report", id === undefined ? "the answer to making a playlist held no playlist, so apply has to find it by its name and description." : "the answer to making a playlist held the playlist, with its id.");
@@ -593,14 +611,14 @@ async function playlistCheck(run: tRun): Promise<void> {
     }
   }
 
-  const { ids, albums } = await albumSongs(run);
-  const [firstSong] = ids;
+  const songs = await albumSongs(run);
+  const [firstSong] = songs;
   if (firstSong === undefined) {
     run.line("skipped", "no chart album's songs could be picked to add");
     return;
   }
-  run.left.playlistSongs = { albums, seen: false };
-  let tracks = ids.map((song) => ({ id: song, type: "songs" as const }));
+  run.left.playlistSongs = { albums: albumsOf(songs, songs.length), seen: false };
+  let tracks = songs.map((song) => ({ id: song.id, type: "songs" as const }));
   let lost = false;
   try {
     await addLibraryPlaylistTracks(music, id, tracks, { signal });
@@ -615,17 +633,26 @@ async function playlistCheck(run: tRun): Promise<void> {
       // Apple refused; a track it will not take would have both refused.
       const first = `one request of ${plural(tracks.length, "track")}: ${brief(e)}`;
       const unanswered = "so how many tracks one request takes is not answered.";
+      // Nothing added: no album of these songs is left to remove.
+      run.left.playlistSongs = undefined;
       if (tracks.length <= 100) {
         run.line("failed", `${first}, ${unanswered}`);
         return;
       }
       tracks = tracks.slice(0, 100);
+      // The albums of what is sent now, the songs it may put in the library, whatever the answer but a refusal.
+      const sentAlbums = { albums: albumsOf(songs, tracks.length), seen: false };
       try {
         await addLibraryPlaylistTracks(music, id, tracks, { signal });
       } catch (again) {
-        run.line("failed", `${first}; and one of 100: ${brief(refusal(again))}. Neither was taken, ${unanswered}`);
-        return;
+        if (refused(again)) {
+          run.line("failed", `${first}; and one of 100: ${brief(again)}. Neither was taken, ${unanswered}`);
+          return;
+        }
+        run.left.playlistSongs = sentAlbums;
+        throw again;
       }
+      run.left.playlistSongs = sentAlbums;
       run.line("differs", `${first}; one of 100 was taken. lib-playlists lets chunk be ${String(MOST_TRACKS)}.`);
     }
   }
@@ -645,8 +672,8 @@ async function playlistCheck(run: tRun): Promise<void> {
   if (other === 0 && held.length === sent.length) run.line("same", "read gives back the catalog id each track was added by, in order, which plan goes by.");
   else run.line("differs", `${plural(other, "track")} of ${String(sent.length)} came back under another catalog id, or none, or in another place. plan goes by the catalog id, so apply would add them again.`);
 
-  const seen = await inLibrary(run, { type: "songs", id: firstSong });
-  run.left.playlistSongs = { albums, seen };
+  const seen = await inLibrary(run, { type: "songs", id: firstSong.id });
+  run.left.playlistSongs = { albums: albumsOf(songs, tracks.length), seen };
   run.line("report", seen ? "adding songs to the playlist put them in the library too." : "adding songs to the playlist had not put them in the library when check looked.");
 
   if (!asSent || other > 0 || held.length !== sent.length) {
