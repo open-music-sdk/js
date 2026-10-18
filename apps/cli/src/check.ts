@@ -9,6 +9,7 @@ import {
   addToFavorites,
   addToLibrary,
   createLibraryPlaylist,
+  createRateLimiter,
   createServerClient,
   getAlbumRelationship,
   getCharts,
@@ -107,6 +108,8 @@ const POLL_MS = 60_000;
 const SETTLE_S = 4;
 /** The most tracks one request takes, as the client's function and lib-playlists' `chunk` allow. */
 const MOST_TRACKS = 300;
+/** How fast a run asks Apple: ten requests at once, then ten a second. Apple does not say what a key may make. */
+export const PACE = { capacity: 10, refillPerSecond: 10 } as const;
 
 // What Apple's answers hold is read as it comes, with nothing taken on trust.
 const at = (value: unknown, ...keys: readonly (string | number)[]): unknown =>
@@ -512,7 +515,8 @@ async function addToFavoritesCheck(run: tRun): Promise<void> {
 
 /** A playlist of the listener's with this name, from all the pages of their playlists. */
 async function listed(run: tRun, name: string): Promise<unknown> {
-  for await (const playlist of run.music.user.listLibraryPlaylists({ limit: 100, signal: run.signal })) if (text(at(playlist, "attributes", "name")) === name) return playlist;
+  // Asked again every second while it waits, so a walk is held to the first thousand playlists.
+  for await (const playlist of run.music.user.listLibraryPlaylists({ limit: 100, maxPages: 10, signal: run.signal })) if (text(at(playlist, "attributes", "name")) === name) return playlist;
   return undefined;
 }
 
@@ -709,7 +713,9 @@ export async function check(flags: tFlags, ctx: tContext, names: readonly string
     const req = new Request(input, init);
     return fetch(req, { signal: AbortSignal.any([req.signal, AbortSignal.timeout(TIMEOUT_MS)]) });
   };
-  const music = createServerClient({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, userToken: token, storefront, fetch: timed });
+  // The key is most likely the one the developer's app asks with too, and Apple counts its limit by the key: the run
+  // keeps to a pace that leaves the app room, since a run that drew 429s would draw them for the app's listeners.
+  const music = createServerClient({ pem: key.pem, teamId: key.teamId, keyId: key.keyId, userToken: token, storefront, fetch: timed, rateLimit: createRateLimiter(PACE) });
 
   const stop = new AbortController();
   const interrupt = () => {

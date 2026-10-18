@@ -3,10 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { AppleMusicError } from "@open-music-sdk/server";
-import { CHECKS, brief, whereOf } from "./check";
+import { AppleMusicError, createRateLimiter } from "@open-music-sdk/server";
+import { CHECKS, PACE, brief, whereOf } from "./check";
 import { FileUserTokenStore } from "./files";
 import { main } from "./main";
+
+// The pace a run keeps is the limiter's to keep, and is held to by one test below: elsewhere every request is let
+// through at once, so that a run of a few hundred against the fake takes no real seconds.
+const acquire = vi.fn(() => Promise.resolve());
+vi.mock("@open-music-sdk/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("@open-music-sdk/server")>()), createRateLimiter: vi.fn(() => ({ acquire })) }));
 
 const TEAM = "DEF123GHIJ";
 const KEY_ID = "ABC123DEFG";
@@ -386,6 +391,26 @@ describe("which checks run: by name, in the list's order, and the write checks o
     expect(await main(["help", "check"])).toBe(0);
     for (const each of CHECKS) expect(stdout.split(LF).find((line) => line.trim().startsWith(`${each.id} `))?.endsWith("(--write)"), each.id).toBe(each.writes);
     expect(stdout).toContain("--write");
+  });
+});
+
+describe("the pace of a run: the key is likely the app's too, and Apple counts its limit by the key", () => {
+  test("every request after doctor's two waits on a limiter of ten at once and ten a second", async () => {
+    acquire.mockClear();
+    expect(await main(["check", "search-next", "isrc-next", "--no-color"])).toBe(0);
+    expect(PACE).toEqual({ capacity: 10, refillPerSecond: 10 });
+    expect(vi.mocked(createRateLimiter)).toHaveBeenCalledWith(PACE);
+    // Doctor's two questions, and validateUserToken's, are asked before the run's own client is made.
+    const own = asked.filter((req) => !["/v1/test", "/v1/me/storefront"].includes(new URL(req.url).pathname));
+    expect(acquire.mock.calls.length).toBe(own.length);
+  });
+
+  test("the listener's playlists are walked to the thousandth at most, each time a new one is looked for", async () => {
+    apple.listener.push(...Array.from({ length: 2000 }, (_, i): tPlaylist => ({ id: `p.n${String(i)}`, name: `Other ${String(i)}`, description: "", tracks: [], readable: 0, listed: 0, hidden: 0, shown: 0 })));
+    await finish(["check", "playlist", "--write", "--no-color"]);
+    const lists = asked.filter((req) => req.method === "GET" && new URL(req.url).pathname === "/v1/me/library/playlists");
+    expect(lists.length).toBeGreaterThan(10);
+    expect(lists.every((req) => Number(new URL(req.url).searchParams.get("offset") ?? "0") < 1000)).toBe(true);
   });
 });
 
