@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AppleMusicError } from "@open-music-sdk/server";
-import { CHECKS, brief } from "./check";
+import { CHECKS, brief, whereOf } from "./check";
 import { FileUserTokenStore } from "./files";
 import { main } from "./main";
 
@@ -323,6 +323,17 @@ describe("brief: what Apple failed with, from its tag, status and code alone", (
   });
 });
 
+describe("whereOf: which request failed, with no id of the listener's in it", () => {
+  test.each([
+    ["a path, its ids left out", new AppleMusicError("ApiError", "500 /v1/me/library/playlists/p.AbC123/tracks: Oops (detail)", { status: 500 }), "/v1/me/library/playlists/{id}/tracks"],
+    ["a catalog path, its storefront kept", new AppleMusicError("NetworkError", "GET /v1/catalog/gb/songs/1440833098/library: fetch failed"), "/v1/catalog/gb/songs/{id}/library"],
+    ["the function that found the answer wanting", new AppleMusicError("ApiError", "getSongRating: Apple answered with no resource", { status: 200 }), "getSongRating"],
+    ["nothing, where the error names neither", new AppleMusicError("UserTokenInvalid", "No storefront configured and no Music User Token to resolve one from"), undefined],
+  ])("%s", (_what, error, where) => {
+    expect(whereOf(error)).toBe(where);
+  });
+});
+
 describe("which checks run: by name, in the list's order, and the write checks only with --write", () => {
   test("with none named, every check that reads runs, none that writes, and stderr says --write adds them", async () => {
     expect(await main(["check", "--no-color"])).toBe(0);
@@ -412,7 +423,7 @@ describe("marks and the exit status", () => {
   test("a check Apple fails is ✗, worded from the status and the code alone, the rest still run, and the run exits 1", async () => {
     apple.failing["/v1/catalog/gb/search"] = 503;
     expect(await finish(["check", "search-next", "isrc-next", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
-    expect(linesOf("search-next")).toEqual(["✗ search-next: Apple answered 503, code 50301, so this was not answered."]);
+    expect(linesOf("search-next")).toEqual(["✗ search-next: Apple answered 503, code 50301 (at /v1/catalog/gb/search), so this was not answered."]);
     expect(marksOf("isrc-next")).toEqual(["✓"]);
     expect(stdout).not.toContain("detail with");
   });
@@ -650,7 +661,8 @@ describe("playlist-include: a long playlist's tracks, as lib-playlists' read rea
   test("a playlist's tracks Apple fails to answer for, other than a 404, fail the check", async () => {
     apple.failing["/v1/me/library/playlists/p.short/tracks"] = 403;
     expect(await main(["check", "playlist-include", "--no-color"])).toBe(1);
-    expect(linesOf("playlist-include")).toEqual(["✗ playlist-include: Apple refused the Music User Token (403, code 40301), so this was not answered."]);
+    // The playlist's id is the listener's, and is left out of the path the line names.
+    expect(linesOf("playlist-include")).toEqual(["✗ playlist-include: Apple refused the Music User Token (403, code 40301) (at /v1/me/library/playlists/{id}/tracks), so this was not answered."]);
   });
 
   test("a library with no playlist of more than a page of tracks is not asked about, and an empty one is passed over", async () => {
@@ -717,7 +729,7 @@ describe("user-token-refused: what Apple answers for a Music User Token it never
       return real(req);
     });
     expect(await finish(["check", "user-token-refused", "--no-color"], ["setTimeout", "clearTimeout"])).toBe(1);
-    expect(linesOf("user-token-refused")).toEqual(["✗ user-token-refused: Apple could not be reached, so this was not answered."]);
+    expect(linesOf("user-token-refused")).toEqual(["✗ user-token-refused: Apple could not be reached (at /v1/me/storefront), so this was not answered."]);
   });
 });
 
@@ -877,7 +889,7 @@ describe("add-to-library and add-to-favorites", () => {
       return real(req);
     });
     expect(await main(["check", "add-to-library", "--write", "--no-color"])).toBe(1);
-    expect(linesOf("add-to-library")).toEqual(["✗ add-to-library: Apple could not be reached, so this was not answered."]);
+    expect(linesOf("add-to-library")).toEqual(["✗ add-to-library: Apple could not be reached (at /v1/me/library), so this was not answered."]);
     expect(cleanupOf()).toContain("Name of s1\" by Artist of s1: https://music.apple.com/gb/x/s1 (Apple's answer was lost, so it may not be there)");
   });
 
