@@ -22,10 +22,10 @@ export interface tLibraryAlbum {
 
 /** The attributes for a library album resource. */
 export interface tLibraryAlbumAttributes {
-  /** The artist’s name. */
-  artistName: string;
-  /** The album artwork. */
-  artwork: tArtwork;
+  /** The artist’s name. Left out for some albums in a listener's library against the live API on 18 October 2026. */
+  artistName?: string;
+  /** The album artwork. Left out for some albums in a listener's library against the live API on 18 October 2026. */
+  artwork?: tArtwork;
   /** The Recording Industry Association of America (RIAA) rating of the content. The possible values for this rating are clean and explicit. No value means no rating. */
   contentRating?: "clean" | "explicit";
   /** The date the album was added to the library, in YYYY-MM-DD or YYYY format. */

@@ -97,6 +97,16 @@ becomes a string-literal union, and `required: false` becomes an optional proper
 no documented properties becomes `Record<string, unknown>`. Property descriptions are carried over as
 doc comments.
 
+**Corrections.** Where Apple's reference marks a property required and Apple was seen to leave it out,
+by the CLI's `check` against the live API, the emitter's `OPTIONAL` table makes it optional before
+anything is written. The property's doc comment then says when and where it was seen. A correction
+that no longer matches a required property throws, so that the table shrinks when a crawl brings the
+fix. Run on 18 October 2026, `check` found four:
+- a view's own `attributes`, sent only when asked for and only on the first page;
+- `durationInMillis` on songs and music videos, left out for some of an album's tracks;
+- `artistName` on some albums in a listener's library;
+- `artwork` on some albums in a listener's library.
+
 **Resources.** Any dictionary with an `id`, a single-valued `type`, and at least one of `href`,
 `attributes`, `relationships`, `views`, or `meta` is a resource. That follows Apple's base `Resource`
 dictionary, where `href` is optional ("only present in responses"); the replay objects

@@ -404,12 +404,16 @@ describe("a validator from the family fits as a schema, though this package depe
     expect(sent()).toEqual(["GET /v1/catalog/us/albums/9/view/other-versions?with=attributes", "GET /v1/catalog/us/albums/9/view/other-versions?with=attributes"]);
   });
 
-  test("an answer the validator does not pass is a ValidationError: what is no album, and a view asked for without the attributes its validator wants", async () => {
-    const { music } = apple([{ body: { data: [{ id: 1 }], attributes: { title: "Other Versions" } } }, { body: { data: [album] } }]);
-    for (let asked = 0; asked < 2; asked++) {
-      const error = await rejection(api.getAlbumView(music, "9", "other-versions", { schema: albumViewsAlbumOtherVersionsView }));
-      expect(isAppleMusicError(error, "ValidationError")).toBe(true);
-    }
+  test("an answer the validator does not pass is a ValidationError: what is no album", async () => {
+    const { music } = apple([{ body: { data: [{ id: 1 }], attributes: { title: "Other Versions" } } }]);
+    const error = await rejection(api.getAlbumView(music, "9", "other-versions", { schema: albumViewsAlbumOtherVersionsView }));
+    expect(isAppleMusicError(error, "ValidationError")).toBe(true);
+  });
+
+  test("a view's page without the view's own attributes passes its validator: Apple sends them only when asked for, and on the first page alone", async () => {
+    const answer = { data: [album] };
+    const { music } = apple([{ body: answer }]);
+    expect(await api.getAlbumView(music, "9", "other-versions", { schema: albumViewsAlbumOtherVersionsView })).toEqual(answer);
   });
 
   test("a relationship's page passes the validator of that relationship", async () => {

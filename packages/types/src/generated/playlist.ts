@@ -105,8 +105,8 @@ export interface tPlaylistViewsPlaylistFeaturedArtistsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attribute metadata for the view. */
-  attributes: tPlaylistViewsPlaylistFeaturedArtistsViewAttributes;
+  /** The attribute metadata for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tPlaylistViewsPlaylistFeaturedArtistsViewAttributes;
   /** A paginated collection of resources in the view. */
   data: tArtist[];
 }
@@ -123,8 +123,8 @@ export interface tPlaylistViewsPlaylistMoreByCuratorView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attribute metadata for the view. */
-  attributes: tPlaylistViewsPlaylistMoreByCuratorViewAttributes;
+  /** The attribute metadata for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tPlaylistViewsPlaylistMoreByCuratorViewAttributes;
   /** A paginated collection of resources in the view. */
   data: tPlaylist[];
 }

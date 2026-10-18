@@ -52,7 +52,7 @@ export const songAttributes: r.tSchema<t.tSongAttributes> = r.object<t.tSongAttr
     url: r.string,
     workName: r.string,
   },
-  ["albumName", "artistName", "artwork", "durationInMillis", "genreNames", "hasLyrics", "isAppleDigitalMaster", "name", "previews", "url"],
+  ["albumName", "artistName", "artwork", "genreNames", "hasLyrics", "isAppleDigitalMaster", "name", "previews", "url"],
 );
 
 /** Validates a `tSongRelationships`: the relationships for a song resource. */

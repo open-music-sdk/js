@@ -34,7 +34,7 @@ export const libraryAlbumAttributes: r.tSchema<t.tLibraryAlbumAttributes> = r.ob
     genreNames: r.array(r.string),
     inFavorites: r.boolean,
   },
-  ["artistName", "artwork", "name", "trackCount", "genreNames"],
+  ["name", "trackCount", "genreNames"],
 );
 
 /** Validates a `tLibraryAlbumRelationships`: the relationships for a library album object. */

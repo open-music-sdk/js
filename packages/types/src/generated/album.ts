@@ -151,8 +151,8 @@ export interface tAlbumViewsAlbumAppearsOnView {
   href?: string;
   /** The relative location to request the next page of resources in the collection, if additional resources are available for fetching. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tAlbumViewsAlbumAppearsOnViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tAlbumViewsAlbumAppearsOnViewAttributes;
   /** A selection of playlists that tracks from this album appear on. */
   data: tPlaylist[];
 }
@@ -169,8 +169,8 @@ export interface tAlbumViewsAlbumOtherVersionsView {
   href?: string;
   /** The relative location to request the next page of resources in the collection, if additional resources are available for fetching. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tAlbumViewsAlbumOtherVersionsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tAlbumViewsAlbumOtherVersionsViewAttributes;
   /** Other versions of the album. */
   data: tAlbum[];
 }
@@ -187,8 +187,8 @@ export interface tAlbumViewsAlbumRelatedAlbumsView {
   href?: string;
   /** The relative location to request the next page of resources in the collection, if additional resources are available for fetching. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tAlbumViewsAlbumRelatedAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tAlbumViewsAlbumRelatedAlbumsViewAttributes;
   /** A collection of other albums related or similar to the album. */
   data: tAlbum[];
 }
@@ -205,8 +205,8 @@ export interface tAlbumViewsAlbumRelatedVideosView {
   href?: string;
   /** The relative location to request the next page of resources in the collection, if additional resources are available for fetching. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tAlbumViewsAlbumRelatedVideosViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tAlbumViewsAlbumRelatedVideosViewAttributes;
   /** The music videos available for songs on the album. */
   data: tMusicVideo[];
 }

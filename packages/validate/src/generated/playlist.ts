@@ -99,7 +99,7 @@ export const playlistViewsPlaylistFeaturedArtistsView: r.tSchema<t.tPlaylistView
     attributes: r.lazy(() => playlistViewsPlaylistFeaturedArtistsViewAttributes),
     data: r.array(r.lazy(() => artist)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tPlaylistViewsPlaylistFeaturedArtistsViewAttributes`: Attribute metadata for the playlist featured artists view. */
@@ -118,7 +118,7 @@ export const playlistViewsPlaylistMoreByCuratorView: r.tSchema<t.tPlaylistViewsP
     attributes: r.lazy(() => playlistViewsPlaylistMoreByCuratorViewAttributes),
     data: r.array(r.lazy(() => playlist)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tPlaylistViewsPlaylistMoreByCuratorViewAttributes`: Attribute metadata for the view containing additional content by the same curator for this playlist. */

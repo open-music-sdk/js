@@ -35,8 +35,8 @@ export interface tMusicVideoAttributes {
   artwork: tArtwork;
   /** The Recording Industry Association of America (RIAA) rating of the content. No value means no rating. */
   contentRating?: "clean" | "explicit";
-  /** The duration of the music video in milliseconds. */
-  durationInMillis: number;
+  /** The duration of the music video in milliseconds. Left out for some of an album's tracks against the live API on 18 October 2026. */
+  durationInMillis?: number;
   /** The editorial notes for the music video. */
   editorialNotes?: tEditorialNotes;
   /** The music video’s associated genres. */
@@ -147,8 +147,8 @@ export interface tMusicVideoViewsMusicVideoMoreByArtistView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tMusicVideoViewsMusicVideoMoreByArtistViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tMusicVideoViewsMusicVideoMoreByArtistViewAttributes;
   /** Music videos of some type by the artist. */
   data: tMusicVideo[];
 }
@@ -165,8 +165,8 @@ export interface tMusicVideoViewsMusicVideoMoreInGenreView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tMusicVideoViewsMusicVideoMoreInGenreViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tMusicVideoViewsMusicVideoMoreInGenreViewAttributes;
   /** Music videos in the given music video genre. */
   data: tMusicVideo[];
 }
