@@ -50,9 +50,15 @@ async function find(text: string): Promise<void> {
 /** Your crate, drawn as the others are, with the sleeve at `at` in front. Its order is the playlist's. */
 function draw(at = 0): void {
   byId("crate-count", HTMLSpanElement).textContent = String(picks.length);
-  const move = (from: number, to: number) => () => {
+  const move = (from: number, to: number, label: string) => () => {
     picks.splice(to, 0, ...picks.splice(from, 1));
     draw(to);
+    again(label);
+  };
+  const takeOut = (i: number) => () => {
+    picks.splice(i, 1);
+    draw(i);
+    again("Take out");
   };
   const sleeve = (song: tSong, i: number): tSleeve => ({
     artwork: song.attributes?.artwork,
@@ -61,14 +67,21 @@ function draw(at = 0): void {
     open: () => { playFrom(picks, song); },
     actions: () => [
       h("button", { type: "button", textContent: "Play", onclick: () => { playFrom(picks, song); } }),
-      h("button", { type: "button", textContent: "Move earlier", disabled: i === 0, onclick: move(i, i - 1) }),
-      h("button", { type: "button", textContent: "Move later", disabled: i === picks.length - 1, onclick: move(i, i + 1) }),
-      h("button", { type: "button", textContent: "Take out", onclick: () => { picks.splice(i, 1); draw(i); } }),
+      h("button", { type: "button", textContent: "Move earlier", disabled: i === 0, onclick: move(i, i - 1, "Move earlier") }),
+      h("button", { type: "button", textContent: "Move later", disabled: i === picks.length - 1, onclick: move(i, i + 1, "Move later") }),
+      h("button", { type: "button", textContent: "Take out", onclick: takeOut(i) }),
     ],
   });
   const empty = "Empty. Put songs in from Dig, or paste a tracklist below.";
   byId("picks", HTMLDivElement).replaceChildren(h("div", { className: "crates" }, crate("Your crate", picks.map(sleeve), { at, empty })));
   byId("send", HTMLFormElement).hidden = now.listener === undefined || picks.length === 0;
+}
+
+/** Focus back on the action just used, in the crate drawn again, so a song can be moved on with the keyboard. */
+function again(label: string): void {
+  const box = byId("picks", HTMLDivElement);
+  const button = [...box.querySelectorAll<HTMLButtonElement>(".actions button")].find((each) => each.textContent === label && !each.disabled);
+  (button ?? box.querySelector<HTMLElement>(".sleeve[tabindex='0']"))?.focus();
 }
 
 // Another storefront has other ids, so the crate, and the songs offered for unmatched lines, empty.
