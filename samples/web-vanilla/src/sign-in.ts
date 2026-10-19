@@ -1,7 +1,7 @@
 // Shows: createConnect, as, getUserStorefront. Guides: /guides/sign-in, /guides/store-user-tokens
 import { createConnect } from "@open-music-sdk/browser";
 import { byId } from "./dom";
-import { say, showError } from "./errors";
+import { fromServer, say, showError } from "./errors";
 import { change, music, now, onChange } from "./music";
 
 const signInButton = byId("sign-in", HTMLButtonElement);
@@ -31,18 +31,11 @@ signIn.ready.then(async (restored) => {
 // #endregion restore
 
 // #region keep
-/** What the server answers when it will not keep a token. */
-const REFUSED: Record<number, string> = {
-  401: "The server has no session for this page. Reload it and sign in again.",
-  422: "Apple did not accept this sign-in. The account may have no Apple Music subscription.",
-  502: "The server could not ask Apple about your sign-in. Try again.",
-};
-
 /** Hands the token to the server, which asks Apple whether it works and keeps it; then signs the page in. */
 async function keep(token: string): Promise<void> {
   const answer = await fetch("/api/music/user-token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
   if (!answer.ok) {
-    say(REFUSED[answer.status] ?? `The server answered ${String(answer.status)}. Try again.`);
+    say(fromServer(answer.status));
     // Apple's script keeps the token Apple refused, and would hand it back at the next sign-in: leave it, so that the
     // listener can sign in with another account.
     if (answer.status === 422) await signIn.disconnect();

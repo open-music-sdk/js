@@ -22,12 +22,28 @@ export function explain(e: unknown): string {
 }
 // #endregion explain
 
-/** Says what went wrong on the status line, and hands the error itself to the console for whoever is developing. */
+/**
+ * Says what went wrong on the status line, and tells the console for whoever is developing: the whole error when it
+ * is the SDK's or a TypeError, whose messages never hold a token, and only the name of anything else, such as what
+ * Apple's sign-in script throws, whose shape is Apple's own.
+ */
 export function showError(e: unknown): void {
   // A later play, next or previous took over from this one: nothing went wrong.
   if (e instanceof DOMException && e.name === "AbortError") return;
   say(explain(e));
-  console.error(e);
+  console.error(isAppleMusicError(e) || e instanceof TypeError ? e : `${e instanceof Error ? e.name : typeof e}: not printed, as it may hold what Apple's script holds`);
+}
+
+/** What the sample's own server answers when it will not do what the page asked. */
+const FROM_SERVER: Record<number, string> = {
+  401: "The server has no session for this page. Reload it.",
+  421: "The server answers only requests sent to its own address. Open the page at the address its README gives.",
+  422: "Apple does not accept this sign-in: the account may have no Apple Music subscription, or the sign-in has ended. Sign in again, with another account if it happens again.",
+  502: "The server could not ask Apple. Try again.",
+};
+
+export function fromServer(status: number): string {
+  return FROM_SERVER[status] ?? `The server answered ${String(status)}. Try again.`;
 }
 
 export function say(message: string): void {

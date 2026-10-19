@@ -2,7 +2,7 @@
 // getLibraryPlaylist, searchLibrary, and one list the server asks for. Guide: /guides/store-user-tokens
 import type { tArtwork, tBrowserMusic, tLibraryPlaylist } from "@open-music-sdk/browser";
 import { byId, h } from "./dom";
-import { showError } from "./errors";
+import { fromServer, showError } from "./errors";
 import { now, onChange } from "./music";
 import { cover } from "./songs";
 
@@ -51,8 +51,8 @@ async function draw(listener: tBrowserMusic): Promise<void> {
 async function fromTheServer(): Promise<HTMLElement[]> {
   const title = h("h3", {}, "Recently played ", h("small", {}, "asked by the server"));
   const answer = await fetch("/api/me/recent");
-  if (answer.status === 422) return [title, h("p", {}, "The server holds no working sign-in for you. Sign out, and in again.")];
-  if (!answer.ok) throw new Error(`The server answered ${String(answer.status)} for what you played lately.`);
+  // A list that cannot be had says why in its own place, and the rest of the Library is drawn all the same.
+  if (!answer.ok) return [title, h("p", {}, fromServer(answer.status))];
   return [title, cards((await answer.json()) as tCard[])];
 }
 // #endregion from-the-server
