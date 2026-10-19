@@ -71,7 +71,7 @@ function yourPlaylists(listener: tBrowserMusic): HTMLElement {
     }
     return next;
   };
-  return crate("Your playlists", [], { more, empty: "Looking for your playlists." });
+  return crate("Your playlists", [], { more, empty: "No playlists in your library." });
 }
 
 /** A playlist of the listener's, with its tracks, under the crates. Songs in a library have no previews. */

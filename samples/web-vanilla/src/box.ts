@@ -2,7 +2,7 @@
 import type { tArtwork } from "@open-music-sdk/browser";
 import { cover } from "./artwork";
 import { h } from "./dom";
-import { showError } from "./errors";
+import { explain, showError } from "./errors";
 
 /** One record in a crate: its cover and names, what pulling it out does, and what can be done with it in front. */
 export interface tSleeve {
@@ -18,7 +18,7 @@ interface tCrateOptions {
   readonly at?: number;
   /** The next sleeves, asked for as the listener nears the back of the crate. None means there are no more. */
   readonly more?: () => Promise<tSleeve[]>;
-  /** What the crate says while it is empty. */
+  /** What the crate says when it is empty, once it has asked for more if it can. */
   readonly empty?: string;
 }
 
@@ -77,11 +77,20 @@ export function crate(label: string, sleeves: readonly tSleeve[], { at = 0, more
     caption.replaceChildren(...(sleeve === undefined ? [] : [h("strong", {}, sleeve.name), h("small", {}, sleeve.by ?? ""), h("div", { className: "actions" }, ...(sleeve.actions?.() ?? []))]));
     if (more !== undefined && !asking && front >= all.length - 3) {
       asking = true;
-      more().then((added) => {
-        add(added);
-        asking = added.length === 0;
-        flip(front);
-      }, showError);
+      note.textContent = "Looking…";
+      // An empty answer means there are no more, and a failure is said in the crate: neither is asked again.
+      more().then(
+        (added) => {
+          note.textContent = empty;
+          add(added);
+          asking = added.length === 0;
+          flip(front);
+        },
+        (e: unknown) => {
+          note.textContent = explain(e);
+          showError(e);
+        },
+      );
     }
   };
 
