@@ -61,7 +61,7 @@ export function Cover({ song }: { song: tSong }) {
 The [vanilla sample](../samples) draws every cover with one function, which leaves a resource with no artwork an
 empty box of the same size:
 
-<<< @/../../samples/web-vanilla/src/box.ts#artwork{ts}
+<<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
 
 How the size is chosen:
 

@@ -1,5 +1,5 @@
 // Shows: getCharts, listGenres, searchCatalog, getSearchHints, listStorefronts.
-import { crate, later, type tSleeve } from "./box";
+import { crate, type tSleeve } from "./box";
 import { byId, h } from "./dom";
 import { showError } from "./errors";
 import { change, music, now, onChange } from "./music";
@@ -37,6 +37,18 @@ async function genres(storefront: string): Promise<HTMLElement[]> {
 async function genreCrate(genre: string, storefront: string): Promise<tSleeve[]> {
   const { results } = await music.catalog.getCharts({ types: ["albums"], genre, limit: 20, storefront });
   return sleeves(results.albums[0]?.data ?? []);
+}
+
+/** A crate filled once it scrolls into view, so a floor of them asks Apple only for the ones the listener reaches. */
+function later(label: string, fill: () => Promise<readonly tSleeve[]>): HTMLElement {
+  const waiting = crate(label, [], { empty: "Not looked through yet." });
+  const seen = new IntersectionObserver(([entry]) => {
+    if (entry?.isIntersecting !== true) return;
+    seen.disconnect();
+    fill().then((sleeves) => { waiting.replaceWith(crate(label, sleeves)); }, showError);
+  }, { rootMargin: "200px" });
+  seen.observe(waiting);
+  return waiting;
 }
 
 const term = byId("term", HTMLInputElement);

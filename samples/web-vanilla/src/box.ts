@@ -1,15 +1,8 @@
-// Shows: artworkImage. Guide: /guides/artwork. The rest is the crate every list is drawn as, and asks Apple nothing.
-import { artworkImage, type tArtwork } from "@open-music-sdk/browser";
+// The crate every list is drawn as: sleeves in a box, flipped through one at a time. Nothing here asks Apple.
+import type { tArtwork } from "@open-music-sdk/browser";
+import { cover } from "./artwork";
 import { h } from "./dom";
 import { showError } from "./errors";
-
-// #region artwork
-/** An `<img>` for an artwork shown `size` CSS pixels wide, with a `srcset` for screens of higher density. */
-export function cover(artwork: tArtwork | undefined, size: number): HTMLImageElement {
-  if (artwork === undefined) return h("img", { alt: "", width: size, height: size });
-  return h("img", { alt: "", ...artworkImage(artwork, size) });
-}
-// #endregion artwork
 
 /** One record in a crate: its cover and names, what pulling it out does, and what can be done with it in front. */
 export interface tSleeve {
@@ -122,16 +115,4 @@ export function crate(label: string, sleeves: readonly tSleeve[], { at = 0, more
   add(sleeves);
   flip(at);
   return h("section", { className: "crate", onkeydown }, bin, h("div", { className: "wall" }, h("h3", {}, label)), h("div", { className: "flip" }, previous, count, next), caption);
-}
-
-/** A crate filled once it scrolls into view, so a floor of them asks Apple only for the ones the listener reaches. */
-export function later(label: string, fill: () => Promise<readonly tSleeve[]>): HTMLElement {
-  const waiting = crate(label, [], { empty: "Not looked through yet." });
-  const seen = new IntersectionObserver(([entry]) => {
-    if (entry?.isIntersecting !== true) return;
-    seen.disconnect();
-    fill().then((sleeves) => { waiting.replaceWith(crate(label, sleeves)); }, showError);
-  }, { rootMargin: "200px" });
-  seen.observe(waiting);
-  return waiting;
 }

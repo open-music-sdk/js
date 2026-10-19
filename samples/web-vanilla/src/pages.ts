@@ -2,7 +2,8 @@
 // addToLibrary, addToFavorites. Guides: /guides/validation, /guides/direct-requests
 import { isAppleMusicError, schemas, type tAlbum, type tArtist, type tArtwork, type tBrowserMusic, type tLibraryAlbum, type tPage, type tPlaylist, type tSong } from "@open-music-sdk/browser";
 import { segmentOf } from "@open-music-sdk/core";
-import { cover, crate, type tSleeve } from "./box";
+import { cover } from "./artwork";
+import { crate, type tSleeve } from "./box";
 import { h } from "./dom";
 import { say, showError } from "./errors";
 import { music, now } from "./music";

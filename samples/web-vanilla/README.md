@@ -15,14 +15,14 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | [`src/dig.ts`](./src/dig.ts) | `getCharts`, `listGenres`, `searchCatalog`, `getSearchHints`, `listStorefronts` |
 | [`src/pages.ts`](./src/pages.ts) | `getAlbum` with `schemas`, `getArtist`, `getArtistView`, `getArtistRelationship`, `getPlaylist`, `request` with `segmentOf` for the one endpoint the clients lack, `addToLibrary`, `addToFavorites` |
 | [`src/songs.ts`](./src/songs.ts) | `getSongRatings`, `setSongRating`, `deleteSongRating`, `addToLibrary` |
-| [`src/box.ts`](./src/box.ts) | `artworkImage`, and the crate every list is drawn as |
+| [`src/artwork.ts`](./src/artwork.ts) | `artworkImage` |
 | [`src/player.ts`](./src/player.ts) | `previewPlayer`, `artworkUrl` |
 | [`src/sign-in.ts`](./src/sign-in.ts) | `createConnect`: sign in, restore a returning listener, sign out; the token posted to the server |
 | [`src/library.ts`](./src/library.ts) | The listener's lists, their playlists a page at a time, `searchLibrary`, and the list the server asks for |
 | [`src/crate.ts`](./src/crate.ts) | The picks, and `playlists.resolve` for a pasted tracklist |
 | [`src/send.ts`](./src/send.ts) | `playlists.read`, `plan` and `apply`: the crate sent as a playlist, with the plan shown first |
 | [`src/errors.ts`](./src/errors.ts) | `isAppleMusicError`, each tag in words a listener can act on |
-| [`src/view.ts`](./src/view.ts), [`src/dom.ts`](./src/dom.ts), [`src/main.ts`](./src/main.ts) | The page itself, with nothing of the SDK |
+| [`src/box.ts`](./src/box.ts), [`src/view.ts`](./src/view.ts), [`src/dom.ts`](./src/dom.ts), [`src/main.ts`](./src/main.ts) | The page itself, with nothing of the SDK: the crate, the floor and its pages, the tabs |
 
 Signed out, the page asks the catalog in the storefront you pick. Signed in, it asks in yours, from Apple. Catalog
 ids differ between storefronts, so the crate empties when the storefront changes.
