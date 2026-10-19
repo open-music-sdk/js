@@ -1,0 +1,11 @@
+// Run locally with `wrangler dev`, never deployed. `build` is a dry run, to check the Worker bundles.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crate-digger-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // Kept in .wrangler/state on this machine. The id is a placeholder, since no namespace is ever made at Cloudflare.
+  "kv_namespaces": [{ "binding": "MUSIC_USER_TOKENS", "id": "00000000000000000000000000000000" }],
+  // Where the Vite samples forward /api to, on this machine's loopback address alone.
+  "dev": { "ip": "127.0.0.1", "port": 8787 }
+}

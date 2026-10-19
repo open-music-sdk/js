@@ -1,0 +1,19 @@
+{
+  "name": "worker-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Crate Digger's server as a Cloudflare Worker, run locally with Wrangler: the page's developer token, the listener's Music User Token in Workers KV, and one request made for the listener.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "dependencies": {
+    "@open-music-sdk/server": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
+  }
+}
