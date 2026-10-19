@@ -14,7 +14,8 @@
   --grain: #946235;
   --inside: #3b2b1e;
   --tape: #f2e4a9;
-  --marker: "Permanent Marker", "Segoe Print", "Bradley Hand", cursive;
+  /* A face of the system that looks written by hand, rather than one from a font host the page would tell about each visit. */
+  --marker: "Marker Felt", "Segoe Print", "Bradley Hand", cursive;
 }
 @media (prefers-color-scheme: dark) {
   :root {
