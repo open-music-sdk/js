@@ -158,16 +158,14 @@ const LIBRARY_ALBUMS = seed("album in your library", async (a) => idsIn(await sd
 const LIBRARY_ARTISTS = seed("artist in your library", async (a) => idsIn(await sdk.listLibraryArtists(a.music, { limit: 5, ...o(a) })));
 const LIBRARY_VIDEOS = seed("music video in your library", async (a) => idsIn(await sdk.listLibraryMusicVideos(a.music, { limit: 5, ...o(a) })));
 const LIBRARY_PLAYLISTS = seed("playlist in your library", async (a) => idsIn(await sdk.listLibraryPlaylists(a.music, { limit: 5, ...o(a) })));
-/**
- * The id of the root playlist folder, as Apple answers for it, or the one its children were found under on 18 October
- * 2026, when the identity filter answered with none for a listener with no folder.
- */
-const ROOT_ID = "p.playlistsroot";
-const rootOf = async (a: tAsk) => (await idsOf(sdk.getRootLibraryPlaylistFolder(a.music, o(a))))[0] ?? ROOT_ID;
-const ROOT = seed("root playlist folder", async (a) => [await rootOf(a)]);
+/** The id of the root playlist folder, as Apple answers for it, once for the run. */
+const rootOf = (a: tAsk) => once(a, "root folder", async () => (await idsOf(sdk.getRootLibraryPlaylistFolder(a.music, o(a))))[0]);
+const ROOT = seed("root playlist folder", async (a) => [await rootOf(a)].filter(defined));
 /** The folders in the root folder, which have a parent to ask for, as the root does not. */
 const FOLDERS = seed("playlist folder in your library", async (a) => {
-  const children = list(at(await sdk.getLibraryPlaylistFolderRelationship(a.music, await rootOf(a), "children", { limit: 100, ...o(a) }), "data"));
+  const root = await rootOf(a);
+  if (root === undefined) return [];
+  const children = list(at(await sdk.getLibraryPlaylistFolderRelationship(a.music, root, "children", { limit: 100, ...o(a) }), "data"));
   return children.filter((child) => at(child, "type") === "library-playlist-folders").map(idOf).filter(defined);
 });
 /** A folder to read by its id: one in the root, whose id Apple gave, and then the root, which was a 404 by its id on 18 October 2026. */
@@ -764,21 +762,21 @@ async function folderTrip(r: tRun): Promise<void> {
   }
   // Every page of the root's children, a thousand at most, and a second's wait for each page walked, as the playlist's poll.
   let pages = 1;
-  const among = async () => {
+  const among = async (top: string) => {
     let seen = 0;
-    for await (const child of r.music.user.getLibraryPlaylistFolderRelationship(root, "children", { limit: 100, maxPages: 10, ...signal })) {
+    for await (const child of r.music.user.getLibraryPlaylistFolderRelationship(top, "children", { limit: 100, maxPages: 10, ...signal })) {
       seen += 1;
       if (idOf(child) === id) return true;
     }
     pages = Math.max(1, Math.ceil(seen / 100));
     return false;
   };
-  const listed = await seconds(r, "the new folder to be among the root folder's", among, madeAt, () => pages * 1000);
+  const listed = root === undefined ? undefined : await seconds(r, "the new folder to be among the root folder's", () => among(root), madeAt, () => pages * 1000);
   if (diffs.length > 0) r.line("differs", `types: ${someOf(diffs)}.`, diffs);
   const wrong = [
     readable === undefined ? "it could not be read by its id within a minute" : undefined,
-    listed === undefined ? "it was not among the root folder's children within a minute" : undefined,
-    readable !== undefined && parent !== root ? "its parent was not the root folder" : undefined,
+    root === undefined ? "Apple answered with no root folder to look for it in" : listed === undefined ? "it was not among the root folder's children within a minute" : undefined,
+    readable !== undefined && root !== undefined && parent !== root ? "its parent was not the root folder" : undefined,
   ].filter(defined);
   if (wrong.length === 0) r.line("same", `a folder was made, could be read by its id after ${took(readable)}, was among the root folder's children after ${took(listed)}, and has the root for its parent.`);
   else r.line("differs", `a folder was made, but ${wrong.join("; ")}.`);

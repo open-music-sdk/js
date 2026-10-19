@@ -350,9 +350,14 @@ async function anything(req: Request, url: URL): Promise<Response> {
     const named = (one: string) => (one === ROOT ? { id: ROOT, name: "Playlists" } : apple.folders.find((each) => each.id === one));
     if (id === undefined && query.has("ids"))
       return json(valid(schemas.libraryPlaylistFoldersResponse, { data: (query.get("ids") ?? "").split(",").map(named).filter((one) => one !== undefined).map(folder) }));
-    if (id === undefined) return query.get("filter[identity]") === "playlistsroot" ? json(valid(schemas.libraryPlaylistFoldersResponse, { data: [folder({ id: ROOT, name: "Playlists" })] })) : refuse(404);
+    // As Apple answered on 18 October 2026: the root comes only when something is included with it, by its identity
+    // or by its id.
+    const included = query.has("include");
+    if (id === undefined && query.get("filter[identity]") === "playlistsroot")
+      return json(included ? valid(schemas.libraryPlaylistFoldersResponse, { data: [folder({ id: ROOT, name: "Playlists" })] }) : { data: [], meta: { filters: { identity: { playlistsroot: [] } } } });
+    if (id === undefined) return refuse(404);
     const known = named(id);
-    if (known === undefined) return refuse(404);
+    if (known === undefined || (id === ROOT && rel === undefined && !included)) return refuse(404);
     if (rel === undefined) return json(valid(schemas.libraryPlaylistFoldersResponse, { data: [folder(known)] }));
     if (rel === "parent") return id === ROOT ? refuse(404) : json(valid(shape("libraryPlaylistFolderRelationshipsLibraryPlaylistFolderParentRelationship"), { data: [folder({ id: ROOT, name: "Playlists" })] }));
     if (id !== ROOT) return refuse(404);
@@ -2019,12 +2024,19 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(marksOf("searchLibrary")).toEqual(["-"]);
   });
 
-  test("a root folder Apple answers none for by its identity is ≠, since there always is one, and the root its children were found under is asked for them", async () => {
-    apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
+  test("the root folder is answered, as client-user asks for it with its children, which Apple answers the request that includes nothing without", async () => {
+    expect(await main(["check", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(0);
+    expect(rowsOf("getRootLibraryPlaylistFolder")).toEqual(["✓ getRootLibraryPlaylistFolder: as the types have it."]);
+    expect(asked.find((req) => new URL(req.url).searchParams.has("filter[identity]"))?.url).toContain("include=children");
+  });
+
+  test("a root folder Apple answers none for, asked with its children, is ≠, since there always is one, and nothing is asked under it", async () => {
+    apple.answers["/v1/me/library/playlist-folders"] = { data: [] };
     expect(await main(["check", "getLibraryPlaylistFolderRelationship", "getRootLibraryPlaylistFolder", "--no-color"])).toBe(1);
     expect(rowsOf("getRootLibraryPlaylistFolder")).toEqual(["≠ getRootLibraryPlaylistFolder: Apple answered with nothing for the listener's root folder."]);
-    expect(rowsOf("getLibraryPlaylistFolderRelationship")).toEqual(["✓ getLibraryPlaylistFolderRelationship: 2 of 2 relationships as the types have them."]);
-    expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.playlistsroot/children");
+    expect(marksOf("getLibraryPlaylistFolderRelationship:children")).toEqual(["-"]);
+    expect(marksOf("getLibraryPlaylistFolderRelationship:parent")).toEqual(["-"]);
+    expect(pathsOf(asked).some((path) => path.endsWith("/children"))).toBe(false);
   });
 
   test("a folder is read by its id as one in the root, before the root itself, which may be a 404 by its id", async () => {
@@ -2594,10 +2606,10 @@ describe("what the sweep and its round trips say when Apple answers otherwise", 
     expect(cleanupOf()).toMatch(/Delete the playlist folder named .*\(Apple's answer was lost, so it may not be there\)/);
   });
 
-  test("with no root folder answered for by its identity, a folder made is looked for under the root its children were found under", async () => {
-    apple.answers["/v1/me/library/playlist-folders?filter%5Bidentity%5D=playlistsroot"] = { data: [] };
-    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(0);
-    expect(marksOf("createLibraryPlaylistFolder")).toEqual(["✓"]);
+  test("with no root folder answered for, a folder made has nothing to be looked for in, which is ≠", async () => {
+    apple.answers["/v1/me/library/playlist-folders"] = { data: [] };
+    expect(await main(["check", "createLibraryPlaylistFolder", "--write", "--no-color"])).toBe(1);
+    expect(linesOf("createLibraryPlaylistFolder")).toEqual(["≠ createLibraryPlaylistFolder: a folder was made, but Apple answered with no root folder to look for it in."]);
   });
 
   test("a playlist whose making is answered unlike its type is ≠ for that, and the question goes on", async () => {
