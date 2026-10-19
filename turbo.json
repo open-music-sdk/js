@@ -41,6 +41,22 @@
         "codegen-emit#codegen"
       ]
     },
+    "samples-export-check#test": {
+      "dependsOn": [
+        "^build",
+        "codegen-emit#codegen"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/samples/**/*.{ts,tsx,html}",
+        "!$TURBO_ROOT$/samples/**/node_modules/**",
+        "!$TURBO_ROOT$/samples/**/dist/**",
+        "!$TURBO_ROOT$/samples/**/.wrangler/**",
+        "$TURBO_ROOT$/apps/docs/**/*.md",
+        "!$TURBO_ROOT$/apps/docs/reference/**",
+        "$TURBO_ROOT$/apps/docs/check-snippets.mjs"
+      ]
+    },
     "check": {
       "dependsOn": [
         "^build",
