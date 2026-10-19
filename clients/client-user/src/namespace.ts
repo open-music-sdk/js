@@ -272,7 +272,9 @@ export interface tUserFunctions {
    */
   readonly createLibraryPlaylist: typeof resources.createLibraryPlaylist;
   /**
-   * The playlist folder with an id in the listener's library.
+   * The playlist folder with an id in the listener's library. The root, `p.playlistsroot`, was answered `404` by its
+   * id against the live API on 18 October 2026, unless asked for with an `include`, such as `["children"]`; a folder
+   * made in it was answered without one.
    *
    * @param id - The library playlist folder's id.
    * @param options - What to send beside the playlist folder.
@@ -884,12 +886,13 @@ export interface tUserFunctions {
   readonly addLibraryPlaylistTracks: typeof library.addLibraryPlaylistTracks;
   /**
    * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
-   * Against the live API on 18 October 2026, the root was answered with none, for a listener with no folder and for
-   * one with a folder: `data` was empty, and so was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot`
-   * was answered `404` by its id, and its `children` were the listener's playlists and folders.
+   * It is asked for with its `children`, unless `options.include` names what to include instead: against the live API
+   * on 18 October 2026, Apple answered the documented request, which names nothing to include, with no folder at all,
+   * `data` and `meta.filters.identity.playlistsroot` both empty. Asked with an `include`, it answered with the root,
+   * `p.playlistsroot`, which has no attributes.
    *
-   * @param options - What to send beside the folder.
-   * @returns The root folder, out of `data`. It was answered with none, with folders or without, which this rejects.
+   * @param options - What to send beside the folder: its `children`, unless `include` names what to send instead.
+   * @returns The root folder, out of `data`, with its first page of children under `relationships`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
    * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.

@@ -361,7 +361,9 @@ export const createLibraryPlaylist = /*#__PURE__*/ endpoint(
 // Library playlist folders
 
 /**
- * The playlist folder with an id in the listener's library.
+ * The playlist folder with an id in the listener's library. The root, `p.playlistsroot`, was answered `404` by its
+ * id against the live API on 18 October 2026, unless asked for with an `include`, such as `["children"]`; a folder
+ * made in it was answered without one.
  *
  * @function
  * @param client - The listener's client to ask with.

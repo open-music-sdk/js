@@ -198,14 +198,15 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 
 /**
  * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
- * Against the live API on 18 October 2026, the root was answered with none, for a listener with no folder and for
- * one with a folder: `data` was empty, and so was `meta.filters.identity.playlistsroot`. The folder `p.playlistsroot`
- * was answered `404` by its id, and its `children` were the listener's playlists and folders.
+ * It is asked for with its `children`, unless `options.include` names what to include instead: against the live API
+ * on 18 October 2026, Apple answered the documented request, which names nothing to include, with no folder at all,
+ * `data` and `meta.filters.identity.playlistsroot` both empty. Asked with an `include`, it answered with the root,
+ * `p.playlistsroot`, which has no attributes.
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param options - What to send beside the folder.
- * @returns What Apple answered: the root folder under `data`, which was empty, with folders or without.
+ * @param options - What to send beside the folder: its `children`, unless `include` names what to send instead.
+ * @returns What Apple answered: the root folder under `data`, with its first page of children under `relationships`.
  * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
  * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
@@ -214,10 +215,12 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 export const getRootLibraryPlaylistFolder = /*#__PURE__*/ endpoint(
   "getRootLibraryPlaylistFolder",
   "resource",
-  (_client, options?: tRootLibraryPlaylistFolderOptions): tRequestPlan<tLibraryPlaylistFoldersResponse> => [
-    "v1/me/library/playlist-folders",
-    initOf<tLibraryPlaylistFoldersResponse>("getRootLibraryPlaylistFolder", optionsOf("getRootLibraryPlaylistFolder", options, OPTIONS), { "filter[identity]": "playlistsroot" }),
-  ],
+  (_client, options?: tRootLibraryPlaylistFolderOptions): tRequestPlan<tLibraryPlaylistFoldersResponse> => {
+    const bag = optionsOf("getRootLibraryPlaylistFolder", options, OPTIONS);
+    // Apple answers with the root only when something is included with it.
+    const asked = bag.include === undefined ? { ...bag, include: ["children"] } : bag;
+    return ["v1/me/library/playlist-folders", initOf<tLibraryPlaylistFoldersResponse>("getRootLibraryPlaylistFolder", asked, { "filter[identity]": "playlistsroot" })];
+  },
 );
 
 /**
