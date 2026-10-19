@@ -54,19 +54,27 @@ async function lovedOf(tracks: readonly tTrack[]): Promise<Set<string>> {
   }
 }
 
-/** A heart that loves the song, a rating of 1, or takes the rating away again. `loved` keeps what it did. */
+/**
+ * A heart that loves the song, a rating of 1, or takes the rating away again. `loved` changes as it is clicked, and
+ * back if Apple refuses, so a heart drawn again before Apple answers shows what the listener asked for.
+ */
 function love(id: string, loved: Set<string>): HTMLButtonElement {
-  const button = h("button", { type: "button", textContent: loved.has(id) ? "Loved" : "Love", ariaPressed: String(loved.has(id)) });
+  const button = h("button", { type: "button" });
+  const show = (loving: boolean) => {
+    if (loving) loved.add(id);
+    else loved.delete(id);
+    button.ariaPressed = String(loving);
+    button.textContent = loving ? "Loved" : "Love";
+  };
+  show(loved.has(id));
   button.onclick = async () => {
+    const loving = !loved.has(id);
+    show(loving);
     try {
-      const loving = !loved.has(id);
       if (loving) await now.listener?.user.setSongRating(id, 1);
       else await now.listener?.user.deleteSongRating(id);
-      if (loving) loved.add(id);
-      else loved.delete(id);
-      button.ariaPressed = String(loving);
-      button.textContent = loving ? "Loved" : "Love";
     } catch (e) {
+      show(!loving);
       showError(e);
     }
   };
