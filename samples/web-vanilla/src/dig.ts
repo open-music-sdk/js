@@ -15,7 +15,7 @@ async function theFloor(): Promise<HTMLElement[]> {
   const genres: HTMLElement[] = [];
   for await (const { id, attributes } of music.catalog.listGenres({ storefront })) {
     // Every genre but Music, the one the others belong to.
-    if (attributes?.parentId !== undefined) genres.push(later(attributes.name, () => genreCrate(id)));
+    if (attributes?.parentId !== undefined) genres.push(later(attributes.name, () => genreCrate(id, storefront)));
   }
   return [
     h("h2", {}, "Top charts"),
@@ -25,9 +25,9 @@ async function theFloor(): Promise<HTMLElement[]> {
   ];
 }
 
-/** A genre's crate: the albums of its chart. */
-async function genreCrate(genre: string): Promise<tSleeve[]> {
-  const { results } = await music.catalog.getCharts({ types: ["albums"], genre, limit: 20, storefront: now.storefront });
+/** A genre's crate: the albums of its chart, in the floor's storefront, whichever is current when it scrolls in. */
+async function genreCrate(genre: string, storefront: string): Promise<tSleeve[]> {
+  const { results } = await music.catalog.getCharts({ types: ["albums"], genre, limit: 20, storefront });
   return sleeves(results.albums[0]?.data ?? []);
 }
 
