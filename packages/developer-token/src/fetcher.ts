@@ -62,7 +62,8 @@ function parse(url: string | URL, base?: string): URL | undefined {
  *
  * | The endpoint | `status` | Retried by the client |
  * | --- | --- | --- |
- * | is unreachable, redirects, times out, or drops the connection mid-body | none | Yes |
+ * | is unreachable, times out, or drops the connection mid-body | none | Yes |
+ * | redirects | the redirect's, or 0 where a browser hands over an opaque answer for it | No |
  * | answers 429, or a 5xx other than 501 | the endpoint's | Yes, after its `Retry-After` if it sent one |
  * | answers any other status that is not 2xx | the endpoint's | No |
  * | answers 2xx without a JWT that has an `exp`, or with more than 16 KB | the endpoint's | No |
@@ -109,8 +110,10 @@ export function developerTokenFetcher(url: string | URL, options: tFetcherOption
     // The shared fetch answers to the timeout alone; no caller's signal may cancel it for the others.
     const timeout = AbortSignal.timeout(timeoutMs);
     const exchange = async () => {
-      // A redirect is refused: the token comes from the URL that was configured or from nowhere.
-      const answer = await fetchImpl(endpoint, { cache: "no-store", redirect: "error", signal: timeout });
+      // A redirect is refused: the token comes from the URL that was configured or from nowhere. `manual` is the mode
+      // that follows none and that every runtime takes: Cloudflare Workers refuse `error`. What it hands over, a 3xx
+      // or a browser's opaque answer, is no 2xx, and is refused below with the status it came with.
+      const answer = await fetchImpl(endpoint, { cache: "no-store", redirect: "manual", signal: timeout });
       // Counted as it arrives, after any decompression; what lies beyond the limit is cancelled rather than read.
       return { res: answer, body: await readBounded(answer, MAX_BODY_BYTES) };
     };

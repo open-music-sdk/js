@@ -414,8 +414,9 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       if (user && userToken) headers.set("music-user-token", credential("userToken", await userToken({ signal })));
       if (body !== null) headers.set("content-type", "application/json");
       // A redirect is refused, not followed: fetch drops `authorization` when one leaves the origin, but sends every
-      // other header on, the Music User Token too, and to an `http:` address in the clear.
-      const req = new Request(url, { method: init.method ?? "GET", headers, body, signal: signal ?? null, redirect: "error" });
+      // other header on, the Music User Token too, and to an `http:` address in the clear. `manual` is the mode that
+      // follows none and that every runtime takes: Cloudflare Workers refuse `error`.
+      const req = new Request(url, { method: init.method ?? "GET", headers, body, signal: signal ?? null, redirect: "manual" });
       options.onRequest?.(req);
       let res: Response;
       try {
@@ -423,6 +424,11 @@ export function createClient(given: tClientOptions): tAppleMusicClient {
       } catch (e) {
         if (signal?.aborted) throw e;
         throw new AppleMusicError("NetworkError", `${req.method} ${url.pathname}: ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      }
+      // A 3xx where the runtime hands it over, as Node and Workers do; the opaque answer a browser gives instead.
+      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+        await res.body?.cancel().catch(() => undefined);
+        throw new AppleMusicError("NetworkError", `${req.method} ${url.pathname}: Apple answered with a redirect, which is not followed`);
       }
       const outcome = await settle(res, init, user, url);
       options.onResponse?.(res, req, { body: outcome.body, error: outcome.error });
