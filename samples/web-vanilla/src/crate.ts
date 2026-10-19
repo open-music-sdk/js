@@ -1,10 +1,11 @@
 // Shows: playlists.resolve. Guide: /guides/import-playlist
-import type { tSong, tTrackDescription } from "@open-music-sdk/browser";
-import { crate, type tSleeve } from "./box";
-import { byId, h } from "./dom";
+import type { tSkippedTrack, tSong, tTrackDescription } from "@open-music-sdk/browser";
+import { crate } from "./box";
+import { button, byId, h } from "./dom";
 import { say, showError } from "./errors";
 import { music, now, onChange } from "./music";
 import { playFrom } from "./player";
+import type { tSleeve } from "./sleeve";
 
 /** The songs picked so far, in order. Page state: a reload empties the crate. */
 export const picks: tSong[] = [];
@@ -16,72 +17,107 @@ export function pick(song: tSong): void {
   say(`${song.attributes?.name ?? "The song"} is in the crate.`);
 }
 
-// #region resolve
-// A pasted tracklist, one "Artist - Title" a line, found in the catalog. No sign-in needed: it asks the catalog only.
 byId("paste", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
-  find(byId("tracklist", HTMLTextAreaElement).value).catch(showError);
+  const text = byId("tracklist", HTMLTextAreaElement).value;
+  findTracklist(text).catch(showError);
 };
 
-async function find(text: string): Promise<void> {
-  const descriptions: tTrackDescription[] = text
-    .split("\n")
-    .map((line) => line.split(" - "))
-    .filter((parts) => parts.length >= 2)
-    .map(([artistName = "", ...title]) => ({ artistName: artistName.trim(), name: title.join(" - ").trim() }));
-  const asked = now.storefront;
+/**
+ * A description for each line written "Artist - Title", where the title may hold " - " too. Any other line is
+ * left out.
+ */
+function parseTracklist(text: string): tTrackDescription[] {
+  const descriptions: tTrackDescription[] = [];
+  for (const line of text.split("\n")) {
+    const [artistName = "", ...title] = line.split(" - ");
+    if (title.length === 0) continue;
+    descriptions.push({ artistName: artistName.trim(), name: title.join(" - ").trim() });
+  }
+  return descriptions;
+}
+
+// #region resolve
+/**
+ * Finds a pasted tracklist, one "Artist - Title" a line, in the catalog. No sign-in needed: it
+ * asks the catalog only.
+ */
+async function findTracklist(text: string): Promise<void> {
+  const descriptions = parseTracklist(text);
+  const storefront = now.storefront;
   const { tracks, skipped } = await music.playlists.resolve(descriptions, {
-    storefront: asked,
+    storefront,
     onProgress: ({ done, total = 0 }) => {
       say(`Finding songs: ${String(done)} of ${String(total)}.`);
     },
   });
-  // Songs found in a storefront the page has left have other ids than the ones it shows now.
-  if (now.storefront !== asked) return;
+  // Songs found in a storefront the page has left since have other ids than the ones it shows.
+  if (now.storefront !== storefront) return;
   for (const song of tracks) pick(song);
-  // A line with no exact match comes back with the songs its search found, for the listener to choose from.
-  const take = (song: tSong) => h("button", { type: "button", textContent: `Take ${song.attributes?.name ?? song.id} by ${song.attributes?.artistName ?? ""}`, onclick: () => { pick(song); } });
-  const lines = skipped.map(({ track, candidates }) => h("li", {}, `Not found: ${track.artistName ?? ""} - ${track.name ?? ""}. `, ...candidates.slice(0, 3).map(take)));
-  unmatched.replaceChildren(h("ul", {}, ...lines));
+  offerCandidates(skipped);
   say(`Found ${String(tracks.length)} of ${String(descriptions.length)} songs.`);
+}
+
+/**
+ * A line with no exact match comes back with the songs its search found, best first: each is
+ * offered with a button for the first three.
+ */
+function offerCandidates(skipped: readonly tSkippedTrack<tTrackDescription>[]): void {
+  const take = (song: tSong) => {
+    const title = song.attributes?.name ?? song.id;
+    const artist = song.attributes?.artistName ?? "";
+    return button(`Take ${title} by ${artist}`, () => { pick(song); });
+  };
+  const lines = skipped.map(({ track, candidates }) => {
+    const notFound = `Not found: ${track.artistName ?? ""} - ${track.name ?? ""}. `;
+    return h("li", {}, notFound, ...candidates.slice(0, 3).map(take));
+  });
+  unmatched.replaceChildren(h("ul", {}, ...lines));
 }
 // #endregion resolve
 
 /** Your crate, drawn as the others are, with the sleeve at `at` in front. Its order is the playlist's. */
 function draw(at = 0): void {
   byId("crate-count", HTMLSpanElement).textContent = String(picks.length);
+
   const move = (from: number, to: number, label: string) => () => {
     picks.splice(to, 0, ...picks.splice(from, 1));
     draw(to);
-    again(label);
+    focusAgain(label);
   };
-  const takeOut = (i: number) => () => {
-    picks.splice(i, 1);
-    draw(i);
-    again("Take out");
+  const takeOut = (index: number) => () => {
+    picks.splice(index, 1);
+    draw(index);
+    focusAgain("Take out");
   };
-  const sleeve = (song: tSong, i: number): tSleeve => ({
+  const sleeve = (song: tSong, index: number): tSleeve => ({
     artwork: song.attributes?.artwork,
     name: song.attributes?.name ?? song.id,
     by: song.attributes?.artistName,
     open: () => { playFrom(picks, song); },
     actions: () => [
-      h("button", { type: "button", textContent: "Play", onclick: () => { playFrom(picks, song); } }),
-      h("button", { type: "button", textContent: "Move earlier", disabled: i === 0, onclick: move(i, i - 1, "Move earlier") }),
-      h("button", { type: "button", textContent: "Move later", disabled: i === picks.length - 1, onclick: move(i, i + 1, "Move later") }),
-      h("button", { type: "button", textContent: "Take out", onclick: takeOut(i) }),
+      button("Play", () => { playFrom(picks, song); }),
+      button("Move earlier", move(index, index - 1, "Move earlier"), { disabled: index === 0 }),
+      button("Move later", move(index, index + 1, "Move later"), { disabled: index === picks.length - 1 }),
+      button("Take out", takeOut(index)),
     ],
   });
+
   const empty = "Empty. Put songs in from Dig, or paste a tracklist below.";
-  byId("picks", HTMLDivElement).replaceChildren(h("div", { className: "crates" }, crate("Your crate", picks.map(sleeve), { at, empty })));
+  const yours = crate("Your crate", picks.map(sleeve), { at, empty });
+  byId("picks", HTMLDivElement).replaceChildren(h("div", { className: "crates" }, yours));
   byId("send", HTMLFormElement).hidden = now.listener === undefined || picks.length === 0;
 }
 
-/** Focus back on the action just used, in the crate drawn again, so a song can be moved on with the keyboard. */
-function again(label: string): void {
+/** Focus back on the button just used, in the crate drawn again, so that a song can be moved on with the keyboard. */
+function focusAgain(label: string): void {
   const box = byId("picks", HTMLDivElement);
-  const button = [...box.querySelectorAll<HTMLButtonElement>(".actions button")].find((each) => each.textContent === label && !each.disabled);
-  (button ?? box.querySelector<HTMLElement>(".sleeve[tabindex='0']"))?.focus();
+  const buttons = [...box.querySelectorAll<HTMLButtonElement>(".actions button")];
+  const same = buttons.find((each) => each.textContent === label && !each.disabled);
+  // A song moved as far as it goes has that button disabled: the sleeve in front instead. Take out is
+  // never disabled, so it is found again, unless the crate is empty and there is nothing to focus.
+  const target = same ?? box.querySelector<HTMLElement>(".sleeve[tabindex='0']");
+  target?.focus();
 }
 
 // Another storefront has other ids, so the crate, and the songs offered for unmatched lines, empty.

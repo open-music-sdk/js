@@ -5,13 +5,20 @@ import { createBrowserClient, type tBrowserMusic } from "@open-music-sdk/browser
 // whichever server sample runs, and fetches the next one before the last runs out.
 export const music = createBrowserClient({ tokenUrl: "/api/music/token" });
 
-/**
- * Who is signed in, and the storefront every catalog call asks in: the picker's while signed out, and the listener's
- * own, from Apple, once signed in. sign-in.ts and the picker change it, and every screen redraws.
- */
-export const now: { readonly listener: tBrowserMusic | undefined; readonly storefront: string } = { listener: undefined, storefront: "us" };
+interface tNow {
+  /** A client for the signed-in listener, or undefined while no one is signed in. */
+  readonly listener: tBrowserMusic | undefined;
+  /** The storefront every catalog call asks in. */
+  readonly storefront: string;
+}
 
-export function change(next: Partial<typeof now>): void {
+/**
+ * Who is signed in, and the storefront: the picker's while signed out, and the listener's own, from Apple, once
+ * signed in. sign-in.ts and the picker change it, and every screen draws itself again.
+ */
+export const now: tNow = { listener: undefined, storefront: "us" };
+
+export function change(next: Partial<tNow>): void {
   Object.assign(now, next);
   document.dispatchEvent(new Event("now-changed"));
 }

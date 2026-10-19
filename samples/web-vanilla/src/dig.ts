@@ -1,31 +1,39 @@
-// Shows: getCharts, listGenres, searchCatalog, getSearchHints, listStorefronts.
-import { crate, type tSleeve } from "./box";
+// Shows: getCharts, listGenres, listStorefronts.
+import { crate } from "./box";
 import { byId, h } from "./dom";
 import { showError } from "./errors";
 import { change, music, now, onChange } from "./music";
 import { sleeves } from "./pages";
+import type { tSleeve } from "./sleeve";
 import { songCrate } from "./songs";
-import { drawFloor, drawPage, go, route } from "./view";
+import { drawFloor, drawPage } from "./view";
 
 // The floor, before anyone searches: the storefront's top charts, then a crate for each genre the charts are kept by.
 async function theFloor(): Promise<HTMLElement[]> {
   const { storefront } = now;
   const { results } = await music.catalog.getCharts({ types: ["songs", "albums", "playlists"], limit: 20, storefront });
-  const [songs, albums, playlists] = [results.songs[0], results.albums[0], results.playlists[0]];
-  return [
-    h("h2", {}, "Top charts"),
-    h("div", { className: "crates" }, await songCrate(songs?.name ?? "Top songs", songs?.data ?? []), crate(albums?.name ?? "Top albums", sleeves(albums?.data ?? [])), crate(playlists?.name ?? "Top playlists", sleeves(playlists?.data ?? []))),
-    h("h2", {}, "Genres"),
-    h("div", { className: "crates" }, ...(await genres(storefront))),
-  ];
+  // Each type has a list of charts; the first is the storefront's most played. Its name is the crate's label.
+  const songs = results.songs[0];
+  const albums = results.albums[0];
+  const playlists = results.playlists[0];
+  const charts = h(
+    "div",
+    { className: "crates" },
+    await songCrate(songs?.name ?? "Top songs", songs?.data ?? []),
+    crate(albums?.name ?? "Top albums", sleeves(albums?.data ?? [])),
+    crate(playlists?.name ?? "Top playlists", sleeves(playlists?.data ?? [])),
+  );
+  const genres = h("div", { className: "crates" }, ...(await genreCrates(storefront)));
+  return [h("h2", {}, "Top charts"), charts, h("h2", {}, "Genres"), genres];
 }
 
-/** A crate for each genre but Music, the one the others belong to. If Apple will not list them, the charts still show. */
-async function genres(storefront: string): Promise<HTMLElement[]> {
+/** A crate for each genre but Music, the one the others belong to. If Apple won't list them, the charts still show. */
+async function genreCrates(storefront: string): Promise<HTMLElement[]> {
   const crates: HTMLElement[] = [];
   try {
     for await (const { id, attributes } of music.catalog.listGenres({ storefront })) {
-      if (attributes?.parentId !== undefined) crates.push(later(attributes.name, () => genreCrate(id, storefront)));
+      if (attributes?.parentId === undefined) continue;
+      crates.push(fillWhenSeen(attributes.name, () => genreAlbums(id, storefront)));
     }
   } catch (e) {
     showError(e);
@@ -33,64 +41,41 @@ async function genres(storefront: string): Promise<HTMLElement[]> {
   return crates;
 }
 
-/** A genre's crate: the albums of its chart, in the floor's storefront, whichever is current when it scrolls in. */
-async function genreCrate(genre: string, storefront: string): Promise<tSleeve[]> {
+/** The albums of a genre's chart, in the floor's storefront, even if another is current by the time it scrolls in. */
+async function genreAlbums(genre: string, storefront: string): Promise<tSleeve[]> {
   const { results } = await music.catalog.getCharts({ types: ["albums"], genre, limit: 20, storefront });
   return sleeves(results.albums[0]?.data ?? []);
 }
 
 /** A crate filled once it scrolls into view, so a floor of them asks Apple only for the ones the listener reaches. */
-function later(label: string, fill: () => Promise<readonly tSleeve[]>): HTMLElement {
+function fillWhenSeen(label: string, fill: () => Promise<readonly tSleeve[]>): HTMLElement {
   const waiting = crate(label, [], { empty: "Not looked through yet." });
-  const seen = new IntersectionObserver(([entry]) => {
-    if (entry?.isIntersecting !== true) return;
-    seen.disconnect();
-    fill().then((sleeves) => { waiting.replaceWith(crate(label, sleeves)); }, showError);
-  }, { rootMargin: "200px" });
-  seen.observe(waiting);
+  const watcher = new IntersectionObserver(
+    ([entry]) => {
+      if (entry?.isIntersecting !== true) return;
+      watcher.disconnect();
+      fill().then((filled) => { waiting.replaceWith(crate(label, filled)); }, showError);
+    },
+    // Filled a little before it comes into view.
+    { rootMargin: "200px" },
+  );
+  watcher.observe(waiting);
   return waiting;
-}
-
-const term = byId("term", HTMLInputElement);
-
-byId("search", HTMLFormElement).onsubmit = (event) => {
-  event.preventDefault();
-  const text = term.value.trim();
-  if (text === "") location.hash = "";
-  else go("search", text);
-};
-
-route("search", async (text) => {
-  term.value = text;
-  const { results } = await music.catalog.searchCatalog(text, { types: ["songs", "albums", "artists", "playlists"], limit: 20, storefront: now.storefront });
-  const { songs, albums, artists, playlists } = results;
-  return [
-    h("h2", {}, `Results for "${text}"`),
-    h("div", { className: "crates" }, await songCrate("Songs", songs?.data ?? []), crate("Albums", sleeves(albums?.data ?? [])), crate("Artists", sleeves(artists?.data ?? [])), crate("Playlists", sleeves(playlists?.data ?? []))),
-  ];
-});
-
-// Offered as the listener types, once typing pauses rather than on every key.
-let typing: ReturnType<typeof setTimeout> | undefined;
-term.oninput = () => {
-  clearTimeout(typing);
-  const text = term.value.trim();
-  if (text !== "") typing = setTimeout(() => { hints(text).catch(showError); }, 250);
-};
-
-async function hints(text: string): Promise<void> {
-  const { results } = await music.catalog.getSearchHints(text, { storefront: now.storefront });
-  byId("hints", HTMLDataListElement).replaceChildren(...results.terms.map((value) => h("option", { value })));
 }
 
 // Signed out, the listener picks the storefront. Signed in, it is their own, from Apple, and the picker goes.
 const picker = byId("storefront", HTMLSelectElement);
-async function storefronts(): Promise<void> {
+
+async function fillPicker(): Promise<void> {
   const options: HTMLOptionElement[] = [];
-  for await (const { id, attributes } of music.catalog.listStorefronts()) options.push(h("option", { value: id, textContent: attributes?.name ?? id }));
-  picker.replaceChildren(...options.sort((a, b) => a.text.localeCompare(b.text)));
+  for await (const { id, attributes } of music.catalog.listStorefronts()) {
+    options.push(h("option", { value: id, textContent: attributes?.name ?? id }));
+  }
+  options.sort((a, b) => a.text.localeCompare(b.text));
+  picker.replaceChildren(...options);
   picker.value = now.storefront;
 }
+
 picker.onchange = () => {
   change({ storefront: picker.value });
 };
@@ -104,6 +89,5 @@ onChange(() => {
   drawPage();
 });
 
-storefronts().catch(showError);
+fillPicker().catch(showError);
 drawFloor(theFloor);
-drawPage();

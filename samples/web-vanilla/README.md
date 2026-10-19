@@ -12,7 +12,8 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | File | Shows |
 | --- | --- |
 | [`src/music.ts`](./src/music.ts) | `createBrowserClient`, and who is signed in |
-| [`src/dig.ts`](./src/dig.ts) | `getCharts`, `listGenres`, `searchCatalog`, `getSearchHints`, `listStorefronts` |
+| [`src/dig.ts`](./src/dig.ts) | `getCharts`, `listGenres`, `listStorefronts`: the floor, and the storefront picker |
+| [`src/search.ts`](./src/search.ts) | `searchCatalog`, `getSearchHints` |
 | [`src/pages.ts`](./src/pages.ts) | `getAlbum` with `schemas`, `getArtist`, `getArtistView`, `getArtistRelationship`, `getPlaylist`, `request` with `segmentOf` for the one endpoint the clients lack, `addToLibrary`, `addToFavorites` |
 | [`src/songs.ts`](./src/songs.ts) | `getSongRatings`, `setSongRating`, `deleteSongRating`, `addToLibrary` |
 | [`src/artwork.ts`](./src/artwork.ts) | `artworkImage` |
@@ -22,7 +23,7 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | [`src/crate.ts`](./src/crate.ts) | The picks, and `playlists.resolve` for a pasted tracklist |
 | [`src/send.ts`](./src/send.ts) | `playlists.read`, `plan` and `apply`: the crate sent as a playlist, with the plan shown first |
 | [`src/errors.ts`](./src/errors.ts) | `isAppleMusicError`, each tag in words a listener can act on |
-| [`src/box.ts`](./src/box.ts), [`src/view.ts`](./src/view.ts), [`src/dom.ts`](./src/dom.ts), [`src/main.ts`](./src/main.ts) | The page itself, with nothing of the SDK: the crate, the floor and its pages, the tabs |
+| [`src/box.ts`](./src/box.ts), [`src/sleeve.ts`](./src/sleeve.ts), [`src/view.ts`](./src/view.ts), [`src/dom.ts`](./src/dom.ts), [`src/main.ts`](./src/main.ts) | The page itself, with nothing of the SDK: the crate and its sleeves, the floor and its pages, the tabs |
 
 Signed out, the page asks the catalog in the storefront you pick. Signed in, it asks in yours, from Apple. Catalog
 ids differ between storefronts, so the crate empties when the storefront changes.
