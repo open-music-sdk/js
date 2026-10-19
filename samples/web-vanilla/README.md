@@ -7,7 +7,7 @@ Apple Music, see your library, and send a crate of songs to it as a playlist.
 pnpm turbo dev --filter=web-vanilla --filter=express-server   # from the repository's root, or worker-server
 ```
 
-Then open <http://localhost:5173>. Vite forwards `/api` to the server on `127.0.0.1:8787`.
+Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.0.1:8787`.
 
 | File | Shows |
 | --- | --- |

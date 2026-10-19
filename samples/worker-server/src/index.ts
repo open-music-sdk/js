@@ -13,7 +13,7 @@ import {
   type tUserTokenIntake,
 } from "@open-music-sdk/server";
 
-// What Wrangler hands the Worker: the secrets from .dev.vars, and the KV namespace from wrangler.jsonc.
+// What Wrangler hands the Worker: the secrets from .env, and the KV namespace from wrangler.jsonc.
 interface tEnv {
   readonly APPLE_MUSIC_PRIVATE_KEY?: string;
   readonly APPLE_MUSIC_TEAM_ID?: string;
@@ -34,14 +34,14 @@ let app: tApp | undefined;
 
 function setUp(env: tEnv): tApp {
   const { APPLE_MUSIC_PRIVATE_KEY: pem, APPLE_MUSIC_TEAM_ID: teamId, APPLE_MUSIC_KEY_ID: keyId } = env;
-  if (!pem || !teamId || !keyId) throw new Error("The MusicKit key is not set. Copy samples/.env.example to samples/worker-server/.dev.vars and fill it in.");
+  if (!pem || !teamId || !keyId) throw new Error("The MusicKit key is not set. Copy samples/.env.example to samples/worker-server/.env and fill it in.");
   const key = { pem, teamId, keyId };
   const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
   const music = createServerClient({ ...key, userTokenStore: store, rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }) });
   return {
     music,
     // #region token-route
-    token: tokenEndpoint({ ...key, origin: [env.PAGE_ORIGIN ?? "http://localhost:5173"] }),
+    token: tokenEndpoint({ ...key, origin: [env.PAGE_ORIGIN ?? "http://localhost:2728"] }),
     // #endregion token-route
     // #region user-token
     // Asks Apple whether the posted token works, and keeps it under the session's id only then.

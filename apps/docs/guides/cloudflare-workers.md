@@ -44,6 +44,11 @@ APPLE_MUSIC_KEY_ID="ABC123DEFG"
 It holds your private key. Add it to `.gitignore` before you write the key into it.
 :::
 
+If a Vite dev server runs in the same repository, as a page's often does, name the file `.env` instead, which
+`wrangler dev` reads when there is no `.dev.vars`. Vite's dev server serves any file in the repository to a page
+that asks for it, except those on its deny list, and that list names `.env` but not `.dev.vars`. The
+[sample apps](../samples) do this.
+
 ## 3. Write the Worker
 
 The Worker below is the [worker-server sample](../samples), complete. Its sessions are a stand-in: `sessionOf`

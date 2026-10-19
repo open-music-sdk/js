@@ -21,8 +21,8 @@ subscription.
    pnpm install
    ```
 
-2. Copy `samples/.env.example` to the server sample you run, and fill it in: `samples/express-server/.env`, or
-   `samples/worker-server/.dev.vars`.
+2. Copy `samples/.env.example` to the server sample you run, as `.env`, and fill it in:
+   `samples/express-server/.env` or `samples/worker-server/.env`.
 
 3. Run a page with a server, from the repository's root:
 
@@ -30,14 +30,18 @@ subscription.
    pnpm turbo dev --filter=web-vanilla --filter=express-server
    ```
 
-4. Open `http://localhost:5173` in your browser. Use `localhost`, not `127.0.0.1`: the developer token is bound to
+4. Open `http://localhost:2728` in your browser. Use `localhost`, not `127.0.0.1`: the developer token is bound to
    that origin.
+
+5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
+   `localhost:2728`, which any other app you later serve on that port could read.
 
 Any page runs with any server: swap `express-server` for `worker-server` to run the Worker instead.
 
-::: warning Never commit the copy
-The file you copied holds your private key. The repository ignores `.env` and `.dev.vars`, so keep the key in one
-of those names.
+::: warning Keep the key in a file named `.env`
+The file you copied holds your private key. The repository ignores it, and the page's dev server refuses to serve
+it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that reason: the dev server would serve a
+`.dev.vars` to any page that asked for it.
 :::
 
 ## The samples

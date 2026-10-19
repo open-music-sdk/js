@@ -12,7 +12,7 @@ function required(name: string): string {
   return value;
 }
 const key = { pem: required("APPLE_MUSIC_PRIVATE_KEY"), teamId: required("APPLE_MUSIC_TEAM_ID"), keyId: required("APPLE_MUSIC_KEY_ID") };
-const pageOrigin = process.env.PAGE_ORIGIN ?? "http://localhost:5173";
+const pageOrigin = process.env.PAGE_ORIGIN ?? "http://localhost:2728";
 
 // One client for the whole server. Every listener's requests count against the same developer token, so they
 // share one limiter. The store loses its tokens when the server stops: a real app keeps them somewhere lasting.

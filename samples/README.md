@@ -23,7 +23,10 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
    | Server | Copy it to |
    | --- | --- |
    | `express-server` | `samples/express-server/.env` |
-   | `worker-server` | `samples/worker-server/.dev.vars` |
+   | `worker-server` | `samples/worker-server/.env` |
+
+   The Worker reads `.env`, not Wrangler's usual `.dev.vars`, because the page's dev server refuses to serve a
+   file named `.env` and would serve `.dev.vars` to any page that asked for it.
 
 3. Run a page with a server, from the repository's root. Turborepo builds the packages first.
 
@@ -32,7 +35,10 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
    pnpm turbo dev --filter=web-vanilla --filter=worker-server
    ```
 
-4. Open <http://localhost:5173>. Use `localhost`, not `127.0.0.1`: the developer token is bound to that origin.
+4. Open <http://localhost:2728>. Use `localhost`, not `127.0.0.1`: the developer token is bound to that origin.
+
+5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
+   `localhost:2728`, which any other app you later serve on that port could read.
 
 Any page runs with any server. Both servers listen on `127.0.0.1:8787` and answer the same routes, and the page's
 dev server forwards `/api` to whichever one runs, so the page and its server share one origin.

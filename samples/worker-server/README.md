@@ -4,7 +4,7 @@ Crate Digger's server as a Cloudflare Worker, run on your machine by Wrangler. I
 takes in the listener's Music User Token and keeps it in Workers KV, and asks Apple for one list with it.
 
 ```sh
-cp ../.env.example .dev.vars   # then fill it in
+cp ../.env.example .env   # then fill it in
 pnpm turbo dev --filter=web-vanilla --filter=worker-server   # from the repository's root
 ```
 
