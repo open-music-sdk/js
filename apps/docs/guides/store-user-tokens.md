@@ -131,7 +131,16 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 `validateUserToken` tells the two apart: it rejects with `UserTokenInvalid` when the listener is the cause. See
 [Handle errors](./errors).
 
-When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`.
+When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`. The
+samples' servers take a `DELETE` on the same route, which the page sends once Apple's sign-out is done:
+
+::: code-group
+
+<<< @/../../samples/worker-server/src/index.ts#sign-out{ts} [Cloudflare Workers]
+
+<<< @/../../samples/express-server/src/server.ts#sign-out{ts} [Express]
+
+:::
 
 The [sample apps](../samples)' servers ask Apple what the listener played lately this way, with a session cookie
 standing in for your own sessions:

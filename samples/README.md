@@ -67,8 +67,19 @@ no sample and is not on its list of exceptions, each with the reason.
 
 ## What they leave out
 
-- Accounts and lasting storage. The Express server forgets its tokens when it stops.
+Each of these is enough for one developer's machine, and not for an app on the web. Change them before you copy a
+sample into one.
+
+- Accounts and real sessions. A listener is any id a browser presents in the `crate_session` cookie: not checked
+  as one the server gave, not renewed at sign-in, and not `Secure`.
+- Lasting, encrypted storage. The Express server forgets its tokens when it stops. The Worker's tokens sit in
+  plain text in `.wrangler/state` until you delete it.
+- Rate limits on the two routes. A deployed token route hands tokens to anyone who asks, and the user-token route
+  costs a request to Apple for each token posted to it.
 - A content security policy. Vite's dev server injects inline scripts, which a strict policy refuses. The CLI's
   sign-in page sets one, in [`apps/cli/src/loopback.ts`](../apps/cli/src/loopback.ts).
+- An icon of your own. The page's `apple-music-app-icon` link points at this project's logo, which Apple's sign-in
+  window shows beside your page's host.
 - Music videos in the crate. They play, but the playlist tools are shown with songs.
-- Deployment. A build exists only to check that a sample bundles.
+- Deployment. A build exists only to check that a sample bundles. The servers answer only requests sent to
+  `127.0.0.1:8787` or to the page's own host, and refuse to start without `PAGE_ORIGIN`.

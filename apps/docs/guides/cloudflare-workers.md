@@ -31,13 +31,17 @@ npx wrangler secret put APPLE_MUSIC_KEY_ID
 Wrangler asks for each value. For the key, paste the contents of the `.p8` file on one line, with each line break
 written as `\n`. The SDK reads line breaks escaped that way.
 
-For local development, put the same three in a `.dev.vars` file next to your Wrangler config, which `wrangler dev`
-reads:
+The Worker in step 3 also reads `PAGE_ORIGIN`, the origin your page is served from, which isn't a secret. Set it
+under `vars` in your Wrangler config.
+
+For local development, put the same values in a `.dev.vars` file next to your Wrangler config, which
+`wrangler dev` reads:
 
 ```
 APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG…\n-----END PRIVATE KEY-----"
 APPLE_MUSIC_TEAM_ID="ABCDE12345"
 APPLE_MUSIC_KEY_ID="ABC123DEFG"
+PAGE_ORIGIN="http://localhost:2728"
 ```
 
 ::: warning Never commit `.dev.vars`
@@ -51,13 +55,20 @@ that asks for it, except those on its deny list, and that list names `.env` but 
 
 ## 3. Write the Worker
 
-The Worker below is the [worker-server sample](../samples), complete. Its sessions are a stand-in: `sessionOf`
-reads a random id from a cookie the Worker gives with its first answer. Put your own session lookup in its place,
-one that resolves to the signed-in user's id, or `undefined` when there is none, and leave the cookie out.
+The Worker below is the [worker-server sample](../samples), complete, as it runs on a developer's machine.
 
 <<< @/../../samples/worker-server/src/index.ts{ts}
 
 The `// #region` lines mark the parts other guides show, and do nothing.
+
+Before you deploy it, change what is there for the machine it runs on:
+
+- Put your own session lookup in place of `sessionOf`, one that resolves to the signed-in user's id or `undefined`,
+  and leave out the cookie the Worker gives. The sample's session is any id a browser presents, which is enough
+  on one machine and not on the web.
+- Make `hosts` the names your Worker answers to, its own and your page's, in place of `127.0.0.1:8787`. The check
+  is there because a server on a loopback address can be reached by a site whose name points at it.
+- Rate-limit both routes, as [Who can post a token](#the-two-routes) below says.
 
 If you generate your `Env` type with `wrangler types`, use that one in place of `tEnv`.
 

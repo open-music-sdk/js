@@ -43,6 +43,9 @@ async function keep(token: string): Promise<void> {
   const answer = await fetch("/api/music/user-token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
   if (!answer.ok) {
     say(REFUSED[answer.status] ?? `The server answered ${String(answer.status)}. Try again.`);
+    // Apple's script keeps the token Apple refused, and would hand it back at the next sign-in: leave it, so that the
+    // listener can sign in with another account.
+    if (answer.status === 422) await signIn.disconnect();
     return;
   }
   // A client for this listener, and the storefront their account is in, from Apple.
@@ -54,13 +57,17 @@ async function keep(token: string): Promise<void> {
 // #endregion keep
 
 // #region sign-out
-// Apple's own sign-out: it ends the token at Apple, so the copy the server keeps stops working too.
 signOutButton.onclick = () => {
-  signIn.disconnect().then(() => {
-    change({ listener: undefined, storefront: "us" });
-    say("Signed out.");
-  }, showError);
+  signOut().catch(showError);
 };
+
+async function signOut(): Promise<void> {
+  // Apple's own sign-out, which ends the token at Apple, and then the server forgets its copy.
+  await signIn.disconnect();
+  await fetch("/api/music/user-token", { method: "DELETE" });
+  change({ listener: undefined, storefront: "us" });
+  say("Signed out.");
+}
 // #endregion sign-out
 
 onChange(() => {

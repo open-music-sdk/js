@@ -11,6 +11,7 @@ import {
   type tMusic,
   type tTokenEndpoint,
   type tUserTokenIntake,
+  type tUserTokenStore,
 } from "@open-music-sdk/server";
 
 // What Wrangler hands the Worker: the secrets from .env, and the KV namespace from wrangler.jsonc.
@@ -24,8 +25,10 @@ interface tEnv {
 
 interface tApp {
   readonly music: tMusic;
+  readonly store: tUserTokenStore;
   readonly token: tTokenEndpoint;
   readonly intake: tUserTokenIntake;
+  readonly hosts: ReadonlySet<string>;
 }
 
 // Made on the first request, from the secrets that request brings, and kept for every request after it: a client
@@ -33,21 +36,23 @@ interface tApp {
 let app: tApp | undefined;
 
 function setUp(env: tEnv): tApp {
-  const { APPLE_MUSIC_PRIVATE_KEY: pem, APPLE_MUSIC_TEAM_ID: teamId, APPLE_MUSIC_KEY_ID: keyId } = env;
-  if (!pem || !teamId || !keyId) throw new Error("The MusicKit key is not set. Copy samples/.env.example to samples/worker-server/.env and fill it in.");
+  const { APPLE_MUSIC_PRIVATE_KEY: pem, APPLE_MUSIC_TEAM_ID: teamId, APPLE_MUSIC_KEY_ID: keyId, PAGE_ORIGIN: pageOrigin } = env;
+  // The page the token is bound to has no default either: a deployed copy has to name its own.
+  if (!pem || !teamId || !keyId || !pageOrigin) throw new Error("The MusicKit key or PAGE_ORIGIN is not set. Copy samples/.env.example to samples/worker-server/.env and fill it in.");
   const key = { pem, teamId, keyId };
   const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
   const music = createServerClient({ ...key, userTokenStore: store, rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }) });
-  return {
-    music,
-    // #region token-route
-    token: tokenEndpoint({ ...key, origin: [env.PAGE_ORIGIN ?? "http://localhost:2728"] }),
-    // #endregion token-route
-    // #region user-token
-    // Asks Apple whether the posted token works, and keeps it under the session's id only then.
-    intake: userTokenIntake(music, { store, userId: sessionOf }),
-    // #endregion user-token
-  };
+  // #region token-route
+  // The page's developer token, minted for the page's origin alone and short-lived, since anyone can read a page.
+  // The handler takes the Worker's request as it comes: see route() below.
+  const token = tokenEndpoint({ ...key, origin: [pageOrigin] });
+  // #endregion token-route
+  // Asks Apple whether the posted token works, and keeps it under the session's id only then.
+  const intake = userTokenIntake(music, { store, userId: sessionOf });
+  // Requests sent to the Worker by its own name or the page's: a site whose name a DNS trick points at 127.0.0.1
+  // would otherwise reach it from the listener's browser as if it were the page.
+  const hosts = new Set([new URL(pageOrigin).host, "127.0.0.1:8787"]);
+  return { music, store, token, intake, hosts };
 }
 
 // A listener is a random id in a cookie, given with the first answer. A real app has its own sessions.
@@ -65,14 +70,24 @@ export default {
   },
 };
 
-// The two routes answer methods themselves, so each is routed by its path alone.
-async function route(req: Request, { music, token, intake }: tApp): Promise<Response> {
+// The two SDK handlers answer methods themselves, so each is routed by its path; the sign-out is the one DELETE.
+async function route(req: Request, { music, store, token, intake, hosts }: tApp): Promise<Response> {
+  if (!hosts.has(req.headers.get("host") ?? "")) return reply(421, { error: "MisdirectedRequest" });
   const { pathname } = new URL(req.url);
   if (pathname === "/api/music/token") return token(req);
-  if (pathname === "/api/music/user-token") return intake(req);
+  if (pathname === "/api/music/user-token") return req.method === "DELETE" ? signOut(store, req) : intake(req);
   if (pathname === "/api/me/recent") return recent(music, req);
   return reply(404, { error: "NotFound" });
 }
+
+// #region sign-out
+// The listener signed out of Apple Music in the page: the Worker forgets its copy of their token.
+async function signOut(store: tUserTokenStore, req: Request): Promise<Response> {
+  const session = sessionOf(req);
+  if (session !== undefined) await store.delete(session);
+  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+}
+// #endregion sign-out
 
 // #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored for them.

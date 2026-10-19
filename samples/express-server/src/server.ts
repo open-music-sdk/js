@@ -1,9 +1,9 @@
-// Shows: createServerClient, createRateLimiter, tokenEndpoint, acceptUserToken, MemoryUserTokenStore, forUser,
-// isAppleMusicError. Guides: /guides/token-endpoint, /guides/store-user-tokens
+// Shows: createServerClient, createRateLimiter, tokenEndpoint, acceptUserToken, parseToken, MemoryUserTokenStore,
+// forUser, isAppleMusicError. Guides: /guides/token-endpoint, /guides/store-user-tokens
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { MemoryUserTokenStore, acceptUserToken, createRateLimiter, createServerClient, isAppleMusicError, tokenEndpoint } from "@open-music-sdk/server";
+import { MemoryUserTokenStore, acceptUserToken, createRateLimiter, createServerClient, isAppleMusicError, parseToken, tokenEndpoint } from "@open-music-sdk/server";
 import { web } from "./web.ts";
 
 function required(name: string): string {
@@ -12,7 +12,8 @@ function required(name: string): string {
   return value;
 }
 const key = { pem: required("APPLE_MUSIC_PRIVATE_KEY"), teamId: required("APPLE_MUSIC_TEAM_ID"), keyId: required("APPLE_MUSIC_KEY_ID") };
-const pageOrigin = process.env.PAGE_ORIGIN ?? "http://localhost:2728";
+// The page the developer token is bound to. A deployed copy has to name its own: there is no default to forget.
+const pageOrigin = required("PAGE_ORIGIN");
 
 // One client for the whole server. Every listener's requests count against the same developer token, so they
 // share one limiter. The store loses its tokens when the server stops: a real app keeps them somewhere lasting.
@@ -20,6 +21,14 @@ const store = new MemoryUserTokenStore();
 const music = createServerClient({ ...key, userTokenStore: store, rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }) });
 
 const app = express();
+
+// Only requests sent to this server by its own name or the page's: a site whose name a DNS trick points at
+// 127.0.0.1 would otherwise reach it from the listener's browser as if it were the page.
+const hosts = new Set([new URL(pageOrigin).host, "127.0.0.1:8787"]);
+app.use((req, res, next) => {
+  if (hosts.has(req.headers.host ?? "")) next();
+  else res.status(421).json({ error: "MisdirectedRequest" });
+});
 
 // A listener is a random id in a cookie, given with the first answer under /api. A real app has its own sessions.
 const sessionOf = (req: Request) => /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
@@ -54,13 +63,15 @@ app.post("/api/music/user-token", express.json({ limit: "8kb" }), async (req, re
     res.status(400).json({ error: "BadRequest" });
     return;
   }
-  // What acceptUserToken takes for a token: printable characters, no spaces inside.
-  if (!/^[\x21-\x7e]+$/.test(posted.trim())) {
+  // Checked here rather than left to acceptUserToken, whose TypeError means a string that is no token or a key that
+  // is no key: the first is the listener's to hear about, the second the server's.
+  const token = parseToken(posted);
+  if (token === undefined) {
     res.status(422).json({ error: "UserTokenInvalid" });
     return;
   }
   try {
-    await acceptUserToken(music, store, session, posted);
+    await acceptUserToken(music, store, session, token);
     res.status(204).end();
   } catch (e) {
     if (!isAppleMusicError(e)) throw e;
@@ -69,6 +80,15 @@ app.post("/api/music/user-token", express.json({ limit: "8kb" }), async (req, re
   }
 });
 // #endregion user-token
+
+// #region sign-out
+// The listener signed out of Apple Music in the page: the server forgets its copy of their token.
+app.delete("/api/music/user-token", async (req, res) => {
+  const session = sessionOf(req);
+  if (session !== undefined) await store.delete(session);
+  res.status(204).end();
+});
+// #endregion sign-out
 
 // #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored for them.
