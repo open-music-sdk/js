@@ -8,11 +8,14 @@ const view = byId("dig-view", HTMLDivElement);
 
 /** What the view shows: a step that asks Apple and gives back what to draw. Drawn again when someone signs in or out. */
 export let current: () => Promise<HTMLElement[]> = () => Promise.resolve([]);
+let turns = 0;
 
 export function show(step: () => Promise<HTMLElement[]>): void {
   current = step;
+  const turn = ++turns;
   step().then((elements) => {
-    view.replaceChildren(...elements);
+    // Drawn only if nothing was asked for since: a slow search must not cover the charts of a newer storefront.
+    if (turn === turns) view.replaceChildren(...elements);
   }, showError);
 }
 

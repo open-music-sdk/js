@@ -17,8 +17,11 @@ const found = h("div");
 
 onChange(() => {
   document.querySelector<HTMLButtonElement>('nav button[value="library"]')?.toggleAttribute("hidden", now.listener === undefined);
-  if (now.listener === undefined) view.replaceChildren();
-  else draw(now.listener).catch(showError);
+  found.replaceChildren();
+  view.replaceChildren();
+  if (now.listener !== undefined) draw(now.listener).catch(showError);
+  // Signed out with the Library open: back to Dig, since nothing of a listener's is left to show.
+  else if (!byId("library", HTMLElement).hidden) document.querySelector<HTMLButtonElement>('nav button[value="dig"]')?.click();
 });
 
 async function draw(listener: tBrowserMusic): Promise<void> {
@@ -28,15 +31,18 @@ async function draw(listener: tBrowserMusic): Promise<void> {
   const added = await first(listener.user.listRecentlyAdded({ limit: 10, maxPages: 1 }));
   const picked = await first(listener.user.listPersonalRecommendations({ limit: 3, maxPages: 1 }));
   // #endregion lists
+  const recent = await fromTheServer();
+  // Drawn only for the listener it was asked for: one who signed out while it loaded is shown nothing of it.
+  if (now.listener !== listener) return;
   view.replaceChildren(
     found,
-    ...(await fromTheServer()),
+    ...recent,
     h("h3", {}, "Heavy rotation"),
     cards(heavy),
     ...picked.flatMap((recommendation) => [h("h3", {}, recommendation.attributes?.title?.stringForDisplay ?? "Made for you"), cards(recommendation.relationships?.contents?.data ?? [])]),
     h("h3", {}, "Recently added"),
     cards(added),
-    ...playlists(listener),
+    ...yourPlaylists(listener),
   );
 }
 
@@ -53,7 +59,7 @@ async function fromTheServer(): Promise<HTMLElement[]> {
 
 // #region playlists
 /** The listener's playlists, 25 at a time. Each More asks Apple for the next page, and nothing is asked before. */
-function playlists(listener: tBrowserMusic): HTMLElement[] {
+function yourPlaylists(listener: tBrowserMusic): HTMLElement[] {
   const walk = listener.user.listLibraryPlaylists({ limit: 25 })[Symbol.asyncIterator]();
   const list = h("ul", { className: "playlists" });
   const tracks = h("div");
@@ -92,6 +98,7 @@ byId("library-search", HTMLFormElement).onsubmit = (event) => {
 async function find(listener: tBrowserMusic, text: string): Promise<void> {
   const { results } = await listener.user.searchLibrary(text, { types: ["library-songs", "library-albums"], limit: 10 });
   const items = [...(results["library-songs"]?.data ?? []), ...(results["library-albums"]?.data ?? [])];
+  if (now.listener !== listener) return;
   found.replaceChildren(h("h3", {}, `In your library: "${text}"`), items.length === 0 ? h("p", {}, "Nothing. Apple's library search finds a song by the first word of its name more often than by the whole name.") : cards(items));
 }
 // #endregion find

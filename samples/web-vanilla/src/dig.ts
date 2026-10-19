@@ -12,11 +12,11 @@ const term = byId("term", HTMLInputElement);
 // #region search
 byId("search", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
-  show(term.value.trim() === "" ? charts : search);
+  const text = term.value.trim();
+  show(text === "" ? charts : () => search(text));
 };
 
-async function search(): Promise<HTMLElement[]> {
-  const text = term.value.trim();
+async function search(text: string): Promise<HTMLElement[]> {
   const { results } = await music.catalog.searchCatalog(text, { types: ["songs", "albums", "artists", "playlists"], limit: 10, storefront: now.storefront });
   return found(`Results for "${text}"`, results.songs?.data, results.albums?.data, results.artists?.data, results.playlists?.data);
 }
