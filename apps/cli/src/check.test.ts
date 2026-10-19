@@ -2039,6 +2039,13 @@ describe("the sweep: every function of client-catalog and client-user, each answ
     expect(pathsOf(asked).some((path) => path.endsWith("/children"))).toBe(false);
   });
 
+  test("with no folder in the root, a folder's parent is not asked, though the root is still read by its id: each is found by itself, however they are worded", async () => {
+    apple.folders = [];
+    await main(["check", "client-user", "--no-color"]);
+    expect(rowsOf("getLibraryPlaylistFolderRelationship:parent")).toEqual(["- getLibraryPlaylistFolderRelationship:parent: not asked, since there was nothing to ask it with (stderr says why)"]);
+    expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.playlistsroot");
+  });
+
   test("a folder is read by its id as one in the root, before the root itself, which may be a 404 by its id", async () => {
     expect(await main(["check", "getLibraryPlaylistFolder", "getLibraryPlaylistFolders", "--no-color"])).toBe(0);
     expect(pathsOf(asked)).toContain("/v1/me/library/playlist-folders/p.folder");

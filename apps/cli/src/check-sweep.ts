@@ -66,7 +66,12 @@ interface tSeed<T> {
   readonly what: string;
   readonly get: (a: tAsk) => Promise<readonly T[]>;
 }
-const seed = <T>(what: string, get: (a: tAsk) => Promise<readonly T[]>): tSeed<T> => ({ what, get: (a) => once(a, `seed ${what}`, async () => (await get(a)).slice(0, 5)) });
+/** How many seeds there are: each is made once for the run by a key of its own, since two may be said in the same words. */
+let seeds = 0;
+const seed = <T>(what: string, get: (a: tAsk) => Promise<readonly T[]>): tSeed<T> => {
+  const key = `seed ${String(++seeds)}`;
+  return { what, get: (a) => once(a, key, async () => (await get(a)).slice(0, 5)) };
+};
 
 const o = (a: tAsk) => ({ signal: a.signal });
 const idsIn = (body: unknown) => list(at(body, "data")).map(idOf).filter(defined);
