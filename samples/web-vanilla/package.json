@@ -11,7 +11,8 @@
     "lint": "eslint --flag unstable_native_nodejs_ts_config ."
   },
   "dependencies": {
-    "@open-music-sdk/browser": "workspace:*"
+    "@open-music-sdk/browser": "workspace:*",
+    "@open-music-sdk/core": "workspace:*"
   },
   "devDependencies": {
     "vite": "catalog:"

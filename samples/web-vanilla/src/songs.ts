@@ -42,8 +42,14 @@ function row(tracks: readonly tTrack[], track: tTrack, isLoved: boolean): HTMLLI
 async function lovedOf(tracks: readonly tTrack[]): Promise<Set<string>> {
   const ids = tracks.filter((track) => track.type === "songs").map((track) => track.id);
   if (now.listener === undefined || ids.length === 0) return new Set();
-  const ratings = await now.listener.user.getSongRatings(ids.slice(0, 300));
-  return new Set(ratings.filter((rating) => rating.attributes?.value === 1).map((rating) => rating.id));
+  try {
+    const ratings = await now.listener.user.getSongRatings(ids.slice(0, 300));
+    return new Set(ratings.filter((rating) => rating.attributes?.value === 1).map((rating) => rating.id));
+  } catch (e) {
+    // The hearts are an extra: songs whose ratings Apple will not give are drawn without them, and the page says why.
+    showError(e);
+    return new Set();
+  }
 }
 
 /** A heart that loves the song, a rating of 1, or takes the rating away again. */

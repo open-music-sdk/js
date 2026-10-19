@@ -47,9 +47,10 @@ async function charts(): Promise<HTMLElement[]> {
 
 /** What a search or the charts found, each type under its own heading. */
 async function found(title: string, songs: readonly (tSong | tMusicVideo)[] = [], albums: readonly tAlbum[] = [], artists: readonly tArtist[] = [], playlists: readonly tPlaylist[] = []): Promise<HTMLElement[]> {
+  const rows = songs.length > 0 ? await songRows(songs) : undefined;
   return [
     h("h2", {}, title),
-    ...(songs.length > 0 ? [h("h3", {}, "Songs"), await songRows(songs)] : []),
+    ...(rows !== undefined ? [h("h3", {}, "Songs"), rows] : []),
     ...shelf("Albums", albums, openAlbum),
     ...shelf("Artists", artists, openArtist),
     ...shelf("Playlists", playlists, openPlaylist),

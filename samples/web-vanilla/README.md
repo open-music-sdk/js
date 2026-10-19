@@ -13,7 +13,7 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | --- | --- |
 | [`src/music.ts`](./src/music.ts) | `createBrowserClient`, and who is signed in |
 | [`src/dig.ts`](./src/dig.ts) | `searchCatalog`, `getSearchHints`, `getCharts`, `listStorefronts` |
-| [`src/pages.ts`](./src/pages.ts) | `getAlbum` with `schemas`, `getArtist`, `getArtistView`, `getArtistRelationship`, `getPlaylist`, `request` for the one endpoint the clients lack, `addToLibrary`, `addToFavorites` |
+| [`src/pages.ts`](./src/pages.ts) | `getAlbum` with `schemas`, `getArtist`, `getArtistView`, `getArtistRelationship`, `getPlaylist`, `request` with `segmentOf` for the one endpoint the clients lack, `addToLibrary`, `addToFavorites` |
 | [`src/songs.ts`](./src/songs.ts) | `artworkImage`, `getSongRatings`, `setSongRating`, `deleteSongRating`, `addToLibrary` |
 | [`src/player.ts`](./src/player.ts) | `previewPlayer`, `artworkUrl` |
 | [`src/sign-in.ts`](./src/sign-in.ts) | `createConnect`: sign in, restore a returning listener, sign out; the token posted to the server |

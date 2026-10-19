@@ -1,6 +1,7 @@
-// Shows: getAlbum, getArtist, getArtistView, getArtistRelationship, getPlaylist, schemas, request, addToLibrary,
-// addToFavorites. Guides: /guides/validation, /guides/direct-requests
+// Shows: getAlbum, getArtist, getArtistView, getArtistRelationship, getPlaylist, schemas, request, segmentOf,
+// addToLibrary, addToFavorites. Guides: /guides/validation, /guides/direct-requests
 import { isAppleMusicError, schemas, type tAlbum, type tArtist, type tArtwork, type tBrowserMusic, type tLibraryAlbum, type tPage, type tPlaylist, type tSong } from "@open-music-sdk/browser";
+import { segmentOf } from "@open-music-sdk/core";
 import { h } from "./dom";
 import { say, showError } from "./errors";
 import { music, now } from "./music";
@@ -13,8 +14,10 @@ export async function openAlbum({ id }: tAlbum): Promise<HTMLElement[]> {
   // the path of each value that differs, rather than an undefined somewhere later.
   const album = await music.catalog.getAlbum(id, { include: ["tracks"], storefront: now.storefront, schema: schemas.albumsResponse });
   // #endregion schema
+  const actions = await albumActions(id);
+  const rows = await songRows(album.relationships?.tracks?.data ?? []);
   const { name, artistName, artwork } = album.attributes ?? {};
-  return [heading(name, artistName, artwork), ...(await albumActions(id)), await songRows(album.relationships?.tracks?.data ?? [])];
+  return [heading(name, artistName, artwork), ...actions, rows];
 }
 
 export async function openArtist({ id }: tArtist): Promise<HTMLElement[]> {
@@ -28,33 +31,34 @@ export async function openArtist({ id }: tArtist): Promise<HTMLElement[]> {
   const albums: tAlbum[] = [];
   for await (const album of music.catalog.getArtistRelationship(id, "albums", { storefront, limit: 25, maxPages: 4 })) albums.push(album);
   // #endregion view-and-relationship
-  return [heading(artist.attributes?.name, undefined, artist.attributes?.artwork), h("h3", {}, "Top songs"), await songRows(top), ...shelf("Albums", albums, openAlbum)];
+  const rows = await songRows(top);
+  return [heading(artist.attributes?.name, undefined, artist.attributes?.artwork), h("h3", {}, "Top songs"), rows, ...shelf("Albums", albums, openAlbum)];
 }
 
 export async function openPlaylist({ id }: tPlaylist): Promise<HTMLElement[]> {
   const playlist = await music.catalog.getPlaylist(id, { include: ["tracks"], storefront: now.storefront });
+  const rows = await songRows(playlist.relationships?.tracks?.data ?? []);
   const { name, curatorName, artwork } = playlist.attributes ?? {};
-  return [heading(name, curatorName, artwork), await songRows(playlist.relationships?.tracks?.data ?? [])];
+  return [heading(name, curatorName, artwork), rows];
 }
 
 /** What a signed-in listener can do with an album: add it to their library unless it is there, or make it a favorite. */
 async function albumActions(id: string): Promise<HTMLElement[]> {
   const { listener } = now;
   if (listener === undefined) return [];
+  // An extra: if Apple cannot say whether the listener holds the album, the page offers to add it, and says why.
+  const held = await inLibrary(listener, id).catch((e: unknown) => {
+    showError(e);
+    return false;
+  });
   const add = () => {
     write(listener.user.addToLibrary({ albums: [id] }), "Added the album to your library.");
   };
   const favorite = () => {
     write(listener.user.addToFavorites({ albums: [id] }), "Made the album a favorite, which adds it to your library too.");
   };
-  return [
-    h(
-      "p",
-      { className: "actions" },
-      (await inLibrary(listener, id)) ? h("span", {}, "In your library") : h("button", { type: "button", textContent: "Add album to library", onclick: add }),
-      h("button", { type: "button", textContent: "Favorite", onclick: favorite }),
-    ),
-  ];
+  const library = held ? h("span", {}, "In your library") : h("button", { type: "button", textContent: "Add album to library", onclick: add });
+  return [h("p", { className: "actions" }, library, h("button", { type: "button", textContent: "Favorite", onclick: favorite }))];
 }
 
 // #region in-library
@@ -63,8 +67,10 @@ async function albumActions(id: string): Promise<HTMLElement[]> {
  * function asks for. Apple answers 404 for an album they do not hold, and counts one they hold a song of.
  */
 async function inLibrary(listener: tBrowserMusic, id: string): Promise<boolean> {
+  // Each value checked as one segment of the path, as the clients check every id: `..` would point the request,
+  // and the listener's token with it, somewhere else on Apple's API.
+  const path = `v1/catalog/${segmentOf("inLibrary", "storefront", now.storefront)}/albums/${segmentOf("inLibrary", "id", id)}/library`;
   try {
-    const path = `v1/catalog/${encodeURIComponent(now.storefront)}/albums/${encodeURIComponent(id)}/library`;
     const { data = [] } = await listener.request<tPage<tLibraryAlbum>>(path, { user: true });
     return data.length > 0;
   } catch (e) {
@@ -76,7 +82,9 @@ async function inLibrary(listener: tBrowserMusic, id: string): Promise<boolean> 
 
 /** A write, and what to say once Apple has accepted it: Apple carries it out afterwards, within seconds. */
 function write(accepted: Promise<unknown>, done: string): void {
-  accepted.then(() => { say(`${done} It can take a few seconds to show.`); }, showError);
+  accepted.then(() => {
+    say(`${done} It can take a few seconds to show.`);
+  }, showError);
 }
 
 function heading(name: string | undefined, by: string | undefined, artwork: tArtwork | undefined): HTMLElement {
