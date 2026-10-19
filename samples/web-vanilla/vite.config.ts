@@ -12,5 +12,8 @@ export default defineConfig({
     // is restated, with a MusicKit key and Wrangler's files added, and no page on another origin may read an answer.
     cors: false,
     fs: { deny: [".env", ".env.*", "*.{crt,pem,key,p12,pfx,cer,der}", ".npmrc", ".yarnrc.yml", "**/.git/**", "*.p8", ".dev.vars", ".dev.vars.*", "**/.wrangler/**"] },
+    // No page may frame this one. Another localhost port counts as the same site, so a frame there would have the
+    // listener signed in, and a page opened by its address could be laid under a click meant for something else.
+    headers: { "X-Frame-Options": "DENY", "Content-Security-Policy": "frame-ancestors 'none'" },
   },
 });
