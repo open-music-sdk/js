@@ -6,6 +6,13 @@ coverage/
 .env
 .env.*
 !.env.example
+# Wrangler's secrets for local development, and its local state (the samples' KV namespace among it)
+.dev.vars
+.dev.vars.*
+.wrangler/
+# Next.js's build output
+.next/
+next-env.d.ts
 # Apple private keys: the contents belong in the environment, never in the repository
 *.p8
 .DS_Store
