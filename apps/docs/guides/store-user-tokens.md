@@ -133,46 +133,36 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 
 When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`.
 
+The [sample apps](../samples)' servers ask Apple what the listener played lately this way, with a session cookie
+standing in for your own sessions:
+
+::: code-group
+
+<<< @/../../samples/worker-server/src/index.ts#act-for-listener{ts} [Cloudflare Workers]
+
+<<< @/../../samples/express-server/src/server.ts#act-for-listener{ts} [Express]
+
+:::
+
 ## 5. Take a token in without a web-standard `Request`
 
 If your framework hands you something other than a web-standard `Request`, as Express does, call
 `acceptUserToken` yourself. It's what the intake route does once it has read the request: it asks Apple, and
 stores the token only if Apple accepts it.
 
-On your server:
+On your server, as the [Express sample](../samples) does it, with `sessionOf` reading its session cookie in place
+of your own sessions:
 
-```ts
-import { acceptUserToken, isAppleMusicError } from "@open-music-sdk/server";
-import express from "express";
-import { music, store } from "./music";
+<<< @/../../samples/express-server/src/server.ts#user-token{ts}
 
-const app = express();
+It answers a token as the intake route does: `422` when it's no good, and `502` when Apple didn't confirm it. Check
+the session and require JSON here too, for the reasons in step 2. `express.json()` reads a body only when its
+content type is JSON. Answer every request with `Cache-Control: no-store`, as the sample does for everything under
+`/api`.
 
-app.post("/api/music/user-token", express.json(), async (req, res) => {
-  res.set("Cache-Control", "no-store");
-  const userId = sessionUserId(req);
-  if (!userId) return void res.status(401).end();
-  const token: unknown = req.body?.token;
-  if (typeof token !== "string") return void res.status(400).end();
-  try {
-    await acceptUserToken(music, store, userId, token);
-    res.status(204).end();
-  } catch (e) {
-    // A string that isn't a token is a TypeError, before Apple is asked.
-    if (e instanceof TypeError || isAppleMusicError(e, "UserTokenInvalid")) return void res.status(422).end();
-    // Apple didn't confirm the token.
-    if (isAppleMusicError(e)) return void res.status(502).end();
-    throw e;
-  }
-});
-```
-
-It answers a token as the intake route does: `422` when it's no good, `502` when Apple didn't confirm it, and
-`Cache-Control: no-store` on every answer. Check the session and require JSON here too, for the reasons in step 2.
-`express.json()` reads a body only when its content type is JSON.
-
-`acceptUserToken` also throws a `TypeError` for a `userId` that isn't a string, which this example would answer
-with `422` too. Make sure your session lookup returns a string.
+Check that what was posted is a token before you call `acceptUserToken`, rather than catching its `TypeError`. It
+throws one for a string that isn't a token, but a `pem` that isn't a key throws one too, at the first request, and
+a listener told their sign-in failed would never learn that your key is the problem.
 
 ## Choose a store
 

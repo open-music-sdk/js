@@ -56,6 +56,11 @@ An `ApiError` can also come from a successful answer that isn't what the call ne
 from a function on `music.catalog` or `music.user` that hands over one resource, an answer that holds none. Its
 `status` is then the success's, such as `200`.
 
+The [vanilla sample](../samples) sends every error through one function, which says each kind in words a listener
+can act on:
+
+<<< @/../../samples/web-vanilla/src/errors.ts#explain{ts}
+
 ### Writes that may have happened
 
 The client sends a `POST`, such as `addToLibrary` or `createLibraryPlaylist`, again only after a `429`, when

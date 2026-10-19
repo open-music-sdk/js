@@ -28,7 +28,6 @@ interface tApp {
   readonly intake: tUserTokenIntake;
 }
 
-// #region set-up
 // Made on the first request, from the secrets that request brings, and kept for every request after it: a client
 // made per request would sign a new developer token every time.
 let app: tApp | undefined;
@@ -50,7 +49,6 @@ function setUp(env: tEnv): tApp {
     // #endregion user-token
   };
 }
-// #endregion set-up
 
 // A listener is a random id in a cookie, given with the first answer. A real app has its own sessions.
 function sessionOf(req: Request): string | undefined {

@@ -175,6 +175,11 @@ Hybrid: the page posts the token to your server, which stores it and calls Apple
 [Keep a listener's token on your server](./store-user-tokens). When the listener signs out, also have your server
 delete the token it stored.
 
+The [vanilla sample](../samples) does both. It posts the token, and once its server has kept it, it reads the
+listener's library from the page too:
+
+<<< @/../../samples/web-vanilla/src/sign-in.ts#keep{ts}
+
 ::: warning Apple's script keeps a copy of the token
 Apple's script keeps its own copy of the token in the browser's storage, which is how a returning listener is
 still signed in, so a cross-site scripting hole on your origin exposes the token on any later visit. See

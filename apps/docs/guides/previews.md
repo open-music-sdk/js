@@ -85,6 +85,12 @@ the player hasn't played a clip from the live API in a browser yet. See
 [Differences from Apple's documentation](../differences#lib-preview-player) for what it takes on trust.
 :::
 
+A list with a Play button on each row plays the whole list, from the row that was clicked. The track's place in
+the queue `load` gives back can differ from its place in your list, since tracks with no clip are left out. The
+[vanilla sample](../samples) does it this way:
+
+<<< @/../../samples/web-vanilla/src/player.ts#play-from{ts}
+
 ## 4. Draw the player's state
 
 In your page, subscribe to the player and draw from `player.state`:

@@ -111,6 +111,7 @@ export default defineConfig({
       { text: "Guides", link: "/guides/musickit-key", activeMatch: "^/guides/" },
       { text: "Concepts", link: "/concepts/packages", activeMatch: "^/concepts/" },
       { text: "Reference", link: "/reference/", activeMatch: "^/(reference/|differences|glossary)" },
+      { text: "Samples", link: "/samples" },
       { text: "Status", link: "/status" },
     ],
     // The longest matching path wins, so a package's own sidebar is used under its folder.

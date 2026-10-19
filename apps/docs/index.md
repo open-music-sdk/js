@@ -49,6 +49,7 @@ exists.
    [`browser`](./reference/@open-music-sdk/browser/) or [`react`](./reference/@open-music-sdk/react/).
 4. To try the listener's side with your own account before your app has a sign-in, get a Music User Token with
    the CLI's `login`. See [The command-line tool](./concepts/packages#the-command-line-tool).
+5. To see it all working together, run one of the [sample apps](./samples) on your machine.
 
 ## A first look
 

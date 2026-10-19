@@ -46,80 +46,15 @@ It holds your private key. Add it to `.gitignore` before you write the key into 
 
 ## 3. Write the Worker
 
-The Worker below is complete. Your session lookup is the one piece left to you: `sessionUserId` stands for it, and
-resolves to the signed-in user's id, or `undefined` when there is none.
+The Worker below is the [worker-server sample](../samples), complete. Its sessions are a stand-in: `sessionOf`
+reads a random id from a cookie the Worker gives with its first answer. Put your own session lookup in its place,
+one that resolves to the signed-in user's id, or `undefined` when there is none, and leave the cookie out.
 
-```ts
-// src/index.ts
-import {
-  KvUserTokenStore,
-  createServerClient,
-  isAppleMusicError,
-  tokenEndpoint,
-  userTokenIntake,
-  type tKvNamespace,
-  type tMusic,
-  type tTokenEndpoint,
-  type tUserTokenIntake,
-} from "@open-music-sdk/server";
+<<< @/../../samples/worker-server/src/index.ts{ts}
 
-interface Env {
-  APPLE_MUSIC_PRIVATE_KEY: string;
-  APPLE_MUSIC_TEAM_ID: string;
-  APPLE_MUSIC_KEY_ID: string;
-  MUSIC_USER_TOKENS: tKvNamespace;
-}
+The `// #region` lines mark the parts other guides show, and do nothing.
 
-interface App {
-  readonly music: tMusic;
-  readonly token: tTokenEndpoint;
-  readonly intake: tUserTokenIntake;
-}
-
-// Made on the first request, and kept for every request this isolate serves after it.
-let app: App | undefined;
-
-function setUp(env: Env): App {
-  const key = { pem: env.APPLE_MUSIC_PRIVATE_KEY, teamId: env.APPLE_MUSIC_TEAM_ID, keyId: env.APPLE_MUSIC_KEY_ID };
-  const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
-  const music = createServerClient({ ...key, storefront: "us", userTokenStore: store });
-  return {
-    music,
-    token: tokenEndpoint({ ...key, origin: ["https://app.example"] }),
-    intake: userTokenIntake(music, { store, userId: (req) => sessionUserId(req, env) }),
-  };
-}
-
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const { music, token, intake } = (app ??= setUp(env));
-    const { pathname } = new URL(req.url);
-
-    if (pathname === "/api/music/token") return token(req);
-    if (pathname === "/api/music/user-token") return intake(req);
-
-    if (pathname === "/api/music/playlists") {
-      const userId = await sessionUserId(req, env);
-      if (userId === undefined) return new Response(null, { status: 401 });
-      const names: string[] = [];
-      try {
-        for await (const playlist of music.forUser(userId).user.listLibraryPlaylists()) {
-          names.push(playlist.attributes?.name ?? "");
-        }
-      } catch (e) {
-        if (isAppleMusicError(e, "UserTokenInvalid")) return Response.json({ error: "UserTokenInvalid" }, { status: 422 });
-        throw e;
-      }
-      return Response.json({ names });
-    }
-
-    return new Response("Not found", { status: 404 });
-  },
-};
-```
-
-If you generate your `Env` type with `wrangler types`, use that one instead. Its KV namespace type fits
-`KvUserTokenStore`.
+If you generate your `Env` type with `wrangler types`, use that one in place of `tEnv`.
 
 ### Made once, on the first request
 
@@ -154,8 +89,9 @@ the store. A listener the store has no token for gets a `UserTokenInvalid` error
 answers `403` to. The Worker answers `422` then, and your page asks the listener to sign in again.
 
 A listener who isn't signed in to Apple Music, or has no subscription, can get a `401` instead, which arrives as
-`DeveloperTokenInvalid` and which this Worker rethrows. `validateUserToken` tells it apart from a developer token
-Apple refuses. See [Handle errors](./errors).
+`DeveloperTokenInvalid`. The Worker answers that, and any other `AppleMusicError`, with `502` and the error's
+tag. `validateUserToken` tells a listener's `401` apart from a developer token Apple refuses. See
+[Handle errors](./errors).
 
 ## 4. Keep listeners' tokens in Workers KV
 

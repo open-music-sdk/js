@@ -61,6 +61,11 @@ const page = await listener.request<tAlbumRelationshipsAlbumLibraryRelationship>
 `storefront()` gives the storefront the client was created with, or else the listener's, which the client asks
 Apple for once.
 
+Apple answers `404` for an album the listener doesn't hold, as it did against the live API on 18 October 2026,
+and with their copy for one they hold a song of. The [vanilla sample](../samples) turns that into a yes or a no:
+
+<<< @/../../samples/web-vanilla/src/pages.ts#in-library{ts}
+
 Build a path from values you trust. A value from outside your app, such as an id from a URL, can hold `../` and
 point the request somewhere else on Apple's API, where it carries the listener's token. `segmentOf` checks a
 value as one segment of a path, as the clients check every id.

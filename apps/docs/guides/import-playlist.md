@@ -194,6 +194,22 @@ a write's answer was lost, rejects with that write's own error.
 Each function makes one request at a time. The client's own rate limiter, and its wait after a `429`, apply
 underneath `delayMs`. These options set how hard one call pushes; the client sets how hard your whole app does.
 
+## In a page
+
+The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in.
+`resolve` needs no token at all. The [vanilla sample](../samples) sends its crate of songs this way: it finds a
+pasted tracklist, shows the plan in a dialog, and applies it only when the listener says to.
+
+::: code-group
+
+<<< @/../../samples/web-vanilla/src/crate.ts#resolve{ts} [1. Resolve]
+
+<<< @/../../samples/web-vanilla/src/crate.ts#plan{ts} [2. Plan]
+
+<<< @/../../samples/web-vanilla/src/crate.ts#apply{ts} [3. Apply]
+
+:::
+
 ## When something goes wrong
 
 - A mistake in how you call a function is a `TypeError` that names it and the argument, such as

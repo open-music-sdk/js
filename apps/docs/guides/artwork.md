@@ -58,6 +58,11 @@ export function Cover({ song }: { song: tSong }) {
 `src` as the 1x image wherever the `srcset` doesn't offer one, and lays out an image that has no `width` and
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
+The [vanilla sample](../samples) draws every cover with one function, which leaves a resource with no artwork an
+empty box of the same size:
+
+<<< @/../../samples/web-vanilla/src/songs.ts#artwork{ts}
+
 How the size is chosen:
 
 - With no `height` option, the image keeps the artwork's own shape: a 1920 by 1080 still shown at 320 is asked
