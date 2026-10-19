@@ -204,9 +204,9 @@ pasted tracklist, shows the plan in a dialog, and applies it only when the liste
 
 <<< @/../../samples/web-vanilla/src/crate.ts#resolve{ts} [1. Resolve]
 
-<<< @/../../samples/web-vanilla/src/crate.ts#plan{ts} [2. Plan]
+<<< @/../../samples/web-vanilla/src/send.ts#plan{ts} [2. Plan]
 
-<<< @/../../samples/web-vanilla/src/crate.ts#apply{ts} [3. Apply]
+<<< @/../../samples/web-vanilla/src/send.ts#apply{ts} [3. Apply]
 
 :::
 

@@ -4,6 +4,7 @@ import "./dig";
 import "./sign-in";
 import "./library";
 import "./crate";
+import "./send";
 
 const tabs = document.querySelectorAll<HTMLButtonElement>("nav button");
 for (const tab of tabs) {

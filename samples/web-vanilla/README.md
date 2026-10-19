@@ -18,7 +18,8 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | [`src/player.ts`](./src/player.ts) | `previewPlayer`, `artworkUrl` |
 | [`src/sign-in.ts`](./src/sign-in.ts) | `createConnect`: sign in, restore a returning listener, sign out; the token posted to the server |
 | [`src/library.ts`](./src/library.ts) | The listener's lists, their playlists a page at a time, `searchLibrary`, and the list the server asks for |
-| [`src/crate.ts`](./src/crate.ts) | `playlists.resolve` for a pasted tracklist, then `read`, `plan` and `apply` to send the crate |
+| [`src/crate.ts`](./src/crate.ts) | The picks, and `playlists.resolve` for a pasted tracklist |
+| [`src/send.ts`](./src/send.ts) | `playlists.read`, `plan` and `apply`: the crate sent as a playlist, with the plan shown first |
 | [`src/errors.ts`](./src/errors.ts) | `isAppleMusicError`, each tag in words a listener can act on |
 | [`src/view.ts`](./src/view.ts), [`src/dom.ts`](./src/dom.ts), [`src/main.ts`](./src/main.ts) | The page itself, with nothing of the SDK |
 
