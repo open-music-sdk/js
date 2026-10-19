@@ -37,7 +37,6 @@ function row(tracks: readonly tTrack[], track: tTrack, isLoved: boolean): HTMLLI
   );
 }
 
-// #region ratings
 /** Which of these songs the listener loves, from one request for all of them. Songs never rated are left out. */
 async function lovedOf(tracks: readonly tTrack[]): Promise<Set<string>> {
   const ids = tracks.filter((track) => track.type === "songs").map((track) => track.id);
@@ -68,9 +67,7 @@ function love(id: string, isLoved: boolean): HTMLButtonElement {
   };
   return button;
 }
-// #endregion ratings
 
-// #region add-to-library
 async function add(track: tTrack): Promise<void> {
   try {
     await now.listener?.user.addToLibrary(track.type === "songs" ? { songs: [track.id] } : { "music-videos": [track.id] });
@@ -80,4 +77,3 @@ async function add(track: tTrack): Promise<void> {
     showError(e);
   }
 }
-// #endregion add-to-library

@@ -1,11 +1,9 @@
 // Shows: createBrowserClient. Guide: /guides/token-endpoint
 import { createBrowserClient, type tBrowserMusic } from "@open-music-sdk/browser";
 
-// #region client
 // One client for the page. It fetches its developer token from the server's token route, which Vite forwards to
 // whichever server sample runs, and fetches the next one before the last runs out.
 export const music = createBrowserClient({ tokenUrl: "/api/music/token" });
-// #endregion client
 
 /**
  * Who is signed in, and the storefront every catalog call asks in: the picker's while signed out, and the listener's

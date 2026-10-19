@@ -7,7 +7,6 @@ import { change, music, now, onChange } from "./music";
 const signInButton = byId("sign-in", HTMLButtonElement);
 const signOutButton = byId("sign-out", HTMLButtonElement);
 
-// #region connect
 // Made as the page loads, so that Apple's script is loaded and configured before the click, and its window opens
 // inside the click: a browser blocks a window opened later.
 const signIn = createConnect(music, { app: { name: "Crate Digger" } });
@@ -18,9 +17,7 @@ signInButton.onclick = () => {
     if (token !== undefined) await keep(token);
   }).catch(showError);
 };
-// #endregion connect
 
-// #region restore
 // A returning listener: Apple's script restores their token as it loads. The button works either way, since
 // connect() loads the script afresh after a load that failed.
 signIn.ready.then(async (restored) => {
@@ -28,7 +25,6 @@ signIn.ready.then(async (restored) => {
 }).catch(showError).finally(() => {
   signInButton.disabled = false;
 });
-// #endregion restore
 
 // #region keep
 /** Hands the token to the server, which asks Apple whether it works and keeps it; then signs the page in. */
@@ -49,7 +45,6 @@ async function keep(token: string): Promise<void> {
 }
 // #endregion keep
 
-// #region sign-out
 signOutButton.onclick = () => {
   signOut().catch(showError);
 };
@@ -61,7 +56,6 @@ async function signOut(): Promise<void> {
   change({ listener: undefined, storefront: "us" });
   say("Signed out.");
 }
-// #endregion sign-out
 
 onChange(() => {
   signInButton.hidden = now.listener !== undefined;

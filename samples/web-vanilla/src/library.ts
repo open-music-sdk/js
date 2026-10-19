@@ -25,12 +25,10 @@ onChange(() => {
 });
 
 async function draw(listener: tBrowserMusic): Promise<void> {
-  // #region lists
   // The first page of each list is enough here, so each walk stops after one.
   const heavy = await first(listener.user.listHeavyRotation({ limit: 10, maxPages: 1 }));
   const added = await first(listener.user.listRecentlyAdded({ limit: 10, maxPages: 1 }));
   const picked = await first(listener.user.listPersonalRecommendations({ limit: 3, maxPages: 1 }));
-  // #endregion lists
   const recent = await fromTheServer();
   // Drawn only for the listener it was asked for: one who signed out while it loaded is shown nothing of it.
   if (now.listener !== listener) return;
@@ -46,7 +44,6 @@ async function draw(listener: tBrowserMusic): Promise<void> {
   );
 }
 
-// #region from-the-server
 // One list the server asks for, with the token it kept for this listener when they signed in.
 async function fromTheServer(): Promise<HTMLElement[]> {
   const title = h("h3", {}, "Recently played ", h("small", {}, "asked by the server"));
@@ -55,9 +52,7 @@ async function fromTheServer(): Promise<HTMLElement[]> {
   if (!answer.ok) return [title, h("p", {}, fromServer(answer.status))];
   return [title, cards((await answer.json()) as tCard[])];
 }
-// #endregion from-the-server
 
-// #region playlists
 /** The listener's playlists, 25 at a time. Each More asks Apple for the next page, and nothing is asked before. */
 function yourPlaylists(listener: tBrowserMusic): HTMLElement[] {
   const walk = listener.user.listLibraryPlaylists({ limit: 25 })[Symbol.asyncIterator]();
@@ -86,9 +81,7 @@ async function open(listener: tBrowserMusic, { id }: tLibraryPlaylist, into: HTM
   const names = (playlist.relationships?.tracks?.data ?? []).map((track) => h("li", {}, `${track.attributes?.name ?? track.id}, ${track.attributes?.artistName ?? ""}`));
   into.replaceChildren(h("h3", {}, playlist.attributes?.name ?? id), h("ol", {}, ...names));
 }
-// #endregion playlists
 
-// #region find
 byId("library-search", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   const text = byId("library-term", HTMLInputElement).value.trim();
@@ -101,7 +94,6 @@ async function find(listener: tBrowserMusic, text: string): Promise<void> {
   if (now.listener !== listener) return;
   found.replaceChildren(h("h3", {}, `In your library: "${text}"`), items.length === 0 ? h("p", {}, "Nothing. Apple's library search finds a song by the first word of its name more often than by the whole name.") : cards(items));
 }
-// #endregion find
 
 async function first<T>(walk: AsyncIterable<T>): Promise<T[]> {
   const items: T[] = [];

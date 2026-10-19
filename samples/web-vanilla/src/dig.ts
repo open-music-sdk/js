@@ -9,7 +9,6 @@ import { current, shelf, show } from "./view";
 
 const term = byId("term", HTMLInputElement);
 
-// #region search
 byId("search", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   const text = term.value.trim();
@@ -20,9 +19,7 @@ async function search(text: string): Promise<HTMLElement[]> {
   const { results } = await music.catalog.searchCatalog(text, { types: ["songs", "albums", "artists", "playlists"], limit: 10, storefront: now.storefront });
   return found(`Results for "${text}"`, results.songs?.data, results.albums?.data, results.artists?.data, results.playlists?.data);
 }
-// #endregion search
 
-// #region hints
 // Offered as the listener types, once typing pauses rather than on every key.
 let typing: ReturnType<typeof setTimeout> | undefined;
 term.oninput = () => {
@@ -35,15 +32,12 @@ async function hints(text: string): Promise<void> {
   const { results } = await music.catalog.getSearchHints(text, { storefront: now.storefront });
   byId("hints", HTMLDataListElement).replaceChildren(...results.terms.map((value) => h("option", { value })));
 }
-// #endregion hints
 
-// #region charts
 // What the page shows before anyone searches: the first chart of each type in the storefront.
 async function charts(): Promise<HTMLElement[]> {
   const { results } = await music.catalog.getCharts({ types: ["songs", "albums", "playlists"], limit: 10, storefront: now.storefront });
   return found("Top charts", results.songs[0]?.data, results.albums[0]?.data, [], results.playlists[0]?.data);
 }
-// #endregion charts
 
 /** What a search or the charts found, each type under its own heading. */
 async function found(title: string, songs: readonly (tSong | tMusicVideo)[] = [], albums: readonly tAlbum[] = [], artists: readonly tArtist[] = [], playlists: readonly tPlaylist[] = []): Promise<HTMLElement[]> {
@@ -57,7 +51,6 @@ async function found(title: string, songs: readonly (tSong | tMusicVideo)[] = []
   ];
 }
 
-// #region storefronts
 // Signed out, the listener picks the storefront. Signed in, it is their own, from Apple, and the picker goes.
 const picker = byId("storefront", HTMLSelectElement);
 async function storefronts(): Promise<void> {
@@ -69,7 +62,6 @@ async function storefronts(): Promise<void> {
 picker.onchange = () => {
   change({ storefront: picker.value });
 };
-// #endregion storefronts
 
 // Another storefront has other ids, so the view starts again from its charts. Signing in or out redraws it.
 let shownIn = now.storefront;

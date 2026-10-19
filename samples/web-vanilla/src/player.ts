@@ -5,11 +5,9 @@ import { say, showError } from "./errors";
 
 type tTrack = tSong | tMusicVideo;
 
-// #region player
 // One player for the page. It plays the previews of tracks already fetched, through an audio element of its own,
 // and asks Apple for nothing.
 const player = previewPlayer<tTrack>();
-// #endregion player
 
 // #region play-from
 /** Plays a list of tracks, from one of them. Called from a click: a browser starts sound only after one. */
@@ -24,7 +22,6 @@ export function playFrom(tracks: readonly tTrack[], track: tTrack): void {
 const play = byId("play", HTMLButtonElement);
 const position = byId("position", HTMLInputElement);
 
-// #region controls
 play.onclick = () => {
   if (player.state.status === "playing") player.pause();
   else player.play().catch(showError);
@@ -42,11 +39,9 @@ const volume = byId("volume", HTMLInputElement);
 volume.oninput = () => {
   player.setVolume(Number(volume.value));
 };
-// #endregion controls
 
 const art = byId("now-art", HTMLImageElement);
 
-// #region draw
 // The player tells its listeners after every change, several times a second while a preview plays.
 player.subscribe(() => {
   const { status, track, position: at, duration } = player.state;
@@ -60,4 +55,3 @@ player.subscribe(() => {
   // Left alone while the listener drags it.
   if (document.activeElement !== position) position.value = String(at);
 });
-// #endregion draw

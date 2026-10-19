@@ -9,11 +9,9 @@ import { cover, songRows } from "./songs";
 import { shelf } from "./view";
 
 export async function openAlbum({ id }: tAlbum): Promise<HTMLElement[]> {
-  // #region schema
   // Held to the album's generated type as it arrives: an answer in another shape is a ValidationError here, with
   // the path of each value that differs, rather than an undefined somewhere later.
   const album = await music.catalog.getAlbum(id, { include: ["tracks"], storefront: now.storefront, schema: schemas.albumsResponse });
-  // #endregion schema
   const actions = await albumActions(id);
   const rows = await songRows(album.relationships?.tracks?.data ?? []);
   const { name, artistName, artwork } = album.attributes ?? {};
@@ -23,14 +21,12 @@ export async function openAlbum({ id }: tAlbum): Promise<HTMLElement[]> {
 export async function openArtist({ id }: tArtist): Promise<HTMLElement[]> {
   const { storefront } = now;
   const artist = await music.catalog.getArtist(id, { storefront });
-  // #region view-and-relationship
   // A view, one page of it: the artist's top songs.
   const top: tSong[] = [];
   for await (const song of music.catalog.getArtistView(id, "top-songs", { storefront, limit: 10, maxPages: 1 })) top.push(song);
   // A relationship, walked a page at a time until its pages or maxPages run out: the artist's albums.
   const albums: tAlbum[] = [];
   for await (const album of music.catalog.getArtistRelationship(id, "albums", { storefront, limit: 25, maxPages: 4 })) albums.push(album);
-  // #endregion view-and-relationship
   const rows = await songRows(top);
   return [heading(artist.attributes?.name, undefined, artist.attributes?.artwork), h("h3", {}, "Top songs"), rows, ...shelf("Albums", albums, openAlbum)];
 }
