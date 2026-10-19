@@ -54,6 +54,8 @@ export interface tSearchLibraryOptions extends tReadOptions<tLibrarySearchRespon
  * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
  * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
  * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
+ * Against the live API on 18 October 2026, the whole name of a song of three words or more found nothing, while
+ * the first word of it found the song.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -109,7 +111,7 @@ export type tAddedIds = Readonly<Partial<Record<"albums" | "music-videos" | "pla
 export type tAddOptions = tReadOptions<void>;
 
 /**
- * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
+ * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and within 20 in a second run; the playlist's songs did not go into the library with it either time.
  *
  * @function
  * @param client - The listener's client to ask with.
@@ -196,11 +198,15 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 
 /**
  * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
+ * It is asked for with its `children`, unless `options.include` names what to include instead: against the live API
+ * on 18 October 2026, Apple answered the documented request, which names nothing to include, with no folder at all,
+ * `data` and `meta.filters.identity.playlistsroot` both empty. Asked with an `include`, it answered with the root,
+ * `p.playlistsroot`, which has no attributes.
  *
  * @function
  * @param client - The listener's client to ask with.
- * @param options - What to send beside the folder.
- * @returns What Apple answered: the root folder under `data`.
+ * @param options - What to send beside the folder: its `children`, unless `include` names what to send instead.
+ * @returns What Apple answered: the root folder under `data`, with its first page of children under `relationships`.
  * @throws TypeError if `client` is no client or an argument is not what it should be, before Apple is asked.
  * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues; `_tag` says which.
  * @throws The reason `options.signal` aborted with, when it does.
@@ -209,10 +215,12 @@ export type tRootLibraryPlaylistFolderOptions = tReadOptions<tLibraryPlaylistFol
 export const getRootLibraryPlaylistFolder = /*#__PURE__*/ endpoint(
   "getRootLibraryPlaylistFolder",
   "resource",
-  (_client, options?: tRootLibraryPlaylistFolderOptions): tRequestPlan<tLibraryPlaylistFoldersResponse> => [
-    "v1/me/library/playlist-folders",
-    initOf<tLibraryPlaylistFoldersResponse>("getRootLibraryPlaylistFolder", optionsOf("getRootLibraryPlaylistFolder", options, OPTIONS), { "filter[identity]": "playlistsroot" }),
-  ],
+  (_client, options?: tRootLibraryPlaylistFolderOptions): tRequestPlan<tLibraryPlaylistFoldersResponse> => {
+    const bag = optionsOf("getRootLibraryPlaylistFolder", options, OPTIONS);
+    // Apple answers with the root only when something is included with it.
+    const asked = bag.include === undefined ? { ...bag, include: ["children"] } : bag;
+    return ["v1/me/library/playlist-folders", initOf<tLibraryPlaylistFoldersResponse>("getRootLibraryPlaylistFolder", asked, { "filter[identity]": "playlistsroot" })];
+  },
 );
 
 /**

@@ -1,6 +1,7 @@
 # @open-music-sdk/validate
 
-Runtime validators for the Apple Music API's answers, generated from Apple's documentation: one for each object,
+Runtime validators for the Apple Music API's answers, generated from Apple's documentation, with the corrections
+the [types](../types/README.md) make where Apple was seen to differ from it: one for each object,
 each a [Standard Schema](https://open-music-sdk.github.io/js/glossary#standard-schema), so they also work with
 TanStack, tRPC and anything else that takes one. Nothing in the SDK validates unless you pass one.
 
@@ -58,7 +59,8 @@ in the singular where the object is a single thing: `Songs.Attributes` is `songA
 
 ### What a validator checks
 
-- A required property is there. An optional one is checked only when it's there.
+- A required property is there. An optional one is checked only when it's there. Four that Apple's documentation
+  marks as required are optional here, as they are in the types, since Apple leaves them out.
 - A scalar has the type Apple documents. A property with an `allowedValues` list holds one of them.
 - Lists, nested dictionaries and unions (`[*]` in the documentation) are checked all the way down.
 - A key Apple doesn't document is allowed. Apple adds attributes without notice, and that shouldn't break your app.

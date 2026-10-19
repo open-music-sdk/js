@@ -4,6 +4,7 @@ The types and validators are generated from Apple's documentation, and each clie
 to it: the method, the path, every documented parameter and the answer of each endpoint. Where Apple's
 documentation is silent, the SDK has met the live API twice: the CLI's first sign-in on 16 October 2026, and its
 `check` on 18 October 2026, in one storefront, with the sign-in's questions run by hand in Firefox on Windows.
+`check` asked every endpoint function of both clients that only reads, and held each answer to its generated type.
 This page lists, package by package, where the SDK differs from the documentation, what those runs settled, and
 what it still takes on trust. One run is one sample: what was seen once may not hold every day, in every storefront.
 
@@ -45,9 +46,10 @@ These are still open:
 
 ## [cli](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)
 
-The CLI's `login` is where the sign-ins above ran, and its `check` asked the live API everything it asks, reads and
-writes, on 18 October 2026: its findings are in the sections below, by package. `open-music-sdk check` asks it all
-again, and `open-music-sdk check <name>` one question, to see whether it still holds.
+The CLI's `login` is where the sign-ins above ran. Its `check` asked the live API on 18 October 2026: every endpoint
+function that reads, each answer held to its generated type, and every question it asks about how Apple behaves,
+reads and writes. Its findings are in the sections below, by package. `open-music-sdk check` asks it all again, and
+`open-music-sdk check <name>` one function or question, to see whether it still holds.
 
 Settled for the CLI itself:
 
@@ -70,6 +72,13 @@ Against the live API on 18 October 2026:
   after the first page. The link keeps the term and the types, and leaves out `limit`.
 - A chart's `next` link answers with charts by type as well, and keeps the types and the limit.
 - 25 ISRCs gave 663 songs in one page, with no `next`, even asked for one to a page.
+- Every function that was asked answered as its generated type has it, once the [types](#types) were corrected
+  where the documentation marks as required what Apple left out.
+- A view's `next` link keeps nothing but its offset, so it drops `with`. A view's own attributes, such as its title,
+  come only on a page asked for with `with: ["attributes"]`, and so only on the first page.
+- These held nothing to see in that storefront, each asked of five: a playlist's `more-by-curator` view, a music
+  video's `genres`, and a live radio station's `radio-show`. A search for ten common words found no activity, so
+  the functions for activities weren't asked.
 
 Where it differs from the documentation:
 
@@ -91,12 +100,35 @@ Where it differs from the documentation:
 Against the live API on 18 October 2026:
 
 - A song never rated is answered `404`, so `getSongRating` rejects with an `ApiError` of status `404`. The ratings
-  of several songs leave out those never rated. The other types of rating are taken to answer the same way.
+  of several songs leave out those never rated.
+- **Ratings, of each of the nine types that take one:** a dislike set on a song, an album, a music video, a
+  playlist, a station, and on a library song, album, music video and playlist was read back at once, alone and in a
+  batch. Taken away, it was gone at once.
+- **A library copy's rating:** a library song's, album's or music video's rating was its catalog item's too, and
+  went with it.
 - `listRecentlyPlayed` and `listRecentlyPlayedTracks` answer without `types`, with what was played, as they do with
   every type named.
-- `addToLibrary` took a song, an album, a catalog playlist and a music video, and each showed in the library
-  within 4 seconds. The catalog playlist's songs didn't go into the library with it.
+- **Additions:** `addToLibrary` took a song, an album, a catalog playlist and a music video. In one run each showed
+  in the library within 4 seconds. In another, the song took 20 seconds and the album 16. Neither time did the
+  catalog playlist's songs go into the library with it.
+- **An album held in part:** an album counted as in the library once one song of it was. Its `library`
+  relationship answered with the listener's copy.
 - `addToFavorites` gave the song a rating of 1 at once, as a like does, and put it in the library.
+- **A playlist folder:** `createLibraryPlaylistFolder` made one in the root. It could be read by its id at once,
+  and was among the root's children after a second, with `p.playlistsroot` for its parent.
+- Every function that reads, and was asked, answered as its generated type has it, once the [types](#types) were
+  corrected and the root folder was asked for as below. A listener with no music video in their library was asked
+  none of the functions for music videos.
+- The root folder came only when something was included with it. The documented request,
+  `filter[identity]=playlistsroot` and nothing else, was answered `200` with `data` empty, and so was
+  `meta.filters.identity.playlistsroot`, for a listener with folders and without. With `include=children`, or
+  `include=parent`, Apple answered with the root: `p.playlistsroot`, with no attributes, and its children. So
+  `getRootLibraryPlaylistFolder` asks with `include=children`, unless you name what to include.
+- By its id, `p.playlistsroot` was answered `404` with nothing included, and with the root when asked with
+  `include=children`. Its `children` answered with the listener's playlists and folders either way. A folder made in
+  the root was answered by its id with nothing included.
+- `searchLibrary` found nothing for the whole name of a song of three words or more that was in the library, while
+  the first word of it found the song. A name of one or two words found it.
 
 Where it differs from the documentation:
 
@@ -135,11 +167,15 @@ Against the live API on 18 October 2026, a playlist was made, given 300 tracks, 
 - The tracks of a playlist with none are answered `404`, and `read` takes it for empty. A playlist with tracks,
   asked for with `include=tracks`, carries them, which is what a `404` for its tracks is checked against.
 - A track added by its catalog id is held under that id: 300 of 300, in the order they were added.
-- A new playlist could be read by its id at once, and was among the listener's playlists after 4 seconds. 300
-  tracks added to it showed after 2. `settle` gives a write ten reads a second apart.
+- A new playlist could be read by its id at once, and was among the listener's playlists after 4 seconds, and after
+  5 in a second run. 300 tracks added to it showed after 2. `settle` gives a write ten reads a second apart.
+- The 300 songs added to a playlist went into the listener's library with it in one run, and not in another.
 - One request took 300 tracks, which `chunk` defaults to.
 - A playlist's name and description came back as they were sent, and `apply` with the same plan found the
   playlist and added nothing.
+- `resolve`, given the name, artist and album of 50 chart songs and no ISRC, found a song for every one. 32 were
+  the chart's own song, and 18 another release of it, as the same song on another album is; 30 and 20 in a second
+  run.
 
 It still takes these on trust:
 
@@ -148,7 +184,7 @@ It still takes these on trust:
   before it is listed makes a second one.
 - That a `404` for the tracks of a playlist that exists always means it has none. The package still asks for the
   playlist once more, with `include=tracks`, before it believes that.
-- How many real tracks the exact-match rule of `resolve`'s search misses.
+- How many tracks of a real import the exact-match rule of `resolve`'s search misses: chart songs are the easy case.
 
 ## [lib-preview-player](./reference/@open-music-sdk/lib-preview-player/)
 
@@ -193,7 +229,8 @@ and image server were seen to do when the package was written:
 - the limit of 10,000 pixels a side.
 
 Against the live API on 18 October 2026, the 200 artwork templates of one storefront's charts all named their crop
-and format, with `{w}` and `{h}` their only placeholders, and were all on `mzstatic.com`.
+and format, with `{w}` and `{h}` their only placeholders, and were all on `mzstatic.com`. One of them, asked for in
+each of the six formats, came back in each, with its Content-Type.
 
 ## [types](./reference/@open-music-sdk/types/)
 
@@ -204,6 +241,13 @@ in front: `Songs.Attributes` is `tSongAttributes`. A response keeps the plural, 
 
 An object the documentation gives no properties for is `Record<string, unknown>`.
 
+Four properties the documentation marks as required are optional, since Apple left them out against the live API
+on 18 October 2026. Each one's doc comment says so.
+- **A view's own `attributes`:** sent only for a page asked for with `with: ["attributes"]`, and only on the first.
+- **`durationInMillis` of a song and of a music video:** left out for some of an album's tracks, in an album looked
+  up by its UPC.
+- **`artistName` and `artwork` of an album in the library:** left out for some albums in a listener's library.
+
 ## [validate](./reference/@open-music-sdk/validate/)
 
 The validators are named as the types are, without the `t` and with the first letter in lower case:
@@ -211,3 +255,6 @@ The validators are named as the types are, without the `t` and with the first le
 
 A validator allows keys Apple hasn't documented. Apple adds attributes without notice, and that shouldn't break
 your app.
+
+A validator takes the four properties the [types](#types) make optional as optional too, so it passes what Apple
+sends without them.

@@ -138,8 +138,8 @@ export interface tArtistViewsArtistAppearsOnAlbumsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistAppearsOnAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistAppearsOnAlbumsViewAttributes;
   /** A selection of albums from other artists this artist appears on. */
   data: tAlbum[];
 }
@@ -156,8 +156,8 @@ export interface tArtistViewsArtistCompilationAlbumsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistCompilationAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistCompilationAlbumsViewAttributes;
   /** Albums associated with the artist categorized as compilations. */
   data: tAlbum[];
 }
@@ -174,8 +174,8 @@ export interface tArtistViewsArtistFeaturedAlbumsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistFeaturedAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistFeaturedAlbumsViewAttributes;
   /** A collection of albums selected as featured for the artist. */
   data: tAlbum[];
 }
@@ -188,8 +188,8 @@ export interface tArtistViewsArtistFeaturedAlbumsViewAttributes {
 
 /** A relationship view from this artist to a collection of music videos selected as featured for the artist. */
 export interface tArtistViewsArtistFeaturedMusicVideosView {
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistFeaturedMusicVideosViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistFeaturedMusicVideosViewAttributes;
   /** A collection of music videos selected as featured for the artist. */
   data: tMusicVideo[];
   /** A relative location for the view. */
@@ -210,8 +210,8 @@ export interface tArtistViewsArtistFeaturedPlaylistsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistFeaturedPlaylistsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistFeaturedPlaylistsViewAttributes;
   /** Relevant playlists associated with the artist. */
   data: tPlaylist[];
 }
@@ -228,8 +228,8 @@ export interface tArtistViewsArtistFullAlbumsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistFullAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistFullAlbumsViewAttributes;
   /** Full-release albums associated with the artist. */
   data: tAlbum[];
 }
@@ -246,8 +246,8 @@ export interface tArtistViewsArtistLatestReleaseView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistLatestReleaseViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistLatestReleaseViewAttributes;
   /** The latest release for the artist determined to still be recent by the Apple Music Catalog. */
   data: tAlbum[];
 }
@@ -264,8 +264,8 @@ export interface tArtistViewsArtistLiveAlbumsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistLiveAlbumsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistLiveAlbumsViewAttributes;
   /** Albums associated with the artist categorized as live performances. */
   data: tAlbum[];
 }
@@ -282,8 +282,8 @@ export interface tArtistViewsArtistSimilarArtistsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistSimilarArtistsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistSimilarArtistsViewAttributes;
   /** Other artists similar to this artist. */
   data: tArtist[];
 }
@@ -300,8 +300,8 @@ export interface tArtistViewsArtistSinglesView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistSinglesViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistSinglesViewAttributes;
   /** Albums associated with the artist categorized as singles. */
   data: tAlbum[];
 }
@@ -318,8 +318,8 @@ export interface tArtistViewsArtistTopMusicVideosView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistTopMusicVideosViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistTopMusicVideosViewAttributes;
   /** Relevant music videos associated with the artist. */
   data: tMusicVideo[];
 }
@@ -336,8 +336,8 @@ export interface tArtistViewsArtistTopSongsView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tArtistViewsArtistTopSongsViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tArtistViewsArtistTopSongsViewAttributes;
   /** Songs associated with the artist based on popularity in the current storefront. */
   data: tSong[];
 }

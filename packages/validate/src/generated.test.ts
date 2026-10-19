@@ -45,9 +45,14 @@ describe("song", () => {
     expect(report(song, "1613600188")).toEqual(["<root>: expected object"]);
   });
 
-  test.each(Object.keys(songAttrs))("reports a missing required attribute: %s", (key) => {
+  test.each(Object.keys(songAttrs).filter((key) => key !== "durationInMillis"))("reports a missing required attribute: %s", (key) => {
     const rest = Object.fromEntries(Object.entries(songAttrs).filter(([k]) => k !== key));
     expect(report(song, { ...songFixture, attributes: rest })).toEqual([`attributes.${key}: required`]);
+  });
+
+  test("takes a song without its duration, which Apple's reference marks required and Apple left out for some of an album's tracks", () => {
+    const rest = Object.fromEntries(Object.entries(songAttrs).filter(([k]) => k !== "durationInMillis"));
+    expect(report(song, { ...songFixture, attributes: rest })).toEqual([]);
   });
 
   test("checks nested dictionaries with full paths", () => {

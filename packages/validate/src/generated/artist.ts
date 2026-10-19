@@ -125,7 +125,7 @@ export const artistViewsArtistAppearsOnAlbumsView: r.tSchema<t.tArtistViewsArtis
     attributes: r.lazy(() => artistViewsArtistAppearsOnAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistAppearsOnAlbumsViewAttributes`: Albums from other artists on which this artist appears or with which they’re associated. */
@@ -144,7 +144,7 @@ export const artistViewsArtistCompilationAlbumsView: r.tSchema<t.tArtistViewsArt
     attributes: r.lazy(() => artistViewsArtistCompilationAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistCompilationAlbumsViewAttributes`: Albums associated with the artist categorized as compilations. */
@@ -163,7 +163,7 @@ export const artistViewsArtistFeaturedAlbumsView: r.tSchema<t.tArtistViewsArtist
     attributes: r.lazy(() => artistViewsArtistFeaturedAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistFeaturedAlbumsViewAttributes`: a collection of selected albums to be featured with the artist. */
@@ -182,7 +182,7 @@ export const artistViewsArtistFeaturedMusicVideosView: r.tSchema<t.tArtistViewsA
     href: r.string,
     next: r.string,
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistFeaturedMusicVideosViewAttributes`: a collection of selected music videos to be featured with the artist. */
@@ -201,7 +201,7 @@ export const artistViewsArtistFeaturedPlaylistsView: r.tSchema<t.tArtistViewsArt
     attributes: r.lazy(() => artistViewsArtistFeaturedPlaylistsViewAttributes),
     data: r.array(r.lazy(() => playlist)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistFeaturedPlaylistsViewAttributes`: Relevant playlists associated with the artist. */
@@ -220,7 +220,7 @@ export const artistViewsArtistFullAlbumsView: r.tSchema<t.tArtistViewsArtistFull
     attributes: r.lazy(() => artistViewsArtistFullAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistFullAlbumsViewAttributes`: Full-release albums associated with the artist. */
@@ -239,7 +239,7 @@ export const artistViewsArtistLatestReleaseView: r.tSchema<t.tArtistViewsArtistL
     attributes: r.lazy(() => artistViewsArtistLatestReleaseViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistLatestReleaseViewAttributes`: the latest release for the artist determined to still be recent by the Apple Music Catalog. */
@@ -258,7 +258,7 @@ export const artistViewsArtistLiveAlbumsView: r.tSchema<t.tArtistViewsArtistLive
     attributes: r.lazy(() => artistViewsArtistLiveAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistLiveAlbumsViewAttributes`: Albums associated with the artist and categorized as live performances. */
@@ -277,7 +277,7 @@ export const artistViewsArtistSimilarArtistsView: r.tSchema<t.tArtistViewsArtist
     attributes: r.lazy(() => artistViewsArtistSimilarArtistsViewAttributes),
     data: r.array(r.lazy(() => artist)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistSimilarArtistsViewAttributes`: Other artists similar to this artist. */
@@ -296,7 +296,7 @@ export const artistViewsArtistSinglesView: r.tSchema<t.tArtistViewsArtistSingles
     attributes: r.lazy(() => artistViewsArtistSinglesViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistSinglesViewAttributes`: Albums associated with the artist and categorized as singles. */
@@ -315,7 +315,7 @@ export const artistViewsArtistTopMusicVideosView: r.tSchema<t.tArtistViewsArtist
     attributes: r.lazy(() => artistViewsArtistTopMusicVideosViewAttributes),
     data: r.array(r.lazy(() => musicVideo)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistTopMusicVideosViewAttributes`: Relevant music videos associated with the artist. */
@@ -334,7 +334,7 @@ export const artistViewsArtistTopSongsView: r.tSchema<t.tArtistViewsArtistTopSon
     attributes: r.lazy(() => artistViewsArtistTopSongsViewAttributes),
     data: r.array(r.lazy(() => song)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tArtistViewsArtistTopSongsViewAttributes`: Songs associated with the artist based on popularity in the current storefront. */

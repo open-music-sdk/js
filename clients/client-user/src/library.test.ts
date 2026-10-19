@@ -370,7 +370,19 @@ describe("what a caller puts in is what is sent, and nothing more", () => {
   test("the root folder is always asked for by the one filter there is, whatever the caller's params say", async () => {
     const { music, sent } = apple();
     await api.getRootLibraryPlaylistFolder(music, { params: { "filter[identity]": "something-else" } });
-    expect(sent()).toEqual(["GET /v1/me/library/playlist-folders?filter[identity]=playlistsroot"]);
+    expect(sent()).toEqual(["GET /v1/me/library/playlist-folders?filter[identity]=playlistsroot&include=children"]);
+  });
+
+  test("the root folder is asked for with its children, since Apple answers the request that includes nothing with no folder; what the caller names to include is sent instead", async () => {
+    const { music, sent } = apple(Array.from({ length: 3 }, () => ({ body: { data: [item("p.playlistsroot")] } })));
+    await api.getRootLibraryPlaylistFolder(music);
+    await api.getRootLibraryPlaylistFolder.bound(music)();
+    await api.getRootLibraryPlaylistFolder(music, { include: ["parent"] });
+    expect(sent()).toEqual([
+      "GET /v1/me/library/playlist-folders?include=children&filter[identity]=playlistsroot",
+      "GET /v1/me/library/playlist-folders?include=children&filter[identity]=playlistsroot",
+      "GET /v1/me/library/playlist-folders?include=parent&filter[identity]=playlistsroot",
+    ]);
   });
 });
 

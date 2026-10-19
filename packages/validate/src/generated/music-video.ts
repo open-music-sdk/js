@@ -47,7 +47,7 @@ export const musicVideoAttributes: r.tSchema<t.tMusicVideoAttributes> = r.object
     workId: r.string,
     workName: r.string,
   },
-  ["artistName", "artwork", "durationInMillis", "genreNames", "has4K", "hasHDR", "name", "previews", "url"],
+  ["artistName", "artwork", "genreNames", "has4K", "hasHDR", "name", "previews", "url"],
 );
 
 /** Validates a `tMusicVideoRelationships`: the relationships for a music video resource. */
@@ -129,7 +129,7 @@ export const musicVideoViewsMusicVideoMoreByArtistView: r.tSchema<t.tMusicVideoV
     attributes: r.lazy(() => musicVideoViewsMusicVideoMoreByArtistViewAttributes),
     data: r.array(r.lazy(() => musicVideo)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tMusicVideoViewsMusicVideoMoreByArtistViewAttributes`: More content of some other type by the artist. */
@@ -148,7 +148,7 @@ export const musicVideoViewsMusicVideoMoreInGenreView: r.tSchema<t.tMusicVideoVi
     attributes: r.lazy(() => musicVideoViewsMusicVideoMoreInGenreViewAttributes),
     data: r.array(r.lazy(() => musicVideo)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tMusicVideoViewsMusicVideoMoreInGenreViewAttributes`: More music videos in a specific music video genre. */

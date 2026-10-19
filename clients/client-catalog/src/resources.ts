@@ -61,7 +61,10 @@ export interface tRestrictOption {
 
 /** The option of a function for a view: what to send beside its resources. */
 export interface tWithOption {
-  /** What to send beside the resources: `["attributes"]` for the view's own, such as its title. Default: nothing. */
+  /**
+   * What to send beside the resources: `["attributes"]` for the view's own, such as its title, which come on the
+   * first page alone, since a view's `next` link keeps only its offset. Default: nothing.
+   */
   readonly with?: readonly "attributes"[] | undefined;
 }
 
@@ -80,7 +83,7 @@ export type tViewAttributesOf<Views, K extends keyof Views> = NonNullable<Views[
 export type tViewPage<Views, K extends keyof Views> = Omit<tRelationshipViewResponse, "data" | "attributes"> & {
   /** What the view holds, this page of it: the resources the name asked for decides. */
   data: tRelated<Views, K>[];
-  /** The view's own attributes, such as its title: there when `with: ["attributes"]` asked for them. */
+  /** The view's own attributes, such as its title: there when `with: ["attributes"]` asked for them, on the first page alone. */
   attributes?: tViewAttributesOf<Views, K>;
 };
 
@@ -310,7 +313,8 @@ export const getAlbumsByEquivalents = /*#__PURE__*/ resourcesFinder<tAlbumsRespo
  */
 export const getAlbumRelationship = /*#__PURE__*/ relationshipGetter<Omit<tAlbumRelationships, "library">, tStorefrontOption>("getAlbumRelationship", albums);
 /**
- * One view of an album, such as `other-versions`, a page at a time.
+ * One view of an album, such as `other-versions`, a page at a time. Its `next` link kept only its offset against the
+ * live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -379,7 +383,8 @@ export const getArtists = /*#__PURE__*/ resourcesGetter<tArtistsResponse, tStore
  */
 export const getArtistRelationship = /*#__PURE__*/ relationshipGetter<tArtistRelationships, tStorefrontOption>("getArtistRelationship", artists);
 /**
- * One view of an artist, such as `top-songs`, a page at a time.
+ * One view of an artist, such as `top-songs`, a page at a time. Its `next` link kept only its offset against the
+ * live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -463,7 +468,8 @@ export const getPlaylistsByStorefrontChart = /*#__PURE__*/ resourcesFinder<tPlay
  */
 export const getPlaylistRelationship = /*#__PURE__*/ relationshipGetter<Omit<tPlaylistRelationships, "library">, tStorefrontOption>("getPlaylistRelationship", playlists);
 /**
- * One view of a playlist, such as `featured-artists`, a page at a time.
+ * One view of a playlist, such as `featured-artists`, a page at a time. Its `next` link kept only its offset against
+ * the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -564,7 +570,8 @@ export const getMusicVideosByEquivalents = /*#__PURE__*/ resourcesFinder<tMusicV
  */
 export const getMusicVideoRelationship = /*#__PURE__*/ relationshipGetter<Omit<tMusicVideoRelationships, "library">, tStorefrontOption>("getMusicVideoRelationship", musicVideos);
 /**
- * One view of a music video, such as `more-by-artist`, a page at a time.
+ * One view of a music video, such as `more-by-artist`, a page at a time. Its `next` link kept only its offset
+ * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.
@@ -924,7 +931,8 @@ export const getRecordLabel = /*#__PURE__*/ resourceGetter<tRecordLabelsResponse
  */
 export const getRecordLabels = /*#__PURE__*/ resourcesGetter<tRecordLabelsResponse, tStorefrontOption>("getRecordLabels", recordLabels);
 /**
- * One view of a record label, such as `latest-releases`, a page at a time.
+ * One view of a record label, such as `latest-releases`, a page at a time. Its `next` link kept only its offset
+ * against the live API on 18 October 2026, so the view's own attributes come on the first page alone.
  *
  * @function
  * @param client - The client to ask with.

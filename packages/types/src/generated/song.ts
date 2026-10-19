@@ -42,8 +42,8 @@ export interface tSongAttributes {
   contentRating?: "clean" | "explicit";
   /** The disc number of the album the song appears on. */
   discNumber?: number;
-  /** The duration of the song in milliseconds. */
-  durationInMillis: number;
+  /** The duration of the song in milliseconds. Left out for some of an album's tracks against the live API on 18 October 2026. */
+  durationInMillis?: number;
   /** The notes about the song that appear in the Apple Music catalog. */
   editorialNotes?: tEditorialNotes;
   /** The genre names the song is associated with. */

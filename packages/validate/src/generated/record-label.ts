@@ -45,7 +45,7 @@ export const recordLabelViewsRecordLabelLatestReleasesView: r.tSchema<t.tRecordL
     attributes: r.lazy(() => recordLabelViewsRecordLabelLatestReleasesViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tRecordLabelViewsRecordLabelLatestReleasesViewAttributes`: the attributes for the record label latest releases view. */
@@ -64,7 +64,7 @@ export const recordLabelViewsRecordLabelTopReleasesView: r.tSchema<t.tRecordLabe
     attributes: r.lazy(() => recordLabelViewsRecordLabelTopReleasesViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tRecordLabelViewsRecordLabelTopReleasesViewAttributes`: the attributes for the record label top releases view. */

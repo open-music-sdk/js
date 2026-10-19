@@ -33,7 +33,7 @@ APPLE_MUSIC_USER_TOKEN=$(open-music-sdk token) node job.js
 | `login` | Checks your key with Apple, then serves a page on `http://localhost` that runs Apple's sign-in, and opens it in your browser. Keeps the token once Apple accepts it. `--port` fixes the port; `--no-browser` only prints the address. |
 | `token` | Prints the kept token, and nothing else, for another program to read. `--developer` mints a developer token from your key instead, which lives an hour. |
 | `doctor` | Asks Apple whether your key works (`GET /v1/test`), then whether the kept token does (`GET /v1/me/storefront`). A `401` can mean either, and this tells them apart. Prints nothing secret. |
-| `check` | Asks the live API what the SDK takes on trust about it, as you, and prints what Apple did. See [`check`](#check). |
+| `check` | Asks the live API, as you, every endpoint function of the SDK, holding each answer to its type, and what the SDK takes on trust about Apple. Prints what Apple did. See [`check`](#check). |
 | `logout` | Forgets the kept token. Apple isn't told, so a copy you handed to another program works until Apple ends it. |
 
 `open-music-sdk --help` lists every command, and `open-music-sdk help <command>` gives a command's options and
@@ -122,41 +122,85 @@ script names an app by the page's host.
 
 ## `check`
 
-Apple's documentation is silent or wrong in places, and the SDK takes some things on trust there. `check` asks the
-live API about those a server can ask, through the SDK's own functions, signed in as you with the token `login`
-kept. It starts with `doctor`'s two questions, then prints a line for each answer:
+`check` is a diagnostic of the SDK against the live API, run as you with the token `login` kept. It starts with
+`doctor`'s two questions, then asks two kinds of thing:
 
-| Mark | Means |
-| --- | --- |
-| `✓` | Apple did what the SDK assumes. |
-| `≠` | It didn't. The line says which package assumes otherwise. |
-| `·` | What Apple did, where the SDK assumes nothing, such as how long a write takes to show. |
-| `-` | Not asked: your account can't be asked it, for example when no playlist of yours is long enough, or what it would be asked after didn't hold. |
-| `✗` | Apple failed, so the question wasn't answered. |
+- **Every endpoint function** of `client-catalog` and `client-user`, 137 of them. Each answer is held to its
+  generated type, with the `validate` package's own validator for that type. A function with relationships or views,
+  such as `getArtistView`, is asked for each one. A function whose answer has a `next` link is asked for page 2 too.
+- **Questions** about how Apple behaves where the SDK takes something on trust, such as whether a playlist's `next`
+  link keeps `include=catalog`, through the SDK's own functions. There are 15 of them.
+
+What each function is asked with is found at run time: songs, albums, playlists and music videos from the charts,
+what those lead to, a search, and the first things in each part of your library.
+
+```sh
+open-music-sdk check                                # every function and question that only reads
+open-music-sdk check client-catalog                 # one package: its functions, then its questions
+open-music-sdk check getSong getArtistView          # functions, by their names in the SDK
+open-music-sdk check getArtistView:top-songs        # one view or relationship of a function
+open-music-sdk check isrc-next rating-unset         # questions, by their names
+open-music-sdk check --write                        # what writes too, with the cleanup at the end
+open-music-sdk check setSongRating --write          # one write alone
+open-music-sdk help check                           # every name
+```
+
+The names are stable, so an issue can ask for one. A name that isn't one, or one that writes named without
+`--write`, ends with exit status `2` before Apple is asked. A package named without `--write` runs what of it only
+reads. A function a question already asks, such as `addToLibrary`, runs that question.
+
+Each line is marked:
+
+| Mark | For a function | For a question |
+| --- | --- | --- |
+| `✓` | Apple answered, and what it held was what the types say. An empty answer is never a `✓`. | Apple did what the SDK assumes. |
+| `≠` | The answer differs from the types: up to three fields, each with the resource type Apple named, and what the type expected. Or Apple answered 404, or with nothing, for an id it gave in another answer, or for what there always is, such as the genres or your root folder. Or a view came without the attributes it was asked for with. | It didn't. The line says which package assumes otherwise. |
+| `·` | | What Apple did, where the SDK assumes nothing, such as how long a write takes to show. |
+| `-` | Nothing was seen. A relationship, a view or a search answered with a 404 or nothing is asked again with the next of five things to ask with, and then it's a `-`. With nothing found to ask with, stderr says what. | Not asked: your account can't be asked it, or what it would be asked after didn't hold. Where the reason would say what you hold or rated, stderr says it. |
+| `✗` | Apple failed. The line names the request, with its ids left out. | The same. |
+
+A difference on page 2 only is put down to the `next` link, since the SDK sends the link as Apple gives it, and the
+line says what the link carries. After the lines, a count of each mark, and "Differences from the types": each field
+once, with every function that met it, which is what a fix of the types starts from.
 
 It exits `1` for a `≠` or a `✗`. What it prints on stdout is the report, for an issue as it is, inside a code block.
 Its first line names the CLI's version, Node's and your system, and `doctor`'s lines after it name your key's ID,
-your team's and your storefront. Nothing in it names anything of your library, says whether something is in it,
-or counts your things. Progress, the paths of files, and the cleanup steps below go to stderr, which is for you.
+your team's and your storefront.
+- Nothing in it names anything of your library, says whether something is in it or rated, or counts your things.
+- A `-` on a function of your library can tell a reader that part of it is empty, such as your music videos.
+- Progress, why something wasn't asked, and the cleanup steps below go to stderr, which is for you.
 
-```sh
-open-music-sdk check                           # every check that only reads
-open-music-sdk check isrc-next rating-unset    # those two alone
-open-music-sdk check --write                   # the checks that write too
-open-music-sdk help check                      # every check, by name
-```
+It asks ten requests at a time, ten a second, since your key is most likely your app's too and Apple counts its
+limit by the key. It stops at the first `429`, with exit status `1`, rather than keep the key limited for your app's
+listeners. A read-only run makes about 300 requests and takes a minute or so.
 
-The checks that write run only with `--write`, since what they add stays: Apple's API has no way to take a playlist
-or anything else out of your library, and `check` doesn't take its favorite back. They add up to four things to
-your library, an album's songs with it, make one song a favorite, and make a playlist of up to 300 songs, which may
-put those songs in your library too. Each is something you didn't have, and the run ends with numbered
-steps that remove them, each with a link to its own page in Apple Music, whose … menu takes it out: the library's
-own lists don't. A song's link is its own page, not its album's, where Delete from Library takes out the whole
-album. Where a write may or may not have carried something else in with it, the steps say what to look for. They're printed whatever happens, Ctrl+C and a SIGTERM included, and a second
-Ctrl+C waits for them. Run them on an account you don't mind cluttering, with an Apple Music subscription.
+### `--write`
+
+What writes runs only with `--write`. Each write is of something you didn't have:
+- **Additions:** up to four things added to your library, an album's songs with it, and one song made a favorite.
+- **Playlists:** one of up to 300 songs, which may put them in your library too, and an empty one.
+- **A playlist folder.**
+- **Ratings:** a dislike set on nine things, one of each type that takes a rating, read back, and taken away again.
+
+What it adds stays: Apple's API has no way to take a playlist, a folder or anything else out of your library, and
+`check` doesn't take its favorite back. So it picks only what you didn't have and hadn't rated, and an album or a
+catalog playlist only when you hold none of its songs, since deleting it takes them all. It records each write
+before it sends it, writes to a playlist it made only once it has seen that playlist is the one it made, and ends
+with numbered steps on stderr that remove what's left.
+- **Links.** Each step links to the thing's own page in Apple Music, whose … menu takes it out: the library's own
+  lists don't. A song's link is its own page, not its album's, where Delete from Library takes out the whole album.
+- **Ratings** are taken away through the API as the run ends, and a step names any that couldn't be.
+- **Uncertain writes.** Where a write may or may not have carried something else in with it, the steps say what to
+  look for.
+- **When they print.** The steps are printed whatever happens, Ctrl+C and a SIGTERM included, and a second Ctrl+C
+  waits for them.
+
+Run it on an account you don't mind cluttering, with an Apple Music subscription. The playlist folder it makes is
+deleted in the Music app, under Playlists in the Library tab, as it was on an iPhone on 18 October 2026.
 
 What `check` finds goes into [Differences from Apple's
-documentation](https://open-music-sdk.github.io/js/differences), and a difference into a fix of the package it
+documentation](https://open-music-sdk.github.io/js/differences). A difference of the types goes into the corrections
+the [type emitter](../../codegen/README.md#emit) makes, and any other difference into a fix of the package it
 names.
 
 ## Development

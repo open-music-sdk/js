@@ -272,7 +272,9 @@ export interface tUserFunctions {
    */
   readonly createLibraryPlaylist: typeof resources.createLibraryPlaylist;
   /**
-   * The playlist folder with an id in the listener's library.
+   * The playlist folder with an id in the listener's library. The root, `p.playlistsroot`, was answered `404` by its
+   * id against the live API on 18 October 2026, unless asked for with an `include`, such as `["children"]`; a folder
+   * made in it was answered without one.
    *
    * @param id - The library playlist folder's id.
    * @param options - What to send beside the playlist folder.
@@ -313,7 +315,9 @@ export interface tUserFunctions {
    * `relationships`. Resolves to the answer that holds the new folder. Bound, it gives the folder, or `undefined` if
    * Apple's answer holds none: the folder was made either way. The folder has to be a plain object, and still one once
    * made into JSON. It is copied as the call is made and sent as it is: what it holds is Apple's to judge, and nothing
-   * here limits its size, so limit it yourself if it comes from outside your app.
+   * here limits its size, so limit it yourself if it comes from outside your app. Against the live API on 18 October
+   * 2026, a folder made with no parent was in the root: it could be read by its id at once, and was among the children
+   * of `p.playlistsroot`, its parent, a second later.
    *
    * @param folder - The folder to make: its name under `attributes`, and the folder to put it in under `relationships`.
    * @param options - The language to answer in, and what else to send with the request.
@@ -819,6 +823,8 @@ export interface tUserFunctions {
    * Searches the listener's library for a term, and resolves to the results by type, each one a first page. `limit`
    * and `offset` apply to every type asked for. A `next` link of a search answers with results by type again, not with
    * a page, so `paginate` stops after the first page: to get more of one type, ask again with a larger `offset`.
+   * Against the live API on 18 October 2026, the whole name of a song of three words or more found nothing, while
+   * the first word of it found the song.
    *
    * @param term - What to search for, 1 to 256 characters.
    * @param options - The types to look for, which have to be given; how many of each to send and where to start; and what to send beside each.
@@ -842,7 +848,7 @@ export interface tUserFunctions {
    */
   readonly getLibraryResources: typeof library.getLibraryResources;
   /**
-   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and the playlist's songs did not go into the library with it.
+   * Adds catalog resources to the listener's library, by their ids: `{ songs: [...], albums: [...] }`. It resolves to nothing: Apple accepts the request and adds them afterwards. Against the live API on 18 October 2026, a song, an album, a playlist and a music video each showed in the library within 4 seconds, and within 20 in a second run; the playlist's songs did not go into the library with it either time.
    *
    * @param ids - The ids of the catalog resources to add, by type: 1 to 32 types with 1 to 300 ids between them; a type whose list is `undefined` is left out.
    * @param options - What else to send with the request, such as a `signal` to abort it with.
@@ -880,9 +886,13 @@ export interface tUserFunctions {
   readonly addLibraryPlaylistTracks: typeof library.addLibraryPlaylistTracks;
   /**
    * The folder every playlist and playlist folder of the listener's library is in, at the top: where to start going down from.
+   * It is asked for with its `children`, unless `options.include` names what to include instead: against the live API
+   * on 18 October 2026, Apple answered the documented request, which names nothing to include, with no folder at all,
+   * `data` and `meta.filters.identity.playlistsroot` both empty. Asked with an `include`, it answered with the root,
+   * `p.playlistsroot`, which has no attributes.
    *
-   * @param options - What to send beside the folder.
-   * @returns The root folder, out of `data`.
+   * @param options - What to send beside the folder: its `children`, unless `include` names what to send instead.
+   * @returns The root folder, out of `data`, with its first page of children under `relationships`.
    * @throws TypeError if an argument is not what it should be, before Apple is asked.
    * @throws AppleMusicError if Apple, the network, or a token provider fails, or a schema finds issues, or if the answer holds no folder, which is an `ApiError`; `_tag` says which.
    * @throws The reason `options.signal` aborted with, when it does.

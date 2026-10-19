@@ -132,7 +132,7 @@ export const albumViewsAlbumAppearsOnView: r.tSchema<t.tAlbumViewsAlbumAppearsOn
     attributes: r.lazy(() => albumViewsAlbumAppearsOnViewAttributes),
     data: r.array(r.lazy(() => playlist)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tAlbumViewsAlbumAppearsOnViewAttributes`: the attributes for the view. */
@@ -151,7 +151,7 @@ export const albumViewsAlbumOtherVersionsView: r.tSchema<t.tAlbumViewsAlbumOther
     attributes: r.lazy(() => albumViewsAlbumOtherVersionsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tAlbumViewsAlbumOtherVersionsViewAttributes`: the attributes for the view. */
@@ -170,7 +170,7 @@ export const albumViewsAlbumRelatedAlbumsView: r.tSchema<t.tAlbumViewsAlbumRelat
     attributes: r.lazy(() => albumViewsAlbumRelatedAlbumsViewAttributes),
     data: r.array(r.lazy(() => album)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tAlbumViewsAlbumRelatedAlbumsViewAttributes`: the attributes for the view. */
@@ -189,7 +189,7 @@ export const albumViewsAlbumRelatedVideosView: r.tSchema<t.tAlbumViewsAlbumRelat
     attributes: r.lazy(() => albumViewsAlbumRelatedVideosViewAttributes),
     data: r.array(r.lazy(() => musicVideo)),
   },
-  ["attributes", "data"],
+  ["data"],
 );
 
 /** Validates a `tAlbumViewsAlbumRelatedVideosViewAttributes`: the attributes for the view. */

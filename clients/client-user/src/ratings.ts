@@ -1,8 +1,9 @@
 // The functions for a listener's ratings. Nine types of resource can be rated, and each has the same four: the
 // rating of one, the ratings of several, a rating set, and a rating taken away. A rating is 1 for a like and -1
-// for a dislike, and its id is that of the resource it is of. Against the live API on 18 October 2026, for songs: a
+// for a dislike, and its id is that of the resource it is of. Against the live API on 18 October 2026: for songs, a
 // rating never set was answered 404, the ratings of several left out the songs with none, and a song made a favorite
-// had a rating of 1 at once. The other types are taken to answer the same way.
+// had a rating of 1 at once. For each of the nine types, a dislike set was read back at once, alone and in a batch,
+// and gone at once when taken away; a library copy's rating was its catalog item's too.
 import { endpoint, got, initOf, optionsOf, resourceGetter, resourcesGetter, segmentOf, type tEndpoint, type tItem, type tReadOptions, type tRequestPlan } from "@open-music-sdk/core";
 import type { tRatingRequest, tRatingsResponse } from "@open-music-sdk/types";
 

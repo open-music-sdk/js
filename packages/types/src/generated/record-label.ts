@@ -43,8 +43,8 @@ export interface tRecordLabelViewsRecordLabelLatestReleasesView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tRecordLabelViewsRecordLabelLatestReleasesViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tRecordLabelViewsRecordLabelLatestReleasesViewAttributes;
   /** A selection of latest releases from this record label. */
   data: tAlbum[];
 }
@@ -61,8 +61,8 @@ export interface tRecordLabelViewsRecordLabelTopReleasesView {
   href?: string;
   /** A relative cursor to fetch the next paginated collection of resources in the view if more exist. */
   next?: string;
-  /** The attributes for the view. */
-  attributes: tRecordLabelViewsRecordLabelTopReleasesViewAttributes;
+  /** The attributes for the view. Sent only for a page asked for with `with: ["attributes"]`, and only on the first: a view's next link kept `offset` alone against the live API on 18 October 2026. */
+  attributes?: tRecordLabelViewsRecordLabelTopReleasesViewAttributes;
   /** A selection of top releases from this record label. */
   data: tAlbum[];
 }
