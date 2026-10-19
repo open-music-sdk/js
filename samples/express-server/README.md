@@ -1,7 +1,7 @@
 # express-server
 
-Crate Digger's server on Node 24 and Express 5. It hands the page a developer token, takes in the listener's Music
-User Token, and asks Apple for one list with the token it kept.
+Vinyl Collector Simulator's server on Node 24 and Express 5. It hands the page a developer token, takes in the
+listener's Music User Token, and asks Apple for one list with the token it kept.
 
 ```sh
 cp ../.env.example .env   # then fill it in

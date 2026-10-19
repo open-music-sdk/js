@@ -12,7 +12,7 @@ Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
 const b64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const TOKEN = `${b64url({ alg: "ES256" })}.${b64url({ exp: Math.floor(Date.now() / 1000) + 900 })}.c2ln`;
 const SONG = { id: "1", type: "songs", href: "/v1/catalog/us/songs/1", attributes: { name: "Hey Jude", previews: [{ url: "https://audio-ssl.itunes.apple.com/1.m4a" }] } };
-const APP = { name: "Crate Digger" };
+const APP = { name: "Vinyl Collector Simulator" };
 
 /** A page's client over a token endpoint and an Apple that each answer with one thing, recording what Apple was asked. */
 function page() {

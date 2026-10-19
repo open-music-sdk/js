@@ -29,8 +29,8 @@ apps/                 beside the packages: cli, the published CLI, and docs, the
 .github/workflows/    ci: build, typecheck, lint and test on what a change affects · pages: the docs site, from main
 ```
 
-`samples/` holds the private sample apps: one demo, Crate Digger, per way of using the SDK, which the guides show
-code from. See [samples/README.md](./samples/README.md).
+`samples/` holds the private sample apps: one demo, Vinyl Collector Simulator, per way of using the SDK, which the
+guides show code from. See [samples/README.md](./samples/README.md).
 
 ## Developer Certificate of Origin
 

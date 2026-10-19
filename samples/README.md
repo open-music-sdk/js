@@ -1,8 +1,8 @@
 # Sample apps
 
-One small app, Crate Digger, written once per way of using the SDK. You dig through Apple's catalog, play the
-previews, sign in with Apple Music, and send a crate of songs to your library as a playlist. It is a demo: there
-are no accounts, the crate lives in the tab, and nothing is built to be deployed.
+One small app, Vinyl Collector Simulator, written once per way of using the SDK. You flip through crates of Apple's
+catalog, play the previews, sign in with Apple Music, and send your own crate of songs to your library as a playlist.
+It is a demo: there are no accounts, your crate lives in the tab, and nothing is built to be deployed.
 
 Each sample runs on your machine against the live Apple Music API, with your own MusicKit key and your own Apple
 Account. They are private to this repository and never published.

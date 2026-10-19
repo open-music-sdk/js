@@ -1,7 +1,7 @@
 // Run locally with `wrangler dev`, never deployed. `build` is a dry run, to check the Worker bundles.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "crate-digger-worker",
+  "name": "vinyl-collector-worker",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   // Kept in .wrangler/state on this machine. The id is a placeholder, since no namespace is ever made at Cloudflare.

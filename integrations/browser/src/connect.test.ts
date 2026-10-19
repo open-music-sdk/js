@@ -2,7 +2,7 @@ import { isAppleMusicError } from "@open-music-sdk/core";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MUSICKIT_SCRIPT, createConnect, type tConnectOptions, type tMusicKit, type tMusicKitInstance } from "./connect";
 
-const APP = { name: "Crate Digger" };
+const APP = { name: "Vinyl Collector Simulator" };
 
 /** An unsigned JWT with an `exp` this many seconds ahead, marked so two can be told apart. */
 const jwt = (lifeSeconds: number, mark = "a") => {
@@ -114,7 +114,7 @@ describe("createConnect: Apple's script", () => {
     scriptLoads(doc, musicKit);
     await expect(Promise.all([first.ready, second.ready])).resolves.toEqual([undefined, undefined]);
     expect(musicKit.configure).toHaveBeenCalledTimes(1);
-    expect(musicKit.configure).toHaveBeenCalledWith({ developerToken: token, app: { name: "Crate Digger" } });
+    expect(musicKit.configure).toHaveBeenCalledWith({ developerToken: token, app: { name: "Vinyl Collector Simulator" } });
     expect(developerToken).toHaveBeenCalledTimes(1);
   });
 
@@ -132,10 +132,10 @@ describe("createConnect: Apple's script", () => {
     const doc = page();
     vi.stubGlobal("document", doc);
     const musicKit = kit();
-    const helper = createConnect({ developerToken: provider() }, { app: { name: "Crate Digger", build: "1.2.0" }, musicKit });
+    const helper = createConnect({ developerToken: provider() }, { app: { name: "Vinyl Collector Simulator", build: "1.2.0" }, musicKit });
     expect(doc.scripts).toHaveLength(0);
     await helper.ready;
-    expect(musicKit.configure).toHaveBeenCalledWith(expect.objectContaining({ app: { name: "Crate Digger", build: "1.2.0" } }));
+    expect(musicKit.configure).toHaveBeenCalledWith(expect.objectContaining({ app: { name: "Vinyl Collector Simulator", build: "1.2.0" } }));
   });
 
   test("a load that fails rejects ready with a NetworkError and takes the element out of the page; connect() tries again, and rejects the same way when that fails too", async () => {
@@ -571,9 +571,9 @@ describe("createConnect: a mistake is a TypeError when the helper is made", () =
     ["no client", undefined, { app: APP }, "createConnect: music must be a client from createBrowserClient, or anything with a developerToken provider; got undefined"],
     ["a client with no developerToken on it", { request: () => undefined }, { app: APP }, "createConnect: music must be a client from createBrowserClient, or anything with a developerToken provider; got object"],
     ["a token where the client belongs", "dev", { app: APP }, "createConnect: music must be a client from createBrowserClient, or anything with a developerToken provider; got 3 characters"],
-    ["no options", { developerToken: provider() }, undefined, "createConnect: app must be an object with the app's name, such as { name: \"Crate Digger\" }; got undefined"],
+    ["no options", { developerToken: provider() }, undefined, "createConnect: app must be an object with the app's name, such as { name: \"Vinyl Collector Simulator\" }; got undefined"],
     ["a list where the options belong", { developerToken: provider() }, [], "createConnect: expected an options object with app; got a list"],
-    ["an app that is a name", { developerToken: provider() }, { app: "Crate Digger" }, "createConnect: app must be an object with the app's name, such as { name: \"Crate Digger\" }; got 12 characters"],
+    ["an app that is a name", { developerToken: provider() }, { app: "Vinyl Collector Simulator" }, "createConnect: app must be an object with the app's name, such as { name: \"Vinyl Collector Simulator\" }; got 25 characters"],
     ["an app with no name", { developerToken: provider() }, { app: {} }, "createConnect: app.name must be a string with something in it; got undefined"],
     ["an app with an empty name", { developerToken: provider() }, { app: { name: "" } }, "createConnect: app.name must be a string with something in it; got 0 characters"],
     ["a build that is a number", { developerToken: provider() }, { app: { name: "x", build: 3 } }, "createConnect: app.build must be a string where it is given; got 3"],

@@ -141,7 +141,7 @@ functions: `request`, `paginate`, `storefront`, `as` or `forUser`.
 
 For sign-in in a page, `createConnect` from `@open-music-sdk/browser` takes anything that holds a
 `developerToken` provider, such as the fetcher from step 2:
-`createConnect({ developerToken }, { app: { name: "Crate Digger" } })`. See [Sign a listener in](./sign-in).
+`createConnect({ developerToken }, { app: { name: "Vinyl Collector Simulator" } })`. See [Sign a listener in](./sign-in).
 
 ## Next steps
 

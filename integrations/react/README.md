@@ -27,7 +27,7 @@ const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "u
 export const App = () => <MusicProvider music={music}><Connect /><Album id="1613600183" /></MusicProvider>;
 
 function Connect() {
-  const { isReady, connect } = useConnect({ app: { name: "Crate Digger" } }); // the token goes to the provider
+  const { isReady, connect } = useConnect({ app: { name: "Vinyl Collector Simulator" } }); // the token goes to the provider
   return <button disabled={!isReady} onClick={() => void connect().catch(showError)}>Connect Apple Music</button>;
 }
 

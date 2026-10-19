@@ -200,7 +200,7 @@ function declined(e: unknown): boolean {
 
 /** The app as the window will show it, checked: a name with something in it, and a build that is a string where it is given. */
 function appOf(app: unknown): tConnectApp {
-  if (typeof app !== "object" || app === null) throw new TypeError(`createConnect: app must be an object with the app's name, such as { name: "Crate Digger" }; got ${got(app)}`);
+  if (typeof app !== "object" || app === null) throw new TypeError(`createConnect: app must be an object with the app's name, such as { name: "Vinyl Collector Simulator" }; got ${got(app)}`);
   const { name, build } = ownOf(app as { readonly name?: unknown; readonly build?: unknown });
   if (typeof name !== "string" || name === "") throw new TypeError(`createConnect: app.name must be a string with something in it; got ${got(name)}`);
   if (build !== undefined && typeof build !== "string") throw new TypeError(`createConnect: app.build must be a string where it is given; got ${got(build)}`);

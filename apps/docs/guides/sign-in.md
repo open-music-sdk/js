@@ -38,7 +38,7 @@ and configures it before the click.
 ```ts
 import { createConnect } from "@open-music-sdk/browser";
 
-const signIn = createConnect(music, { app: { name: "Crate Digger" } });
+const signIn = createConnect(music, { app: { name: "Vinyl Collector Simulator" } });
 ```
 
 `app` is what Apple's script is configured with. You can add `app.build`, your app's version.
@@ -207,7 +207,7 @@ export function App() {
 }
 
 function SignIn() {
-  const { isReady, error, connect, disconnect } = useConnect({ app: { name: "Crate Digger" } });
+  const { isReady, error, connect, disconnect } = useConnect({ app: { name: "Vinyl Collector Simulator" } });
   const [token] = useMusicUserToken();
   if (token) return <button onClick={() => void disconnect().catch(showWhyNot)}>Sign out</button>;
   return (

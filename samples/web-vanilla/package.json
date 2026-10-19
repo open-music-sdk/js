@@ -2,7 +2,7 @@
   "name": "web-vanilla",
   "version": "0.0.0",
   "private": true,
-  "description": "Crate Digger in a page with no framework: dig through the catalog, play previews, sign in with Apple Music, and send a crate of songs to the library as a playlist.",
+  "description": "Vinyl Collector Simulator in a page with no framework: dig through the catalog, play previews, sign in with Apple Music, and send a crate of songs to the library as a playlist.",
   "type": "module",
   "scripts": {
     "dev": "vite",

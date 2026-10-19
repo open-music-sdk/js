@@ -1,7 +1,8 @@
 # worker-server
 
-Crate Digger's server as a Cloudflare Worker, run on your machine by Wrangler. It hands the page a developer token,
-takes in the listener's Music User Token and keeps it in Workers KV, and asks Apple for one list with it.
+Vinyl Collector Simulator's server as a Cloudflare Worker, run on your machine by Wrangler. It hands the page a
+developer token, takes in the listener's Music User Token and keeps it in Workers KV, and asks Apple for one list with
+it.
 
 ```sh
 cp ../.env.example .env   # then fill it in
