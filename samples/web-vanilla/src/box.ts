@@ -52,13 +52,14 @@ export function crate(label: string, sleeves: readonly tSleeve[], { at = 0, more
       // A record with no artwork is a plain sleeve with its name written on.
       const art = sleeve.artwork === undefined ? h("span", {}, sleeve.name) : Object.assign(cover(sleeve.artwork, 240), { loading: "lazy" as const });
       const named = sleeve.by === undefined ? sleeve.name : `${sleeve.name}, ${sleeve.by}`;
-      shown.push(bin.appendChild(h("button", { type: "button", className: "sleeve", ariaLabel: named, onclick: () => { pull(index); } }, art)));
+      shown.push(bin.appendChild(h("button", { type: "button", className: "sleeve", ariaLabel: named, onclick: (event) => { pull(index, event); } }, art)));
     }
   };
 
-  // In front, a click pulls the sleeve out; behind, it flips forward to it. A swipe that flipped is no click.
-  const pull = (at: number) => {
-    if (swiped) return;
+  // In front, a click pulls the sleeve out; behind, it flips forward to it. The click that ends a swipe is no click,
+  // though Enter afterwards is: a click from a key has no `detail`.
+  const pull = (at: number, event: MouseEvent) => {
+    if (swiped && event.detail > 0) return;
     if (at === front) all[at]?.open?.();
     else flip(at);
   };
@@ -109,7 +110,8 @@ export function crate(label: string, sleeves: readonly tSleeve[], { at = 0, more
   bin.onpointercancel = done;
   bin.onpointerleave = done;
 
-  const keys = new Map([["ArrowLeft", () => front - 1], ["ArrowUp", () => front - 1], ["ArrowRight", () => front + 1], ["ArrowDown", () => front + 1], ["Home", () => 0], ["End", () => all.length - 1]]);
+  // Left and right only: up and down still scroll the page.
+  const keys = new Map([["ArrowLeft", () => front - 1], ["ArrowRight", () => front + 1], ["Home", () => 0], ["End", () => all.length - 1]]);
   const onkeydown = (event: KeyboardEvent) => {
     const to = keys.get(event.key);
     if (to === undefined) return;

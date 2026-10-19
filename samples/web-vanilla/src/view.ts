@@ -32,8 +32,9 @@ export function drawFloor(step: tStep): void {
 
 /** Draws the page the address names, or shows the floor again when it names none. */
 export function drawPage(): void {
-  const [kind = "", id = ""] = location.hash.slice(1).split("/");
-  const draw = routes.get(kind);
+  // The kind is up to the first slash, and the id all after it, whatever it holds.
+  const [kind, id] = location.hash.slice(1).split(/\/(.*)/s);
+  const draw = routes.get(kind ?? "");
   const turn = ++pageTurns;
   if (!floor.hidden) floorScroll = scrollY;
   floor.hidden = draw !== undefined;
@@ -46,7 +47,8 @@ export function drawPage(): void {
   const back = h("a", { href: "#", className: "back", textContent: "‹ Back to the crates" });
   page.replaceChildren(back, h("p", {}, "Pulling it out…"));
   scrollTo(0, 0);
-  draw(decodeURIComponent(id)).then((elements) => {
+  // An address typed by hand can hold a % that decodes to nothing: a URIError, said like any other.
+  Promise.resolve().then(() => draw(decodeURIComponent(id ?? ""))).then((elements) => {
     if (turn === pageTurns) page.replaceChildren(back, ...elements);
   }, showError);
 }
