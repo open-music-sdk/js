@@ -1,0 +1,19 @@
+{
+  "name": "web-vanilla",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Crate Digger in a page with no framework: dig through the catalog, play previews, sign in with Apple Music, and send a crate of songs to the library as a playlist.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "dependencies": {
+    "@open-music-sdk/browser": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:"
+  }
+}
