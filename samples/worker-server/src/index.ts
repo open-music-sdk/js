@@ -23,6 +23,7 @@ interface tEnv {
   readonly MUSIC_USER_TOKENS: tKvNamespace;
 }
 
+// Everything the routes use, made once.
 interface tApp {
   readonly music: tMusic;
   readonly store: tUserTokenStore;
@@ -36,15 +37,28 @@ interface tApp {
 let app: tApp | undefined;
 
 function setUp(env: tEnv): tApp {
-  const { APPLE_MUSIC_PRIVATE_KEY: pem, APPLE_MUSIC_TEAM_ID: teamId, APPLE_MUSIC_KEY_ID: keyId, PAGE_ORIGIN: pageOrigin } = env;
+  const pem = env.APPLE_MUSIC_PRIVATE_KEY;
+  const teamId = env.APPLE_MUSIC_TEAM_ID;
+  const keyId = env.APPLE_MUSIC_KEY_ID;
   // The page the token is bound to has no default either: a deployed copy has to name its own.
-  if (!pem || !teamId || !keyId || !pageOrigin) throw new Error("The MusicKit key or PAGE_ORIGIN is not set. Copy samples/.env.example to samples/worker-server/.env and fill it in.");
+  const pageOrigin = env.PAGE_ORIGIN;
+  if (!pem || !teamId || !keyId || !pageOrigin) {
+    throw new Error(
+      "The MusicKit key or PAGE_ORIGIN is not set. "
+        + "Copy samples/.env.example to samples/worker-server/.env and fill it in.",
+    );
+  }
   const key = { pem, teamId, keyId };
+
   const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
-  const music = createServerClient({ ...key, userTokenStore: store, rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }) });
+  const music = createServerClient({
+    ...key,
+    userTokenStore: store,
+    rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }),
+  });
   // #region token-route
-  // The page's developer token, minted for the page's origin alone and short-lived, since anyone can read a page.
-  // The handler takes the Worker's request as it comes: see route() below.
+  // The page's developer token, minted for the page's origin alone and short-lived, since anyone
+  // can read a page. The handler takes the Worker's request as it comes: see route() below.
   const token = tokenEndpoint({ ...key, origin: [pageOrigin] });
   // #endregion token-route
   // Asks Apple whether the posted token works, and keeps it under the session's id only then.
@@ -56,14 +70,18 @@ function setUp(env: tEnv): tApp {
 }
 
 // A listener is a random id in a cookie, given with the first answer. A real app has its own sessions.
+const SESSION_COOKIE = /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/;
+
 function sessionOf(req: Request): string | undefined {
-  return /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/.exec(req.headers.get("cookie") ?? "")?.[1];
+  return SESSION_COOKIE.exec(req.headers.get("cookie") ?? "")?.[1];
 }
 
 export default {
   async fetch(req: Request, env: tEnv): Promise<Response> {
-    const answer = await route(req, (app ??= setUp(env)));
+    app ??= setUp(env);
+    const answer = await route(req, app);
     if (sessionOf(req) !== undefined) return answer;
+    // A request with no session gets one with its answer.
     const withSession = new Response(answer.body, answer);
     withSession.headers.append("set-cookie", `crate_session=${crypto.randomUUID()}; Path=/api; HttpOnly; SameSite=Lax`);
     return withSession;
@@ -74,10 +92,16 @@ export default {
 async function route(req: Request, { music, store, token, intake, hosts }: tApp): Promise<Response> {
   if (!hosts.has(req.headers.get("host") ?? "")) return reply(421, { error: "MisdirectedRequest" });
   const { pathname } = new URL(req.url);
-  if (pathname === "/api/music/token") return token(req);
-  if (pathname === "/api/music/user-token") return req.method === "DELETE" ? signOut(store, req) : intake(req);
-  if (pathname === "/api/me/recent") return recent(music, req);
-  return reply(404, { error: "NotFound" });
+  switch (pathname) {
+    case "/api/music/token":
+      return token(req);
+    case "/api/music/user-token":
+      return req.method === "DELETE" ? signOut(store, req) : intake(req);
+    case "/api/me/recent":
+      return recent(music, req);
+    default:
+      return reply(404, { error: "NotFound" });
+  }
 }
 
 // #region sign-out
@@ -95,17 +119,23 @@ async function recent(music: tMusic, req: Request): Promise<Response> {
   const session = sessionOf(req);
   if (session === undefined) return reply(401, { error: "Unauthorized" });
   try {
+    const listener = music.forUser(session);
     const items: unknown[] = [];
-    for await (const item of music.forUser(session).user.listRecentlyPlayed({ limit: 10, maxPages: 1 })) items.push(item);
+    for await (const item of listener.user.listRecentlyPlayed({ limit: 10, maxPages: 1 })) {
+      items.push(item);
+    }
     return reply(200, items);
   } catch (e) {
     if (!isAppleMusicError(e)) throw e;
-    // UserTokenInvalid: no token is stored for this listener, or Apple no longer takes it. The page asks them to sign in.
-    return reply(e._tag === "UserTokenInvalid" ? 422 : 502, { error: e._tag });
+    // UserTokenInvalid: no token is stored for this listener, or Apple no longer takes it, and
+    // the page asks them to sign in.
+    const status = e._tag === "UserTokenInvalid" ? 422 : 502;
+    return reply(status, { error: e._tag });
   }
 }
 // #endregion act-for-listener
 
+/** A JSON answer that no cache keeps. */
 function reply(status: number, body: unknown): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
 }

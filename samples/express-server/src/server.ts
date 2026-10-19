@@ -3,22 +3,42 @@
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { MemoryUserTokenStore, acceptUserToken, createRateLimiter, createServerClient, isAppleMusicError, parseToken, tokenEndpoint } from "@open-music-sdk/server";
+import {
+  MemoryUserTokenStore,
+  acceptUserToken,
+  createRateLimiter,
+  createServerClient,
+  isAppleMusicError,
+  parseToken,
+  tokenEndpoint,
+} from "@open-music-sdk/server";
 import { web } from "./web.ts";
 
+/** A setting from .env, which has to be there. */
 function required(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set. Copy samples/.env.example to samples/express-server/.env and fill it in.`);
+  if (!value) {
+    throw new Error(`${name} is not set. Copy samples/.env.example to samples/express-server/.env and fill it in.`);
+  }
   return value;
 }
-const key = { pem: required("APPLE_MUSIC_PRIVATE_KEY"), teamId: required("APPLE_MUSIC_TEAM_ID"), keyId: required("APPLE_MUSIC_KEY_ID") };
+
+const key = {
+  pem: required("APPLE_MUSIC_PRIVATE_KEY"),
+  teamId: required("APPLE_MUSIC_TEAM_ID"),
+  keyId: required("APPLE_MUSIC_KEY_ID"),
+};
 // The page the developer token is bound to. A deployed copy has to name its own: there is no default to forget.
 const pageOrigin = required("PAGE_ORIGIN");
 
 // One client for the whole server. Every listener's requests count against the same developer token, so they
 // share one limiter. The store loses its tokens when the server stops: a real app keeps them somewhere lasting.
 const store = new MemoryUserTokenStore();
-const music = createServerClient({ ...key, userTokenStore: store, rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }) });
+const music = createServerClient({
+  ...key,
+  userTokenStore: store,
+  rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }),
+});
 
 const app = express();
 
@@ -31,24 +51,33 @@ app.use((req, res, next) => {
 });
 
 // A listener is a random id in a cookie, given with the first answer under /api. A real app has its own sessions.
-const sessionOf = (req: Request) => /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
+const SESSION_COOKIE = /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/;
+
+function sessionOf(req: Request): string | undefined {
+  return SESSION_COOKIE.exec(req.headers.cookie ?? "")?.[1];
+}
+
 app.use("/api", (req, res, next) => {
-  if (sessionOf(req) === undefined) res.cookie("crate_session", randomUUID(), { httpOnly: true, sameSite: "lax", path: "/api" });
+  if (sessionOf(req) === undefined) {
+    res.cookie("crate_session", randomUUID(), { httpOnly: true, sameSite: "lax", path: "/api" });
+  }
   res.set("cache-control", "no-store");
   next();
 });
 
 // #region token-route
-// The page's developer token, minted for the page's origin alone and short-lived, since anyone can read a page.
+// The page's developer token, minted for the page's origin alone and short-lived, since anyone
+// can read a page.
 const token = tokenEndpoint({ ...key, origin: [pageOrigin] });
 app.all("/api/music/token", web(token));
 // #endregion token-route
 
 // #region user-token
-// The listener's Music User Token, posted by the page after Apple's sign-in. acceptUserToken asks Apple whether it
-// works, and stores it under this listener's session only then.
+// The listener's Music User Token, posted by the page after Apple's sign-in. acceptUserToken asks
+// Apple whether it works, and stores it under this listener's session only then.
 app.post("/api/music/user-token", express.json({ limit: "8kb" }), async (req, res) => {
-  // Only JSON is taken: a form on another site cannot send it, so it cannot bind its own token to this listener.
+  // Only JSON is taken: a form on another site cannot send it, so it cannot bind its own token to
+  // this listener.
   if (!req.is("application/json")) {
     res.status(415).json({ error: "UnsupportedMediaType" });
     return;
@@ -63,8 +92,9 @@ app.post("/api/music/user-token", express.json({ limit: "8kb" }), async (req, re
     res.status(400).json({ error: "BadRequest" });
     return;
   }
-  // Checked here rather than left to acceptUserToken, whose TypeError means a string that is no token or a key that
-  // is no key: the first is the listener's to hear about, the second the server's.
+  // Checked here rather than left to acceptUserToken, whose TypeError means either a string that
+  // is no token or a key that is no key: the first is the listener's to hear about, the second
+  // the server's.
   const token = parseToken(posted);
   if (token === undefined) {
     res.status(422).json({ error: "UserTokenInvalid" });
@@ -76,7 +106,8 @@ app.post("/api/music/user-token", express.json({ limit: "8kb" }), async (req, re
   } catch (e) {
     if (!isAppleMusicError(e)) throw e;
     // UserTokenInvalid: Apple will not take this token. Anything else: Apple could not be asked.
-    res.status(e._tag === "UserTokenInvalid" ? 422 : 502).json({ error: e._tag });
+    const status = e._tag === "UserTokenInvalid" ? 422 : 502;
+    res.status(status).json({ error: e._tag });
   }
 });
 // #endregion user-token
@@ -99,13 +130,18 @@ app.get("/api/me/recent", async (req, res) => {
     return;
   }
   try {
+    const listener = music.forUser(session);
     const recent: unknown[] = [];
-    for await (const item of music.forUser(session).user.listRecentlyPlayed({ limit: 10, maxPages: 1 })) recent.push(item);
+    for await (const item of listener.user.listRecentlyPlayed({ limit: 10, maxPages: 1 })) {
+      recent.push(item);
+    }
     res.json(recent);
   } catch (e) {
     if (!isAppleMusicError(e)) throw e;
-    // UserTokenInvalid: no token is stored for this listener, or Apple no longer takes it. The page asks them to sign in.
-    res.status(e._tag === "UserTokenInvalid" ? 422 : 502).json({ error: e._tag });
+    // UserTokenInvalid: no token is stored for this listener, or Apple no longer takes it, and
+    // the page asks them to sign in.
+    const status = e._tag === "UserTokenInvalid" ? 422 : 502;
+    res.status(status).json({ error: e._tag });
   }
 });
 // #endregion act-for-listener
@@ -114,7 +150,8 @@ app.get("/api/me/recent", async (req, res) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express tells an error handler by its four parameters
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const status = (error as { status?: unknown }).status;
-  const code = typeof status === "number" && status >= 400 && status < 500 ? status : 500;
+  const isClientError = typeof status === "number" && status >= 400 && status < 500;
+  const code = isClientError ? status : 500;
   if (code === 500) console.error(error);
   // Named as userTokenIntake names them: "BadRequest", "PayloadTooLarge".
   res.status(code).json({ error: STATUS_CODES[code]?.replaceAll(" ", "") });
