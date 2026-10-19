@@ -54,7 +54,7 @@ It re-exports these, under the names each package gives them:
 
 | From | Names |
 | --- | --- |
-| [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, and the types |
+| [`core`](../../packages/core/README.md) | `AppleMusicError`, `isAppleMusicError`, `createRateLimiter`, `parseToken`, and the types |
 | [`developer-token`](../../packages/developer-token/README.md) | `mintDeveloperToken`, `developerTokenMinter`, `developerTokenFetcher` |
 | [`user-token`](../../packages/user-token/README.md) | `validateUserToken`, `acceptUserToken`, `userTokenIntake`, `MemoryUserTokenStore`, `KvUserTokenStore` |
 | [`util-artwork`](../../packages/util-artwork/README.md) | `artworkImage`, `artworkUrl`, `artworkSrcSet`, `FORMATS` |

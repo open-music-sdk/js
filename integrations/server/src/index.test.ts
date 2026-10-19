@@ -12,8 +12,12 @@ import { describe, expect, test } from "vitest";
 import manifest from "../package.json" with { type: "json" };
 import * as api from "./index";
 
-/** What an app uses of core. The rest is what the clients are declared with, and `createClient`, which an assembly of one's own takes from core. */
-const CORE = ["AppleMusicError", "createRateLimiter", "isAppleMusicError"];
+/**
+ * What an app uses of core, parseToken among it: a server that takes a token in through acceptUserToken checks what
+ * was posted with it, since a string that is no token and a key that is no key both end in a TypeError there. The
+ * rest is what the clients are declared with, and `createClient`, which an assembly of one's own takes from core.
+ */
+const CORE = ["AppleMusicError", "createRateLimiter", "isAppleMusicError", "parseToken"];
 const OWN = ["createServerClient", "tokenEndpoint"];
 const siblings = { developerToken, userToken, artwork, catalogPackage, userPackage, playlistsPackage };
 

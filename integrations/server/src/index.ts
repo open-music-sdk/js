@@ -6,7 +6,7 @@ export type { tMusic, tServerClientOptions } from "./client";
 export { tokenEndpoint } from "./token-endpoint";
 export type { tTokenEndpoint, tTokenEndpointOptions } from "./token-endpoint";
 
-export { AppleMusicError, createRateLimiter, isAppleMusicError } from "@open-music-sdk/core";
+export { AppleMusicError, createRateLimiter, isAppleMusicError, parseToken } from "@open-music-sdk/core";
 export type {
   tAppleMusicClient,
   tClientOptions,
