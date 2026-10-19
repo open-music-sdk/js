@@ -40,6 +40,10 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
 5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
    `localhost:2728`, which any other app you later serve on that port could read.
 
+The build that `pnpm turbo dev` starts with writes the generated files under `packages/types/src` and
+`packages/validate/src` again, with LF line endings. On a checkout with CRLF endings git then shows them changed,
+with nothing in them changed. `git checkout -- packages/types/src packages/validate/src` puts them back.
+
 Any page runs with any server. Both servers listen on `127.0.0.1:8787` and answer the same routes, and the page's
 dev server forwards `/api` to whichever one runs, so the page and its server share one origin.
 
@@ -59,8 +63,9 @@ A listener is a random id in a cookie, `crate_session`, which the server gives w
 | [`worker-server`](./worker-server) | Cloudflare Workers, locally through Wrangler | the same routes with `userTokenIntake` and `KvUserTokenStore` |
 | [`web-vanilla`](./web-vanilla) | A page built with Vite, no framework | `createBrowserClient`, `createConnect`, `previewPlayer`, the catalog, the listener's library, and the playlist tools |
 
-Every sample has the same screens in files of the same names, so two samples side by side show what a framework
-changes. Each file starts with the exports it shows and the guide it pairs with.
+The two servers answer the same routes. Each page sample has the same screens, in files of the same names, so
+two page samples side by side show what a framework changes. Each file starts with the exports it shows and the
+guide it pairs with.
 
 [`export-check`](./export-check) is a test, not an app. It fails when an export of `server` or `browser` is used by
 no sample and is not on its list of exceptions, each with the reason.

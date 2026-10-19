@@ -52,8 +52,9 @@ it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that re
 | [`worker-server`](https://github.com/open-music-sdk/js/tree/main/samples/worker-server) | Cloudflare Workers, through Wrangler on your machine | `tokenEndpoint`, `userTokenIntake`, `KvUserTokenStore`, `forUser` |
 | [`web-vanilla`](https://github.com/open-music-sdk/js/tree/main/samples/web-vanilla) | A page built with Vite, with no framework | `createBrowserClient`, `createConnect`, `previewPlayer`, the catalog, the listener's library, and the playlist tools |
 
-Every sample has the same screens in files of the same names, so two samples side by side show what a framework
-changes. Each file starts with a comment that names the exports it shows and the guide it pairs with.
+The two servers answer the same routes. Each page sample has the same screens, in files of the same names, so
+two page samples side by side show what a framework changes. Each file starts with a comment that names the
+exports it shows and the guide it pairs with.
 
 ## How a page and its server talk
 

@@ -10,9 +10,6 @@ coverage/
 .dev.vars
 .dev.vars.*
 .wrangler/
-# Next.js's build output
-.next/
-next-env.d.ts
 # Apple private keys: the contents belong in the environment, never in the repository
 *.p8
 .DS_Store
