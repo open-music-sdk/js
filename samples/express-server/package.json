@@ -1,0 +1,20 @@
+{
+  "name": "express-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Crate Digger's server on Express: the page's developer token, the listener's Music User Token, and one request made for the listener.",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch-path=src src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "dependencies": {
+    "@open-music-sdk/server": "workspace:*",
+    "express": "catalog:"
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "@types/node": "catalog:"
+  }
+}
