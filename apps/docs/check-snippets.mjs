@@ -15,6 +15,16 @@ const walk = (dir) =>
   });
 const pages = walk("");
 
+/**
+ * Whether `text` has the region as VitePress finds one: a line that is `// #region <name>` and nothing else, then a
+ * later `// #endregion`, with the name or without it. A name that only starts another, `play` for `play-from`, is not it.
+ */
+function hasRegion(text, name) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^\s*\/\/\s*#region\s+(\S+)\s*$/.exec(line)?.[1] === name);
+  return start >= 0 && lines.slice(start + 1).some((line) => /^\s*\/\/\s*#endregion(?:\s+(\S+))?\s*$/.test(line) && [undefined, name].includes(/#endregion\s+(\S+)/.exec(line)?.[1]));
+}
+
 const broken = [];
 let snippets = 0;
 for (const page of pages)
@@ -22,7 +32,7 @@ for (const page of pages)
     snippets += 1;
     const file = `${root}/${path}`;
     if (!existsSync(file)) broken.push(`${page} shows ${path}, which is not there`);
-    else if (region !== undefined && !new RegExp(`#region ${region}\\b`).test(readFileSync(file, "utf8"))) broken.push(`${page} shows ${path}#${region}, and the file has no such region`);
+    else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that ends`);
   }
 
 if (broken.length) {
