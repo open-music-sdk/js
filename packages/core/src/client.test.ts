@@ -250,6 +250,17 @@ describe("request: credentials never leave the Apple origin", () => {
       const e = await failure(music.request("v1/me/library/songs"));
       expect([e._tag, e.message]).toEqual(["NetworkError", "GET /v1/me/library/songs: Apple answered with a redirect, which is not followed"]);
     });
+
+    test("a redirect is asked again as any NetworkError is, and refused again, with nothing sent to where it points", async () => {
+      const asked: string[] = [];
+      const fetch = (input: RequestInfo | URL) => {
+        asked.push(input instanceof Request ? input.url : String(input));
+        return Promise.resolve(new Response(null, { status: 307, headers: { location: "https://elsewhere.example/" } }));
+      };
+      const music = createClient({ developerToken: "dev", userToken: "user", fetch, retry: { maxAttempts: 2, baseDelayMs: 1, maxDelayMs: 1 } });
+      expect((await failure(music.request("v1/me/library/songs")))._tag).toBe("NetworkError");
+      expect(asked).toEqual(["https://api.music.apple.com/v1/me/library/songs", "https://api.music.apple.com/v1/me/library/songs"]);
+    });
   });
 });
 

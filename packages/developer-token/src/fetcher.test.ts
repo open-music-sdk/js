@@ -595,12 +595,13 @@ describe("developerTokenFetcher: the request", () => {
   });
 
   test.each([
-    ["a 3xx, as Node and Workers hand one over", () => new Response(jwt(), { status: 307, headers: { location: "https://elsewhere.example/token" } }), 307],
-    // A browser's answer for `manual`: status 0, which no Response can be made with.
-    ["the opaque answer a browser gives for one", () => Object.defineProperties(new Response(jwt()), { type: { value: "opaqueredirect" }, status: { value: 0 }, ok: { value: false } }), 0],
-  ])("a redirect is refused whatever form the runtime hands it over in, though a token waits behind it: %s", async (_form, answer, status) => {
+    ["a 3xx, as Node and Workers hand one over: with its status", () => new Response(jwt(), { status: 307, headers: { location: "https://elsewhere.example/token" } }), 307, "answered 307"],
+    // A browser's answer for `manual`: status 0, which no Response can be made with, and which is no status.
+    ["the opaque answer a browser gives for one: with none", () => Object.defineProperties(new Response(jwt()), { type: { value: "opaqueredirect" }, status: { value: 0 }, ok: { value: false } }), undefined, "redirected, which is not followed"],
+  ])("a redirect is refused whatever form the runtime hands it over in, though a token waits behind it: %s", async (_form, answer, status, said) => {
     const e = await failure(developerTokenFetcher(ENDPOINT, { fetch: () => Promise.resolve(answer()) })());
     expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", status]);
+    expect(e.message).toContain(said);
   });
 
   test.each([
