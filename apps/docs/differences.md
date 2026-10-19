@@ -117,12 +117,16 @@ Against the live API on 18 October 2026:
 - **A playlist folder:** `createLibraryPlaylistFolder` made one in the root. It could be read by its id at once,
   and was among the root's children after a second, with `p.playlistsroot` for its parent.
 - Every function that reads, and was asked, answered as its generated type has it, once the [types](#types) were
-  corrected, but for the root folder below. A listener with no music video in their library was asked none of the
-  functions for music videos.
-- `getRootLibraryPlaylistFolder` answered with no folder, for a listener with none and for one with a folder:
-  `data` was empty, and so was `meta.filters.identity.playlistsroot`. So `user(client).getRootLibraryPlaylistFolder()`
-  rejects, as it does for an answer that holds no folder, and `check` marks it `≠`. The folder `p.playlistsroot` was
-  answered `404` by its id, while its `children` answered with the listener's playlists and folders.
+  corrected and the root folder was asked for as below. A listener with no music video in their library was asked
+  none of the functions for music videos.
+- The root folder came only when something was included with it. The documented request,
+  `filter[identity]=playlistsroot` and nothing else, was answered `200` with `data` empty, and so was
+  `meta.filters.identity.playlistsroot`, for a listener with folders and without. With `include=children`, or
+  `include=parent`, Apple answered with the root: `p.playlistsroot`, with no attributes, and its children. So
+  `getRootLibraryPlaylistFolder` asks with `include=children`, unless you name what to include.
+- By its id, `p.playlistsroot` was answered `404` with nothing included, and with the root when asked with
+  `include=children`. Its `children` answered with the listener's playlists and folders either way. A folder made in
+  the root was answered by its id with nothing included.
 - `searchLibrary` found nothing for the whole name of a song of three words or more that was in the library, while
   the first word of it found the song. A name of one or two words found it.
 
