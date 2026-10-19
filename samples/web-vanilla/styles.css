@@ -31,6 +31,8 @@
     --tape: #e4d596;
   }
 }
+/* hidden wins over every display set below, as the page hides and shows with it. */
+[hidden] { display: none !important; }
 body { margin: 0; padding-bottom: 6rem; background: var(--floor); color: var(--ink); }
 header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 2px solid var(--line); }
 h1, h2 { font-family: var(--marker); font-weight: 400; letter-spacing: 0.02em; text-wrap: balance; }
