@@ -12,17 +12,25 @@ async function theFloor(): Promise<HTMLElement[]> {
   const { storefront } = now;
   const { results } = await music.catalog.getCharts({ types: ["songs", "albums", "playlists"], limit: 20, storefront });
   const [songs, albums, playlists] = [results.songs[0], results.albums[0], results.playlists[0]];
-  const genres: HTMLElement[] = [];
-  for await (const { id, attributes } of music.catalog.listGenres({ storefront })) {
-    // Every genre but Music, the one the others belong to.
-    if (attributes?.parentId !== undefined) genres.push(later(attributes.name, () => genreCrate(id, storefront)));
-  }
   return [
     h("h2", {}, "Top charts"),
     h("div", { className: "crates" }, await songCrate(songs?.name ?? "Top songs", songs?.data ?? []), crate(albums?.name ?? "Top albums", sleeves(albums?.data ?? [])), crate(playlists?.name ?? "Top playlists", sleeves(playlists?.data ?? []))),
     h("h2", {}, "Genres"),
-    h("div", { className: "crates" }, ...genres),
+    h("div", { className: "crates" }, ...(await genres(storefront))),
   ];
+}
+
+/** A crate for each genre but Music, the one the others belong to. If Apple will not list them, the charts still show. */
+async function genres(storefront: string): Promise<HTMLElement[]> {
+  const crates: HTMLElement[] = [];
+  try {
+    for await (const { id, attributes } of music.catalog.listGenres({ storefront })) {
+      if (attributes?.parentId !== undefined) crates.push(later(attributes.name, () => genreCrate(id, storefront)));
+    }
+  } catch (e) {
+    showError(e);
+  }
+  return crates;
 }
 
 /** A genre's crate: the albums of its chart, in the floor's storefront, whichever is current when it scrolls in. */
