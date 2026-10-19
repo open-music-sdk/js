@@ -21,10 +21,10 @@ form.onsubmit = (event) => {
 };
 
 async function planFor(listener: tBrowserMusic): Promise<void> {
-  const name = byId("playlist-name", HTMLInputElement).value.trim() || "Crate Digger";
+  const name = byId("playlist-name", HTMLInputElement).value.trim() || "Vinyl Collector Simulator";
   const id = new FormData(form).get("to") === "existing" ? byId("playlist", HTMLSelectElement).value : made.get(name);
   // A new playlist is found again by its name and description, so the description carries the app's mark.
-  const playlist = id !== undefined ? await listener.playlists.read(id) : { name, description: "Made with Crate Digger" };
+  const playlist = id !== undefined ? await listener.playlists.read(id) : { name, description: "Made with Vinyl Collector Simulator" };
   pending = listener.playlists.plan(playlist, picks);
   const said = (text: string) => h("li", {}, text);
   byId("plan-summary", HTMLUListElement).replaceChildren(

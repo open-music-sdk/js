@@ -1,23 +1,25 @@
 // Shows: listHeavyRotation, listPersonalRecommendations, listRecentlyAdded, listLibraryPlaylists,
 // getLibraryPlaylist, searchLibrary, and one list the server asks for. Guide: /guides/store-user-tokens
 import type { tArtwork, tBrowserMusic, tLibraryPlaylist } from "@open-music-sdk/browser";
+import { crate, type tSleeve } from "./box";
 import { byId, h } from "./dom";
 import { fromServer, showError } from "./errors";
 import { now, onChange } from "./music";
-import { cover } from "./songs";
 
 /** What every list of the listener's holds: albums, playlists, stations, each with a name and a cover. */
 interface tCard {
   readonly id: string;
-  readonly attributes?: { readonly name?: string | undefined; readonly artwork?: tArtwork | undefined } | undefined;
+  readonly attributes?: { readonly name?: string | undefined; readonly artistName?: string | undefined; readonly artwork?: tArtwork | undefined } | undefined;
 }
 
 const view = byId("library-view", HTMLDivElement);
 const found = h("div");
+const tracks = h("div");
 
 onChange(() => {
   document.querySelector<HTMLButtonElement>('nav button[value="library"]')?.toggleAttribute("hidden", now.listener === undefined);
   found.replaceChildren();
+  tracks.replaceChildren();
   view.replaceChildren();
   if (now.listener !== undefined) draw(now.listener).catch(showError);
   // Signed out with the Library open: back to Dig, since nothing of a listener's is left to show.
@@ -34,52 +36,49 @@ async function draw(listener: tBrowserMusic): Promise<void> {
   if (now.listener !== listener) return;
   view.replaceChildren(
     found,
-    ...recent,
-    h("h3", {}, "Heavy rotation"),
-    cards(heavy),
-    ...picked.flatMap((recommendation) => [h("h3", {}, recommendation.attributes?.title?.stringForDisplay ?? "Made for you"), cards(recommendation.relationships?.contents?.data ?? [])]),
-    h("h3", {}, "Recently added"),
-    cards(added),
-    ...yourPlaylists(listener),
+    h(
+      "div",
+      { className: "crates" },
+      recent,
+      crate("Heavy rotation", cards(heavy)),
+      ...picked.map((recommendation) => crate(recommendation.attributes?.title?.stringForDisplay ?? "Made for you", cards(recommendation.relationships?.contents?.data ?? []))),
+      crate("Recently added", cards(added)),
+      yourPlaylists(listener),
+    ),
+    tracks,
   );
 }
 
 // One list the server asks for, with the token it kept for this listener when they signed in.
-async function fromTheServer(): Promise<HTMLElement[]> {
-  const title = h("h3", {}, "Recently played ", h("small", {}, "asked by the server"));
+async function fromTheServer(): Promise<HTMLElement> {
+  const label = "Recently played, asked by the server";
   const answer = await fetch("/api/me/recent");
-  // A list that cannot be had says why in its own place, and the rest of the Library is drawn all the same.
-  if (!answer.ok) return [title, h("p", {}, fromServer(answer.status))];
-  return [title, cards((await answer.json()) as tCard[])];
+  // A list that cannot be had says why in its own crate, and the rest of the Library is drawn all the same.
+  if (!answer.ok) return crate(label, [], { empty: fromServer(answer.status) });
+  return crate(label, cards((await answer.json()) as tCard[]));
 }
 
-/** The listener's playlists, 25 at a time. Each More asks Apple for the next page, and nothing is asked before. */
-function yourPlaylists(listener: tBrowserMusic): HTMLElement[] {
+/** The listener's playlists, 25 at a time: flipping near the back of the crate asks Apple for the next page. */
+function yourPlaylists(listener: tBrowserMusic): HTMLElement {
   const walk = listener.user.listLibraryPlaylists({ limit: 25 })[Symbol.asyncIterator]();
-  const list = h("ul", { className: "playlists" });
-  const tracks = h("div");
-  const more = h("button", { type: "button", textContent: "More playlists" });
-  const next = async () => {
+  const more = async () => {
+    const next: tSleeve[] = [];
     for (let shown = 0; shown < 25; shown++) {
       const step = await walk.next();
-      if (step.done === true) {
-        more.hidden = true;
-        return;
-      }
+      if (step.done === true) break;
       const playlist = step.value;
-      list.append(h("li", {}, h("button", { type: "button", className: "link", textContent: playlist.attributes?.name ?? playlist.id, onclick: () => { open(listener, playlist, tracks).catch(showError); } })));
+      next.push({ artwork: playlist.attributes?.artwork, name: playlist.attributes?.name ?? playlist.id, open: () => { open(listener, playlist).catch(showError); } });
     }
+    return next;
   };
-  more.onclick = () => { next().catch(showError); };
-  next().catch(showError);
-  return [h("h3", {}, "Your playlists"), list, more, tracks];
+  return crate("Your playlists", [], { more, empty: "Looking for your playlists." });
 }
 
-/** A playlist of the listener's, with its tracks. Songs in a library have no previews. */
-async function open(listener: tBrowserMusic, { id }: tLibraryPlaylist, into: HTMLElement): Promise<void> {
+/** A playlist of the listener's, with its tracks, under the crates. Songs in a library have no previews. */
+async function open(listener: tBrowserMusic, { id }: tLibraryPlaylist): Promise<void> {
   const playlist = await listener.user.getLibraryPlaylist(id, { include: ["tracks"] });
-  const names = (playlist.relationships?.tracks?.data ?? []).map((track) => h("li", {}, `${track.attributes?.name ?? track.id}, ${track.attributes?.artistName ?? ""}`));
-  into.replaceChildren(h("h3", {}, playlist.attributes?.name ?? id), h("ol", {}, ...names));
+  const names = (playlist.relationships?.tracks?.data ?? []).map((track) => h("li", {}, h("span", { className: "name" }, track.attributes?.name ?? track.id, h("small", {}, track.attributes?.artistName ?? ""))));
+  if (now.listener === listener) tracks.replaceChildren(h("h2", {}, playlist.attributes?.name ?? id), h("ol", { className: "tracklist" }, ...names));
 }
 
 byId("library-search", HTMLFormElement).onsubmit = (event) => {
@@ -92,7 +91,8 @@ async function find(listener: tBrowserMusic, text: string): Promise<void> {
   const { results } = await listener.user.searchLibrary(text, { types: ["library-songs", "library-albums"], limit: 10 });
   const items = [...(results["library-songs"]?.data ?? []), ...(results["library-albums"]?.data ?? [])];
   if (now.listener !== listener) return;
-  found.replaceChildren(h("h3", {}, `In your library: "${text}"`), items.length === 0 ? h("p", {}, "Nothing. Apple's library search finds a song by the first word of its name more often than by the whole name.") : cards(items));
+  const nothing = "Nothing. Apple's library search finds a song by the first word of its name more often than by the whole name.";
+  found.replaceChildren(h("div", { className: "crates" }, crate(`In your library: "${text}"`, cards(items), { empty: nothing })));
 }
 
 async function first<T>(walk: AsyncIterable<T>): Promise<T[]> {
@@ -101,6 +101,6 @@ async function first<T>(walk: AsyncIterable<T>): Promise<T[]> {
   return items;
 }
 
-function cards(items: readonly tCard[]): HTMLElement {
-  return h("div", { className: "shelf" }, ...items.map(({ id, attributes }) => h("figure", { className: "tile" }, cover(attributes?.artwork, 120), h("figcaption", {}, attributes?.name ?? id))));
+function cards(items: readonly tCard[]): tSleeve[] {
+  return items.map(({ id, attributes }) => ({ artwork: attributes?.artwork, name: attributes?.name ?? id, by: attributes?.artistName }));
 }

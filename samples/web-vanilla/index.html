@@ -3,19 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Crate Digger</title>
+    <title>Vinyl Collector Simulator</title>
     <!-- The icon Apple's sign-in window shows, here this project's logo: put your own app's in its place. It has to be
          on a public https address the window can load. -->
     <link rel="apple-music-app-icon" sizes="120x120" href="https://avatars.githubusercontent.com/u/338387998?s=240" />
+    <!-- The face the crates are labelled in. Without it, the labels fall back to a face of the system. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" />
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
     <header>
-      <h1>Crate Digger</h1>
+      <h1>Vinyl Collector Simulator</h1>
       <nav>
         <button type="button" value="dig" aria-pressed="true">Dig</button>
-        <button type="button" value="crate" aria-pressed="false">Crate (<span id="crate-count">0</span>)</button>
+        <button type="button" value="crate" aria-pressed="false">Your crate (<span id="crate-count">0</span>)</button>
         <button type="button" value="library" aria-pressed="false" hidden>Library</button>
       </nav>
       <label id="storefront-picker">Storefront <select id="storefront"><option value="us">United States</option></select></label>
@@ -31,13 +33,13 @@
           <datalist id="hints"></datalist>
           <button>Search</button>
         </form>
-        <div id="dig-view"></div>
+        <div id="floor"></div>
+        <div id="page" hidden></div>
       </section>
 
       <section id="crate" hidden>
-        <h2>Your crate</h2>
         <p>Songs you picked while digging. A reload empties the crate.</p>
-        <ol id="picks"></ol>
+        <div id="picks"></div>
         <form id="paste">
           <label for="tracklist">Or paste a tracklist, one track a line, as <em>Artist - Title</em></label>
           <textarea id="tracklist" rows="5"></textarea>
@@ -46,7 +48,7 @@
         <div id="unmatched"></div>
         <form id="send" hidden>
           <h3>Send the crate to Apple Music</h3>
-          <label><input type="radio" name="to" value="new" checked /> A new playlist named <input id="playlist-name" value="Crate Digger" /></label>
+          <label><input type="radio" name="to" value="new" checked /> A new playlist named <input id="playlist-name" value="Vinyl Collector Simulator" /></label>
           <label><input type="radio" name="to" value="existing" /> One of your playlists <select id="playlist"></select></label>
           <button id="plan-it">Plan it</button>
         </form>

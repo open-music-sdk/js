@@ -9,7 +9,7 @@ const signOutButton = byId("sign-out", HTMLButtonElement);
 
 // Made as the page loads, so that Apple's script is loaded and configured before the click, and its window opens
 // inside the click: a browser blocks a window opened later.
-const signIn = createConnect(music, { app: { name: "Crate Digger" } });
+const signIn = createConnect(music, { app: { name: "Vinyl Collector Simulator" } });
 
 signInButton.onclick = () => {
   signIn.connect().then(async (token) => {

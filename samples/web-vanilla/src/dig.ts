@@ -1,24 +1,54 @@
-// Shows: searchCatalog, getSearchHints, getCharts, listStorefronts. Guide: /guides/artwork
-import type { tAlbum, tArtist, tMusicVideo, tPlaylist, tSong } from "@open-music-sdk/browser";
+// Shows: getCharts, listGenres, searchCatalog, getSearchHints, listStorefronts.
+import { crate, later, type tSleeve } from "./box";
 import { byId, h } from "./dom";
 import { showError } from "./errors";
 import { change, music, now, onChange } from "./music";
-import { openAlbum, openArtist, openPlaylist } from "./pages";
-import { songRows } from "./songs";
-import { current, shelf, show } from "./view";
+import { sleeves } from "./pages";
+import { songCrate } from "./songs";
+import { drawFloor, drawPage, go, route } from "./view";
+
+// The floor, before anyone searches: the storefront's top charts, then a crate for each genre the charts are kept by.
+async function theFloor(): Promise<HTMLElement[]> {
+  const { storefront } = now;
+  const { results } = await music.catalog.getCharts({ types: ["songs", "albums", "playlists"], limit: 20, storefront });
+  const [songs, albums, playlists] = [results.songs[0], results.albums[0], results.playlists[0]];
+  const genres: HTMLElement[] = [];
+  for await (const { id, attributes } of music.catalog.listGenres({ storefront })) {
+    // Every genre but Music, the one the others belong to.
+    if (attributes?.parentId !== undefined) genres.push(later(attributes.name, () => genreCrate(id)));
+  }
+  return [
+    h("h2", {}, "Top charts"),
+    h("div", { className: "crates" }, await songCrate(songs?.name ?? "Top songs", songs?.data ?? []), crate(albums?.name ?? "Top albums", sleeves(albums?.data ?? [])), crate(playlists?.name ?? "Top playlists", sleeves(playlists?.data ?? []))),
+    h("h2", {}, "Genres"),
+    h("div", { className: "crates" }, ...genres),
+  ];
+}
+
+/** A genre's crate: the albums of its chart. */
+async function genreCrate(genre: string): Promise<tSleeve[]> {
+  const { results } = await music.catalog.getCharts({ types: ["albums"], genre, limit: 20, storefront: now.storefront });
+  return sleeves(results.albums[0]?.data ?? []);
+}
 
 const term = byId("term", HTMLInputElement);
 
 byId("search", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   const text = term.value.trim();
-  show(text === "" ? charts : () => search(text));
+  if (text === "") location.hash = "";
+  else go("search", text);
 };
 
-async function search(text: string): Promise<HTMLElement[]> {
-  const { results } = await music.catalog.searchCatalog(text, { types: ["songs", "albums", "artists", "playlists"], limit: 10, storefront: now.storefront });
-  return found(`Results for "${text}"`, results.songs?.data, results.albums?.data, results.artists?.data, results.playlists?.data);
-}
+route("search", async (text) => {
+  term.value = text;
+  const { results } = await music.catalog.searchCatalog(text, { types: ["songs", "albums", "artists", "playlists"], limit: 20, storefront: now.storefront });
+  const { songs, albums, artists, playlists } = results;
+  return [
+    h("h2", {}, `Results for "${text}"`),
+    h("div", { className: "crates" }, await songCrate("Songs", songs?.data ?? []), crate("Albums", sleeves(albums?.data ?? [])), crate("Artists", sleeves(artists?.data ?? [])), crate("Playlists", sleeves(playlists?.data ?? []))),
+  ];
+});
 
 // Offered as the listener types, once typing pauses rather than on every key.
 let typing: ReturnType<typeof setTimeout> | undefined;
@@ -33,24 +63,6 @@ async function hints(text: string): Promise<void> {
   byId("hints", HTMLDataListElement).replaceChildren(...results.terms.map((value) => h("option", { value })));
 }
 
-// What the page shows before anyone searches: the first chart of each type in the storefront.
-async function charts(): Promise<HTMLElement[]> {
-  const { results } = await music.catalog.getCharts({ types: ["songs", "albums", "playlists"], limit: 10, storefront: now.storefront });
-  return found("Top charts", results.songs[0]?.data, results.albums[0]?.data, [], results.playlists[0]?.data);
-}
-
-/** What a search or the charts found, each type under its own heading. */
-async function found(title: string, songs: readonly (tSong | tMusicVideo)[] = [], albums: readonly tAlbum[] = [], artists: readonly tArtist[] = [], playlists: readonly tPlaylist[] = []): Promise<HTMLElement[]> {
-  const rows = songs.length > 0 ? await songRows(songs) : undefined;
-  return [
-    h("h2", {}, title),
-    ...(rows !== undefined ? [h("h3", {}, "Songs"), rows] : []),
-    ...shelf("Albums", albums, openAlbum),
-    ...shelf("Artists", artists, openArtist),
-    ...shelf("Playlists", playlists, openPlaylist),
-  ];
-}
-
 // Signed out, the listener picks the storefront. Signed in, it is their own, from Apple, and the picker goes.
 const picker = byId("storefront", HTMLSelectElement);
 async function storefronts(): Promise<void> {
@@ -63,15 +75,17 @@ picker.onchange = () => {
   change({ storefront: picker.value });
 };
 
-// Another storefront has other ids, so the view starts again from its charts. Signing in or out redraws it.
+// Another storefront has other ids, so the page goes back to the floor. Signing in or out draws both again.
 let shownIn = now.storefront;
 onChange(() => {
   byId("storefront-picker", HTMLLabelElement).hidden = now.listener !== undefined;
   picker.value = now.storefront;
-  const sameStorefront = now.storefront === shownIn;
+  if (now.storefront !== shownIn) location.hash = "";
   shownIn = now.storefront;
-  show(sameStorefront ? current : charts);
+  drawFloor(theFloor);
+  drawPage();
 });
 
 storefronts().catch(showError);
-show(charts);
+drawFloor(theFloor);
+drawPage();

@@ -1,5 +1,6 @@
 // Shows: playlists.resolve. Guide: /guides/import-playlist
 import type { tSong, tTrackDescription } from "@open-music-sdk/browser";
+import { crate, type tSleeve } from "./box";
 import { byId, h } from "./dom";
 import { say, showError } from "./errors";
 import { music, now, onChange } from "./music";
@@ -11,7 +12,7 @@ const unmatched = byId("unmatched", HTMLDivElement);
 
 export function pick(song: tSong): void {
   if (!picks.some(({ id }) => id === song.id)) picks.push(song);
-  draw();
+  draw(picks.findIndex(({ id }) => id === song.id));
   say(`${song.attributes?.name ?? "The song"} is in the crate.`);
 }
 
@@ -46,24 +47,27 @@ async function find(text: string): Promise<void> {
 }
 // #endregion resolve
 
-function draw(): void {
+/** Your crate, drawn as the others are, with the sleeve at `at` in front. Its order is the playlist's. */
+function draw(at = 0): void {
   byId("crate-count", HTMLSpanElement).textContent = String(picks.length);
   const move = (from: number, to: number) => () => {
-    if (to < 0 || to >= picks.length) return;
     picks.splice(to, 0, ...picks.splice(from, 1));
-    draw();
+    draw(to);
   };
-  const row = (song: tSong, at: number) =>
-    h(
-      "li",
-      {},
-      h("span", { className: "name" }, song.attributes?.name ?? song.id, h("small", {}, song.attributes?.artistName ?? "")),
+  const sleeve = (song: tSong, i: number): tSleeve => ({
+    artwork: song.attributes?.artwork,
+    name: song.attributes?.name ?? song.id,
+    by: song.attributes?.artistName,
+    open: () => { playFrom(picks, song); },
+    actions: () => [
       h("button", { type: "button", textContent: "Play", onclick: () => { playFrom(picks, song); } }),
-      h("button", { type: "button", textContent: "Up", onclick: move(at, at - 1) }),
-      h("button", { type: "button", textContent: "Down", onclick: move(at, at + 1) }),
-      h("button", { type: "button", textContent: "Remove", onclick: () => { picks.splice(at, 1); draw(); } }),
-    );
-  byId("picks", HTMLOListElement).replaceChildren(...picks.map(row));
+      h("button", { type: "button", textContent: "Move earlier", disabled: i === 0, onclick: move(i, i - 1) }),
+      h("button", { type: "button", textContent: "Move later", disabled: i === picks.length - 1, onclick: move(i, i + 1) }),
+      h("button", { type: "button", textContent: "Take out", onclick: () => { picks.splice(i, 1); draw(i); } }),
+    ],
+  });
+  const empty = "Empty. Put songs in from Dig, or paste a tracklist below.";
+  byId("picks", HTMLDivElement).replaceChildren(h("div", { className: "crates" }, crate("Your crate", picks.map(sleeve), { at, empty })));
   byId("send", HTMLFormElement).hidden = now.listener === undefined || picks.length === 0;
 }
 

@@ -2,13 +2,24 @@
 // addToLibrary, addToFavorites. Guides: /guides/validation, /guides/direct-requests
 import { isAppleMusicError, schemas, type tAlbum, type tArtist, type tArtwork, type tBrowserMusic, type tLibraryAlbum, type tPage, type tPlaylist, type tSong } from "@open-music-sdk/browser";
 import { segmentOf } from "@open-music-sdk/core";
+import { cover, crate, type tSleeve } from "./box";
 import { h } from "./dom";
 import { say, showError } from "./errors";
 import { music, now } from "./music";
-import { cover, songRows } from "./songs";
-import { shelf } from "./view";
+import { songCrate, songRows } from "./songs";
+import { go, route } from "./view";
 
-export async function openAlbum({ id }: tAlbum): Promise<HTMLElement[]> {
+/** Catalog albums, artists or playlists as sleeves, each opening its page. */
+export function sleeves(items: readonly (tAlbum | tArtist | tPlaylist)[]): tSleeve[] {
+  return items.map((item) => ({
+    artwork: item.attributes?.artwork,
+    name: item.attributes?.name ?? item.id,
+    by: item.type === "albums" ? item.attributes?.artistName : item.type === "playlists" ? item.attributes?.curatorName : undefined,
+    open: () => { go(item.type, item.id); },
+  }));
+}
+
+route("albums", async (id) => {
   // Held to the album's generated type as it arrives: an answer in another shape is a ValidationError here, with
   // the path of each value that differs, rather than an undefined somewhere later.
   const album = await music.catalog.getAlbum(id, { include: ["tracks"], storefront: now.storefront, schema: schemas.albumsResponse });
@@ -16,9 +27,9 @@ export async function openAlbum({ id }: tAlbum): Promise<HTMLElement[]> {
   const rows = await songRows(album.relationships?.tracks?.data ?? []);
   const { name, artistName, artwork } = album.attributes ?? {};
   return [heading(name, artistName, artwork), ...actions, rows];
-}
+});
 
-export async function openArtist({ id }: tArtist): Promise<HTMLElement[]> {
+route("artists", async (id) => {
   const { storefront } = now;
   const artist = await music.catalog.getArtist(id, { storefront });
   // A view, one page of it: the artist's top songs.
@@ -27,16 +38,15 @@ export async function openArtist({ id }: tArtist): Promise<HTMLElement[]> {
   // A relationship, walked a page at a time until its pages or maxPages run out: the artist's albums.
   const albums: tAlbum[] = [];
   for await (const album of music.catalog.getArtistRelationship(id, "albums", { storefront, limit: 25, maxPages: 4 })) albums.push(album);
-  const rows = await songRows(top);
-  return [heading(artist.attributes?.name, undefined, artist.attributes?.artwork), h("h3", {}, "Top songs"), rows, ...shelf("Albums", albums, openAlbum)];
-}
+  return [heading(artist.attributes?.name, undefined, artist.attributes?.artwork), h("div", { className: "crates" }, await songCrate("Top songs", top), crate("Albums", sleeves(albums)))];
+});
 
-export async function openPlaylist({ id }: tPlaylist): Promise<HTMLElement[]> {
+route("playlists", async (id) => {
   const playlist = await music.catalog.getPlaylist(id, { include: ["tracks"], storefront: now.storefront });
   const rows = await songRows(playlist.relationships?.tracks?.data ?? []);
   const { name, curatorName, artwork } = playlist.attributes ?? {};
   return [heading(name, curatorName, artwork), rows];
-}
+});
 
 /** What a signed-in listener can do with an album: add it to their library unless it is there, or make it a favorite. */
 async function albumActions(id: string): Promise<HTMLElement[]> {
@@ -84,5 +94,5 @@ function write(accepted: Promise<unknown>, done: string): void {
 }
 
 function heading(name: string | undefined, by: string | undefined, artwork: tArtwork | undefined): HTMLElement {
-  return h("div", { className: "heading" }, cover(artwork, 160), h("h2", {}, name ?? ""), h("p", {}, by ?? ""));
+  return h("div", { className: "heading" }, cover(artwork, 240), h("h2", {}, name ?? ""), h("p", {}, by ?? ""));
 }

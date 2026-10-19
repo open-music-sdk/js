@@ -1,28 +1,54 @@
-// Where the Dig screen draws, and the shelf of covers its results and pages share. Nothing here asks Apple.
-import type { tAlbum, tArtist, tPlaylist } from "@open-music-sdk/browser";
+// Where the Dig screen draws: the floor of crates, and a page pulled out of one, opened over the floor as a step the
+// browser's Back goes back from. Nothing here asks Apple.
 import { byId, h } from "./dom";
 import { showError } from "./errors";
-import { cover } from "./songs";
 
-const view = byId("dig-view", HTMLDivElement);
+type tStep = () => Promise<HTMLElement[]>;
 
-/** What the view shows: a step that asks Apple and gives back what to draw. Drawn again when someone signs in or out. */
-export let current: () => Promise<HTMLElement[]> = () => Promise.resolve([]);
-let turns = 0;
+const floor = byId("floor", HTMLDivElement);
+const page = byId("page", HTMLDivElement);
+/** The pages a sleeve can open, by kind: `#albums/1440857781` draws `routes.get("albums")` with that id. */
+const routes = new Map<string, (id: string) => Promise<HTMLElement[]>>();
+let floorTurns = 0;
+let pageTurns = 0;
+let floorScroll = 0;
 
-export function show(step: () => Promise<HTMLElement[]>): void {
-  current = step;
-  const turn = ++turns;
+export function route(kind: string, draw: (id: string) => Promise<HTMLElement[]>): void {
+  routes.set(kind, draw);
+}
+
+export function go(kind: string, id: string): void {
+  location.hash = `${kind}/${encodeURIComponent(id)}`;
+}
+
+/** Draws the floor. It stays as the listener left it while a page is open, each crate at the sleeve they were on. */
+export function drawFloor(step: tStep): void {
+  const turn = ++floorTurns;
   step().then((elements) => {
-    // Drawn only if nothing was asked for since: a slow search must not cover the charts of a newer storefront.
-    if (turn === turns) view.replaceChildren(...elements);
+    // Drawn only if nothing was asked for since: a slow answer must not cover the charts of a newer storefront.
+    if (turn === floorTurns) floor.replaceChildren(...elements);
   }, showError);
 }
 
-/** A heading and a row of covers, each opening its page. Nothing when there are none. */
-export function shelf<T extends tAlbum | tArtist | tPlaylist>(title: string, items: readonly T[], open: (item: T) => Promise<HTMLElement[]>): HTMLElement[] {
-  if (items.length === 0) return [];
-  const tile = (item: T) =>
-    h("button", { type: "button", className: "tile", onclick: () => { show(() => open(item)); } }, cover(item.attributes?.artwork, 120), h("span", {}, item.attributes?.name ?? item.id));
-  return [h("h3", {}, title), h("div", { className: "shelf" }, ...items.map(tile))];
+/** Draws the page the address names, or shows the floor again when it names none. */
+export function drawPage(): void {
+  const [kind = "", id = ""] = location.hash.slice(1).split("/");
+  const draw = routes.get(kind);
+  const turn = ++pageTurns;
+  if (!floor.hidden) floorScroll = scrollY;
+  floor.hidden = draw !== undefined;
+  page.hidden = draw === undefined;
+  if (draw === undefined) {
+    page.replaceChildren();
+    scrollTo(0, floorScroll);
+    return;
+  }
+  const back = h("a", { href: "#", className: "back", textContent: "‹ Back to the crates" });
+  page.replaceChildren(back, h("p", {}, "Pulling it out…"));
+  scrollTo(0, 0);
+  draw(decodeURIComponent(id)).then((elements) => {
+    if (turn === pageTurns) page.replaceChildren(back, ...elements);
+  }, showError);
 }
+
+addEventListener("hashchange", drawPage);
