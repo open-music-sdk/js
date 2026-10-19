@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createRateLimiter } from "./rate-limit";
 
@@ -185,6 +186,33 @@ describe("createRateLimiter", () => {
     const next = track(limiter.acquire());
     await vi.advanceTimersByTimeAsync(1000);
     expect(next.state).toBe("resolved");
+  });
+
+  test("each caller waits on a timer of its own, so ending one caller's timers stalls no other, as Cloudflare Workers end a request's timers with it", async () => {
+    const limiter = createRateLimiter({ capacity: 1, refillPerSecond: 4 });
+    const owner = new AsyncLocalStorage<ReturnType<typeof setTimeout>[]>();
+    const set = globalThis.setTimeout;
+    const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation((...args: Parameters<typeof setTimeout>) => {
+      const timer = set(...args);
+      owner.getStore()?.push(timer);
+      return timer;
+    });
+    try {
+      // A request: every timer its acquire sets is its own, and once it has its turn they are all cleared, as the
+      // runtime clears a request's timers when it answers.
+      const request = () => {
+        const timers: ReturnType<typeof setTimeout>[] = [];
+        return owner.run(timers, async () => {
+          await limiter.acquire();
+          for (const timer of timers) clearTimeout(timer);
+        });
+      };
+      const done = Array.from({ length: 4 }, () => track(request()));
+      await vi.advanceTimersByTimeAsync(750);
+      expect(done.map((d) => d.state)).toEqual(["resolved", "resolved", "resolved", "resolved"]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test("resolves to undefined", async () => {

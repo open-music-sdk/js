@@ -14,9 +14,8 @@ export interface tRateLimiter {
 }
 
 interface tWaiter {
-  readonly grant: () => void;
-  readonly signal: AbortSignal | undefined;
-  readonly onAbort: () => void;
+  /** Set when a token is this waiter's: a mark it finds when its own timer fires. */
+  granted: boolean;
 }
 
 /**
@@ -44,8 +43,6 @@ export function createRateLimiter({
   let tokens = capacity;
   let refilledAt = performance.now();
   const queue: tWaiter[] = [];
-  let draining = false;
-  let wake: (() => void) | undefined;
 
   const refill = () => {
     const now = performance.now();
@@ -53,56 +50,38 @@ export function createRateLimiter({
     refilledAt = now;
   };
 
-  // One loop serves the queue in order: grant while tokens last, otherwise wait for the next one.
-  // The wait is for a token, not for a particular waiter, so a waiter leaving mid-wait changes nothing
-  // unless the queue is now empty, in which case the loop is woken to stop.
-  async function drain(): Promise<void> {
-    if (draining) return;
-    draining = true;
-    try {
-      while (queue.length > 0) {
-        refill();
-        if (tokens >= 1) {
-          tokens -= 1;
-          const waiter = queue.shift();
-          if (waiter) {
-            waiter.signal?.removeEventListener("abort", waiter.onAbort);
-            waiter.grant();
-          }
-          continue;
-        }
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, ((1 - tokens) / refillPerSecond) * 1000);
-          wake = () => {
-            clearTimeout(timer);
-            resolve();
-          };
-        });
-        wake = undefined;
-      }
-    } finally {
-      draining = false;
-    }
-  }
+  // Grants in the order asked, while tokens last. A grant only marks the waiter, which finds the mark when its own
+  // timer fires: no caller waits on a timer another caller set. Cloudflare Workers tie a timer to the request that
+  // set it and end it with that request, and a request left waiting on such a timer never answers.
+  const grant = () => {
+    refill();
+    const turns = queue.splice(0, Math.min(queue.length, Math.floor(tokens)));
+    tokens -= turns.length;
+    for (const waiter of turns) waiter.granted = true;
+  };
 
   return {
     async acquire(signal) {
       signal?.throwIfAborted();
-      await new Promise<void>((resolve) => {
-        const waiter: tWaiter = {
-          grant: resolve,
-          signal,
-          onAbort: () => {
-            queue.splice(queue.indexOf(waiter), 1);
+      const waiter: tWaiter = { granted: false };
+      queue.push(waiter);
+      grant();
+      // Each wait is this caller's own, until the next token: a waiter ahead that leaves only makes the turn come sooner.
+      while (!waiter.granted) {
+        await new Promise<void>((resolve, reject) => {
+          const leave = () => {
+            clearTimeout(timer);
+            queue.splice(0, queue.length, ...queue.filter((each) => each !== waiter));
+            reject(signal?.reason as Error);
+          };
+          const timer = setTimeout(() => {
+            signal?.removeEventListener("abort", leave);
             resolve();
-            if (queue.length === 0) wake?.();
-          },
-        };
-        queue.push(waiter);
-        signal?.addEventListener("abort", waiter.onAbort, { once: true });
-        void drain();
-      });
-      signal?.throwIfAborted();
+          }, Math.max(0, ((1 - tokens) / refillPerSecond) * 1000));
+          signal?.addEventListener("abort", leave, { once: true });
+        });
+        grant();
+      }
     },
   };
 }
