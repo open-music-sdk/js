@@ -75,13 +75,11 @@ picker.onchange = () => {
   change({ storefront: picker.value });
 };
 
-// Another storefront has other ids, so the page goes back to the floor. Signing in or out draws both again.
-let shownIn = now.storefront;
+// Signing in or out, or another storefront, draws the floor and the open page again. A page a returning listener
+// reloads opens in their storefront; an id another storefront does not sell is a 404, which the page says.
 onChange(() => {
   byId("storefront-picker", HTMLLabelElement).hidden = now.listener !== undefined;
   picker.value = now.storefront;
-  if (now.storefront !== shownIn) location.hash = "";
-  shownIn = now.storefront;
   drawFloor(theFloor);
   drawPage();
 });
