@@ -33,6 +33,8 @@ interface tHeld {
   readonly at: number;
   /** Counts each put in, move and take out, each bringing `at` to the front. */
   readonly turn: number;
+  /** Whether the songs went because the storefront changed. */
+  readonly emptied: boolean;
 }
 
 interface tYourCrate {
@@ -74,10 +76,19 @@ export function CrateProvider({ children }: { children: ReactNode }) {
     picks: [],
     at: 0,
     turn: 0,
+    emptied: false,
   });
-  // Another storefront has other ids, so the songs found in one are not shown
-  // in another: the crate is empty again.
-  const here = held.storefront === current;
+  // Another storefront has other ids, so the crate empties when the storefront
+  // changes, and says why.
+  if (current !== undefined && held.storefront !== current) {
+    setHeld({
+      storefront: current,
+      picks: [],
+      at: 0,
+      turn: held.turn + 1,
+      emptied: held.picks.length > 0,
+    });
+  }
   // The storefront now, for a song found after the page has left the
   // storefront it was asked in.
   const storefrontNow = useRef<string>(undefined);
@@ -99,14 +110,13 @@ export function CrateProvider({ children }: { children: ReactNode }) {
         return;
       }
       setHeld((was) => {
+        if (was.storefront !== foundIn) return was;
         const turn = was.turn + 1;
-        const picks = was.storefront === foundIn ? was.picks : [];
-        const index = picks.findIndex(({ id }) => id === song.id);
-        if (index !== -1) {
-          return { storefront: foundIn, picks, at: index, turn };
-        }
-        const added = [...picks, song];
-        return { storefront: foundIn, picks: added, at: picks.length, turn };
+        const index = was.picks.findIndex(({ id }) => id === song.id);
+        if (index !== -1) return { ...was, at: index, turn };
+        const picks = [...was.picks, song];
+        const at = was.picks.length;
+        return { ...was, picks, at, turn, emptied: false };
       });
       say(`${song.attributes?.name ?? "The song"} is in the crate.`);
     };
@@ -124,17 +134,17 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       });
     };
     return {
-      picks: here ? held.picks : [],
-      at: here ? held.at : 0,
+      picks: held.picks,
+      at: held.at,
       turn: held.turn,
-      emptied: !here && held.picks.length > 0,
+      emptied: held.emptied,
       pick,
       move,
       takeOut,
       storefront: current,
       storefrontIs,
     };
-  }, [held, here, current]);
+  }, [held, current]);
   return <YourCrate value={crate}>{children}</YourCrate>;
 }
 
