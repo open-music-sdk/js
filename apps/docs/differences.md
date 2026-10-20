@@ -44,6 +44,21 @@ These are still open:
 - whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
   token.
 
+## [react](./reference/@open-music-sdk/react/)
+
+The React and Next.js samples ran against the live API in headless Edge on Windows on 20 October 2026, signed
+out, and the Next sample's pages for a listener too, with a token handed to its server. They settled these:
+
+- Under `<StrictMode>`, which mounts each component twice in development, the provider, `useConnect` and
+  `usePreviewPlayer` set up and undid what they set up, with no error or warning in the console.
+- `next build`, in Next 16 with Turbopack, reads the `"use client"` directive on the hooks' file alone. The Next
+  sample imports `musicQueries`, `schemas` and `isAppleMusicError` from the package into server components and
+  server actions, and the build passes.
+- A query `musicQueries` builds on the server and prefetches into a `HydrationBoundary` is the query the page's
+  `useMusicQueries` builds for the same call: the album page is drawn without asking Apple again.
+
+Still open: Apple's sign-in through `useConnect`, in a browser, by hand.
+
 ## [cli](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)
 
 The CLI's `login` is where the sign-ins above ran. Its `check` asked the live API on 18 October 2026: every endpoint
@@ -231,6 +246,10 @@ and image server were seen to do when the package was written:
 Against the live API on 18 October 2026, the 200 artwork templates of one storefront's charts all named their crop
 and format, with `{w}` and `{h}` their only placeholders, and were all on `mzstatic.com`. One of them, asked for in
 each of the six formats, came back in each, with its Content-Type.
+
+In the Next sample on 20 October 2026, `next/image` with `artworkUrl` as its loader asked for the widths of its own
+list, `256x256` and `640x640` for a cover shown at 240, and the artwork of a listener's own playlist, a URL with no
+size to fill in, needed `unoptimized`. See [With `next/image`](./guides/artwork#with-next-image).
 
 ## [types](./reference/@open-music-sdk/types/)
 

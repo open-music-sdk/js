@@ -51,7 +51,8 @@ function Album({ id }: { id: string }) {
 
 Only the built file that holds the provider and the hooks carries the `"use client"` directive. So `musicQueries`,
 `isAppleMusicError` or `artworkImage` imported from this package can also be used in a route handler, a server
-component or a prefetch. That Next's bundler reads it this way hasn't been tried in a Next build yet.
+component or a prefetch. The [Next sample](https://github.com/open-music-sdk/js/tree/main/samples/web-nextjs)
+imports them so, and `next build` passes in CI.
 
 ## Learn more
 

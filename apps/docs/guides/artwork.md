@@ -177,6 +177,25 @@ list.
 What comes back is a URL, not markup. Assigned to an element, or given to React, it's escaped for you. Written
 into HTML by hand, escape it like any other attribute value, and don't put it inside a CSS `url(…)` as it is.
 
+## With `next/image`
+
+In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
+offers, and Apple's image server makes each one, so Next's own optimizer is never used. A loader is a function, so
+the component that holds it is a client component. The [Next sample](../samples)'s, in `app/artwork.tsx`:
+
+<<< @/../../samples/web-nextjs/app/artwork.tsx#artwork{tsx}
+
+What the sample showed, on 20 October 2026, in Next 16:
+
+- Next picks the widths from its own list, not from the width you show the image at. A cover shown at 240 asks
+  for `256x256`, labelled `1x`, and `640x640`, labelled `2x`: for each density, the first of Next's `imageSizes`
+  and `deviceSizes` at least that wide. `artworkImage` asks for exactly `240x240` and `480x480`.
+- `remotePatterns` in your Next config doesn't apply under a loader of your own, so nothing checks where the URL
+  points but `hosts`, as in step 6. Pass it to `artworkUrl` for artwork from anywhere but Apple's API.
+- A URL with no size to fill in, as the artwork of a listener's own playlist has, is the same image at every width.
+  Next warns about a loader that can't honour a width, so the sample passes `unoptimized` for such a URL, and Next
+  uses it as it is.
+
 ## When something goes wrong
 
 An argument that isn't what the function takes is a `TypeError`, and so, with `hosts`, is an artwork whose URL
@@ -186,6 +205,7 @@ the URL. Each function's reference, linked below, lists every case.
 ## Next steps
 
 - [Play song previews](./previews), with the artwork of the track that is playing.
+- [Next.js](./nextjs), for the rest of a Next app.
 - The reference for [`artworkImage`](../reference/@open-music-sdk/util-artwork/functions/artworkImage),
   [`artworkUrl`](../reference/@open-music-sdk/util-artwork/functions/artworkUrl),
   [`artworkSrcSet`](../reference/@open-music-sdk/util-artwork/functions/artworkSrcSet) and their

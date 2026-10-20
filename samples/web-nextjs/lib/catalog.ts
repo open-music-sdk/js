@@ -7,6 +7,7 @@ import type { tGenre } from "@open-music-sdk/server";
 import { cacheLife } from "next/cache";
 import { getMusic } from "./music";
 
+// #region cache-catalog
 /** A storefront's top charts: the first of each type is its most played. */
 export async function topCharts(storefront: string) {
   "use cache";
@@ -18,6 +19,7 @@ export async function topCharts(storefront: string) {
   });
   return results;
 }
+// #endregion cache-catalog
 
 /** Every genre the storefront's charts are kept by, but Music, their root. */
 export async function genres(storefront: string): Promise<tGenre[]> {

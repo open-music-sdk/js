@@ -54,6 +54,7 @@ function isId(value: unknown): value is string {
   return typeof value === "string" && ID.test(value);
 }
 
+// #region add-to-library
 /**
  * The client that acts for this request's listener. It finds their token in
  * the store at each request; without one, Apple's answer is a
@@ -75,7 +76,6 @@ async function answer<T>(work: () => Promise<T>): Promise<tAnswer<T>> {
   }
 }
 
-// #region add-to-library
 /**
  * Adds a song, a music video or an album to the listener's library. Apple
  * accepts the request at once, and adds it afterwards, within seconds.
