@@ -23,6 +23,17 @@
         "dist/**"
       ]
     },
+    "web-nextjs#build": {
+      "dependsOn": [
+        "^build",
+        "codegen-emit#codegen"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "!.next/dev/**"
+      ]
+    },
     "typecheck": {
       "dependsOn": [
         "^build",
