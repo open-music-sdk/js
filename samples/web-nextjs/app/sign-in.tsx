@@ -8,8 +8,9 @@ import { say, showError } from "./status";
 
 /**
  * The header's sign-in and sign-out. Apple's sign-in runs in the browser, as
- * it has to; the token it gives goes to the server, and the page keeps none of
- * it. `signedIn` is the server's word: it holds a token Apple accepts.
+ * it has to; the token it gives goes to the server, and React's state forgets
+ * it. Apple's script keeps its own copy until the sign-out. `signedIn` is the
+ * server's word: it holds a token Apple accepts.
  */
 export function SignIn({ signedIn }: { signedIn: boolean }) {
   // Apple's script is loaded and configured as the header mounts, so that its

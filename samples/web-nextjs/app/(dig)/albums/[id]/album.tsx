@@ -1,10 +1,11 @@
 "use client";
-// Shows: useMusicQueries, useQuery over what the server prefetched.
-// Guide: /guides/tanstack-query
-import { schemas, useMusicQueries } from "@open-music-sdk/react";
+// Shows: useQuery over what the server prefetched. Guide:
+// /guides/tanstack-query
+import { schemas } from "@open-music-sdk/react";
 import { useQuery } from "@tanstack/react-query";
 import { useTransition, type ReactNode } from "react";
 import { addToLibrary, favorite } from "../../../actions";
+import { catalog } from "../../../providers";
 import { SongRows } from "../../../songs";
 import { say, showError } from "../../../status";
 import { Heading, Pulling } from "../../pages";
@@ -22,9 +23,8 @@ interface tAlbumViewProps {
  * same arguments make the same key, so it is drawn without asking Apple.
  */
 export function AlbumView({ id, storefront, loved, actions }: tAlbumViewProps) {
-  const queries = useMusicQueries();
   const { data: album } = useQuery(
-    queries.catalog.getAlbum(id, {
+    catalog.getAlbum(id, {
       include: ["tracks"],
       storefront,
       schema: schemas.albumsResponse,

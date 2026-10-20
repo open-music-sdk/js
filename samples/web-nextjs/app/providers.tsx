@@ -1,12 +1,14 @@
 "use client";
-// Shows: createBrowserClient, MusicProvider. Guide: /guides/nextjs
+// Shows: createBrowserClient, MusicProvider, musicQueries. Guide:
+// /guides/nextjs
 //
-// What the page's client components read from: the page's own client, which
-// signs in and prefetches nothing, TanStack Query's cache, your crate, and the
-// preview player.
+// What the page's client components read from: the page's own client, for
+// Apple's sign-in and the album's query, TanStack Query's cache, your crate,
+// and the preview player.
 import {
   MusicProvider,
   createBrowserClient,
+  musicQueries,
 } from "@open-music-sdk/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -17,6 +19,13 @@ import { PlayerProvider } from "./player";
 // route when Apple's sign-in, or a query the server's answer has gone stale
 // for, needs one.
 const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+
+/**
+ * The catalog's queries over the page's own client, in scope 0, as the server
+ * builds them for its prefetch: the keys match whoever is signed in, even
+ * while the provider holds a token for the moment the sign-in takes.
+ */
+export const catalog = musicQueries(music).catalog;
 
 export function Providers({ children }: { children: ReactNode }) {
   // One cache per page. A query the server prefetched is fresh for five

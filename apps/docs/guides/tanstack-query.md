@@ -164,8 +164,11 @@ on to use:
 <<< @/../../samples/web-nextjs/app/(dig)/albums/[id]/page.tsx#prefetch{tsx}
 
 Prefetch the catalog only. A listener's queries are in a scope of the page's own, which no server prefetch
-matches, so the page fetches the listener's library itself. The Next sample's page never holds a listener's token,
-so its scope stays 0, and the listener's library is drawn by server components instead.
+matches, so the page fetches the listener's library itself.
+
+A catalog query from `useMusicQueries()` changes scope at each sign-in too, so a prefetched one stops matching once
+a listener has signed in. The Next sample's album page builds its query with `musicQueries(music)` over the page's
+own client instead, in scope 0 whoever is signed in, and its server components draw the listener's library.
 
 `next build` imports `musicQueries` from `@open-music-sdk/react` into the Next sample's server components, and
 passes in CI.

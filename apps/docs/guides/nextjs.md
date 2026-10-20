@@ -120,9 +120,11 @@ The provider holds the listener's token in React state, in memory only. Never ha
 server component: a prop from a server component is written into the page. The token arrives through
 `useConnect`, as [Sign a listener in](./sign-in) shows.
 
-The sample's page keeps no token at all. Its sign-in posts the token to the route of step 4, forgets it, and loads
-the page again. `router.refresh()` would draw only the route that is open: Next keeps the pages visited before,
-hidden, for Back, as they were drawn for no one. Sign-out loads the page again for the same reason.
+In the sample, the server acts for the listener. Its sign-in posts the token to the route of step 4, has the
+provider forget it, and loads the page again. `router.refresh()` would draw only the route that is open: Next keeps
+the pages visited before, hidden, for Back, as they were drawn for no one. Sign-out loads the page again for the
+same reason. Apple's script still keeps its own copy of the token in the page's storage until the sign-out, as on any
+page: see [In a page](../concepts/security#in-a-page) in the security model.
 
 <<< @/../../samples/web-nextjs/app/sign-in.tsx#after-sign-in{tsx}
 

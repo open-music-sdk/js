@@ -22,17 +22,19 @@ Then open <http://localhost:2728>. No server sample runs beside it: the routes u
 | [`app/api/music/token/route.ts`](./app/api/music/token/route.ts) | `tokenEndpoint`, behind `await connection()` so it is never prerendered |
 | [`app/api/music/user-token/route.ts`](./app/api/music/user-token/route.ts) | `userTokenIntake`, and the sign-out that forgets the token |
 | [`app/actions.ts`](./app/actions.ts) | The server actions: `addToLibrary`, `addToFavorites`, ratings, `playlists.resolve`, `plan` and `apply`, the next page of a crate |
-| [`app/providers.tsx`](./app/providers.tsx) | `createBrowserClient` and `MusicProvider`, for the sign-in, and TanStack Query's cache |
-| [`app/sign-in.tsx`](./app/sign-in.tsx) | `useConnect`: the token goes to the server, and the page keeps none of it |
+| [`app/providers.tsx`](./app/providers.tsx) | `createBrowserClient` and `MusicProvider`, for the sign-in, `musicQueries` for the album's query, and TanStack Query's cache |
+| [`app/sign-in.tsx`](./app/sign-in.tsx) | `useConnect`: the token goes to the server, and React's state forgets it |
 | [`app/(dig)/albums/[id]/page.tsx`](./app/(dig)/albums/[id]/page.tsx) | `musicQueries` prefetched into a `HydrationBoundary`, `schemas`, and `request` with `segmentOf` for "in your library" |
 | [`app/artwork.tsx`](./app/artwork.tsx) | `next/image` with `artworkUrl` as its loader |
 | [`app/player.tsx`](./app/player.tsx) | `usePreviewPlayer` |
 | [`app/library/page.tsx`](./app/library/page.tsx) | The listener's lists, each streamed in as the server reads it |
 | [`app/errors.ts`](./app/errors.ts) | `isAppleMusicError`, each tag in words a listener can act on, on either side |
 
-The listener's token never stays in the page. Once Apple's sign-in gives it, the page posts it to the user-token
-route and forgets it, and the server finds it in its store, by the session cookie, for every page it draws and every
-action it runs. The store forgets every token when the dev server stops.
+The server acts for the listener. Once Apple's sign-in gives the token, the page posts it to the user-token route and
+React's state forgets it, and the server finds it in its store, by the session cookie, for every page it draws and
+every action it runs. Apple's script still keeps its own copy in the page's storage until the listener signs out, as
+it does on any page, which is how a returning listener is signed in again on a reload. The server's store forgets
+every token when the dev server stops.
 
 The app turns on Cache Components. A page reads Apple on every request, but for what is marked `"use cache"`, and
 navigating hides the page left behind rather than dropping it, so on Back the floor's crates are where you left them.
