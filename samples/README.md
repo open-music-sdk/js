@@ -88,8 +88,10 @@ sample into one.
   as one the server gave, not renewed at sign-in, and not `Secure`.
 - Lasting, encrypted storage. The Express server and the Next app forget their tokens when they stop. The Worker's
   tokens sit in plain text in `.wrangler/state` until you delete it.
-- Rate limits on the two routes. A deployed token route hands tokens to anyone who asks, and the user-token route
-  costs a request to Apple for each token posted to it.
+- Rate limits on the two routes, and on the Next app's pages and actions. A deployed token route hands tokens to
+  anyone who asks, the user-token route costs a request to Apple for each token posted to it, and each page the Next
+  app draws asks Apple too. The Next app refuses a request another site's page makes on its own, but not a link
+  followed to it.
 - A content security policy. Vite's and Next's dev servers inject inline scripts, which a strict policy refuses.
   The CLI's sign-in page sets one, in [`apps/cli/src/loopback.ts`](../apps/cli/src/loopback.ts).
 - An icon of your own. The page's `apple-music-app-icon` link points at this project's logo, which Apple's sign-in
