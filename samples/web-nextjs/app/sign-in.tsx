@@ -2,7 +2,6 @@
 // Shows: useConnect, useMusicUserToken. Guides: /guides/sign-in,
 // /guides/nextjs
 import { useConnect, useMusicUserToken } from "@open-music-sdk/react";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { fromServer } from "./errors";
 import { say, showError } from "./status";
@@ -19,7 +18,6 @@ export function SignIn({ signedIn }: { signedIn: boolean }) {
     app: { name: "Vinyl Collector Simulator" },
   });
   const [token, setToken] = useMusicUserToken();
-  const router = useRouter();
   // Why the script cannot be had, or why the last sign-in failed.
   useEffect(() => {
     if (error !== undefined) showError(error);
@@ -28,10 +26,16 @@ export function SignIn({ signedIn }: { signedIn: boolean }) {
   // #region after-sign-in
   // Once the provider holds a token, from a sign-in or from Apple's script on
   // a reload, the page hands it to the server, which asks Apple whether it
-  // works and keeps it. Then the page forgets it, and the server draws the
-  // page again for the listener.
+  // works and keeps it. Then the page forgets it, and loads again for the
+  // listener.
   useEffect(() => {
     if (token === undefined) return;
+    // A server that holds a token Apple takes is not handed another, as it
+    // would be on every reload: the page only forgets this one.
+    if (signedIn) {
+      setToken(undefined);
+      return;
+    }
     // The request stops when the token changes or the header goes, as
     // StrictMode makes it go once in development. Its AbortError is said
     // nowhere.
@@ -58,23 +62,24 @@ export function SignIn({ signedIn }: { signedIn: boolean }) {
         say(fromServer(answer.status));
         return;
       }
-      router.refresh();
-      say("Signed in.");
+      // The whole page again, rather than this route drawn again: Next keeps
+      // the pages visited before, as they were drawn for no one, for Back.
+      location.reload();
     }
     keep(token).catch(showError);
     return () => {
       stop.abort();
     };
-  }, [token, disconnect, setToken, router]);
+  }, [token, signedIn, disconnect, setToken]);
   // #endregion after-sign-in
 
   // Apple's own sign-out, which ends the token at Apple, and then the server
-  // forgets its copy and draws the page again.
+  // forgets its copy. The whole page loads again, so no page Next kept for
+  // Back shows the listener's library.
   async function signOut(): Promise<void> {
     await disconnect();
     await fetch("/api/music/user-token", { method: "DELETE" });
-    router.refresh();
-    say("Signed out.");
+    location.reload();
   }
 
   if (signedIn) {
