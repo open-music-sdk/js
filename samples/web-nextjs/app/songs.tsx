@@ -70,8 +70,9 @@ export function SongRows(props: tSongsProps) {
   const loved = useLoved(props.loved);
   return (
     <ol className="tracklist">
-      {tracks.map((track) => (
-        <li key={track.id}>
+      {/* A playlist can hold the same song twice. */}
+      {tracks.map((track, place) => (
+        <li key={`${String(place)}:${track.id}`}>
           <span className="name">
             {track.attributes?.name ?? track.id}
             <small>{track.attributes?.artistName ?? ""}</small>
