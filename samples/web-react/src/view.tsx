@@ -60,8 +60,11 @@ addEventListener("hashchange", (event) => {
 
 interface tViewProps {
   readonly floor: ReactNode;
-  /** The pages a sleeve can open, by the kind its address names. */
-  readonly pages: Readonly<Record<string, tPage>>;
+  /**
+   * The pages a sleeve can open, by the kind its address names. A map, so that
+   * an address such as `#constructor/x` names no page.
+   */
+  readonly pages: ReadonlyMap<string, tPage>;
 }
 
 /**
@@ -72,7 +75,7 @@ interface tViewProps {
 export function View({ floor, pages }: tViewProps) {
   const address = useAddress();
   const { kind, id } = parseAddress(address);
-  const Page = pages[kind];
+  const Page = pages.get(kind);
   const floorRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {

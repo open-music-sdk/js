@@ -11,12 +11,12 @@ import { SongCrate } from "./songs";
 import { View, type tPage } from "./view";
 
 /** The pages a sleeve, or a search, opens over the floor. */
-const PAGES: Readonly<Record<string, tPage>> = {
-  albums: AlbumPage,
-  artists: ArtistPage,
-  playlists: PlaylistPage,
-  search: SearchPage,
-};
+const PAGES: ReadonlyMap<string, tPage> = new Map([
+  ["albums", AlbumPage],
+  ["artists", ArtistPage],
+  ["playlists", PlaylistPage],
+  ["search", SearchPage],
+]);
 
 export function Dig() {
   return (
