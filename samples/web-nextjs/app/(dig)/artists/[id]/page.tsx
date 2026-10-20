@@ -61,7 +61,10 @@ async function Artist({ params }: { params: Promise<{ id: string }> }) {
           loved={loved}
           storefront={where}
         />
+        {/* Drawn afresh in another storefront, rather than keep the albums
+            it paged in from this one. */}
         <LinkCrate
+          key={where}
           label="Albums"
           sleeves={catalogSleeves(albums)}
           more={moreAlbums.bind(null, id)}
