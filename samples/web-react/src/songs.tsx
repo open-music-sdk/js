@@ -3,6 +3,7 @@
 import {
   useMusic,
   useMusicQueries,
+  type tBrowserMusic,
   type tMusicVideo,
   type tSong,
 } from "@open-music-sdk/react";
@@ -123,17 +124,32 @@ function useLoved(tracks: readonly tTrack[]): tLoved {
   // The hearts are an extra: songs whose ratings Apple will not give are drawn
   // without them, and the page says why.
   useShowError(error);
-  const [clicked, setClicked] = useState<ReadonlyMap<string, boolean>>(
-    new Map(),
-  );
+  // The hearts clicked are the listener's who clicked them: each sign-in has
+  // a client of its own, and a heart clicked with another counts for no one.
+  const music = useMusic();
+  const [clicked, setClicked] = useState<tClicked>({
+    by: music,
+    hearts: new Map(),
+  });
+  const none = new Map<string, boolean>();
+  const hearts = clicked.by === music ? clicked.hearts : none;
   const isLoved = (id: string) => {
     const rating = ratings.find((each) => each.id === id);
-    return clicked.get(id) ?? rating?.attributes?.value === 1;
+    return hearts.get(id) ?? rating?.attributes?.value === 1;
   };
   const setLoved = (id: string, loving: boolean) => {
-    setClicked((was) => new Map(was).set(id, loving));
+    setClicked((was) => {
+      const kept = was.by === music ? was.hearts : [];
+      return { by: music, hearts: new Map(kept).set(id, loving) };
+    });
   };
   return { isLoved, setLoved };
+}
+
+/** The hearts clicked since the ratings came, and with whose client. */
+interface tClicked {
+  readonly by: tBrowserMusic;
+  readonly hearts: ReadonlyMap<string, boolean>;
 }
 
 /**
