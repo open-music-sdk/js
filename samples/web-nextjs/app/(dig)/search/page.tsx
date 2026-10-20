@@ -5,7 +5,7 @@ import { getMusic } from "@/lib/music";
 import { catalogSleeves } from "@/lib/sleeves";
 import { LinkCrate } from "../../catalog";
 import { SongCrate } from "../../songs";
-import { BackToTheCrates, Pulling } from "../pages";
+import { BackToTheCrates, CouldNot, Pulling } from "../pages";
 
 type tSearchParams = Promise<{ term?: string | string[] | undefined }>;
 
@@ -29,12 +29,17 @@ async function Results({ searchParams }: { searchParams: tSearchParams }) {
   const text = typeof term === "string" ? term.trim() : "";
   if (text === "") return <p>Search the catalog with the box above.</p>;
   const where = await storefront();
-  const { results } = await getMusic().catalog.searchCatalog(text, {
-    types: ["songs", "albums", "artists", "playlists"],
-    limit: 20,
-    storefront: where,
-  });
-  const { songs, albums, artists, playlists } = results;
+  let found;
+  try {
+    found = await getMusic().catalog.searchCatalog(text, {
+      types: ["songs", "albums", "artists", "playlists"],
+      limit: 20,
+      storefront: where,
+    });
+  } catch (e) {
+    return <CouldNot error={e} />;
+  }
+  const { songs, albums, artists, playlists } = found.results;
   const loved = await lovedOf(songs?.data ?? []);
   return (
     <>

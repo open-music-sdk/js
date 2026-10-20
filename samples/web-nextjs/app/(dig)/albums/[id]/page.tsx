@@ -19,7 +19,7 @@ import {
 import { Suspense } from "react";
 import { listener, lovedOf, storefront } from "@/lib/listener";
 import { getMusic } from "@/lib/music";
-import { BackToTheCrates, Pulling } from "../../pages";
+import { BackToTheCrates, CouldNot, Pulling } from "../../pages";
 import { AlbumButtons, AlbumView } from "./album";
 
 export default function AlbumPage({
@@ -40,19 +40,13 @@ export default function AlbumPage({
 async function Album({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const where = await storefront();
-  // #region prefetch
-  // The album, asked for here as the page's query asks for it, and handed to
-  // the page with it: the page draws it at once, and asks Apple again only
-  // once it is stale. Held to the album's generated type as it arrives.
   const queryClient = new QueryClient();
-  const album = await queryClient.query(
-    musicQueries(getMusic()).catalog.getAlbum(id, {
-      include: ["tracks"],
-      storefront: where,
-      schema: schemas.albumsResponse,
-    }),
-  );
-  // #endregion prefetch
+  let album;
+  try {
+    album = await prefetchAlbum(queryClient, id, where);
+  } catch (e) {
+    return <CouldNot error={e} />;
+  }
   const tracks = album.relationships?.tracks?.data ?? [];
   const loved = await lovedOf(tracks);
   return (
@@ -66,6 +60,28 @@ async function Album({ params }: { params: Promise<{ id: string }> }) {
     </HydrationBoundary>
   );
 }
+
+// #region prefetch
+/**
+ * The album, asked for as the page's query asks for it, into the cache the
+ * page is handed with its HTML: the page draws it at once, and asks Apple
+ * again only once it is stale. Held to the album's generated type as it
+ * arrives.
+ */
+async function prefetchAlbum(
+  queryClient: QueryClient,
+  id: string,
+  storefront: string,
+) {
+  return queryClient.query(
+    musicQueries(getMusic()).catalog.getAlbum(id, {
+      include: ["tracks"],
+      storefront,
+      schema: schemas.albumsResponse,
+    }),
+  );
+}
+// #endregion prefetch
 
 /**
  * What a signed-in listener can do with an album: add it to their library

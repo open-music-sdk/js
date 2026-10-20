@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { lovedOf, storefront } from "@/lib/listener";
 import { getMusic } from "@/lib/music";
 import { SongRows } from "../../../songs";
-import { BackToTheCrates, Heading, Pulling } from "../../pages";
+import { BackToTheCrates, CouldNot, Heading, Pulling } from "../../pages";
 
 export default function PlaylistPage({
   params,
@@ -23,10 +23,15 @@ export default function PlaylistPage({
 async function Playlist({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const where = await storefront();
-  const playlist = await getMusic().catalog.getPlaylist(id, {
-    include: ["tracks"],
-    storefront: where,
-  });
+  let playlist;
+  try {
+    playlist = await getMusic().catalog.getPlaylist(id, {
+      include: ["tracks"],
+      storefront: where,
+    });
+  } catch (e) {
+    return <CouldNot error={e} />;
+  }
   const tracks = playlist.relationships?.tracks?.data ?? [];
   const loved = await lovedOf(tracks);
   const { name, curatorName, artwork } = playlist.attributes ?? {};

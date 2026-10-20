@@ -7,7 +7,7 @@ import { catalogSleeves } from "@/lib/sleeves";
 import { moreAlbums } from "../../../actions";
 import { LinkCrate } from "../../../catalog";
 import { SongCrate } from "../../../songs";
-import { BackToTheCrates, Heading, Pulling } from "../../pages";
+import { BackToTheCrates, CouldNot, Heading, Pulling } from "../../pages";
 
 export default function ArtistPage({
   params,
@@ -28,7 +28,12 @@ async function Artist({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const where = await storefront();
   const music = getMusic();
-  const artist = await music.catalog.getArtist(id, { storefront: where });
+  let artist;
+  try {
+    artist = await music.catalog.getArtist(id, { storefront: where });
+  } catch (e) {
+    return <CouldNot error={e} />;
+  }
 
   // A view, one page of it: the artist's top songs.
   const topSongs: tSong[] = [];
