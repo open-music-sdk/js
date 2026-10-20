@@ -43,7 +43,7 @@ function byLine(item: tCatalogItem): string | undefined {
   return undefined;
 }
 
-/** The listener's playlists, each opening its tracks under the crates. */
+/** The listener's playlists, each opening a page of its tracks. */
 export function playlistSleeves(
   playlists: readonly tLibraryPlaylist[],
 ): tSleeveData[] {
@@ -51,7 +51,7 @@ export function playlistSleeves(
     id: playlist.id,
     artwork: playlist.attributes?.artwork,
     name: playlist.attributes?.name ?? playlist.id,
-    href: `/library?playlist=${encodeURIComponent(playlist.id)}`,
+    href: `/library/playlists/${encodeURIComponent(playlist.id)}`,
   }));
 }
 

@@ -1,6 +1,6 @@
 // Shows: listRecentlyPlayed, listHeavyRotation, listPersonalRecommendations,
-// listRecentlyAdded, listLibraryPlaylists, getLibraryPlaylist, searchLibrary,
-// each asked by the server for the listener. Guide: /guides/store-user-tokens
+// listRecentlyAdded, listLibraryPlaylists, searchLibrary, each asked by the
+// server for the listener. Guide: /guides/store-user-tokens
 import { isAppleMusicError, type tMusic } from "@open-music-sdk/server";
 import { Suspense } from "react";
 import { listener } from "@/lib/listener";
@@ -10,10 +10,7 @@ import { LinkCrate } from "../catalog";
 import { explain } from "../errors";
 import { FindForm } from "./find";
 
-type tSearchParams = Promise<{
-  playlist?: string | string[] | undefined;
-  find?: string | string[] | undefined;
-}>;
+type tSearchParams = Promise<{ find?: string | string[] | undefined }>;
 
 export default function LibraryPage({
   searchParams,
@@ -37,7 +34,7 @@ async function Library({ searchParams }: { searchParams: tSearchParams }) {
   if (you === undefined) {
     return <p>Sign in with Apple Music to see your library.</p>;
   }
-  const { playlist, find } = await searchParams;
+  const { find } = await searchParams;
   const { user } = you.music;
   return (
     <>
@@ -74,11 +71,6 @@ async function Library({ searchParams }: { searchParams: tSearchParams }) {
           empty="No playlists in your library."
         />
       </div>
-      {typeof playlist === "string" && (
-        <Suspense fallback={<p>Looking…</p>}>
-          <PlaylistTracks music={you.music} id={playlist} />
-        </Suspense>
-      )}
     </>
   );
 }
@@ -144,37 +136,6 @@ async function Recommended({ music }: { music: tMusic }) {
       sleeves={cards(relationships?.contents?.data ?? [])}
     />
   ));
-}
-
-/**
- * A playlist of the listener's, with its tracks, under the crates. Songs in a
- * library have no previews.
- */
-async function PlaylistTracks({ music, id }: { music: tMusic; id: string }) {
-  let playlist;
-  try {
-    playlist = await music.user.getLibraryPlaylist(id, { include: ["tracks"] });
-  } catch (e) {
-    if (!isAppleMusicError(e)) throw e;
-    return <p>{explain(e)}</p>;
-  }
-  const tracks = playlist.relationships?.tracks?.data ?? [];
-  return (
-    <>
-      <h2>{playlist.attributes?.name ?? id}</h2>
-      <ol className="tracklist">
-        {/* A playlist can hold the same song twice. */}
-        {tracks.map((track, place) => (
-          <li key={`${String(place)}:${track.id}`}>
-            <span className="name">
-              {track.attributes?.name ?? track.id}
-              <small>{track.attributes?.artistName ?? ""}</small>
-            </span>
-          </li>
-        ))}
-      </ol>
-    </>
-  );
 }
 
 /** What the listener's library holds of a search. */
