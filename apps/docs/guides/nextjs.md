@@ -70,7 +70,8 @@ keeps it. In `app/api/music/user-token/route.ts`:
 when there is none. The sample's `sessionId` reads its session cookie. [Keep a listener's token on your
 server](./store-user-tokens) covers what the route answers and what the page sends.
 
-When the listener signs out, the sample's page sends a `DELETE` to the same route, after Apple's sign-out:
+When the listener signs out, the sample's page sends a `DELETE` to the same route before Apple's sign-out, so that a
+sign-out Apple's script fails still leaves no token on the server:
 
 <<< @/../../samples/web-nextjs/app/api/music/user-token/route.ts#sign-out{ts}
 

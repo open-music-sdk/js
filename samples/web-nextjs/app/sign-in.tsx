@@ -74,12 +74,15 @@ export function SignIn({ signedIn }: { signedIn: boolean }) {
   }, [token, signedIn, disconnect, setToken]);
   // #endregion after-sign-in
 
-  // Apple's own sign-out, which ends the token at Apple, and then the server
-  // forgets its copy. The whole page loads again, so no page Next kept for
-  // Back shows the listener's library.
+  // The server forgets its copy first, so that a sign-out Apple's script then
+  // fails leaves no token on the server. Then Apple's own sign-out, which ends
+  // the token at Apple: a server that could not be told finds Apple refusing
+  // it on the next page it draws, and forgets it then. The whole page loads
+  // again, so no page Next kept for Back shows the listener's library.
   async function signOut(): Promise<void> {
+    const forget = fetch("/api/music/user-token", { method: "DELETE" });
+    await forget.catch(() => undefined);
     await disconnect();
-    await fetch("/api/music/user-token", { method: "DELETE" });
     location.reload();
   }
 

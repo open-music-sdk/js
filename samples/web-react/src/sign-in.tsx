@@ -70,12 +70,13 @@ export function SignIn() {
   }, [token, music, disconnect, signIn, setToken]);
   // #endregion after-sign-in
 
-  // Apple's own sign-out, which ends the token at Apple and makes the provider
-  // forget it, and then the server forgets its copy.
+  // The server forgets its copy first, so that a sign-out Apple's script then
+  // fails leaves no token on the server. Then Apple's own sign-out, which ends
+  // the token at Apple and makes the provider forget it.
   async function signOut(): Promise<void> {
+    const forgotten = await forgetOnServer();
     await disconnect();
-    await fetch("/api/music/user-token", { method: "DELETE" });
-    say("Signed out.");
+    say(forgotten ? "Signed out." : NOT_TOLD);
   }
 
   if (signedIn) {
@@ -108,3 +109,12 @@ export function SignIn() {
     </button>
   );
 }
+
+/** Whether the server says it has forgotten the listener's token. */
+async function forgetOnServer(): Promise<boolean> {
+  const forget = fetch("/api/music/user-token", { method: "DELETE" });
+  return forget.then((answer) => answer.ok, () => false);
+}
+
+const NOT_TOLD = "Signed out. The server could not be told, "
+  + "but Apple no longer takes the token it kept.";
