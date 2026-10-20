@@ -1,6 +1,8 @@
-// Shows: createBrowserClient, useMusicUserToken. Guide: /guides/token-endpoint
+// Shows: createBrowserClient, musicQueries, useMusicUserToken. Guides:
+// /guides/token-endpoint, /guides/tanstack-query
 import {
   createBrowserClient,
+  musicQueries,
   useMusicUserToken,
 } from "@open-music-sdk/react";
 import {
@@ -16,6 +18,14 @@ import {
 // token route, which Vite forwards to whichever server sample runs, and
 // fetches the next one before the last runs out.
 export const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+
+/**
+ * The catalog's queries, which are the same for every listener: over the
+ * page's own client, in scope 0, so that a sign-in asks Apple for none of them
+ * again unless the storefront changes. The listener's own come from
+ * useMusicQueries(), in a scope of each sign-in's own.
+ */
+export const catalog = musicQueries(music).catalog;
 
 /** A sign-in the server has kept the token of. */
 interface tSignIn {

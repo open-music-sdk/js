@@ -1,10 +1,9 @@
 // Shows: searchCatalog, getSearchHints.
-import { useMusicQueries } from "@open-music-sdk/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type SubmitEvent } from "react";
 import { Crate } from "./box";
 import { useShowError } from "./errors";
-import { useNow } from "./music";
+import { catalog, useNow } from "./music";
 import { sleeves } from "./pages";
 import { SongCrate } from "./songs";
 import { go, parseAddress, Pulling, useAddress } from "./view";
@@ -15,7 +14,6 @@ import { go, parseAddress, Pulling, useAddress } from "./view";
  */
 export function SearchForm() {
   const { storefront } = useNow();
-  const queries = useMusicQueries();
   // The term of a search opened by its address, as on a reload or by Back,
   // goes in the box.
   const address = useAddress();
@@ -40,7 +38,7 @@ export function SearchForm() {
     };
   }, [text]);
   const hints = useQuery({
-    ...queries.catalog.getSearchHints(paused, { storefront }),
+    ...catalog.getSearchHints(paused, { storefront }),
     enabled: paused !== "",
   });
   useShowError(hints.error);
@@ -90,9 +88,8 @@ function searchedIn(address: string): string | undefined {
 
 export function SearchPage({ id: text }: { id: string }) {
   const { storefront } = useNow();
-  const queries = useMusicQueries();
   const search = useQuery(
-    queries.catalog.searchCatalog(text, {
+    catalog.searchCatalog(text, {
       types: ["songs", "albums", "artists", "playlists"],
       limit: 20,
       storefront,

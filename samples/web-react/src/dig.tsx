@@ -1,14 +1,10 @@
 // Shows: getCharts, listGenres, listStorefronts.
-import {
-  useMusicQueries,
-  type tGenre,
-  type tStorefront,
-} from "@open-music-sdk/react";
+import type { tGenre, tStorefront } from "@open-music-sdk/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Crate } from "./box";
 import { explain, useShowError } from "./errors";
-import { useNow } from "./music";
+import { catalog, useNow } from "./music";
 import { AlbumPage, ArtistPage, PlaylistPage, sleeves } from "./pages";
 import { SearchForm, SearchPage } from "./search";
 import { SongCrate } from "./songs";
@@ -35,9 +31,8 @@ export function Dig() {
 // for each genre the charts are kept by.
 function Floor() {
   const { storefront } = useNow();
-  const queries = useMusicQueries();
   const charts = useQuery(
-    queries.catalog.getCharts({
+    catalog.getCharts({
       types: ["songs", "albums", "playlists"],
       limit: 20,
       storefront,
@@ -82,8 +77,7 @@ function Floor() {
  * won't list them, the charts still show.
  */
 function GenreCrates({ storefront }: { storefront: string }) {
-  const queries = useMusicQueries();
-  const genres = useInfiniteQuery(queries.catalog.listGenres({ storefront }));
+  const genres = useInfiniteQuery(catalog.listGenres({ storefront }));
   useShowError(genres.error);
   useEveryPage(genres);
 
@@ -117,7 +111,6 @@ interface tGenreCrateProps {
  * so a floor of them asks Apple only for the ones the listener reaches.
  */
 function GenreCrate({ genre, label, storefront }: tGenreCrateProps) {
-  const queries = useMusicQueries();
   const [seen, setSeen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -137,7 +130,7 @@ function GenreCrate({ genre, label, storefront }: tGenreCrateProps) {
   }, []);
 
   const chart = useQuery({
-    ...queries.catalog.getCharts({
+    ...catalog.getCharts({
       types: ["albums"],
       genre,
       limit: 20,
@@ -189,8 +182,10 @@ function waitingFor(query: {
  */
 export function StorefrontPicker() {
   const { signedIn, storefront, pick } = useNow();
-  const queries = useMusicQueries();
-  const walk = useInfiniteQuery(queries.catalog.listStorefronts());
+  const walk = useInfiniteQuery({
+    ...catalog.listStorefronts(),
+    enabled: !signedIn,
+  });
   useShowError(walk.error);
   useEveryPage(walk);
 

@@ -13,7 +13,7 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | File | Shows |
 | --- | --- |
 | [`src/main.tsx`](./src/main.tsx) | `MusicProvider`, TanStack Query's client, and the header's tabs |
-| [`src/music.tsx`](./src/music.tsx) | `createBrowserClient`, and who is signed in |
+| [`src/music.tsx`](./src/music.tsx) | `createBrowserClient`, `musicQueries` for the catalog, and who is signed in |
 | [`src/dig.tsx`](./src/dig.tsx) | `getCharts`, `listGenres`, `listStorefronts`: the floor, and the storefront picker |
 | [`src/search.tsx`](./src/search.tsx) | `searchCatalog`, `getSearchHints` |
 | [`src/pages.tsx`](./src/pages.tsx) | `getAlbum` with `schemas`, `getArtist`, `getArtistView`, `getArtistRelationship` a page at a time, `getPlaylist`, `request` with `segmentOf` for the one endpoint the clients lack, `addToLibrary`, `addToFavorites` |
@@ -27,9 +27,10 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 | [`src/errors.tsx`](./src/errors.tsx) | `isAppleMusicError`, each tag in words a listener can act on, and the status line |
 | [`src/box.tsx`](./src/box.tsx), [`src/sleeve.tsx`](./src/sleeve.tsx), [`src/view.tsx`](./src/view.tsx) | The page itself, with nothing of the SDK: the crate and its sleeves, the floor and its pages |
 
-Every read goes through `useMusicQueries()`, so the cache of one listener is never another's: each sign-in has a
-scope of its own in the keys. A write is a `useMutation` over `useMusic()`, which is bound to the listener once they
-have signed in.
+The catalog is read through `musicQueries` over the page's own client, in scope 0: its answers are the same for every
+listener, so a sign-in asks Apple for none of them again. The listener's library is read through `useMusicQueries()`,
+whose keys carry a scope of each sign-in's own, so one listener's cache is never another's. A write is a
+`useMutation` over `useMusic()`, which is bound to the listener once they have signed in.
 
 Signed out, the page asks the catalog in the storefront you pick. Signed in, it asks in yours, from Apple. Catalog
 ids differ between storefronts, so the crate empties when the storefront changes.

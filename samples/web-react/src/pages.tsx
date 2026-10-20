@@ -5,7 +5,6 @@ import {
   isAppleMusicError,
   schemas,
   useMusic,
-  useMusicQueries,
   type tAlbum,
   type tArtist,
   type tArtwork,
@@ -24,7 +23,7 @@ import {
 import { Cover } from "./artwork";
 import { Crate } from "./box";
 import { say, showError, useShowError } from "./errors";
-import { useNow } from "./music";
+import { catalog, useNow } from "./music";
 import type { tSleeve } from "./sleeve";
 import { SongCrate, SongRows } from "./songs";
 import { go, Pulling } from "./view";
@@ -56,12 +55,11 @@ function byLine(item: tCatalogItem): string | undefined {
 
 export function AlbumPage({ id }: { id: string }) {
   const { signedIn, storefront } = useNow();
-  const queries = useMusicQueries();
   // Held to the album's generated type as it arrives: an answer in another
   // shape is a ValidationError here, with the path of each value that differs,
   // rather than an undefined somewhere later.
   const album = useQuery(
-    queries.catalog.getAlbum(id, {
+    catalog.getAlbum(id, {
       include: ["tracks"],
       storefront,
       schema: schemas.albumsResponse,
@@ -81,13 +79,12 @@ export function AlbumPage({ id }: { id: string }) {
 
 export function ArtistPage({ id }: { id: string }) {
   const { storefront } = useNow();
-  const queries = useMusicQueries();
-  const artist = useQuery(queries.catalog.getArtist(id, { storefront }));
+  const artist = useQuery(catalog.getArtist(id, { storefront }));
 
   // A view, one page of it: the artist's top songs. A view's items are typed
   // as anything one of the artist's views holds, so each is narrowed.
   const view = useInfiniteQuery(
-    queries.catalog.getArtistView(id, "top-songs", { storefront, limit: 10 }),
+    catalog.getArtistView(id, "top-songs", { storefront, limit: 10 }),
   );
   const topSongs = (view.data?.pages[0]?.data ?? []).filter(
     (item): item is tSong => item.type === "songs",
@@ -96,7 +93,7 @@ export function ArtistPage({ id }: { id: string }) {
   // A relationship, a page at a time: flipping near the back of the crate
   // asks Apple for the next page of the artist's albums.
   const relationship = useInfiniteQuery(
-    queries.catalog.getArtistRelationship(id, "albums", {
+    catalog.getArtistRelationship(id, "albums", {
       storefront,
       limit: 25,
     }),
@@ -133,9 +130,8 @@ export function ArtistPage({ id }: { id: string }) {
 
 export function PlaylistPage({ id }: { id: string }) {
   const { storefront } = useNow();
-  const queries = useMusicQueries();
   const playlist = useQuery(
-    queries.catalog.getPlaylist(id, { include: ["tracks"], storefront }),
+    catalog.getPlaylist(id, { include: ["tracks"], storefront }),
   );
   if (playlist.data === undefined) return <Pulling query={playlist} />;
   const { name, curatorName, artwork } = playlist.data.attributes ?? {};
