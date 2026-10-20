@@ -158,7 +158,7 @@ server's client and the page's client the same storefront: a key holds the call'
 storefront.
 
 The [Next sample](../samples) prefetches its album page so, naming the storefront and the schema in the call, and
-its client component calls `getAlbum` with the same three arguments. `query` gives the album, which the page goes
+its client component calls `getAlbum` with the same arguments. `query` gives the album, which the page goes
 on to use:
 
 <<< @/../../samples/web-nextjs/app/(dig)/albums/[id]/page.tsx#prefetch{tsx}

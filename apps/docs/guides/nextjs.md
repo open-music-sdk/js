@@ -26,7 +26,7 @@ key. Client components use `@open-music-sdk/react`, which can't.
 `@open-music-sdk/react` puts the `"use client"` directive on the one file that holds `MusicProvider` and the
 hooks, and on nothing else. So what else it exports, such as `artworkImage`, `isAppleMusicError` or
 `musicQueries`, carries no directive, and you can import it into a route handler or a server component too. The
-sample does, in its album page and its server actions.
+sample does, in its album page, and in the words for an error that its server actions share with its page.
 
 ## 2. Make the server's client once
 

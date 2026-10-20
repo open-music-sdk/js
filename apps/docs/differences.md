@@ -52,8 +52,8 @@ out, and the Next sample's pages for a listener too, with a token handed to its 
 - Under `<StrictMode>`, which mounts each component twice in development, the provider, `useConnect` and
   `usePreviewPlayer` set up and undid what they set up, with no error or warning in the console.
 - `next build`, in Next 16 with Turbopack, reads the `"use client"` directive on the hooks' file alone. The Next
-  sample imports `musicQueries`, `schemas` and `isAppleMusicError` from the package into server components and
-  server actions, and the build passes.
+  sample imports `musicQueries`, `schemas` and `isAppleMusicError` from the package into server components, and
+  into the words for an error that its server actions share with its page, and the build passes.
 - A query `musicQueries` builds on the server and prefetches into a `HydrationBoundary` is the query the page's
   `useMusicQueries` builds for the same call: the album page is drawn without asking Apple again.
 
