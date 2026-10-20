@@ -47,7 +47,9 @@ they ask Apple for nothing but what they read.
 
 `next build` runs in CI with no key in its environment, which is what proves the recipe in the
 [Next.js guide](https://open-music-sdk.github.io/js/guides/nextjs). The build is for that alone: the sample is not
-designed to deploy.
+designed to deploy, and has no `start` script. Its dev script listens on `localhost` alone. `next start`, or
+`next dev` without `--hostname localhost`, listens on every network the machine is on, where only the host check in
+[`proxy.ts`](./proxy.ts) would stand between the app and the rest of the network.
 
 It leaves out a component library and a state library. Its tabs are links to pages, each page is drawn on the server,
 and the crates' look and flip are the same stylesheet as the other page samples', in [`app/styles.css`](./app/styles.css).

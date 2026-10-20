@@ -99,4 +99,5 @@ sample into one.
 - Music videos in the crate. They play, but the playlist tools are shown with songs.
 - Deployment. A build exists only to check that a sample bundles. The servers answer only requests sent to
   `127.0.0.1:8787` or to the page's own host, and refuse to start without `PAGE_ORIGIN`. The Next app answers only
-  requests sent to the page's host, and refuses each one without `PAGE_ORIGIN`.
+  requests sent to the page's host, and refuses each one without `PAGE_ORIGIN`. Its dev script keeps it on
+  `localhost`; run it another way and it listens on your network.
