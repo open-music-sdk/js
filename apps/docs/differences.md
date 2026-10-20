@@ -30,14 +30,16 @@ The two runs, from the CLI's page on `localhost`, settled these:
   cookies, IndexedDB or Cache Storage. See the [security model](./concepts/security#in-a-page).
 - `disconnect()`, which runs the script's own sign-out, ends the token at Apple, and with it a copy your server
   stored: Apple refused the token as soon as the sign-out was done, and five minutes later.
+- A page that keeps the script's copy has the listener back on a reload. On the React sample's page in headless
+  Edge, on 20 October 2026, a token put under that key before a reload was what `ready` resolved to, and Apple took
+  it for the listener's requests.
 
 These are still open:
 
 - how sign-in goes in other browsers, Safari first, and on macOS and Linux, including whether loading the script
   ahead of the click keeps the window inside the click everywhere, and where they keep the script's copy;
-- what a configured instance holds for a returning listener on a page that keeps the script's copy, and whether it
-  takes a new developer token. On the CLI's page, which clears that copy, it held no token, and Apple's window
-  asked again as it did the first time;
+- whether a configured instance takes a new developer token for a returning listener. On the CLI's page, which
+  clears the script's copy, it held no token, and Apple's window asked again as it did the first time;
 - whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event;
 - whether a `Cross-Origin-Opener-Policy` of `same-origin` cuts the sign-in window off, as expected, where
   `same-origin-allow-popups` keeps it;
