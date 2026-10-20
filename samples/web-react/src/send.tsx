@@ -52,7 +52,7 @@ export function SendForm({ picks }: { picks: readonly tSong[] }) {
     }
     // A playlist this page made is planned by its id, in case Apple does not
     // list it yet.
-    return { name: typed, id: made.get(typed) };
+    return { name: typed, id: madeFor(music).get(typed) };
   }
 
   /** Shows the plan, in a dialog, before anything is sent. */
@@ -210,11 +210,18 @@ function describe(
 
 // #region apply
 /**
- * The ids of the playlists this page made, by name. Apple lists a new playlist
- * only seconds after it is made, and a plan by its name before then would make
- * a second one.
+ * The ids of the playlists this page made, by name, for each listener: each
+ * sign-in has a client of its own. Apple lists a new playlist only seconds
+ * after it is made, and a plan by its name before then would make a second
+ * one.
  */
-const made = new Map<string, string>();
+const made = new WeakMap<tBrowserMusic, Map<string, string>>();
+
+function madeFor(listener: tBrowserMusic): Map<string, string> {
+  const playlists = made.get(listener) ?? new Map<string, string>();
+  made.set(listener, playlists);
+  return playlists;
+}
 
 /**
  * Applies the plan the listener said "Send it" to. Plan it waits while a send
@@ -239,7 +246,9 @@ async function send(
     },
   });
   // A playlist this page made is planned by its id from now on.
-  if ("name" in plan.playlist) made.set(plan.playlist.name, result.id);
+  if ("name" in plan.playlist) {
+    madeFor(listener).set(plan.playlist.name, result.id);
+  }
   // Apple carries a write out after it answers: verified says whether the write
   // showed before apply returned.
   const songs = `${String(result.appended)} songs`;

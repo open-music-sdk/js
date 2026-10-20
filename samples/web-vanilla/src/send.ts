@@ -30,7 +30,7 @@ form.onsubmit = (event) => {
 // Apple's API can add songs to the end of a playlist, but can neither take one
 // out nor move one.
 async function planFor(listener: tBrowserMusic): Promise<void> {
-  const { name, id } = chosenPlaylist();
+  const { name, id } = chosenPlaylist(listener);
   // A playlist that is there is read first, for the tracks it holds. A new one
   // is found again by its name and description, so the description carries the
   // app's mark.
@@ -84,7 +84,9 @@ function describe(
  * The playlist the form names: one of the listener's, by its id, or a new one,
  * by its name.
  */
-function chosenPlaylist(): { name: string; id: string | undefined } {
+function chosenPlaylist(
+  listener: tBrowserMusic,
+): { name: string; id: string | undefined } {
   const typed = byId("playlist-name", HTMLInputElement).value.trim();
   const name = typed || APP_NAME;
   if (new FormData(form).get("to") === "existing") {
@@ -92,7 +94,7 @@ function chosenPlaylist(): { name: string; id: string | undefined } {
   }
   // A playlist this page made is planned by its id, in case Apple does not list
   // it yet.
-  return { name, id: made.get(name) };
+  return { name, id: madeFor(listener).get(name) };
 }
 
 /** Shows the plan, in a dialog, before anything is sent. */
@@ -107,11 +109,18 @@ function showPlan(lines: readonly string[]): void {
 
 // #region apply
 /**
- * The ids of the playlists this page made, by name. Apple lists a new playlist
- * only seconds after it is made, and a plan by its name before then would make
- * a second one.
+ * The ids of the playlists this page made, by name, for each listener: each
+ * sign-in has a client of its own. Apple lists a new playlist only seconds
+ * after it is made, and a plan by its name before then would make a second
+ * one.
  */
-const made = new Map<string, string>();
+const made = new WeakMap<tBrowserMusic, Map<string, string>>();
+
+function madeFor(listener: tBrowserMusic): Map<string, string> {
+  const playlists = made.get(listener) ?? new Map<string, string>();
+  made.set(listener, playlists);
+  return playlists;
+}
 
 // The listener closed the dialog: with "Send it" the plan is applied, and with
 // Cancel or Esc nothing is sent.
@@ -141,7 +150,9 @@ async function send(
     },
   });
   // A playlist this page made is planned by its id from now on.
-  if ("name" in plan.playlist) made.set(plan.playlist.name, result.id);
+  if ("name" in plan.playlist) {
+    madeFor(listener).set(plan.playlist.name, result.id);
+  }
   // Apple carries a write out after it answers: verified says whether the write
   // showed before apply returned.
   const songs = `${String(result.appended)} songs`;
