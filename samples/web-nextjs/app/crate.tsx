@@ -274,8 +274,12 @@ function useFindTracklist() {
   const [unmatched, setUnmatched] = useState<tUnmatched>();
 
   async function find(text: string): Promise<void> {
+    // Looked for in the storefront the page is drawn in, once the header has
+    // said which.
+    const where = crate.storefront;
+    if (where === undefined) return;
     say("Finding songs…");
-    const answered = await findTracklist(text);
+    const answered = await findTracklist(text, where);
     if (!answered.ok) {
       say(answered.said);
       return;

@@ -22,7 +22,6 @@ import { cookies } from "next/headers";
 import {
   STOREFRONT_COOKIE,
   isStorefront,
-  storefront,
 } from "@/lib/listener";
 import { getMusic } from "@/lib/music";
 import { sessionId } from "@/lib/session";
@@ -146,16 +145,25 @@ export async function pickStorefront(id: string): Promise<void> {
   });
 }
 
+// The catalog's actions take the storefront the page was drawn in: the
+// catalog is the same for everyone in a storefront, so the page may name one,
+// and the server need not ask Apple for the listener's to learn it.
+
 /** Terms to offer as the listener types. */
-export async function searchHints(text: string): Promise<tAnswer<string[]>> {
+export async function searchHints(
+  text: string,
+  storefront: string,
+): Promise<tAnswer<string[]>> {
   // The page's box takes 200 characters at most.
   if (typeof text !== "string" || text.length > 200) {
     throw new TypeError("searchHints: not a search");
   }
-  const where = await storefront();
+  if (!isStorefront(storefront)) {
+    throw new TypeError("searchHints: not a storefront");
+  }
   return answer(async () => {
     const hints = await getMusic().catalog.getSearchHints(text, {
-      storefront: where,
+      storefront,
     });
     return hints.results.terms;
   });
@@ -164,17 +172,17 @@ export async function searchHints(text: string): Promise<tAnswer<string[]>> {
 /** The next of an artist's albums, from `offset`, 25 at a time. */
 export async function moreAlbums(
   artistId: string,
+  storefront: string,
   offset: number,
 ): Promise<tAnswer<tSleeveData[]>> {
-  if (!isId(artistId) || !isOffset(offset)) {
-    throw new TypeError("moreAlbums: not an artist and an offset");
+  if (!isId(artistId) || !isStorefront(storefront) || !isOffset(offset)) {
+    throw new TypeError("moreAlbums: not an artist, storefront and offset");
   }
-  const where = await storefront();
   return answer(async () => {
     const albums = getMusic().catalog.getArtistRelationship(
       artistId,
       "albums",
-      { storefront: where, limit: 25, offset, maxPages: 1 },
+      { storefront, limit: 25, offset, maxPages: 1 },
     );
     const page = [];
     for await (const album of albums) page.push(album);
@@ -240,23 +248,28 @@ const LINES = 200;
  * sign-in needed: it asks the catalog only. A line with no exact match comes
  * back with the songs its search found, best first.
  */
-export async function findTracklist(text: string): Promise<tAnswer<tFound>> {
+export async function findTracklist(
+  text: string,
+  storefront: string,
+): Promise<tAnswer<tFound>> {
   // The page's box takes 20,000 characters at most.
   if (typeof text !== "string" || text.length > 20_000) {
     throw new TypeError("findTracklist: not a tracklist");
+  }
+  if (!isStorefront(storefront)) {
+    throw new TypeError("findTracklist: not a storefront");
   }
   // At most 200 lines are looked for, so a paste costs Apple a known number
   // of searches.
   const all = parseTracklist(text);
   const descriptions = all.slice(0, LINES);
   const leftOut = all.length - descriptions.length;
-  const where = await storefront();
   return answer(async () => {
     const { tracks, skipped } = await getMusic().playlists.resolve(
       descriptions,
-      { storefront: where },
+      { storefront },
     );
-    return { storefront: where, tracks, skipped, leftOut };
+    return { storefront, tracks, skipped, leftOut };
   });
 }
 // #endregion resolve

@@ -39,6 +39,10 @@ navigating hides the page left behind rather than dropping it, so on Back the fl
 The listener lookup in [`lib/listener.ts`](./lib/listener.ts) awaits `connection()`: the client reads the clock to
 keep its developer token fresh, which Next refuses while it draws a page ahead of time.
 
+Next runs a page's server actions one at a time. So the search hints, and the next page of a crate, wait behind a
+send or a pasted tracklist that is under way. The catalog's actions take the storefront the page was drawn in, so
+they ask Apple for nothing but what they read.
+
 `next build` runs in CI with no key in its environment, which is what proves the recipe in the
 [Next.js guide](https://open-music-sdk.github.io/js/guides/nextjs). The build is for that alone: the sample is not
 designed to deploy.

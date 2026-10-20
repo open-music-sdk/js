@@ -67,7 +67,7 @@ async function Artist({ params }: { params: Promise<{ id: string }> }) {
           key={where}
           label="Albums"
           sleeves={catalogSleeves(albums)}
-          more={moreAlbums.bind(null, id)}
+          more={moreAlbums.bind(null, id, where)}
         />
       </div>
     </>

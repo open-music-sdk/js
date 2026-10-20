@@ -4,6 +4,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type SubmitEvent } from "react";
 import { searchHints } from "./actions";
+import { useCrate } from "./crate";
 import { say, showError } from "./status";
 
 export function SearchForm() {
@@ -17,14 +18,16 @@ export function SearchForm() {
     setTyped(searched);
   }
 
-  // Terms offered once typing pauses, rather than on every key.
+  // Terms offered once typing pauses, rather than on every key, in the
+  // storefront the page is drawn in.
   const text = typed.trim();
+  const { storefront } = useCrate();
   const [hints, setHints] = useState<readonly string[]>([]);
   useEffect(() => {
-    if (text === "") return;
+    if (text === "" || storefront === undefined) return;
     let current = true;
     const typing = setTimeout(() => {
-      searchHints(text).then((answered) => {
+      searchHints(text, storefront).then((answered) => {
         if (!current) return;
         if (answered.ok) setHints(answered.value);
         else say(answered.said);
@@ -34,7 +37,7 @@ export function SearchForm() {
       current = false;
       clearTimeout(typing);
     };
-  }, [text]);
+  }, [text, storefront]);
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
