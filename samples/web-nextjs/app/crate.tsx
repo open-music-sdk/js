@@ -60,6 +60,9 @@ interface tUnmatched {
 
 const YourCrate = createContext<tYourCrate | undefined>(undefined);
 
+/** The most songs the crate holds. */
+const MOST = 500;
+
 /**
  * Your crate, held for every page: Dig puts songs in, and the crate's own
  * page moves them, takes them out and sends them.
@@ -88,6 +91,13 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       // Found in a storefront the page has left since: its id is not the one
       // the page shows.
       if (foundIn !== storefrontNow.current) return;
+      // The server sends at most 500 songs as a playlist, so the crate holds
+      // no more.
+      const full = held.picks.length >= MOST;
+      if (full && !held.picks.some(({ id }) => id === song.id)) {
+        say(`Your crate holds ${String(MOST)} songs at most.`);
+        return;
+      }
       setHeld((was) => {
         const turn = was.turn + 1;
         const picks = was.storefront === foundIn ? was.picks : [];
@@ -231,6 +241,7 @@ function PasteForm() {
         <textarea
           id="tracklist"
           rows={5}
+          maxLength={20_000}
           value={text}
           onChange={(event) => {
             setText(event.target.value);
@@ -259,12 +270,15 @@ function useFindTracklist() {
       say(answered.said);
       return;
     }
-    const { storefront, tracks, skipped } = answered.value;
+    const { storefront, tracks, skipped, leftOut } = answered.value;
     for (const song of tracks) crate.pick(song, storefront);
     setUnmatched({ storefront, skipped });
     const found = `${String(tracks.length)} of `
       + String(tracks.length + skipped.length);
-    say(`Found ${found} songs.`);
+    const unasked = leftOut > 0
+      ? ` The ${String(leftOut)} lines after the first 200 were not looked for.`
+      : "";
+    say(`Found ${found} songs.${unasked}`);
   }
 
   // The songs offered for lines found in another storefront are not offered

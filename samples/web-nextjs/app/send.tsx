@@ -82,6 +82,7 @@ export function SendForm({ picks, editable }: tSendFormProps) {
           A new playlist named{" "}
           <input
             value={name}
+            maxLength={100}
             onChange={(event) => {
               setName(event.target.value);
             }}

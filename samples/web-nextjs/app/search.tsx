@@ -50,6 +50,7 @@ export function SearchForm() {
         placeholder="Search the catalog"
         autoComplete="off"
         aria-label="Search the catalog"
+        maxLength={200}
         value={typed}
         onChange={(event) => {
           setTyped(event.target.value);

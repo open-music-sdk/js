@@ -148,6 +148,7 @@ export async function pickStorefront(id: string): Promise<void> {
 
 /** Terms to offer as the listener types. */
 export async function searchHints(text: string): Promise<tAnswer<string[]>> {
+  // The page's box takes 200 characters at most.
   if (typeof text !== "string" || text.length > 200) {
     throw new TypeError("searchHints: not a search");
   }
@@ -226,7 +227,12 @@ interface tFound {
   readonly storefront: string;
   readonly tracks: readonly tSong[];
   readonly skipped: readonly tSkippedTrack<tTrackDescription>[];
+  /** How many lines were left out, past the 200 looked for. */
+  readonly leftOut: number;
 }
+
+/** At most this many lines of a paste are looked for. */
+const LINES = 200;
 
 // #region resolve
 /**
@@ -235,19 +241,22 @@ interface tFound {
  * back with the songs its search found, best first.
  */
 export async function findTracklist(text: string): Promise<tAnswer<tFound>> {
+  // The page's box takes 20,000 characters at most.
   if (typeof text !== "string" || text.length > 20_000) {
     throw new TypeError("findTracklist: not a tracklist");
   }
   // At most 200 lines are looked for, so a paste costs Apple a known number
   // of searches.
-  const descriptions = parseTracklist(text).slice(0, 200);
+  const all = parseTracklist(text);
+  const descriptions = all.slice(0, LINES);
+  const leftOut = all.length - descriptions.length;
   const where = await storefront();
   return answer(async () => {
     const { tracks, skipped } = await getMusic().playlists.resolve(
       descriptions,
       { storefront: where },
     );
-    return { storefront: where, tracks, skipped };
+    return { storefront: where, tracks, skipped, leftOut };
   });
 }
 // #endregion resolve
@@ -262,7 +271,7 @@ export type tTarget = { readonly id: string } | { readonly name: string };
 
 /**
  * The crate's songs, as a playlist takes them: a crate holds at most 500,
- * each a catalog id.
+ * which the page's crate holds it to, each a catalog id.
  */
 function tracksOf(songIds: unknown): tPlaylistTrack[] {
   const ids = Array.isArray(songIds) ? (songIds as unknown[]) : [];
@@ -272,16 +281,21 @@ function tracksOf(songIds: unknown): tPlaylistTrack[] {
   return ids.map((id) => ({ id, type: "songs" }));
 }
 
-/** The target as the page sent it, checked. */
+/**
+ * The target as the page sent it, checked. The page's own limits, such as a
+ * name of at most 100 characters, are held by its form, so what passes them
+ * here is not the page's.
+ */
 function targetOf(target: unknown): tTarget {
   const given = target as Partial<Record<"id" | "name", unknown>> | null;
   if (isId(given?.id)) return { id: given.id };
-  const name = given?.name;
-  if (typeof name === "string" && name.trim() !== "" && name.length <= 100) {
-    return { name: name.trim() };
-  }
+  const name = typeof given?.name === "string" ? given.name.trim() : "";
+  if (name !== "" && name.length <= NAME) return { name };
   throw new TypeError("not a playlist to send to");
 }
+
+/** The longest name the page's form takes for a new playlist. */
+const NAME = 100;
 
 // #region plan
 // Sending starts with a plan the listener sees before anything is written:
