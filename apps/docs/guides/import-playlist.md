@@ -66,7 +66,10 @@ another one. Where neither names one, the client looks up the listener's storefr
 On your server, plan what the playlist needs:
 
 ```ts
-const plan = listener.playlists.plan({ name: "Imported", description: "from my-app, list 42" }, tracks);
+const plan = listener.playlists.plan(
+  { name: "Imported", description: "from my-app, list 42" },
+  tracks,
+);
 ```
 
 `plan` asks nothing of Apple and changes nothing. It's the dry run: before you write anything, show the listener
@@ -84,7 +87,8 @@ A plan is plain, frozen JSON. You can write it to a file and apply it later.
 On your server, carry the plan out:
 
 ```ts
-const { id, created, appended, verified } = await listener.playlists.apply(plan);
+const { id, created, appended, verified } =
+  await listener.playlists.apply(plan);
 ```
 
 `apply` does four things, in order:
@@ -145,8 +149,16 @@ await listener.playlists.apply(more);
   description: "from my-app",
   canEdit: true,
   tracks: [
-    { id: "i.eoD8XJ3TKlNV3M", type: "library-songs", catalogId: "1441164430", isrc: "GBAYE0601498",
-      name: "Hey Jude", artistName: "The Beatles", albumName: "1", durationInMillis: 425653 },
+    {
+      id: "i.eoD8XJ3TKlNV3M",
+      type: "library-songs",
+      catalogId: "1441164430",
+      isrc: "GBAYE0601498",
+      name: "Hey Jude",
+      artistName: "The Beatles",
+      albumName: "1",
+      durationInMillis: 425653,
+    },
   ],
 }
 ```
@@ -193,6 +205,22 @@ a write's answer was lost, rejects with that write's own error.
 
 Each function makes one request at a time. The client's own rate limiter, and its wait after a `429`, apply
 underneath `delayMs`. These options set how hard one call pushes; the client sets how hard your whole app does.
+
+## In a page
+
+The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in.
+`resolve` needs no token at all. The [vanilla sample](../samples) sends its crate of songs this way: it finds a
+pasted tracklist, shows the plan in a dialog, and applies it only when the listener says to.
+
+::: code-group
+
+<<< @/../../samples/web-vanilla/src/crate.ts#resolve{ts} [1. Resolve]
+
+<<< @/../../samples/web-vanilla/src/send.ts#plan{ts} [2. Plan]
+
+<<< @/../../samples/web-vanilla/src/send.ts#apply{ts} [3. Apply]
+
+:::
 
 ## When something goes wrong
 

@@ -12,7 +12,7 @@ describe("on a server, with no document, no element and no script", () => {
     function App() {
       const held = useMusic();
       const [token] = useMusicUserToken();
-      const { isReady, error } = useConnect({ app: { name: "Crate Digger" } });
+      const { isReady, error } = useConnect({ app: { name: "Vinyl Collector Simulator" } });
       const { state } = usePreviewPlayer();
       const queries = useMusicQueries();
       return createElement("p", null, [held === music ? "page" : "bound", String(token), String(isReady), String(error), state.status, String(queries.catalog.getSong("1").queryKey[1])].join(" "));

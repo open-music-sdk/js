@@ -583,14 +583,25 @@ describe("developerTokenFetcher: timeoutMs holds whatever the fetch it was given
 });
 
 describe("developerTokenFetcher: the request", () => {
-  test("is a plain GET of the configured URL: uncached, refusing redirects, and with no headers, credentials or body of its own", async () => {
+  test("is a plain GET of the configured URL: uncached, following no redirect, and with no headers, credentials or body of its own", async () => {
     const { fetch, calls } = endpoint();
     await developerTokenFetcher(`${ENDPOINT}?tenant=1`, { fetch })({});
     expect(calls[0]?.url).toBe(`${ENDPOINT}?tenant=1`);
     const init = calls[0]?.init ?? {};
-    expect(init).toMatchObject({ cache: "no-store", redirect: "error" });
+    // `manual`, the one mode that follows none and every runtime takes: Cloudflare Workers' fetch refuses `error`.
+    expect(init).toMatchObject({ cache: "no-store", redirect: "manual" });
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect([init.method, init.headers, init.credentials, init.body, init.mode]).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  test.each([
+    ["a 3xx, as Node and Workers hand one over: with its status", () => new Response(jwt(), { status: 307, headers: { location: "https://elsewhere.example/token" } }), 307, "answered 307"],
+    // A browser's answer for `manual`: status 0, which no Response can be made with, and which is no status.
+    ["the opaque answer a browser gives for one: with none", () => Object.defineProperties(new Response(jwt()), { type: { value: "opaqueredirect" }, status: { value: 0 }, ok: { value: false } }), undefined, "redirected, which is not followed"],
+  ])("a redirect is refused whatever form the runtime hands it over in, though a token waits behind it: %s", async (_form, answer, status, said) => {
+    const e = await failure(developerTokenFetcher(ENDPOINT, { fetch: () => Promise.resolve(answer()) })());
+    expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", status]);
+    expect(e.message).toContain(said);
   });
 
   test.each([
@@ -638,11 +649,11 @@ describe("developerTokenFetcher: the request", () => {
     });
 
     test.each([
-      ["to another path on the same host", "/moved"],
-      ["to another origin", "/elsewhere"],
-    ])("a redirect %s is refused, though a token waits at the end of it", async (_name, path) => {
+      ["to another path on the same host", "/moved", 302],
+      ["to another origin", "/elsewhere", 307],
+    ])("a redirect %s is refused with its own status, though a token waits at the end of it", async (_name, path, status) => {
       const e = await failure(developerTokenFetcher(`${base}${path}`)());
-      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", undefined]);
+      expect([e._tag, e.status]).toEqual(["DeveloperTokenUnavailable", status]);
     });
 
     test("a compressed answer is measured as it inflates: 64 MB behind 64 KB on the wire is refused, and little of it kept", async () => {

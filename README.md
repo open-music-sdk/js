@@ -74,6 +74,8 @@ console.log(album.attributes?.name);
 - [Concepts](https://open-music-sdk.github.io/js/concepts/packages): tokens, security, errors and the design
   principles every package follows.
 - [Reference](https://open-music-sdk.github.io/js/reference/): every function, type and option.
+- [Sample apps](https://open-music-sdk.github.io/js/samples): one small app, written once per way of using the
+  SDK, to run on your machine. The code is in [`samples/`](./samples/README.md).
 
 ## Contributing
 

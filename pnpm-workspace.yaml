@@ -4,12 +4,15 @@ packages:
   - lib/*
   - integrations/*
   - apps/*
+  - samples/*
   - codegen/*
   - tooling/*
 
-# No install scripts run. esbuild (under VitePress's Vite) finds its binary in its platform package without one.
+# No install scripts run. esbuild (under VitePress's Vite and Wrangler) and workerd (the worker-server sample's
+# runtime, under Wrangler) each find their binary in their platform package without one.
 allowBuilds:
   esbuild: false
+  workerd: false
 
 # One version of every shared dependency for the whole repo.
 catalog:
@@ -21,6 +24,11 @@ catalog:
   "@tanstack/react-query": ^5
   "@types/react": ^19
   "@types/react-dom": ^19
+  # sample apps, which are never published
+  express: ^5
+  "@types/express": ^5
+  vite: ^8
+  wrangler: ^4
   # toolchain
   happy-dom: ^21
   eslint-plugin-react-hooks: ^7

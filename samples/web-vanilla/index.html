@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vinyl Collector Simulator</title>
+    <!-- The icon Apple's sign-in window shows, here this project's logo: put your own app's in its place. It has to be
+         on a public https address the window can load. -->
+    <link rel="apple-music-app-icon" sizes="120x120" href="https://avatars.githubusercontent.com/u/338387998?s=240" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Vinyl Collector Simulator</h1>
+      <nav>
+        <button type="button" value="dig" aria-pressed="true">Dig</button>
+        <button type="button" value="crate" aria-pressed="false">Your crate (<span id="crate-count">0</span>)</button>
+        <button type="button" value="library" aria-pressed="false" hidden>Library</button>
+      </nav>
+      <label id="storefront-picker">Storefront <select id="storefront"><option value="us">United States</option></select></label>
+      <button id="sign-in" type="button" disabled>Sign in with Apple Music</button>
+      <button id="sign-out" type="button" hidden>Sign out</button>
+    </header>
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <main>
+      <section id="dig">
+        <form id="search">
+          <input id="term" type="search" list="hints" placeholder="Search the catalog" autocomplete="off" aria-label="Search the catalog" />
+          <datalist id="hints"></datalist>
+          <button>Search</button>
+        </form>
+        <div id="floor"></div>
+        <div id="page" hidden></div>
+      </section>
+
+      <section id="crate" hidden>
+        <p>Songs you picked while digging. A reload empties the crate.</p>
+        <div id="picks"></div>
+        <form id="paste">
+          <label for="tracklist">Or paste a tracklist, one track a line, as <em>Artist - Title</em></label>
+          <textarea id="tracklist" rows="5"></textarea>
+          <button>Find these songs</button>
+        </form>
+        <div id="unmatched"></div>
+        <form id="send" hidden>
+          <h3>Send the crate to Apple Music</h3>
+          <label><input type="radio" name="to" value="new" checked /> A new playlist named <input id="playlist-name" value="Vinyl Collector Simulator" /></label>
+          <label><input type="radio" name="to" value="existing" /> One of your playlists <select id="playlist"></select></label>
+          <button id="plan-it">Plan it</button>
+        </form>
+        <dialog id="plan">
+          <form method="dialog">
+            <h3>The plan</h3>
+            <ul id="plan-summary"></ul>
+            <button value="cancel">Cancel</button>
+            <button id="apply" value="apply">Send it</button>
+          </form>
+        </dialog>
+      </section>
+
+      <section id="library" hidden>
+        <form id="library-search">
+          <input id="library-term" type="search" placeholder="Find in your library" aria-label="Find in your library" />
+          <button>Find</button>
+        </form>
+        <div id="library-view"></div>
+      </section>
+    </main>
+
+    <footer id="player">
+      <img id="now-art" alt="" width="48" height="48" hidden />
+      <div class="now"><strong id="now-title">Nothing playing</strong> <span id="now-artist"></span></div>
+      <button id="previous" type="button">Previous</button>
+      <button id="play" type="button">Play</button>
+      <button id="next" type="button">Next</button>
+      <input id="position" type="range" min="0" max="30" step="0.1" value="0" aria-label="Position in the preview" />
+      <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
+    </footer>
+  </body>
+</html>

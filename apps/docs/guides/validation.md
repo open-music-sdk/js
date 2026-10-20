@@ -22,7 +22,9 @@ On your server, or in a page with the same import from `@open-music-sdk/browser`
 ```ts
 import { schemas } from "@open-music-sdk/server";
 
-const album = await music.catalog.getAlbum("1613600183", { schema: schemas.albumsResponse });
+const album = await music.catalog.getAlbum("1613600183", {
+  schema: schemas.albumsResponse,
+});
 ```
 
 The schema checks Apple's whole answer, `{ data: [album] }`, even where the function hands over only the album.
@@ -51,10 +53,11 @@ on the first page: a view's `next` link keeps nothing but its offset. Its valida
 look for them yourself on a first page you asked for them on:
 
 ```ts
-for await (const version of music.catalog.getAlbumView("1613600183", "other-versions", {
+const versions = music.catalog.getAlbumView("1613600183", "other-versions", {
   with: ["attributes"],
   schema: schemas.albumViewsAlbumOtherVersionsView,
-})) {
+});
+for await (const version of versions) {
   console.log(version.attributes?.name);
 }
 ```
@@ -72,11 +75,15 @@ the value from the top of the answer. Its `message` lists them all, and `status`
 import { isAppleMusicError, schemas } from "@open-music-sdk/server";
 
 try {
-  const album = await music.catalog.getAlbum("1613600183", { schema: schemas.albumsResponse });
+  const album = await music.catalog.getAlbum("1613600183", {
+    schema: schemas.albumsResponse,
+  });
   console.log(album.attributes?.name);
 } catch (e) {
   if (!isAppleMusicError(e, "ValidationError")) throw e;
-  console.warn(e.message); // such as "/v1/catalog/us/albums/1613600183: data.0.attributes.name: expected string"
+  // Such as "/v1/catalog/us/albums/1613600183: data.0.attributes.name:
+  // expected string".
+  console.warn(e.message);
 }
 ```
 
@@ -112,10 +119,19 @@ Any Standard Schema works, such as one written with Zod. A schema that describes
 import { z } from "zod";
 
 const storefront = z.object({
-  data: z.array(z.object({ id: z.string(), attributes: z.object({ name: z.string() }) })).min(1),
+  data: z
+    .array(
+      z.object({
+        id: z.string(),
+        attributes: z.object({ name: z.string() }),
+      }),
+    )
+    .min(1),
 });
 
-const { data } = await music.request("v1/storefronts/gb", { schema: storefront });
+const { data } = await music.request("v1/storefronts/gb", {
+  schema: storefront,
+});
 console.log(data[0]?.attributes.name);
 ```
 

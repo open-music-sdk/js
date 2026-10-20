@@ -31,95 +31,46 @@ npx wrangler secret put APPLE_MUSIC_KEY_ID
 Wrangler asks for each value. For the key, paste the contents of the `.p8` file on one line, with each line break
 written as `\n`. The SDK reads line breaks escaped that way.
 
-For local development, put the same three in a `.dev.vars` file next to your Wrangler config, which `wrangler dev`
-reads:
+The Worker in step 3 also reads `PAGE_ORIGIN`, the origin your page is served from, which isn't a secret. Set it
+under `vars` in your Wrangler config.
+
+For local development, put the same values in a `.dev.vars` file next to your Wrangler config, which
+`wrangler dev` reads:
 
 ```
 APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG…\n-----END PRIVATE KEY-----"
 APPLE_MUSIC_TEAM_ID="ABCDE12345"
 APPLE_MUSIC_KEY_ID="ABC123DEFG"
+PAGE_ORIGIN="http://localhost:2728"
 ```
 
 ::: warning Never commit `.dev.vars`
 It holds your private key. Add it to `.gitignore` before you write the key into it.
 :::
 
+If a Vite dev server runs in the same repository, as a page's often does, name the file `.env` instead, which
+`wrangler dev` reads when there is no `.dev.vars`. Vite's dev server serves any file in the repository to a page
+that asks for it, except those on its deny list, and that list names `.env` but not `.dev.vars`. The
+[sample apps](../samples) do this.
+
 ## 3. Write the Worker
 
-The Worker below is complete. Your session lookup is the one piece left to you: `sessionUserId` stands for it, and
-resolves to the signed-in user's id, or `undefined` when there is none.
+The Worker below is the [worker-server sample](../samples), complete, as it runs on a developer's machine.
 
-```ts
-// src/index.ts
-import {
-  KvUserTokenStore,
-  createServerClient,
-  isAppleMusicError,
-  tokenEndpoint,
-  userTokenIntake,
-  type tKvNamespace,
-  type tMusic,
-  type tTokenEndpoint,
-  type tUserTokenIntake,
-} from "@open-music-sdk/server";
+<<< @/../../samples/worker-server/src/index.ts{ts}
 
-interface Env {
-  APPLE_MUSIC_PRIVATE_KEY: string;
-  APPLE_MUSIC_TEAM_ID: string;
-  APPLE_MUSIC_KEY_ID: string;
-  MUSIC_USER_TOKENS: tKvNamespace;
-}
+The `// #region` lines mark the parts other guides show, and do nothing.
 
-interface App {
-  readonly music: tMusic;
-  readonly token: tTokenEndpoint;
-  readonly intake: tUserTokenIntake;
-}
+Before you deploy it, change what is there for the machine it runs on:
 
-// Made on the first request, and kept for every request this isolate serves after it.
-let app: App | undefined;
+- Put your own session lookup in place of `sessionOf`, one that resolves to the signed-in user's id or `undefined`,
+  and leave out the cookie the Worker gives. The sample's session is any id a browser presents, which is enough
+  on one machine and not on the web.
+- Make `hosts` the names your Worker answers to, its own and your page's, in place of `127.0.0.1:8787`. The check
+  is there because a server on a loopback address can be reached by a site whose name points at it.
+- Rate-limit both routes, as [Who can post a token](#the-two-routes) below says.
 
-function setUp(env: Env): App {
-  const key = { pem: env.APPLE_MUSIC_PRIVATE_KEY, teamId: env.APPLE_MUSIC_TEAM_ID, keyId: env.APPLE_MUSIC_KEY_ID };
-  const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
-  const music = createServerClient({ ...key, storefront: "us", userTokenStore: store });
-  return {
-    music,
-    token: tokenEndpoint({ ...key, origin: ["https://app.example"] }),
-    intake: userTokenIntake(music, { store, userId: (req) => sessionUserId(req, env) }),
-  };
-}
-
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const { music, token, intake } = (app ??= setUp(env));
-    const { pathname } = new URL(req.url);
-
-    if (pathname === "/api/music/token") return token(req);
-    if (pathname === "/api/music/user-token") return intake(req);
-
-    if (pathname === "/api/music/playlists") {
-      const userId = await sessionUserId(req, env);
-      if (userId === undefined) return new Response(null, { status: 401 });
-      const names: string[] = [];
-      try {
-        for await (const playlist of music.forUser(userId).user.listLibraryPlaylists()) {
-          names.push(playlist.attributes?.name ?? "");
-        }
-      } catch (e) {
-        if (isAppleMusicError(e, "UserTokenInvalid")) return Response.json({ error: "UserTokenInvalid" }, { status: 422 });
-        throw e;
-      }
-      return Response.json({ names });
-    }
-
-    return new Response("Not found", { status: 404 });
-  },
-};
-```
-
-If you generate your `Env` type with `wrangler types`, use that one instead. Its KV namespace type fits
-`KvUserTokenStore`.
+If you generate your `Env` type with `wrangler types`, use that one in place of `tEnv`.
 
 ### Made once, on the first request
 
@@ -154,8 +105,9 @@ the store. A listener the store has no token for gets a `UserTokenInvalid` error
 answers `403` to. The Worker answers `422` then, and your page asks the listener to sign in again.
 
 A listener who isn't signed in to Apple Music, or has no subscription, can get a `401` instead, which arrives as
-`DeveloperTokenInvalid` and which this Worker rethrows. `validateUserToken` tells it apart from a developer token
-Apple refuses. See [Handle errors](./errors).
+`DeveloperTokenInvalid`. The Worker answers that, and any other `AppleMusicError`, with `502` and the error's
+tag. `validateUserToken` tells a listener's `401` apart from a developer token Apple refuses. See
+[Handle errors](./errors).
 
 ## 4. Keep listeners' tokens in Workers KV
 
@@ -163,7 +115,9 @@ Apple refuses. See [Handle errors](./errors).
 namespace with other data, give it a prefix of your own:
 
 ```ts
-const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS, { prefix: "apple-music:" });
+const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS, {
+  prefix: "apple-music:",
+});
 ```
 
 The store checks the namespace and the prefix when you make it: a binding without `get`, `put` and `delete`, or a
@@ -185,7 +139,10 @@ In your page, give the token route's URL to `createBrowserClient`:
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "https://worker.example/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "https://worker.example/api/music/token",
+  storefront: "us",
+});
 ```
 
 The page can be on another origin than the Worker, such as a static site, as long as it's one of the origins you

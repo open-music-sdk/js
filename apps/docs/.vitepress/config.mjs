@@ -103,7 +103,13 @@ export default defineConfig({
   srcExclude: ["README.md"],
   head: [["link", { rel: "icon", href: "/js/logo.svg" }]],
   // The one chunk past Vite's 500 kB warning is the search index, about 2.5 MB, which loads when the search box opens.
-  vite: { build: { chunkSizeWarningLimit: 4000 } },
+  // `pnpm --filter docs dev` serves files from the whole repository, as Vite does from a workspace's root. Its list of
+  // refusals is restated with a MusicKit key and the sample Worker's files added, and no page on another origin may
+  // read an answer.
+  vite: {
+    build: { chunkSizeWarningLimit: 4000 },
+    server: { cors: false, fs: { deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "*.p8", ".dev.vars", ".dev.vars.*", "**/.wrangler/**"] } },
+  },
   markdown: { config: siteLinks },
   themeConfig: {
     logo: "/logo.svg",
@@ -111,6 +117,7 @@ export default defineConfig({
       { text: "Guides", link: "/guides/musickit-key", activeMatch: "^/guides/" },
       { text: "Concepts", link: "/concepts/packages", activeMatch: "^/concepts/" },
       { text: "Reference", link: "/reference/", activeMatch: "^/(reference/|differences|glossary)" },
+      { text: "Samples", link: "/samples" },
       { text: "Status", link: "/status" },
     ],
     // The longest matching path wins, so a package's own sidebar is used under its folder.

@@ -25,8 +25,12 @@ async function showAlbum(id: string) {
   try {
     show(await music.catalog.getAlbum(id));
   } catch (e) {
-    if (isAppleMusicError(e, "ApiError") && e.status === 404) return showNotFound();
-    if (isAppleMusicError(e, "RateLimited")) return showError("Too many requests. Try again shortly.");
+    if (isAppleMusicError(e, "ApiError") && e.status === 404) {
+      return showNotFound();
+    }
+    if (isAppleMusicError(e, "RateLimited")) {
+      return showError("Too many requests. Try again shortly.");
+    }
     throw e;
   }
 }
@@ -56,6 +60,11 @@ An `ApiError` can also come from a successful answer that isn't what the call ne
 from a function on `music.catalog` or `music.user` that hands over one resource, an answer that holds none. Its
 `status` is then the success's, such as `200`.
 
+The [vanilla sample](../samples) sends every error through one function, which says each kind in words a listener
+can act on:
+
+<<< @/../../samples/web-vanilla/src/errors.ts#explain{ts}
+
 ### Writes that may have happened
 
 The client sends a `POST`, such as `addToLibrary` or `createLibraryPlaylist`, again only after a `429`, when
@@ -81,9 +90,13 @@ with an `AppleMusicError`:
 ```ts
 const controller = new AbortController();
 try {
-  await music.catalog.searchCatalog(term, { types: ["songs"], signal: controller.signal });
+  await music.catalog.searchCatalog(term, {
+    types: ["songs"],
+    signal: controller.signal,
+  });
 } catch (e) {
-  if (!controller.signal.aborted) throw e; // otherwise you stopped it yourself, and there's nothing to report
+  // Aborted means you stopped it yourself, and there's nothing to report.
+  if (!controller.signal.aborted) throw e;
 }
 ```
 
@@ -109,10 +122,15 @@ To change the policy, pass the fields you want. Each field you leave out keeps i
 const music = createServerClient({
   ...key,
   retry: {
-    maxAttempts: 3, // attempts in all, the first included. Default 2.
-    baseDelayMs: 500, // the first wait is up to this long, and it doubles each attempt. Default 250.
-    maxDelayMs: 8_000, // the longest wait between attempts. Default 4,000.
-    maxRetryAfterMs: 10_000, // the longest Retry-After to wait for. Default 60,000.
+    // Attempts in all, the first included. Default 2.
+    maxAttempts: 3,
+    // The first wait is up to this long, and it doubles each attempt.
+    // Default 250.
+    baseDelayMs: 500,
+    // The longest wait between attempts. Default 4,000.
+    maxDelayMs: 8_000,
+    // The longest Retry-After to wait for. Default 60,000.
+    maxRetryAfterMs: 10_000,
   },
 });
 ```

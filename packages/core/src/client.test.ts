@@ -227,6 +227,40 @@ describe("request: credentials never leave the Apple origin", () => {
       expect(e._tag).toBe("NetworkError");
       expect(landed).toEqual([]);
     });
+
+    // Cloudflare Workers' fetch throws a TypeError for `redirect: "error"`, and hands a redirect over as it is for
+    // `manual`; a browser's hands over an opaque answer with status 0 for `manual`, which no Response can be made with.
+    const workers = (answer: () => Response) => (input: RequestInfo | URL) => {
+      const req = input instanceof Request ? input : new Request(input);
+      if (req.redirect === "error") return Promise.reject(new TypeError('Invalid redirect value, must be one of "follow" or "manual"'));
+      return Promise.resolve(answer());
+    };
+    const opaque = () => Object.defineProperties(new Response(null), { type: { value: "opaqueredirect" }, status: { value: 0 }, ok: { value: false } });
+
+    test("a runtime that takes no redirect: error, as Workers' fetch takes none, still gets its requests answered", async () => {
+      const music = createClient({ developerToken: "dev", fetch: workers(() => Response.json({ data: [] })), retry: false });
+      expect(await music.request("v1/catalog/us/songs")).toEqual({ data: [] });
+    });
+
+    test.each([
+      ["a 3xx, as Node and Workers hand one over", () => new Response(null, { status: 302, headers: { location: "https://elsewhere.example/" } })],
+      ["the opaque answer a browser gives for one", opaque],
+    ])("a redirect is refused whatever form the runtime hands it over in: %s", async (_form, answer) => {
+      const music = createClient({ developerToken: "dev", userToken: "user", fetch: workers(answer), retry: false });
+      const e = await failure(music.request("v1/me/library/songs"));
+      expect([e._tag, e.message]).toEqual(["NetworkError", "GET /v1/me/library/songs: Apple answered with a redirect, which is not followed"]);
+    });
+
+    test("a redirect is asked again as any NetworkError is, and refused again, with nothing sent to where it points", async () => {
+      const asked: string[] = [];
+      const fetch = (input: RequestInfo | URL) => {
+        asked.push(input instanceof Request ? input.url : String(input));
+        return Promise.resolve(new Response(null, { status: 307, headers: { location: "https://elsewhere.example/" } }));
+      };
+      const music = createClient({ developerToken: "dev", userToken: "user", fetch, retry: { maxAttempts: 2, baseDelayMs: 1, maxDelayMs: 1 } });
+      expect((await failure(music.request("v1/me/library/songs")))._tag).toBe("NetworkError");
+      expect(asked).toEqual(["https://api.music.apple.com/v1/me/library/songs", "https://api.music.apple.com/v1/me/library/songs"]);
+    });
   });
 });
 

@@ -36,6 +36,19 @@ from 60 to 86,400 (one day).
 A page on one of your origins can read the token even when the route is on another origin, such as a Worker in
 front of a static site. The route sends the CORS header for your origins only, and for nothing but the token.
 
+The [sample apps](../samples) mount the route on a Worker, which takes the handler as it is, and on Express, which
+hands a route Node's request instead of a web `Request`:
+
+::: code-group
+
+<<< @/../../samples/worker-server/src/index.ts#token-route{ts} [Cloudflare Workers]
+
+<<< @/../../samples/express-server/src/server.ts#token-route{ts} [Express]
+
+<<< @/../../samples/express-server/src/web.ts{ts} [Express: web.ts]
+
+:::
+
 ## 2. Point the browser client at it
 
 In your page, give the route's URL to `createBrowserClient`:
@@ -43,7 +56,10 @@ In your page, give the route's URL to `createBrowserClient`:
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "/api/music/token",
+  storefront: "us",
+});
 const album = await music.catalog.getAlbum("1613600183");
 ```
 

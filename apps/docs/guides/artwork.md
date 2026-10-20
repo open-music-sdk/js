@@ -18,7 +18,8 @@ Anywhere, read the artwork from the resource's attributes:
 
 ```ts
 const artwork = song.attributes?.artwork;
-// { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000, bgColor: "…", … }
+// { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000,
+//   bgColor: "…", … }
 ```
 
 Some resources have no artwork, and a resource can come without its attributes. The functions take an artwork,
@@ -36,7 +37,8 @@ import { artworkImage } from "@open-music-sdk/browser";
 
 if (artwork) Object.assign(img, artworkImage(artwork, 300));
 // img.src     https://…/300x300bb.jpg
-// img.srcset  https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x, https://…/900x900bb.jpg 3x
+// img.srcset  https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x,
+//             https://…/900x900bb.jpg 3x
 // img.width   300
 // img.height  300
 ```
@@ -57,6 +59,11 @@ export function Cover({ song }: { song: tSong }) {
 `artworkImage` works out `src`, `srcset`, `width` and `height` together, and they have to agree. A browser takes
 `src` as the 1x image wherever the `srcset` doesn't offer one, and lays out an image that has no `width` and
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
+
+The [vanilla sample](../samples) draws every cover with one function. A resource with no artwork gets an empty box
+of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
+
+<<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
 
 How the size is chosen:
 

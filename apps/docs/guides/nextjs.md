@@ -34,9 +34,13 @@ hooks, and on nothing else. So what else it exports, such as `artworkImage`, `is
 Make one client for your whole server, in a module that only server code imports. Here it's `lib/music.ts`:
 
 ```ts
-import { createServerClient, type tUserTokenStore } from "@open-music-sdk/server";
+import {
+  createServerClient,
+  type tUserTokenStore,
+} from "@open-music-sdk/server";
 
-// Where listeners' tokens are kept, reachable from every instance of your server.
+// Where listeners' tokens are kept, reachable from every instance of your
+// server.
 export const store: tUserTokenStore = createTokenStore();
 
 export const music = createServerClient({
@@ -93,7 +97,10 @@ keeps it. In `app/api/music/user-token/route.ts`:
 import { userTokenIntake } from "@open-music-sdk/server";
 import { music, store } from "@/lib/music";
 
-export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
+export const POST = userTokenIntake(music, {
+  store,
+  userId: (req) => sessionUserId(req),
+});
 ```
 
 `userId` decides whose token this is, so it must return the signed-in user from your own session, and nothing
@@ -115,7 +122,10 @@ client component of its own. In `app/providers.tsx`:
 import { MusicProvider, createBrowserClient } from "@open-music-sdk/react";
 import type { ReactNode } from "react";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "/api/music/token",
+  storefront: "us",
+});
 
 export function Providers({ children }: { children: ReactNode }) {
   return <MusicProvider music={music}>{children}</MusicProvider>;
@@ -150,7 +160,11 @@ A server component reads the catalog with the server's client. In `app/album/[id
 ```tsx
 import { music } from "@/lib/music";
 
-export default async function AlbumPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AlbumPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const album = await music.catalog.getAlbum(id);
   return <h1>{album.attributes?.name}</h1>;
@@ -168,7 +182,9 @@ A server action finds the listener's token in your store with `music.forUser(use
 import { isAppleMusicError } from "@open-music-sdk/server";
 import { music } from "@/lib/music";
 
-export async function addToLibrary(songId: string): Promise<"added" | "sign-in-again"> {
+export async function addToLibrary(
+  songId: string,
+): Promise<"added" | "sign-in-again"> {
   const userId = await currentUserId();
   try {
     await music.forUser(userId).user.addToLibrary({ songs: [songId] });
