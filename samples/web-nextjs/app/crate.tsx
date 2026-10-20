@@ -48,6 +48,8 @@ interface tYourCrate {
   readonly pick: (song: tSong, foundIn: string) => void;
   readonly move: (from: number, to: number) => void;
   readonly takeOut: (index: number) => void;
+  /** Whether the page asks in this storefront now. */
+  readonly isCurrent: (storefront: string) => boolean;
   /** The storefront the server asks in now, once the header has said. */
   readonly storefront: string | undefined;
   /** Tells the crate the storefront the server asks in now. */
@@ -98,10 +100,13 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       storefrontNow.current = storefront;
       setCurrent(storefront);
     };
+    const isCurrent = (storefront: string) => {
+      return storefront === storefrontNow.current;
+    };
     const pick = (song: tSong, foundIn: string) => {
       // Found in a storefront the page has left since: its id is not the one
       // the page shows.
-      if (foundIn !== storefrontNow.current) return;
+      if (!isCurrent(foundIn)) return;
       // The server sends at most 500 songs as a playlist, so the crate holds
       // no more.
       const full = held.picks.length >= MOST;
@@ -141,6 +146,7 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       pick,
       move,
       takeOut,
+      isCurrent,
       storefront: current,
       storefrontIs,
     };
@@ -285,6 +291,9 @@ function useFindTracklist() {
       return;
     }
     const { storefront, tracks, skipped, leftOut } = answered.value;
+    // Songs found in a storefront the page has left since have other ids than
+    // the ones it shows.
+    if (!crate.isCurrent(storefront)) return;
     for (const song of tracks) crate.pick(song, storefront);
     setUnmatched({ storefront, skipped });
     const found = `${String(tracks.length)} of `

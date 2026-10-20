@@ -47,6 +47,8 @@ interface tYourCrate {
   readonly pick: (song: tSong, foundIn: string) => void;
   readonly move: (from: number, to: number) => void;
   readonly takeOut: (index: number) => void;
+  /** Whether the page asks in this storefront now. */
+  readonly isCurrent: (storefront: string) => boolean;
 }
 
 const YourCrate = createContext<tYourCrate | undefined>(undefined);
@@ -83,10 +85,13 @@ export function CrateProvider({ children }: { children: ReactNode }) {
   }, [storefront]);
 
   const crate = useMemo<tYourCrate>(() => {
+    const isCurrent = (storefront: string) => {
+      return storefront === storefrontNow.current;
+    };
     const pick = (song: tSong, foundIn: string) => {
       // Found in a storefront the page has left since: its id is not the one
       // the page shows.
-      if (foundIn !== storefrontNow.current) return;
+      if (!isCurrent(foundIn)) return;
       setHeld((was) => {
         if (was.storefront !== foundIn) return was;
         const turn = was.turn + 1;
@@ -119,6 +124,7 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       pick,
       move,
       takeOut,
+      isCurrent,
     };
   }, [held]);
   return <YourCrate value={crate}>{children}</YourCrate>;
@@ -258,7 +264,7 @@ function parseTracklist(text: string): tTrackDescription[] {
 function useFindTracklist() {
   const music = useMusic();
   const { storefront } = useNow();
-  const { pick } = useCrate();
+  const { pick, isCurrent } = useCrate();
   const [unmatched, setUnmatched] = useState<{
     readonly storefront: string;
     readonly skipped: readonly tSkipped[];
@@ -272,6 +278,9 @@ function useFindTracklist() {
         say(`Finding songs: ${String(done)} of ${String(total)}.`);
       },
     });
+    // Songs found in a storefront the page has left since have other ids than
+    // the ones it shows.
+    if (!isCurrent(storefront)) return;
     for (const song of tracks) pick(song, storefront);
     setUnmatched({ storefront, skipped });
     const found = `${String(tracks.length)} of ${String(descriptions.length)}`;
