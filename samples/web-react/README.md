@@ -29,7 +29,9 @@ Then open <http://localhost:2728>. Vite forwards `/api` to the server on `127.0.
 
 The catalog is read through `musicQueries` over the page's own client, in scope 0: its answers are the same for every
 listener, so a sign-in asks Apple for none of them again. The listener's library is read through `useMusicQueries()`,
-whose keys carry a scope of each sign-in's own, so one listener's cache is never another's. A write is a
+whose keys carry a scope of each sign-in's own, so one listener's cache is never another's. Two queries the page
+writes itself, the album's "in your library" check and the list the server asks for, have keys that say nothing of
+the listener: they are drawn only while one is signed in, and kept no longer than they are drawn. A write is a
 `useMutation` over `useMusic()`, which is bound to the listener once they have signed in.
 
 Signed out, the page asks the catalog in the storefront you pick. Signed in, it asks in yours, from Apple. Catalog
