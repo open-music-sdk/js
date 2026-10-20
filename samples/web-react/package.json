@@ -1,0 +1,26 @@
+{
+  "name": "web-react",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vinyl Collector Simulator in a React page with TanStack Query: dig through the catalog, play previews, sign in with Apple Music, and send a crate of songs to the library as a playlist.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "dependencies": {
+    "@open-music-sdk/core": "workspace:*",
+    "@open-music-sdk/react": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "vite": "catalog:"
+  }
+}
