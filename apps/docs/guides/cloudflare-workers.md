@@ -115,7 +115,9 @@ tag. `validateUserToken` tells a listener's `401` apart from a developer token A
 namespace with other data, give it a prefix of your own:
 
 ```ts
-const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS, { prefix: "apple-music:" });
+const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS, {
+  prefix: "apple-music:",
+});
 ```
 
 The store checks the namespace and the prefix when you make it: a binding without `get`, `put` and `delete`, or a
@@ -137,7 +139,10 @@ In your page, give the token route's URL to `createBrowserClient`:
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "https://worker.example/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "https://worker.example/api/music/token",
+  storefront: "us",
+});
 ```
 
 The page can be on another origin than the Worker, such as a static site, as long as it's one of the origins you

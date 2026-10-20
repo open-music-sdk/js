@@ -22,7 +22,8 @@ covers it.
 On your server or in your page:
 
 ```ts
-await music.request("v1/test"); // resolves when Apple accepts your developer token
+// Resolves when Apple accepts your developer token.
+await music.request("v1/test");
 ```
 
 A path is `v1/...` or `/v1/...`. In `init`, you can pass:
@@ -39,7 +40,9 @@ Type the answer with a type parameter, or let a `schema` type it:
 ```ts
 import type { tStorefrontsResponse } from "@open-music-sdk/server";
 
-const { data } = await music.request<tStorefrontsResponse>("v1/storefronts", { params: { limit: 10 } });
+const { data } = await music.request<tStorefrontsResponse>("v1/storefronts", {
+  params: { limit: 10 },
+});
 ```
 
 ## 2. Send the listener's token outside `/v1/me`
@@ -48,11 +51,13 @@ The `library` relationship of a catalog song, album, playlist or music video is 
 needs their token. Its path is in the catalog, not under `/v1/me`, so pass `user: true`:
 
 ```ts
-import type { tAlbumRelationshipsAlbumLibraryRelationship } from "@open-music-sdk/server";
+import type {
+  tAlbumRelationshipsAlbumLibraryRelationship as tAlbumLibrary,
+} from "@open-music-sdk/server";
 
 const listener = music.as(musicUserToken);
 const storefront = await listener.storefront();
-const page = await listener.request<tAlbumRelationshipsAlbumLibraryRelationship>(
+const page = await listener.request<tAlbumLibrary>(
   `v1/catalog/${storefront}/albums/1613600183/library`,
   { user: true },
 );
@@ -76,9 +81,11 @@ integration, on [the same version](../concepts/packages#one-version-for-every-pa
 ```ts
 import { segmentOf } from "@open-music-sdk/core";
 
-// `albumId` came from outside your app. "../me/library" is a TypeError; anything allowed comes back encoded.
+// `albumId` came from outside your app. "../me/library" is a TypeError;
+// anything allowed comes back encoded.
 const id = segmentOf("albumLibrary", "id", albumId);
-await listener.request(`v1/catalog/${storefront}/albums/${id}/library`, { user: true });
+const path = `v1/catalog/${storefront}/albums/${id}/library`;
+await listener.request(path, { user: true });
 ```
 
 The first argument names your function in the error, and the second names the value.
@@ -120,7 +127,8 @@ when the loop ends:
 import type { tLibraryAlbum } from "@open-music-sdk/server";
 
 const path = `v1/catalog/${storefront}/albums/1613600183/library`;
-for await (const album of listener.paginate<tLibraryAlbum>(path, { user: true })) {
+const pages = listener.paginate<tLibraryAlbum>(path, { user: true });
+for await (const album of pages) {
   console.log(album.id);
 }
 ```
@@ -133,7 +141,7 @@ for await (const album of listener.paginate<tLibraryAlbum>(path, { user: true })
 pass `user: false`, which sends no Music User Token wherever the links point, and give the walk a `maxPages`:
 
 ```ts
-// `next` came from outside your app, such as a query string your page sent back.
+// `next` came from outside your app, such as a query string your page sent.
 for await (const genre of music.paginate(next, { user: false, maxPages: 5 })) {
   console.log(genre);
 }
@@ -148,24 +156,40 @@ declare it with the builders in `@open-music-sdk/core`. The integrations don't r
 and `types` beside your integration, on the same version. Here, the `library` relationship of a catalog album:
 
 ```ts
-import { inStorefront, relationshipGetter, type tAppleMusicClient, type tCollection, type tStorefrontOption } from "@open-music-sdk/core";
+import {
+  inStorefront,
+  relationshipGetter,
+  type tAppleMusicClient,
+  type tCollection,
+  type tStorefrontOption,
+} from "@open-music-sdk/core";
 import type { tAlbumRelationships } from "@open-music-sdk/types";
 
-// Where the catalog's albums are. `user: true` sends the Music User Token, though the path isn't under /v1/me.
+// Where the catalog's albums are. `user: true` sends the Music User Token,
+// though the path isn't under /v1/me.
 const albums: tCollection<tStorefrontOption> = Object.assign(
   (fn: string, client: tAppleMusicClient, options: tStorefrontOption) =>
-    inStorefront(fn, client, options.storefront, (storefront) => `v1/catalog/${storefront}/albums`),
+    inStorefront(
+      fn,
+      client,
+      options.storefront,
+      (storefront) => `v1/catalog/${storefront}/albums`,
+    ),
   { user: true },
 );
 
-export const getAlbumLibrary = relationshipGetter<Pick<tAlbumRelationships, "library">, tStorefrontOption>("getAlbumLibrary", albums);
+export const getAlbumLibrary = relationshipGetter<
+  Pick<tAlbumRelationships, "library">,
+  tStorefrontOption
+>("getAlbumLibrary", albums);
 
 // Called with a client, it resolves to Apple's answer: the first page.
 const page = await getAlbumLibrary(listener, "1613600183", "library");
 console.log(page.data.length);
 
 // Bound to a client, it walks every page.
-for await (const copy of getAlbumLibrary.bound(listener)("1613600183", "library")) console.log(copy.id);
+const copies = getAlbumLibrary.bound(listener)("1613600183", "library");
+for await (const copy of copies) console.log(copy.id);
 ```
 
 The function checks the id and the name as path segments, and the options as every client function does, before

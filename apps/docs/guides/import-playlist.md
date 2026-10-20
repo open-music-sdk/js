@@ -66,7 +66,10 @@ another one. Where neither names one, the client looks up the listener's storefr
 On your server, plan what the playlist needs:
 
 ```ts
-const plan = listener.playlists.plan({ name: "Imported", description: "from my-app, list 42" }, tracks);
+const plan = listener.playlists.plan(
+  { name: "Imported", description: "from my-app, list 42" },
+  tracks,
+);
 ```
 
 `plan` asks nothing of Apple and changes nothing. It's the dry run: before you write anything, show the listener
@@ -84,7 +87,8 @@ A plan is plain, frozen JSON. You can write it to a file and apply it later.
 On your server, carry the plan out:
 
 ```ts
-const { id, created, appended, verified } = await listener.playlists.apply(plan);
+const { id, created, appended, verified } =
+  await listener.playlists.apply(plan);
 ```
 
 `apply` does four things, in order:
@@ -145,8 +149,16 @@ await listener.playlists.apply(more);
   description: "from my-app",
   canEdit: true,
   tracks: [
-    { id: "i.eoD8XJ3TKlNV3M", type: "library-songs", catalogId: "1441164430", isrc: "GBAYE0601498",
-      name: "Hey Jude", artistName: "The Beatles", albumName: "1", durationInMillis: 425653 },
+    {
+      id: "i.eoD8XJ3TKlNV3M",
+      type: "library-songs",
+      catalogId: "1441164430",
+      isrc: "GBAYE0601498",
+      name: "Hey Jude",
+      artistName: "The Beatles",
+      albumName: "1",
+      durationInMillis: 425653,
+    },
   ],
 }
 ```

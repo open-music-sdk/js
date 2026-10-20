@@ -19,7 +19,10 @@ On your server, create one store and one client, and share them between your rou
 
 ```ts
 // music.ts
-import { MemoryUserTokenStore, createServerClient } from "@open-music-sdk/server";
+import {
+  MemoryUserTokenStore,
+  createServerClient,
+} from "@open-music-sdk/server";
 
 export const store = new MemoryUserTokenStore();
 export const music = createServerClient({
@@ -43,7 +46,10 @@ web-standard `Request` and returns a `Response`:
 import { userTokenIntake } from "@open-music-sdk/server";
 import { music, store } from "./music";
 
-export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
+export const POST = userTokenIntake(music, {
+  store,
+  userId: (req) => sessionUserId(req),
+});
 ```
 
 `userId` finds the signed-in user from your own session, and returns nothing when there's none. The token is
@@ -114,8 +120,8 @@ try {
   await music.forUser(userId).user.addToLibrary({ songs: ["1613600188"] });
 } catch (e) {
   if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
-  // Forget only the token Apple refused. The listener may have signed in again, and a new token
-  // been stored, while this request was on its way.
+  // Forget only the token Apple refused. The listener may have signed in
+  // again, and a new token been stored, while this request was on its way.
   if ((await store.get(userId)) === sent) {
     await store.delete(userId);
     askListenerToReconnect(userId);
@@ -189,7 +195,9 @@ isn't shared between processes or isolates. Use it for tests, scripts and a serv
 import { KvUserTokenStore } from "@open-music-sdk/server";
 
 // env.MUSIC_TOKENS is a KV namespace bound to your Worker.
-const store = new KvUserTokenStore(env.MUSIC_TOKENS, { prefix: "apple-music:" });
+const store = new KvUserTokenStore(env.MUSIC_TOKENS, {
+  prefix: "apple-music:",
+});
 ```
 
 Workers KV is eventually consistent, which the [security model](../concepts/security#on-your-server) covers. See

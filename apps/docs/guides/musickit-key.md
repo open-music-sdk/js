@@ -30,7 +30,7 @@ Each is ten capital letters and digits, exactly as Apple issues it. The SDK refu
 The SDK reads no environment variable and no file. Your app loads the key and its two IDs the way it loads its
 other secrets, and hands them over as `pem`, `teamId` and `keyId`. These docs use three environment variables:
 
-```sh
+```dotenv
 # .env, for local work only
 APPLE_MUSIC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG...\n-----END PRIVATE KEY-----"
 APPLE_MUSIC_TEAM_ID="ABCDE12345"

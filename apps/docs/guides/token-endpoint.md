@@ -56,7 +56,10 @@ In your page, give the route's URL to `createBrowserClient`:
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "/api/music/token",
+  storefront: "us",
+});
 const album = await music.catalog.getAlbum("1613600183");
 ```
 

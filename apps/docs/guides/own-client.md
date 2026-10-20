@@ -17,7 +17,8 @@ In the code below, `musicUserToken` is a listener's token, from [Sign a listener
 Install `core`, `developer-token`, and the packages whose functions you call:
 
 ```sh
-pnpm add @open-music-sdk/core @open-music-sdk/developer-token @open-music-sdk/client-catalog
+pnpm add @open-music-sdk/core @open-music-sdk/developer-token \
+  @open-music-sdk/client-catalog
 ```
 
 Keep every package on [the same version as `core`](../concepts/packages#one-version-for-every-package).
@@ -80,7 +81,9 @@ import { listLibraryPlaylists } from "@open-music-sdk/client-user";
 
 const listener = music.as(musicUserToken);
 const firstPage = await listLibraryPlaylists(listener, { limit: 100 });
-for await (const playlist of listener.paginate(firstPage)) console.log(playlist.attributes?.name);
+for await (const playlist of listener.paginate(firstPage)) {
+  console.log(playlist.attributes?.name);
+}
 ```
 
 Called with a client, a function resolves to Apple's answer as it came, and a list to its first page. `paginate`
@@ -97,7 +100,8 @@ import { catalog } from "@open-music-sdk/client-catalog";
 
 const store = catalog(music); // create it once, and keep it
 const album = await store.getAlbum("1613600183"); // the album itself
-for await (const track of store.getAlbumRelationship("1613600183", "tracks")) console.log(track.attributes?.name);
+const tracks = store.getAlbumRelationship("1613600183", "tracks");
+for await (const track of tracks) console.log(track.attributes?.name);
 ```
 
 What each kind of function gives, called with the client and bound, is under "Two ways to call" in the reference
@@ -130,10 +134,14 @@ import { catalog } from "@open-music-sdk/client-catalog";
 import { user } from "@open-music-sdk/client-user";
 import { playlists } from "@open-music-sdk/lib-playlists";
 
-const app = withNamespaces(createClient({ developerToken, storefront: "us" }), { catalog, user, playlists });
+const client = createClient({ developerToken, storefront: "us" });
+const app = withNamespaces(client, { catalog, user, playlists });
 
 const album = await app.catalog.getAlbum("1613600183");
-for await (const playlist of app.as(musicUserToken).user.listLibraryPlaylists()) console.log(playlist.id);
+const listener = app.as(musicUserToken);
+for await (const playlist of listener.user.listLibraryPlaylists()) {
+  console.log(playlist.id);
+}
 ```
 
 This is how the integrations build their clients. A namespace can't take the name of one of the client's own

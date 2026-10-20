@@ -40,7 +40,10 @@ Every query has `retry: false`. The client already retried what is worth retryin
 a mistake would help no one. No `staleTime` is set: choose your own, as you would for any query:
 
 ```tsx
-const { data: album } = useQuery({ ...queries.catalog.getAlbum(id), staleTime: 5 * 60_000 });
+const { data: album } = useQuery({
+  ...queries.catalog.getAlbum(id),
+  staleTime: 5 * 60_000,
+});
 ```
 
 ## 2. Walk pages with `useInfiniteQuery`
@@ -49,7 +52,11 @@ In a component, spread a walk's query into `useInfiniteQuery`. A listener's quer
 once they've signed in:
 
 ```tsx
-import { useMusicQueries, useMusicUserToken, type tLibraryPlaylist } from "@open-music-sdk/react";
+import {
+  useMusicQueries,
+  useMusicUserToken,
+  type tLibraryPlaylist,
+} from "@open-music-sdk/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 export function Library() {
@@ -59,13 +66,19 @@ export function Library() {
     ...queries.user.listLibraryPlaylists(),
     enabled: token !== undefined,
   });
-  const playlists = data?.pages.flatMap((page): tLibraryPlaylist[] => page.data ?? []) ?? [];
+  const pages = data?.pages ?? [];
+  const playlists = pages.flatMap(
+    (page): tLibraryPlaylist[] => page.data ?? [],
+  );
+  const more = () => void fetchNextPage();
   return (
     <>
       <ul>
-        {playlists.map((playlist) => <li key={playlist.id}>{playlist.attributes?.name}</li>)}
+        {playlists.map((playlist) => (
+          <li key={playlist.id}>{playlist.attributes?.name}</li>
+        ))}
       </ul>
-      {hasNextPage && <button onClick={() => void fetchNextPage()}>More</button>}
+      {hasNextPage && <button onClick={more}>More</button>}
     </>
   );
 }
@@ -91,7 +104,9 @@ import { useMutation } from "@tanstack/react-query";
 
 export function AddToLibrary({ songId }: { songId: string }) {
   const music = useMusic();
-  const add = useMutation({ mutationFn: () => music.user.addToLibrary({ songs: [songId] }) });
+  const add = useMutation({
+    mutationFn: () => music.user.addToLibrary({ songs: [songId] }),
+  });
   return (
     <button disabled={add.isPending} onClick={() => add.mutate()}>
       Add to library
@@ -110,11 +125,19 @@ the page. In a Next.js server component, `app/album/[id]/page.tsx`:
 
 ```tsx
 import { musicQueries } from "@open-music-sdk/react";
-import { HydrationBoundary, QueryClient, dehydrate } from "@tanstack/react-query";
+import {
+  HydrationBoundary,
+  QueryClient,
+  dehydrate,
+} from "@tanstack/react-query";
 import { music } from "@/lib/music"; // the client from createServerClient
 import { Album } from "./album"; // the client component from step 1
 
-export default async function AlbumPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AlbumPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const queryClient = new QueryClient();
   await queryClient.prefetchQuery(musicQueries(music).catalog.getAlbum(id));

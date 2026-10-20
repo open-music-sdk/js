@@ -19,11 +19,21 @@ listener with an Apple Music subscription.
 In your page, fetch songs or music videos with the catalog. Here they are an album's tracks:
 
 ```ts
-import { createBrowserClient, previewPlayer, type tMusicVideo, type tSong } from "@open-music-sdk/browser";
+import {
+  createBrowserClient,
+  previewPlayer,
+  type tMusicVideo,
+  type tSong,
+} from "@open-music-sdk/browser";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token", storefront: "us" });
+const music = createBrowserClient({
+  tokenUrl: "/api/music/token",
+  storefront: "us",
+});
 
-const album = await music.catalog.getAlbum("1613600183", { include: ["tracks"] });
+const album = await music.catalog.getAlbum("1613600183", {
+  include: ["tracks"],
+});
 const tracks = album.relationships?.tracks?.data ?? [];
 ```
 
@@ -125,11 +135,17 @@ In a React component, `usePreviewPlayer` from `@open-music-sdk/react` gives you 
 functions:
 
 ```tsx
-import { usePreviewPlayer, type tMusicVideo, type tSong } from "@open-music-sdk/react";
+import {
+  usePreviewPlayer,
+  type tMusicVideo,
+  type tSong,
+} from "@open-music-sdk/react";
 import { useEffect } from "react";
 
-export function Previews({ tracks }: { tracks: readonly (tSong | tMusicVideo)[] }) {
-  const { state, load, play, pause, next } = usePreviewPlayer<tSong | tMusicVideo>();
+type tTrack = tSong | tMusicVideo;
+
+export function Previews({ tracks }: { tracks: readonly tTrack[] }) {
+  const { state, load, play, pause, next } = usePreviewPlayer<tTrack>();
 
   useEffect(() => {
     load(tracks);

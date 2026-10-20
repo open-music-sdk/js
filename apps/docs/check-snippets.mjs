@@ -35,8 +35,29 @@ for (const page of pages)
     else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that ends`);
   }
 
-if (broken.length) {
-  console.error(`${broken.length} snippet(s) of a file or region that is not there:\n${broken.join("\n")}`);
-  process.exit(1);
+// A code block on the site shows about 86 characters before it scrolls, margins aside, so a block of code a reader
+// copies keeps every line to 80. The samples' own lines are held to 80 by ESLint. A block of data a line break would
+// change, such as an HTTP header, a .env file's key or an error message quoted whole, is labelled for what it is
+// (http, dotenv, or nothing) and left as it is.
+const WIDTH = 80;
+const CODE = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs", "sh", "bash", "shell", "html", "vue", "css", "json", "jsonc", "yaml", "yml"]);
+const wide = [];
+let blocks = 0;
+// README.md is the docs package's own, and not part of the site.
+for (const page of pages.filter((page) => page !== "README.md")) {
+  let language;
+  readFileSync(`${root}/${page}`, "utf8").split(/\r?\n/).forEach((line, i) => {
+    const fence = /^\s*```+\s*([\w-]*)/.exec(line);
+    if (fence) {
+      language = language === undefined ? fence[1] : undefined;
+      if (language !== undefined && CODE.has(language)) blocks += 1;
+      return;
+    }
+    if (language !== undefined && CODE.has(language) && line.length > WIDTH) wide.push(`${page}:${i + 1} is ${line.length} characters`);
+  });
 }
-console.log(`Snippets checked: ${snippets}, on ${pages.length} pages.`);
+
+if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there:\n${broken.join("\n")}`);
+if (wide.length) console.error(`${wide.length} line(s) of code blocks over ${WIDTH} characters, which the site would scroll:\n${wide.join("\n")}`);
+if (broken.length || wide.length) process.exit(1);
+console.log(`Snippets checked: ${snippets}, on ${pages.length} pages; ${blocks} code blocks within ${WIDTH} characters.`);

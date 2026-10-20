@@ -38,7 +38,9 @@ and configures it before the click.
 ```ts
 import { createConnect } from "@open-music-sdk/browser";
 
-const signIn = createConnect(music, { app: { name: "Vinyl Collector Simulator" } });
+const signIn = createConnect(music, {
+  app: { name: "Vinyl Collector Simulator" },
+});
 ```
 
 `app` is what Apple's script is configured with. You can add `app.build`, your app's version.
@@ -49,7 +51,11 @@ Apple's sign-in window doesn't show `app.name`. It names your app by your page's
 itself.
 
 ```html
-<link rel="apple-music-app-icon" sizes="120x120" href="https://app.example/music-icon-240.png">
+<link
+  rel="apple-music-app-icon"
+  sizes="120x120"
+  href="https://app.example/music-icon-240.png"
+>
 ```
 
 The script is one download from Apple, about 140 kB compressed as measured on 10 October 2026, made only by a
@@ -165,7 +171,9 @@ listener, which is what `signedIn` received above:
 
 ```ts
 async function signedIn(listener: typeof music) {
-  for await (const playlist of listener.user.listLibraryPlaylists()) console.log(playlist.attributes?.name);
+  for await (const playlist of listener.user.listLibraryPlaylists()) {
+    console.log(playlist.attributes?.name);
+  }
 }
 ```
 
@@ -193,7 +201,12 @@ disposes of it when the component unmounts. `<MusicProvider>` holds the token in
 Steps 6 and 7 apply as they are.
 
 ```tsx
-import { MusicProvider, createBrowserClient, useConnect, useMusicUserToken } from "@open-music-sdk/react";
+import {
+  MusicProvider,
+  createBrowserClient,
+  useConnect,
+  useMusicUserToken,
+} from "@open-music-sdk/react";
 
 // Created once, outside the tree.
 const music = createBrowserClient({ tokenUrl: "/api/music/token" });
@@ -207,15 +220,21 @@ export function App() {
 }
 
 function SignIn() {
-  const { isReady, error, connect, disconnect } = useConnect({ app: { name: "Vinyl Collector Simulator" } });
+  const { isReady, error, connect, disconnect } = useConnect({
+    app: { name: "Vinyl Collector Simulator" },
+  });
   const [token] = useMusicUserToken();
-  if (token) return <button onClick={() => void disconnect().catch(showWhyNot)}>Sign out</button>;
+  const signIn = () => void connect().catch(showWhyNot);
+  const signOut = () => void disconnect().catch(showWhyNot);
+  if (token) return <button onClick={signOut}>Sign out</button>;
   return (
     <>
-      <button disabled={!isReady} onClick={() => void connect().catch(showWhyNot)}>
+      <button disabled={!isReady} onClick={signIn}>
         Connect Apple Music
       </button>
-      {error !== undefined && <p>Apple Music sign-in isn't available right now.</p>}
+      {error !== undefined && (
+        <p>Apple Music sign-in isn't available right now.</p>
+      )}
     </>
   );
 }

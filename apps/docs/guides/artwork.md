@@ -18,7 +18,8 @@ Anywhere, read the artwork from the resource's attributes:
 
 ```ts
 const artwork = song.attributes?.artwork;
-// { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000, bgColor: "…", … }
+// { url: "https://…/{w}x{h}bb.jpg", width: 3000, height: 3000,
+//   bgColor: "…", … }
 ```
 
 Some resources have no artwork, and a resource can come without its attributes. The functions take an artwork,
@@ -36,7 +37,8 @@ import { artworkImage } from "@open-music-sdk/browser";
 
 if (artwork) Object.assign(img, artworkImage(artwork, 300));
 // img.src     https://…/300x300bb.jpg
-// img.srcset  https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x, https://…/900x900bb.jpg 3x
+// img.srcset  https://…/300x300bb.jpg 1x, https://…/600x600bb.jpg 2x,
+//             https://…/900x900bb.jpg 3x
 // img.width   300
 // img.height  300
 ```
