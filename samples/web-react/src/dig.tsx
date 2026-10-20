@@ -85,11 +85,7 @@ function GenreCrates({ storefront }: { storefront: string }) {
   const queries = useMusicQueries();
   const genres = useInfiniteQuery(queries.catalog.listGenres({ storefront }));
   useShowError(genres.error);
-  // Every page of them, one after another.
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = genres;
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  useEveryPage(genres);
 
   const pages = genres.data?.pages ?? [];
   const all = pages.flatMap((page): tGenre[] => page.data);
@@ -157,6 +153,26 @@ function GenreCrate({ genre, label, storefront }: tGenreCrateProps) {
   );
 }
 
+interface tWalk {
+  readonly hasNextPage: boolean;
+  readonly isFetchingNextPage: boolean;
+  readonly isFetchNextPageError: boolean;
+  readonly fetchNextPage: () => Promise<unknown>;
+}
+
+/**
+ * Asks for every page of a walk, one after another. A page that fails is not
+ * asked for again: its error is said, and the pages before it are drawn.
+ */
+function useEveryPage(walk: tWalk): void {
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError } = walk;
+  const { fetchNextPage } = walk;
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || isFetchNextPageError) return;
+    void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
+}
+
 /** What an empty crate says while its list is asked for, or once it failed. */
 function waitingFor(query: {
   readonly isPending: boolean;
@@ -176,11 +192,7 @@ export function StorefrontPicker() {
   const queries = useMusicQueries();
   const walk = useInfiniteQuery(queries.catalog.listStorefronts());
   useShowError(walk.error);
-  // Every page of them, one after another.
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = walk;
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  useEveryPage(walk);
 
   if (signedIn) return null;
   const pages = walk.data?.pages ?? [];
