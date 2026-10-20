@@ -243,8 +243,14 @@ export function Crate(props: tCrateProps) {
       </div>
       <div className="caption">
         {/* What a screen reader says on a flip: the name and the artist, once
-            for each record that comes to the front. */}
-        <div className="said" aria-live="polite">
+            for each record that comes to the front. Drawn afresh when the
+            crate fills, since a screen reader says nothing of what a live
+            region holds as it appears: a list arriving is not a flip. */}
+        <div
+          key={sleeve === undefined ? "empty" : "filled"}
+          className="said"
+          aria-live="polite"
+        >
           {sleeve !== undefined && (
             <>
               <strong>{sleeve.name}</strong>
