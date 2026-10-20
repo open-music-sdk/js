@@ -1,0 +1,64 @@
+// Shows: searchCatalog.
+import { Suspense } from "react";
+import { lovedOf, storefront } from "@/lib/listener";
+import { getMusic } from "@/lib/music";
+import { catalogSleeves } from "@/lib/sleeves";
+import { LinkCrate } from "../../catalog";
+import { SongCrate } from "../../songs";
+import { BackToTheCrates, Pulling } from "../pages";
+
+type tSearchParams = Promise<{ term?: string | string[] | undefined }>;
+
+export default function SearchPage({
+  searchParams,
+}: {
+  searchParams: tSearchParams;
+}) {
+  return (
+    <>
+      <BackToTheCrates />
+      <Suspense fallback={<Pulling />}>
+        <Results searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function Results({ searchParams }: { searchParams: tSearchParams }) {
+  const { term } = await searchParams;
+  const text = typeof term === "string" ? term.trim() : "";
+  if (text === "") return <p>Search the catalog with the box above.</p>;
+  const where = await storefront();
+  const { results } = await getMusic().catalog.searchCatalog(text, {
+    types: ["songs", "albums", "artists", "playlists"],
+    limit: 20,
+    storefront: where,
+  });
+  const { songs, albums, artists, playlists } = results;
+  const loved = await lovedOf(songs?.data ?? []);
+  return (
+    <>
+      <h2>Results for "{text}"</h2>
+      <div className="crates">
+        <SongCrate
+          label="Songs"
+          tracks={songs?.data ?? []}
+          loved={loved}
+          storefront={where}
+        />
+        <LinkCrate
+          label="Albums"
+          sleeves={catalogSleeves(albums?.data ?? [])}
+        />
+        <LinkCrate
+          label="Artists"
+          sleeves={catalogSleeves(artists?.data ?? [])}
+        />
+        <LinkCrate
+          label="Playlists"
+          sleeves={catalogSleeves(playlists?.data ?? [])}
+        />
+      </div>
+    </>
+  );
+}

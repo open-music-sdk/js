@@ -18,21 +18,24 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
    pnpm install
    ```
 
-2. Copy [`.env.example`](./.env.example) to the server sample you run, and fill it in. Never commit the copy.
+2. Copy [`.env.example`](./.env.example) to the server you run, and fill it in. Never commit the copy.
 
    | Server | Copy it to |
    | --- | --- |
    | `express-server` | `samples/express-server/.env` |
    | `worker-server` | `samples/worker-server/.env` |
+   | `web-nextjs`, its own server | `samples/web-nextjs/.env.local` |
 
    The Worker reads `.env`, not Wrangler's usual `.dev.vars`, because the page's dev server refuses to serve a
    file named `.env` and would serve `.dev.vars` to any page that asked for it.
 
-3. Run a page with a server, from the repository's root. Turborepo builds the packages first.
+3. Run a page with a server, or the Next app alone, from the repository's root. Turborepo builds the packages
+   first.
 
    ```sh
    pnpm turbo dev --filter=web-vanilla --filter=express-server
-   pnpm turbo dev --filter=web-vanilla --filter=worker-server
+   pnpm turbo dev --filter=web-react --filter=worker-server
+   pnpm turbo dev --filter=web-nextjs
    ```
 
 4. Open <http://localhost:2728>. Use `localhost`, not `127.0.0.1`: the developer token is bound to that origin.
@@ -44,8 +47,9 @@ The build that `pnpm turbo dev` starts with writes the generated files under `pa
 `packages/validate/src` again, with LF line endings. On a checkout with CRLF endings git then shows them changed,
 with nothing in them changed. `git checkout -- packages/types/src packages/validate/src` puts them back.
 
-Any page runs with any server. Both servers listen on `127.0.0.1:8787` and answer the same routes, and the page's
-dev server forwards `/api` to whichever one runs, so the page and its server share one origin.
+Either Vite page runs with either server. Both servers listen on `127.0.0.1:8787` and answer the same routes, and
+the page's dev server forwards `/api` to whichever one runs, so the page and its server share one origin. Every page
+sample serves on `localhost:2728`, so only one runs at a time.
 
 | Route | What it does |
 | --- | --- |
@@ -55,6 +59,9 @@ dev server forwards `/api` to whichever one runs, so the page and its server sha
 
 A listener is a random id in a cookie, `crate_session`, which the server gives with its first answer.
 
+The Next app has the first two routes under its own `app/api`, and needs no third: its pages ask Apple for the
+listener on the server.
+
 ## The samples
 
 | Sample | Runs on | Shows |
@@ -62,13 +69,15 @@ A listener is a random id in a cookie, `crate_session`, which the server gives w
 | [`express-server`](./express-server) | Node 24 and Express 5 | `createServerClient`, `tokenEndpoint` mounted on Express, `acceptUserToken` behind Express's own body parser, `MemoryUserTokenStore`, `forUser` |
 | [`worker-server`](./worker-server) | Cloudflare Workers, locally through Wrangler | the same routes with `userTokenIntake` and `KvUserTokenStore` |
 | [`web-vanilla`](./web-vanilla) | A page built with Vite, no framework | `createBrowserClient`, `createConnect`, `previewPlayer`, the catalog, the listener's library, and the playlist tools |
+| [`web-react`](./web-react) | A React page built with Vite, with TanStack Query | `MusicProvider`, `useConnect`, `usePreviewPlayer`, `useMusicQueries` with `useQuery` and `useInfiniteQuery`, `useMutation` over `useMusic` |
+| [`web-nextjs`](./web-nextjs) | Next.js 16, its own server | server components and server actions through `forUser`, `tokenEndpoint` and `userTokenIntake` as routes, `musicQueries` prefetched, `"use cache"`, `next/image` with `artworkUrl` |
 
-The two servers answer the same routes. Each page sample has the same screens, in files of the same names, so
-two page samples side by side show what a framework changes. Each file starts with the exports it shows and the
-guide it pairs with.
+The two servers answer the same routes. Each page sample has the same crates and screens, and the two Vite pages
+keep them in files of the same names, so two samples side by side show what a framework changes. Each file starts
+with the exports it shows and the guide it pairs with.
 
-[`export-check`](./export-check) is a test, not an app. It fails when an export of `server` or `browser` is used by
-no sample and is not on its list of exceptions, each with the reason.
+[`export-check`](./export-check) is a test, not an app. It fails when an export of `server`, `browser` or `react` is
+used by no sample and is not on its list of exceptions, each with the reason.
 
 ## What they leave out
 
@@ -77,14 +86,15 @@ sample into one.
 
 - Accounts and real sessions. A listener is any id a browser presents in the `crate_session` cookie: not checked
   as one the server gave, not renewed at sign-in, and not `Secure`.
-- Lasting, encrypted storage. The Express server forgets its tokens when it stops. The Worker's tokens sit in
-  plain text in `.wrangler/state` until you delete it.
+- Lasting, encrypted storage. The Express server and the Next app forget their tokens when they stop. The Worker's
+  tokens sit in plain text in `.wrangler/state` until you delete it.
 - Rate limits on the two routes. A deployed token route hands tokens to anyone who asks, and the user-token route
   costs a request to Apple for each token posted to it.
-- A content security policy. Vite's dev server injects inline scripts, which a strict policy refuses. The CLI's
-  sign-in page sets one, in [`apps/cli/src/loopback.ts`](../apps/cli/src/loopback.ts).
+- A content security policy. Vite's and Next's dev servers inject inline scripts, which a strict policy refuses.
+  The CLI's sign-in page sets one, in [`apps/cli/src/loopback.ts`](../apps/cli/src/loopback.ts).
 - An icon of your own. The page's `apple-music-app-icon` link points at this project's logo, which Apple's sign-in
   window shows beside your page's host.
 - Music videos in the crate. They play, but the playlist tools are shown with songs.
 - Deployment. A build exists only to check that a sample bundles. The servers answer only requests sent to
-  `127.0.0.1:8787` or to the page's own host, and refuse to start without `PAGE_ORIGIN`.
+  `127.0.0.1:8787` or to the page's own host, and refuse to start without `PAGE_ORIGIN`. The Next app answers only
+  requests sent to the page's host, and refuses each one without `PAGE_ORIGIN`.

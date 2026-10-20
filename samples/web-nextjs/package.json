@@ -1,0 +1,27 @@
+{
+  "name": "web-nextjs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vinyl Collector Simulator as a Next.js app, its own server: the catalog and the listener's library rendered on the server, a server action for everything the listener does, and only sign-in and previews in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 2728 --hostname localhost",
+    "build": "next build",
+    "typecheck": "next typegen && tsc -p tsconfig.json",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config ."
+  },
+  "dependencies": {
+    "@open-music-sdk/core": "workspace:*",
+    "@open-music-sdk/react": "workspace:*",
+    "@open-music-sdk/server": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}

@@ -2,7 +2,7 @@
   "name": "samples-export-check",
   "version": "0.0.0",
   "private": true,
-  "description": "Holds the sample apps to using every export of the integrations, or saying why one does not.",
+  "description": "Holds the sample apps to using every export of the three integrations, or saying why one does not.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -13,9 +13,12 @@
     "@open-music-sdk/browser": "workspace:*",
     "@open-music-sdk/client-catalog": "workspace:*",
     "@open-music-sdk/client-user": "workspace:*",
+    "@open-music-sdk/react": "workspace:*",
     "@open-music-sdk/server": "workspace:*",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "react": "catalog:",
     "tooling-vitest-config": "workspace:*",
     "vitest": "catalog:"
   }

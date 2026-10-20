@@ -22,13 +22,14 @@ subscription.
    pnpm install
    ```
 
-2. Copy `samples/.env.example` to the server sample you run, as `.env`, and fill it in:
-   `samples/express-server/.env` or `samples/worker-server/.env`.
+2. Copy `samples/.env.example` to the server you run, and fill it in: `samples/express-server/.env`,
+   `samples/worker-server/.env`, or `samples/web-nextjs/.env.local` for the Next app, which is its own server.
 
-3. Run a page with a server, from the repository's root:
+3. Run a page with a server, or the Next app alone, from the repository's root:
 
    ```sh
    pnpm turbo dev --filter=web-vanilla --filter=express-server
+   pnpm turbo dev --filter=web-nextjs
    ```
 
 4. Open `http://localhost:2728` in your browser. Use `localhost`, not `127.0.0.1`: the developer token is bound to
@@ -37,12 +38,13 @@ subscription.
 5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
    `localhost:2728`, which any other app you later serve on that port could read.
 
-Any page runs with any server: swap `express-server` for `worker-server` to run the Worker instead.
+Either Vite page runs with either server: swap `web-vanilla` for `web-react`, or `express-server` for
+`worker-server`. Every page sample serves on `localhost:2728`, so only one runs at a time.
 
 ::: warning Keep the key in a file named `.env`
-The file you copied holds your private key. The repository ignores it, and the page's dev server refuses to serve
-it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that reason: the dev server would serve a
-`.dev.vars` to any page that asked for it.
+The file you copied holds your private key. The repository ignores it, and the Vite pages' dev server refuses to
+serve it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that reason: the dev server would
+serve a `.dev.vars` to any page that asked for it. Next serves nothing from its project folder but `public`.
 :::
 
 ## The samples
@@ -52,10 +54,12 @@ it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that re
 | [`express-server`](https://github.com/open-music-sdk/js/tree/main/samples/express-server) | Node 24 and Express 5 | `createServerClient`, `tokenEndpoint` mounted on Express, `acceptUserToken` behind Express's body parser, `MemoryUserTokenStore`, `forUser` |
 | [`worker-server`](https://github.com/open-music-sdk/js/tree/main/samples/worker-server) | Cloudflare Workers, through Wrangler on your machine | `tokenEndpoint`, `userTokenIntake`, `KvUserTokenStore`, `forUser` |
 | [`web-vanilla`](https://github.com/open-music-sdk/js/tree/main/samples/web-vanilla) | A page built with Vite, with no framework | `createBrowserClient`, `createConnect`, `previewPlayer`, the catalog, the listener's library, and the playlist tools |
+| [`web-react`](https://github.com/open-music-sdk/js/tree/main/samples/web-react) | A React page built with Vite, with TanStack Query | `MusicProvider`, `useConnect`, `usePreviewPlayer`, `useMusicQueries` with `useQuery` and `useInfiniteQuery`, `useMutation` over `useMusic` |
+| [`web-nextjs`](https://github.com/open-music-sdk/js/tree/main/samples/web-nextjs) | Next.js 16, its own server | Server components and server actions through `forUser`, `tokenEndpoint` and `userTokenIntake` as routes, `musicQueries` prefetched, `"use cache"`, `next/image` with `artworkUrl` |
 
-The two servers answer the same routes. Each page sample has the same screens, in files of the same names, so
-two page samples side by side show what a framework changes. Each file starts with a comment that names the
-exports it shows and the guide it pairs with.
+The two servers answer the same routes. Each page sample has the same crates and screens, and the two Vite pages
+keep them in files of the same names, so two samples side by side show what a framework changes. Each file starts
+with a comment that names the exports it shows and the guide it pairs with.
 
 ## How a page and its server talk
 
@@ -69,3 +73,6 @@ whichever one runs, so the page and its server share one origin, and the page's 
 | `GET /api/me/recent` | What the listener played lately, asked by the server with the token it kept | [Keep a listener's token on your server](./guides/store-user-tokens) |
 
 A listener is a random id in a cookie the server gives with its first answer. A real app uses its own sessions.
+
+The Next app answers the first two routes under its own `app/api`, and needs no third: its pages ask Apple for the
+listener on the server, with the token the second route kept.
