@@ -32,7 +32,7 @@ signIn.ready
     signInButton.disabled = false;
   });
 
-// #region keep
+// #region after-sign-in
 /**
  * Hands the token to the server, which asks Apple whether it works and keeps it; then signs the
  * page in.
@@ -57,7 +57,7 @@ async function keep(token: string): Promise<void> {
   const where = storefront.attributes?.name ?? storefront.id;
   say(`Signed in. You're digging in the ${where} storefront.`);
 }
-// #endregion keep
+// #endregion after-sign-in
 
 signOutButton.onclick = () => {
   signOut().catch(showError);

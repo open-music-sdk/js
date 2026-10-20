@@ -178,7 +178,7 @@ delete the token it stored.
 The [vanilla sample](../samples) does both. It posts the token, and once its server has kept it, it reads the
 listener's library from the page too:
 
-<<< @/../../samples/web-vanilla/src/sign-in.ts#keep{ts}
+<<< @/../../samples/web-vanilla/src/sign-in.ts#after-sign-in{ts}
 
 ::: warning Apple's script keeps a copy of the token
 Apple's script keeps its own copy of the token in the browser's storage, which is how a returning listener is
