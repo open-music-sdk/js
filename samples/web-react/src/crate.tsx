@@ -30,12 +30,15 @@ interface tHeld {
   readonly picks: readonly tSong[];
   /** Which song is in front: the one last put in or moved. */
   readonly at: number;
+  /** Counts each put in, move and take out, each bringing `at` to the front. */
+  readonly turn: number;
 }
 
 interface tYourCrate {
   /** The songs picked so far, in order. Page state: a reload empties it. */
   readonly picks: readonly tSong[];
   readonly at: number;
+  readonly turn: number;
   /** Whether the crate is empty again because the storefront changed. */
   readonly emptied: boolean;
   /** Puts a song in, found in this storefront. */
@@ -52,7 +55,12 @@ const YourCrate = createContext<tYourCrate | undefined>(undefined);
  */
 export function CrateProvider({ children }: { children: ReactNode }) {
   const { storefront } = useNow();
-  const [held, setHeld] = useState<tHeld>({ storefront, picks: [], at: 0 });
+  const [held, setHeld] = useState<tHeld>({
+    storefront,
+    picks: [],
+    at: 0,
+    turn: 0,
+  });
   // Another storefront has other ids, so the songs found in one are not shown
   // in another: the crate is empty again.
   const here = held.storefront === storefront;
@@ -69,11 +77,14 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       // the page shows.
       if (foundIn !== storefrontNow.current) return;
       setHeld((was) => {
+        const turn = was.turn + 1;
         const picks = was.storefront === foundIn ? was.picks : [];
         const index = picks.findIndex(({ id }) => id === song.id);
-        if (index !== -1) return { storefront: foundIn, picks, at: index };
+        if (index !== -1) {
+          return { storefront: foundIn, picks, at: index, turn };
+        }
         const added = [...picks, song];
-        return { storefront: foundIn, picks: added, at: picks.length };
+        return { storefront: foundIn, picks: added, at: picks.length, turn };
       });
       say(`${song.attributes?.name ?? "The song"} is in the crate.`);
     };
@@ -81,18 +92,19 @@ export function CrateProvider({ children }: { children: ReactNode }) {
       setHeld((was) => {
         const picks = [...was.picks];
         picks.splice(to, 0, ...picks.splice(from, 1));
-        return { ...was, picks, at: to };
+        return { ...was, picks, at: to, turn: was.turn + 1 };
       });
     };
     const takeOut = (index: number) => {
       setHeld((was) => {
         const picks = was.picks.filter((_, each) => each !== index);
-        return { ...was, picks, at: index };
+        return { ...was, picks, at: index, turn: was.turn + 1 };
       });
     };
     return {
       picks: here ? held.picks : [],
       at: here ? held.at : 0,
+      turn: held.turn,
       emptied: !here && held.picks.length > 0,
       pick,
       move,
@@ -113,7 +125,7 @@ export function useCrate(): tYourCrate {
  * front. Its order is the playlist's.
  */
 export function CrateScreen() {
-  const { picks, at, emptied, move, takeOut } = useCrate();
+  const { picks, at, turn, emptied, move, takeOut } = useCrate();
   const { signedIn } = useNow();
   const playFrom = usePlayFrom();
 
@@ -168,7 +180,13 @@ export function CrateScreen() {
     <>
       <p>Songs you picked while digging. A reload empties the crate.</p>
       <div className="crates">
-        <Crate label="Your crate" sleeves={sleeves} at={at} empty={empty} />
+        <Crate
+          label="Your crate"
+          sleeves={sleeves}
+          at={at}
+          turn={turn}
+          empty={empty}
+        />
       </div>
       <PasteForm />
       {signedIn && picks.length > 0 && <SendForm picks={picks} />}

@@ -15,11 +15,13 @@ interface tCrateProps {
   /** The label taped on the crate: the list's name. */
   readonly label: string;
   readonly sleeves: readonly tSleeve[];
-  /**
-   * Which sleeve is in front: to begin with, and again each time it changes,
-   * as it does in your crate when a song moves.
-   */
+  /** Which sleeve is in front to begin with, and at each new `turn`. */
   readonly at?: number;
+  /**
+   * Changes each time the sleeve at `at` comes to the front again, as one put
+   * in or moved does in your crate, wherever the listener had flipped to.
+   */
+  readonly turn?: number;
   /**
    * Asks for the next sleeves, as the listener nears the back of the crate.
    * They arrive as more `sleeves`. None means there are no more.
@@ -40,13 +42,14 @@ const SWIPE = 40;
  * keys, a swipe, or a click on an edge.
  */
 export function Crate(props: tCrateProps) {
-  const { label, sleeves, at = 0, more, looking = false, ref } = props;
-  const { empty = "Nothing in this one." } = props;
+  const { label, sleeves, at = 0, turn = 0, more, ref } = props;
+  const { looking = false, empty = "Nothing in this one." } = props;
   const [front, setFront] = useState(at);
-  // A new `at` brings that sleeve to the front.
-  const [lastAt, setLastAt] = useState(at);
-  if (at !== lastAt) {
-    setLastAt(at);
+  // A new turn brings the sleeve at `at` to the front, even when that is the
+  // place it had.
+  const [lastTurn, setLastTurn] = useState(turn);
+  if (turn !== lastTurn) {
+    setLastTurn(turn);
     setFront(at);
   }
   // Sleeves can go, as a song taken out of your crate does, so the one in
