@@ -35,6 +35,10 @@ function made(): tServer {
     pem: required("APPLE_MUSIC_PRIVATE_KEY"),
     teamId: required("APPLE_MUSIC_TEAM_ID"),
     keyId: required("APPLE_MUSIC_KEY_ID"),
+    // The storefront of a catalog call that names none, as the guides'
+    // shorter examples do. The sample's own calls each name the storefront the
+    // page is in.
+    storefront: "us",
     userTokenStore: store,
     rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }),
   });

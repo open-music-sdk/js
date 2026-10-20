@@ -89,7 +89,10 @@ client component of its own. In `app/providers.tsx`:
 import { MusicProvider, createBrowserClient } from "@open-music-sdk/react";
 import type { ReactNode } from "react";
 
-const music = createBrowserClient({ tokenUrl: "/api/music/token" });
+const music = createBrowserClient({
+  tokenUrl: "/api/music/token",
+  storefront: "us",
+});
 
 export function Providers({ children }: { children: ReactNode }) {
   return <MusicProvider music={music}>{children}</MusicProvider>;

@@ -120,17 +120,27 @@ import {
   QueryClient,
   dehydrate,
 } from "@tanstack/react-query";
-import { music } from "@/lib/music"; // the client from createServerClient
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { getMusic } from "@/lib/music"; // the server's client, from Next.js
 import { Album } from "./album"; // the client component from step 1
 
-export default async function AlbumPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+type tParams = Promise<{ id: string }>;
+
+export default function AlbumPage({ params }: { params: tParams }) {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Prefetched params={params} />
+    </Suspense>
+  );
+}
+
+async function Prefetched({ params }: { params: tParams }) {
+  await connection();
   const { id } = await params;
   const queryClient = new QueryClient();
-  await queryClient.prefetchQuery(musicQueries(music).catalog.getAlbum(id));
+  const query = musicQueries(getMusic()).catalog.getAlbum(id);
+  await queryClient.prefetchQuery(query);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <Album id={id} />
@@ -139,7 +149,10 @@ export default async function AlbumPage({
 }
 ```
 
-`musicQueries(music)` builds its keys in scope 0, which is the page's scope until a listener signs in (see
+`<Suspense>` and `await connection()` are what a Next app with Cache Components asks of a read made at each
+request: see step 6 of [Next.js](./nextjs).
+
+`musicQueries(getMusic())` builds its keys in scope 0, which is the page's scope until a listener signs in (see
 step 5). So a prefetched query matches the page's query when both are called with the same arguments. Give the
 server's client and the page's client the same storefront: a key holds the call's arguments, not the client's
 storefront.
