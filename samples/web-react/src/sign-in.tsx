@@ -19,9 +19,9 @@ export function SignIn() {
   const { isReady, error, connect, disconnect } = useConnect({
     app: { name: "Vinyl Collector Simulator" },
   });
-  const [token] = useMusicUserToken();
+  const [token, setToken] = useMusicUserToken();
   const music = useMusic();
-  const { signIn } = useNow();
+  const { signedIn, signIn } = useNow();
   // Why the script cannot be had, or why the last sign-in failed.
   useShowError(error);
 
@@ -43,14 +43,15 @@ export function SignIn() {
         body: JSON.stringify({ token: posted }),
         signal,
       });
-      if (!answer.ok) {
+      if (answer.status === 422) {
         say(fromServer(answer.status));
         // Apple's script keeps the token Apple refused, and would hand it back
         // at the next sign-in: leave it, so that the listener can sign in with
         // another account.
-        if (answer.status === 422) await disconnect();
+        await disconnect();
         return;
       }
+      if (!answer.ok) throw new Error(fromServer(answer.status));
       // useMusic() is bound to the listener by now. The storefront their
       // account is in, from Apple.
       const storefront = await music.user.getUserStorefront({ signal });
@@ -58,11 +59,15 @@ export function SignIn() {
       const where = storefront.attributes?.name ?? storefront.id;
       say(`Signed in. You're digging in the ${where} storefront.`);
     }
-    keep(token).catch(showError);
+    keep(token).catch((e: unknown) => {
+      showError(e);
+      // A sign-in that failed is not kept, so that Sign in tries again.
+      if (!signal.aborted) setToken(undefined);
+    });
     return () => {
       stop.abort();
     };
-  }, [token, music, disconnect, signIn]);
+  }, [token, music, disconnect, signIn, setToken]);
   // #endregion after-sign-in
 
   // Apple's own sign-out, which ends the token at Apple and makes the provider
@@ -73,7 +78,7 @@ export function SignIn() {
     say("Signed out.");
   }
 
-  if (token !== undefined) {
+  if (signedIn) {
     return (
       <button
         type="button"
@@ -86,12 +91,14 @@ export function SignIn() {
     );
   }
   // The button works once the script has loaded, or failed to: connect() loads
-  // it afresh after a load that failed.
+  // it afresh after a load that failed. It waits while the server is asked
+  // about a token.
   const settled = isReady || error !== undefined;
+  const asking = token !== undefined;
   return (
     <button
       type="button"
-      disabled={!settled}
+      disabled={!settled || asking}
       onClick={() => {
         // A failure is in `error` too, and said from there.
         connect().catch(() => undefined);
