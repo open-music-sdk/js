@@ -29,13 +29,14 @@ export function Cover({ artwork, size, lazy = false }: tCoverProps) {
   const loader: ImageLoader = ({ width }) => artworkUrl(artwork, width);
   // A URL with no size to fill in, as the artwork of a listener's own
   // playlist has, is one image at every width: next/image is told so, rather
-  // than handed a loader that cannot honour a width.
+  // than handed a loader that cannot honour a width. It then uses `src` as it
+  // is, so that comes from artworkUrl too, where a `hosts` check would run.
   const sized = artwork.url.includes("{w}");
   return (
     <Image
       loader={loader}
       unoptimized={!sized}
-      src={artwork.url}
+      src={sized ? artwork.url : artworkUrl(artwork, size)}
       alt=""
       width={size}
       height={size}

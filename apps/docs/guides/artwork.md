@@ -193,8 +193,9 @@ What the sample showed, on 20 October 2026, in Next 16:
 - `remotePatterns` in your Next config doesn't apply under a loader of your own, so nothing checks where the URL
   points but `hosts`, as in step 6. Pass it to `artworkUrl` for artwork from anywhere but Apple's API.
 - A URL with no size to fill in, as the artwork of a listener's own playlist has, is the same image at every width.
-  Next warns about a loader that can't honour a width, so the sample passes `unoptimized` for such a URL, and Next
-  uses it as it is.
+  Next warns about a loader that can't honour a width, so the sample passes `unoptimized` for such a URL. Next then
+  calls no loader and uses `src` as it is, so the sample's `src` for it comes from `artworkUrl` too, where `hosts`
+  would be checked.
 
 ## When something goes wrong
 
