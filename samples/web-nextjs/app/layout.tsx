@@ -1,5 +1,6 @@
 // The page around every route: the providers, and the header the server draws
 // for whoever is signed in.
+import { isAppleMusicError } from "@open-music-sdk/server";
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { storefronts } from "@/lib/catalog";
@@ -53,7 +54,7 @@ async function ForTheListener() {
   const signedIn = you !== undefined;
   const picker = signedIn
     ? undefined
-    : <StorefrontPicker current={where} storefronts={await storefronts()} />;
+    : <StorefrontPicker current={where} storefronts={await pickable(where)} />;
   return (
     <>
       <Nav signedIn={signedIn} storefront={where} />
@@ -61,4 +62,17 @@ async function ForTheListener() {
       <SignIn signedIn={signedIn} />
     </>
   );
+}
+
+/**
+ * The storefronts the picker offers. If Apple won't list them, it offers the
+ * one the page is in, and the header is drawn all the same.
+ */
+async function pickable(current: string) {
+  try {
+    return await storefronts();
+  } catch (e) {
+    if (!isAppleMusicError(e)) throw e;
+    return [{ id: current, name: current }];
+  }
 }

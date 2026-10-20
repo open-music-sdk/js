@@ -43,9 +43,7 @@ async function Library({ searchParams }: { searchParams: tSearchParams }) {
     <>
       <FindForm />
       {typeof find === "string" && find.trim() !== "" && (
-        <Suspense fallback={<p>Looking…</p>}>
-          <Found music={you.music} text={find.trim()} />
-        </Suspense>
+        <Found music={you.music} text={find.trim()} />
       )}
       <div className="crates">
         <ListCrate
@@ -153,9 +151,13 @@ async function Recommended({ music }: { music: tMusic }) {
  * library have no previews.
  */
 async function PlaylistTracks({ music, id }: { music: tMusic; id: string }) {
-  const playlist = await music.user.getLibraryPlaylist(id, {
-    include: ["tracks"],
-  });
+  let playlist;
+  try {
+    playlist = await music.user.getLibraryPlaylist(id, { include: ["tracks"] });
+  } catch (e) {
+    if (!isAppleMusicError(e)) throw e;
+    return <p>{explain(e)}</p>;
+  }
   const tracks = playlist.relationships?.tracks?.data ?? [];
   return (
     <>
@@ -175,26 +177,32 @@ async function PlaylistTracks({ music, id }: { music: tMusic; id: string }) {
 }
 
 /** What the listener's library holds of a search. */
-async function Found({ music, text }: { music: tMusic; text: string }) {
-  const { results } = await music.user.searchLibrary(text, {
-    types: ["library-songs", "library-albums"],
-    limit: 10,
-  });
-  const items = [
-    ...(results["library-songs"]?.data ?? []),
-    ...(results["library-albums"]?.data ?? []),
-  ];
+function Found({ music, text }: { music: tMusic; text: string }) {
   const nothing = "Nothing. Apple's library search finds a song by the first "
     + "word of its name more often than by the whole name.";
   return (
     <div className="crates">
-      <LinkCrate
+      <ListCrate
         label={`In your library: "${text}"`}
-        sleeves={cards(items)}
+        read={() => searchYourLibrary(music, text)}
         empty={nothing}
       />
     </div>
   );
+}
+
+async function searchYourLibrary(
+  listener: tMusic,
+  text: string,
+): Promise<tSleeveData[]> {
+  const { results } = await listener.user.searchLibrary(text, {
+    types: ["library-songs", "library-albums"],
+    limit: 10,
+  });
+  return cards([
+    ...(results["library-songs"]?.data ?? []),
+    ...(results["library-albums"]?.data ?? []),
+  ]);
 }
 
 /** Every item of a walk, which here is one page of it. */

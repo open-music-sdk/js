@@ -1,6 +1,9 @@
 // Your crate. The songs are the page's, in the browser; the playlists they
 // can go to are the listener's, from the server.
-import type { tLibraryPlaylist } from "@open-music-sdk/server";
+import {
+  isAppleMusicError,
+  type tLibraryPlaylist,
+} from "@open-music-sdk/server";
 import { Suspense } from "react";
 import { listener } from "@/lib/listener";
 import { CrateScreen } from "../crate";
@@ -13,7 +16,10 @@ export default function CratePage() {
   );
 }
 
-/** The listener's playlists they may add to, among the first 100. */
+/**
+ * The listener's playlists they may add to, among the first 100. If Apple
+ * won't list them, the crate can still go to a new playlist.
+ */
 async function ForTheListener() {
   const you = await listener();
   if (you === undefined) return <CrateScreen signedIn={false} editable={[]} />;
@@ -22,8 +28,12 @@ async function ForTheListener() {
     limit: 100,
     maxPages: 1,
   });
-  for await (const playlist of playlists) {
-    if (playlist.attributes?.canEdit === true) editable.push(playlist);
+  try {
+    for await (const playlist of playlists) {
+      if (playlist.attributes?.canEdit === true) editable.push(playlist);
+    }
+  } catch (e) {
+    if (!isAppleMusicError(e)) throw e;
   }
   return <CrateScreen signedIn editable={editable} />;
 }

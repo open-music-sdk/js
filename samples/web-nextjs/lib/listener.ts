@@ -54,10 +54,15 @@ export const listener = cache(async (): Promise<tListener | undefined> => {
     const storefront = await music.user.getUserStorefront();
     return { music, storefront: storefront.id };
   } catch (e) {
-    if (!isAppleMusicError(e, "UserTokenInvalid")) throw e;
+    if (!isAppleMusicError(e)) throw e;
     // Forget only the token Apple refused: the listener may have signed in
     // again, and a new token been stored, while this was on its way.
-    if ((await store.get(session)) === token) await store.delete(session);
+    const refused = isAppleMusicError(e, "UserTokenInvalid");
+    if (refused && (await store.get(session)) === token) {
+      await store.delete(session);
+    }
+    // Any other failure leaves the token kept, and this render drawn as for no
+    // one, rather than every page failing with it.
     return undefined;
   }
   // #endregion act-for-listener
