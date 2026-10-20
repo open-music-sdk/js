@@ -39,6 +39,10 @@ export function config({ tsconfigRootDir }: { tsconfigRootDir: string }) {
     { files: ["codegen/**", "apps/**", "samples/**"], rules: { "no-console": "off" } },
     // A sample names environment variables and a Worker's bindings as their platforms do: APPLE_MUSIC_TEAM_ID.
     { files: ["samples/**"], rules: { "@typescript-eslint/naming-convention": ["error", ...naming, { selector: "typeProperty", format: ["camelCase", "UPPER_CASE"] }] } },
+    // The docs show the sample apps' code, and a code block on the docs site fits about 86 characters before it
+    // scrolls. Comments and strings count too: a reader sees every line. The core rule is deprecated in favour of
+    // ESLint Stylistic's max-len, which takes the same options, should a later ESLint drop it.
+    { files: ["samples/{web-*,*-server}/**/*.{ts,tsx}"], rules: { "max-len": ["error", { code: 80, ignoreUrls: true }] } },
     // A package of hooks is held to the two rules of hooks: where one may be called, and what an effect depends on.
     { files: ["integrations/react/**"], plugins: { "react-hooks": reactHooks }, rules: { "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": "error" } },
     { files: ["**/*.{js,mjs,cjs}"], ...tseslint.configs.disableTypeChecked },

@@ -1,4 +1,5 @@
-// The crate every list is drawn as: sleeves standing in a box, flipped through one at a time. Nothing here asks Apple.
+// The crate every list is drawn as: sleeves standing in a box, flipped through
+// one at a time. Nothing here asks Apple.
 import { button, h } from "./dom";
 import { explain, showError } from "./errors";
 import { place, sleeveButton, type tSleeve } from "./sleeve";
@@ -6,17 +7,27 @@ import { place, sleeveButton, type tSleeve } from "./sleeve";
 interface tCrateOptions {
   /** Which sleeve is in front to begin with. */
   readonly at?: number;
-  /** Gives the next sleeves, asked for as the listener nears the back of the crate. None means there are no more. */
+  /**
+   * Gives the next sleeves, asked for as the listener nears the back of the
+   * crate. None means there are no more.
+   */
   readonly more?: () => Promise<tSleeve[]>;
-  /** What the crate says when it is empty, once it has asked for more if it can. */
+  /** What the crate says when empty, once it has asked for more if it can. */
   readonly empty?: string;
 }
 
 /** How far a swipe goes, in CSS pixels, to flip one sleeve. */
 const SWIPE = 40;
 
-/** A labelled crate of sleeves, flipped through with its buttons, the arrow keys, a swipe, or a click on an edge. */
-export function crate(label: string, sleeves: readonly tSleeve[], options: tCrateOptions = {}): HTMLElement {
+/**
+ * A labelled crate of sleeves, flipped through with its buttons, the arrow
+ * keys, a swipe, or a click on an edge.
+ */
+export function crate(
+  label: string,
+  sleeves: readonly tSleeve[],
+  options: tCrateOptions = {},
+): HTMLElement {
   const { at = 0, more, empty = "Nothing in this one." } = options;
   const all: tSleeve[] = [];
   const buttons: HTMLButtonElement[] = [];
@@ -27,10 +38,15 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
 
   const note = h("p", { className: "empty", textContent: empty });
   const bin = h("div", { className: "bin" }, note);
-  const previous = button("‹", () => { flip(front - 1); }, { ariaLabel: "Previous record" });
-  const next = button("›", () => { flip(front + 1); }, { ariaLabel: "Next record" });
+  const previous = button("‹", () => { flip(front - 1); }, {
+    ariaLabel: "Previous record",
+  });
+  const next = button("›", () => { flip(front + 1); }, {
+    ariaLabel: "Next record",
+  });
   const count = h("span");
-  // What a screen reader says on a flip: the name and the artist, once for each record that comes to the front.
+  // What a screen reader says on a flip: the name and the artist, once for each
+  // record that comes to the front.
   const said = h("div", { className: "said", ariaLive: "polite" });
   const actions = h("div", { className: "actions" });
 
@@ -43,8 +59,9 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
     }
   }
 
-  // In front, a click pulls the sleeve out; behind, it flips forward to that sleeve. The click that ends a swipe is
-  // not a click on a sleeve, though Enter afterwards is: a click from a key has no `detail`.
+  // In front, a click pulls the sleeve out; behind, it flips forward to that
+  // sleeve. The click that ends a swipe is not a click on a sleeve, though
+  // Enter afterwards is: a click from a key has no `detail`.
   function pull(index: number, event: MouseEvent): void {
     if (swiped && event.detail > 0) return;
     if (index === front) all[index]?.open?.();
@@ -52,21 +69,28 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
   }
 
   function flip(to: number): void {
-    const hadFocus = bin.contains(document.activeElement) || actions.contains(document.activeElement);
+    const focused = document.activeElement;
+    const hadFocus = bin.contains(focused) || actions.contains(focused);
     front = Math.max(0, Math.min(to, all.length - 1));
     buttons.forEach((drawn, index) => { place(drawn, index - front); });
 
     const sleeve = all[front];
     note.hidden = sleeve !== undefined;
-    count.textContent = all.length === 0 ? "" : `${String(front + 1)} / ${String(all.length)}`;
+    count.textContent = all.length === 0
+      ? ""
+      : `${String(front + 1)} / ${String(all.length)}`;
     previous.disabled = front === 0;
     next.disabled = front >= all.length - 1;
     if (sleeve !== inFront) showInFront(sleeve);
 
-    // Focus on a sleeve, or on an action of the record that left the front, goes to the sleeve in front: the
-    // arrow keys keep flipping, and Tab reaches its actions.
-    if (hadFocus && !actions.contains(document.activeElement)) buttons[front]?.focus({ preventScroll: true });
-    if (more !== undefined && !asking && front >= all.length - 3) askForMore(more);
+    // Focus on a sleeve, or on an action of the record that left the front,
+    // goes to the sleeve in front: the arrow keys keep flipping, and Tab
+    // reaches its actions.
+    if (hadFocus && !actions.contains(document.activeElement)) {
+      buttons[front]?.focus({ preventScroll: true });
+    }
+    const nearTheBack = front >= all.length - 3;
+    if (more !== undefined && !asking && nearTheBack) askForMore(more);
   }
 
   function showInFront(sleeve: tSleeve | undefined): void {
@@ -76,11 +100,15 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
       actions.replaceChildren();
       return;
     }
-    said.replaceChildren(h("strong", {}, sleeve.name), h("small", {}, sleeve.by ?? ""));
+    said.replaceChildren(
+      h("strong", {}, sleeve.name),
+      h("small", {}, sleeve.by ?? ""),
+    );
     actions.replaceChildren(...(sleeve.actions?.() ?? []));
   }
 
-  // An empty answer means there are no more, and a failure is said in the crate: neither is asked again.
+  // An empty answer means there are no more, and a failure is said in the
+  // crate: neither is asked again.
   function askForMore(ask: () => Promise<tSleeve[]>): void {
     asking = true;
     note.textContent = "Looking…";
@@ -98,14 +126,16 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
     );
   }
 
-  // A swipe across the sleeves flips one for each SWIPE pixels it goes: to the left for the next, to the right back.
+  // A swipe across the sleeves flips one for each SWIPE pixels it goes: to the
+  // left for the next, to the right back.
   let swipeFrom: number | undefined;
   bin.onpointerdown = (event) => {
     swipeFrom = event.clientX;
     swiped = false;
   };
   bin.onpointermove = (event) => {
-    if (swipeFrom === undefined || Math.abs(event.clientX - swipeFrom) < SWIPE) return;
+    if (swipeFrom === undefined) return;
+    if (Math.abs(event.clientX - swipeFrom) < SWIPE) return;
     flip(event.clientX < swipeFrom ? front + 1 : front - 1);
     swipeFrom = event.clientX;
     swiped = true;
@@ -140,7 +170,13 @@ export function crate(label: string, sleeves: readonly tSleeve[], options: tCrat
   flip(at);
   return h(
     "div",
-    { className: "crate", role: "group", ariaLabel: label, ariaRoleDescription: "crate", onkeydown },
+    {
+      className: "crate",
+      role: "group",
+      ariaLabel: label,
+      ariaRoleDescription: "crate",
+      onkeydown,
+    },
     bin,
     h("div", { className: "wall" }, h("h3", {}, label)),
     h("div", { className: "flip" }, previous, count, next),

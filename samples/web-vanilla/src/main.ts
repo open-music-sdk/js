@@ -1,4 +1,5 @@
-// The page: each screen's module starts it as it loads, and the header's tabs switch between them.
+// The page: each screen's module starts it as it loads, and the header's tabs
+// switch between them.
 import "./player";
 import "./dig";
 import "./search";
@@ -12,11 +13,14 @@ const tabs = document.querySelectorAll<HTMLButtonElement>("nav button");
 for (const tab of tabs) {
   tab.onclick = () => {
     for (const each of tabs) {
-      each.ariaPressed = String(each === tab);
-      document.getElementById(each.value)?.toggleAttribute("hidden", each !== tab);
+      const isThisTab = each === tab;
+      each.ariaPressed = String(isThisTab);
+      const screen = document.getElementById(each.value);
+      screen?.toggleAttribute("hidden", !isThisTab);
     }
   };
 }
 
-// Every page has its route by now, so an address the page was loaded with, such as a search, opens its page.
+// Every page has its route by now, so an address the page was loaded with, such
+// as a search, opens its page.
 drawPage();
