@@ -2,7 +2,7 @@
 // it says while Apple is asked.
 import { isAppleMusicError, type tArtwork } from "@open-music-sdk/server";
 import Link from "next/link";
-import { Cover } from "../artwork";
+import { Artwork } from "../artwork";
 import { explain } from "../errors";
 
 /** The link above every page a crate opens. */
@@ -37,7 +37,7 @@ interface tHeadingProps {
 export function Heading({ name, by, artwork }: tHeadingProps) {
   return (
     <div className="heading">
-      <Cover artwork={artwork} size={240} />
+      <Artwork artwork={artwork} width={240} alt="" loading="eager" />
       <h2>{name}</h2>
       <p>{by}</p>
     </div>

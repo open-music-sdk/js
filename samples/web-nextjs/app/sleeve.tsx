@@ -3,7 +3,7 @@
 // Nothing here asks Apple.
 import type { tArtwork } from "@open-music-sdk/react";
 import type { CSSProperties, MouseEvent, ReactNode, Ref } from "react";
-import { Cover } from "./artwork";
+import { Artwork } from "./artwork";
 
 /**
  * A record: its cover and names, what pulling it out does, and what can be done
@@ -43,7 +43,14 @@ export function SleeveButton({ sleeve, d, onClick, ref }: tSleeveButtonProps) {
   // may be the largest on the screen; the ones behind wait until they near it.
   const face = artwork === undefined
     ? <span>{name}</span>
-    : <Cover artwork={artwork} size={240} lazy={d !== 0} />;
+    : (
+      <Artwork
+        artwork={artwork}
+        width={240}
+        alt=""
+        loading={d === 0 ? "eager" : "lazy"}
+      />
+    );
   return (
     <button
       ref={ref}

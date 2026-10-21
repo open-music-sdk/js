@@ -180,10 +180,58 @@ into HTML by hand, escape it like any other attribute value, and don't put it in
 ## With `next/image`
 
 In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
-offers, and Apple's image server makes each one, so Next's own optimizer is never used. A loader is a function, so
-the component that holds it is a client component. The [Next sample](../samples)'s, in `app/artwork.tsx`:
+offers, and Apple's image server makes each one, so Next's own optimizer is never used and your Next config needs
+no `remotePatterns` for Apple. The [Next sample](../samples) does this in one component, `Artwork`, in
+`app/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
 
 <<< @/../../samples/web-nextjs/app/artwork.tsx#artwork{tsx}
+
+In any component, server or client, give `Artwork` a resource's artwork and the width you show it at:
+
+```tsx
+import type { tAlbum } from "@open-music-sdk/react";
+import { Artwork } from "./artwork";
+
+export function AlbumHeading({ album }: { album: tAlbum }) {
+  const { name, artwork } = album.attributes ?? {};
+  return (
+    <header>
+      <Artwork artwork={artwork} width={240} alt="" loading="eager" />
+      <h1>{name}</h1>
+    </header>
+  );
+}
+```
+
+The `alt` is empty because the heading beside the cover names the album. A cover on its own takes the name as its
+`alt`, as any image does.
+
+`Artwork` takes:
+
+- `artwork`: a resource's `attributes.artwork`. With none, it draws an empty image in the same box, so a page laid
+  out around covers keeps its shape. You don't need to check for artwork first.
+- `width` and `height`, as `next/image` takes them. Leave out `height` and the artwork's own shape decides it: a
+  1920 by 1080 still shown 320 wide is 180 high.
+- `fill` and `sizes`, as `next/image` takes them, for a box sized by CSS.
+- `format`, such as `"webp"`, as in step 5.
+- `hosts`, the hosts the URL may point to, as in step 6.
+- Everything else `next/image` takes, such as `className`, `loading` and `preload`. The exceptions are `src` and
+  `loader`, which `Artwork` sets, and `quality` and `unoptimized`, which only Next's own optimizer would use.
+
+While the image loads, the box shows the artwork's `bgColor`.
+
+For a cover that fills a grid cell, give the cell a position and a shape, and say how wide it is shown in `sizes`:
+
+```tsx
+<div style={{ position: "relative", aspectRatio: 1 }}>
+  <Artwork
+    artwork={artwork}
+    fill
+    sizes="(max-width: 640px) 50vw, 240px"
+    alt={name}
+  />
+</div>
+```
 
 What the sample showed, on 20 October 2026, in Next 16:
 
@@ -191,11 +239,14 @@ What the sample showed, on 20 October 2026, in Next 16:
   for `256x256`, labelled `1x`, and `640x640`, labelled `2x`: for each density, the first of Next's `imageSizes`
   and `deviceSizes` at least that wide. `artworkImage` asks for exactly `240x240` and `480x480`.
 - `remotePatterns` in your Next config doesn't apply under a loader of your own, so nothing checks where the URL
-  points but `hosts`, as in step 6. Pass it to `artworkUrl` for artwork from anywhere but Apple's API.
+  points but `hosts`, as in step 6. Pass `hosts` to `Artwork` for artwork from anywhere but Apple's API.
 - A URL with no size to fill in, as the artwork of a listener's own playlist has, is the same image at every width.
-  Next warns about a loader that can't honour a width, so the sample passes `unoptimized` for such a URL. Next then
-  calls no loader and uses `src` as it is, so the sample's `src` for it comes from `artworkUrl` too, where `hosts`
-  would be checked.
+  Next warns about a loader that can't honour a width, so `Artwork` passes `unoptimized` for such a URL. Next then
+  calls no loader and uses `src` as it is, so `Artwork` makes that `src` with `artworkUrl` too, where `hosts` is
+  checked.
+- The artwork's `bgColor` goes into a style that the server writes into the page's HTML without parsing it first.
+  `Artwork` uses it only if it is six hex digits, as Apple sends it, so a colour from elsewhere can't add CSS
+  declarations of its own.
 
 ## When something goes wrong
 

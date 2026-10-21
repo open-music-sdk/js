@@ -25,7 +25,7 @@ Then open <http://localhost:2728>. No server sample runs beside it: the routes u
 | [`app/providers.tsx`](./app/providers.tsx) | `createBrowserClient` and `MusicProvider`, for the sign-in, `musicQueries` for the album's query, and TanStack Query's cache |
 | [`app/sign-in.tsx`](./app/sign-in.tsx) | `useConnect`: the token goes to the server, and React's state forgets it |
 | [`app/(dig)/albums/[id]/page.tsx`](./app/(dig)/albums/[id]/page.tsx) | `musicQueries` prefetched into a `HydrationBoundary`, `schemas`, and `request` with `segmentOf` for "in your library" |
-| [`app/artwork.tsx`](./app/artwork.tsx) | `next/image` with `artworkUrl` as its loader |
+| [`app/artwork.tsx`](./app/artwork.tsx) | `next/image` with `artworkUrl` as its loader, in one file to copy into your own app |
 | [`app/player.tsx`](./app/player.tsx) | `usePreviewPlayer` |
 | [`app/library/page.tsx`](./app/library/page.tsx) | The listener's lists, each streamed in as the server reads it |
 | [`app/errors.ts`](./app/errors.ts) | `isAppleMusicError`, each tag in words a listener can act on, on either side |
