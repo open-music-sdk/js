@@ -182,9 +182,9 @@ into HTML by hand, escape it like any other attribute value, and don't put it in
 In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
 offers, and Apple's image server makes each one, so Next's own optimizer is never used and your Next config needs
 no `remotePatterns` for Apple. The [Next sample](../samples) does this in one component, `Artwork`, in
-`app/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
+`src/components/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
 
-<<< @/../../samples/web-nextjs/app/artwork.tsx#artwork{tsx}
+<<< @/../../samples/web-nextjs/src/components/artwork.tsx#artwork{tsx}
 
 In any component, server or client, give `Artwork` a resource's artwork and the width you show it at:
 

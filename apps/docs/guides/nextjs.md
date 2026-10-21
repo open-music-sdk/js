@@ -31,9 +31,9 @@ sample does, in its album page, and in the words for an error that its server ac
 ## 2. Make the server's client once
 
 Make one client for your whole server, in a module that only server code imports. The sample makes it, with its
-store of listeners' tokens, in `lib/music.ts`:
+store of listeners' tokens, in `src/lib/music.ts`:
 
-<<< @/../../samples/web-nextjs/lib/music.ts{ts}
+<<< @/../../samples/web-nextjs/src/lib/music.ts{ts}
 
 - The client is made the first time it's asked for, not as the module loads. `next build` loads every route's
   modules with no key in its environment, and builds nothing that needs one.
@@ -46,9 +46,9 @@ one instance, or on serverless functions, use a store they all reach. See
 
 ## 3. Add the token route
 
-A page fetches its developer token from a route on your server. In `app/api/music/token/route.ts`:
+A page fetches its developer token from a route on your server. In `src/app/api/music/token/route.ts`:
 
-<<< @/../../samples/web-nextjs/app/api/music/token/route.ts#token-route{ts}
+<<< @/../../samples/web-nextjs/src/app/api/music/token/route.ts#token-route{ts}
 
 `await connection()` tells Next the route answers each request as it comes, so it's never prerendered.
 
@@ -62,9 +62,9 @@ this route.
 ## 4. Add the route that takes a listener's token
 
 After a listener signs in, your page posts their Music User Token to your server, which checks it with Apple and
-keeps it. In `app/api/music/user-token/route.ts`:
+keeps it. In `src/app/api/music/user-token/route.ts`:
 
-<<< @/../../samples/web-nextjs/app/api/music/user-token/route.ts#user-token{ts}
+<<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#user-token{ts}
 
 `userId` decides whose token this is, so it must return the signed-in user from your own session, and nothing
 when there is none. The sample's `sessionId` reads its session cookie. [Keep a listener's token on your
@@ -73,7 +73,7 @@ server](./store-user-tokens) covers what the route answers and what the page sen
 When the listener signs out, the sample's page sends a `DELETE` to the same route before Apple's sign-out, so that a
 sign-out Apple's script fails still leaves no token on the server:
 
-<<< @/../../samples/web-nextjs/app/api/music/user-token/route.ts#sign-out{ts}
+<<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#sign-out{ts}
 
 ::: warning Who can post a token
 Read the warnings in [Mount the intake route](./store-user-tokens#_2-mount-the-intake-route) before you deploy
@@ -83,7 +83,7 @@ this route: on `userId`, on your CORS policy, and on rate-limiting it.
 ## 5. Wrap the app in `MusicProvider`
 
 Client components get their client from `MusicProvider`. Make the page's client once, outside the tree, in a
-client component of its own. In `app/providers.tsx`:
+client component of its own. In `src/components/providers.tsx`:
 
 ```tsx
 "use client";
@@ -100,11 +100,11 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 ```
 
-Then wrap your layout in it. In `app/layout.tsx`:
+Then wrap your layout in it. In `src/app/layout.tsx`:
 
 ```tsx
 import type { ReactNode } from "react";
-import { Providers } from "./providers";
+import { Providers } from "@/components/providers";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -127,13 +127,13 @@ the pages visited before, hidden, for Back, as they were drawn for no one. Sign-
 same reason. Apple's script still keeps its own copy of the token in the page's storage until the sign-out, as on any
 page: see [In a page](../concepts/security#in-a-page) in the security model.
 
-<<< @/../../samples/web-nextjs/app/sign-in.tsx#after-sign-in{tsx}
+<<< @/../../samples/web-nextjs/src/components/sign-in.tsx#after-sign-in{tsx}
 
 ## 6. Read the catalog in a server component
 
 A server component reads the catalog with the server's client. A new Next 16 app has Cache Components turned on,
 so a read made at each request goes inside `<Suspense>`, after `await connection()`. In
-`app/album/[id]/page.tsx`:
+`src/app/album/[id]/page.tsx`:
 
 ```tsx
 import { connection } from "next/server";
@@ -167,9 +167,9 @@ Reading the catalog needs only the developer token, which the server's client si
 
 ## 7. Act for a listener in a server action
 
-A server action finds the listener's token in your store with `music.forUser(userId)`. In `app/actions.ts`:
+A server action finds the listener's token in your store with `music.forUser(userId)`. In `src/lib/actions.ts`:
 
-<<< @/../../samples/web-nextjs/app/actions.ts#add-to-library{ts}
+<<< @/../../samples/web-nextjs/src/lib/actions.ts#add-to-library{ts}
 
 The client looks the token up in the store at each request. A listener the store has no token for gets a
 `UserTokenInvalid` error, as does one whose token Apple answers `403` to. Either way, ask them to sign in again.
@@ -188,9 +188,9 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 
 The client sends every request through the `fetch` it's given, so Next's caching applies the usual ways: pass a
 `fetch` of your own to `createServerClient`, or wrap a read in a function marked `"use cache"`. In the sample's
-`lib/catalog.ts`:
+`src/lib/catalog.ts`:
 
-<<< @/../../samples/web-nextjs/lib/catalog.ts#cache-catalog{ts}
+<<< @/../../samples/web-nextjs/src/lib/catalog.ts#cache-catalog{ts}
 
 `"use cache"` needs Cache Components, turned on in `next.config.ts`:
 

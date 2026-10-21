@@ -59,7 +59,7 @@ sample serves on `localhost:2728`, so only one runs at a time.
 
 A listener is a random id in a cookie, `crate_session`, which the server gives with its first answer.
 
-The Next app has the first two routes under its own `app/api`, and needs no third: its pages ask Apple for the
+The Next app has the first two routes under its own `src/app/api`, and needs no third: its pages ask Apple for the
 listener on the server.
 
 ## The samples

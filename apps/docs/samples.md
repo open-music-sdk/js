@@ -74,5 +74,5 @@ whichever one runs, so the page and its server share one origin, and the page's 
 
 A listener is a random id in a cookie the server gives with its first answer. A real app uses its own sessions.
 
-The Next app answers the first two routes under its own `app/api`, and needs no third: its pages ask Apple for the
+The Next app answers the first two routes under its own `src/app/api`, and needs no third: its pages ask Apple for the
 listener on the server, with the token the second route kept.

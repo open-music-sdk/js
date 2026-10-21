@@ -111,7 +111,7 @@ query of the library refetched at once may not show them yet.
 ## 4. Prefetch the catalog on the server
 
 On the server, `musicQueries` over the server's client gives the same queries, which you can prefetch and hand to
-the page. In a Next.js server component, `app/album/[id]/page.tsx`:
+the page. In a Next.js server component, `src/app/album/[id]/page.tsx`:
 
 ```tsx
 import { musicQueries } from "@open-music-sdk/react";
@@ -161,7 +161,7 @@ The [Next sample](../samples) prefetches its album page so, naming the storefron
 its client component calls `getAlbum` with the same arguments. `query` gives the album, which the page goes
 on to use:
 
-<<< @/../../samples/web-nextjs/app/(dig)/albums/[id]/page.tsx#prefetch{tsx}
+<<< @/../../samples/web-nextjs/src/app/(dig)/albums/[id]/page.tsx#prefetch{tsx}
 
 Prefetch the catalog only. A listener's queries are in a scope of the page's own, which no server prefetch
 matches, so the page fetches the listener's library itself.
