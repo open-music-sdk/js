@@ -39,12 +39,19 @@ front of a static site. The route sends the CORS header for your origins only, a
 `tokenEndpoint` checks its options when it's called, so the route above needs the key wherever its module is
 loaded. A build that loads it with no key, as `next build` does, fails there.
 
-::: for server=workers
-The [Workers sample](../samples) hands the route the Worker's request as it comes, since a Worker's requests are
-web `Request`s:
+:::: for server=workers
+The [Workers sample](../samples) makes the route once, from the Worker's settings, and hands it the Worker's
+request as it comes, since a Worker's requests are web `Request`s:
 
-<<< @/../../samples/worker-server/src/index.ts#token-route{ts}
+::: code-group
+
+<<< @/../../samples/worker-server/src/index.ts#token-route{ts} [setUp]
+
+<<< @/../../samples/worker-server/src/index.ts#route{ts} [route]
+
 :::
+
+::::
 
 :::: for server=express
 The [Express sample](../samples) mounts the route through a small adapter, since Express hands a route Node's

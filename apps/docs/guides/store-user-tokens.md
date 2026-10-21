@@ -60,12 +60,19 @@ export const POST = userTokenIntake(music, {
 stored under the id it returns. `userTokenIntake` checks `store` and `userId` when you create it, so a mistake is
 a `TypeError` at startup.
 
-::: for server=workers
+:::: for server=workers
 The [Workers sample](../samples) makes the route once, with a session cookie standing in for your own sessions, and
 hands it the Worker's request as it comes:
 
-<<< @/../../samples/worker-server/src/index.ts#user-token{ts}
+::: code-group
+
+<<< @/../../samples/worker-server/src/index.ts#user-token{ts} [setUp]
+
+<<< @/../../samples/worker-server/src/index.ts#route{ts} [route]
+
 :::
+
+::::
 
 ::: for server=express
 Express hands a route Node's request instead of a web `Request`, so the [Express sample](../samples) calls

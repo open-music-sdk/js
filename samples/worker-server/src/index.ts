@@ -103,6 +103,7 @@ export default {
   },
 };
 
+// #region route
 // The two SDK handlers answer methods themselves, so each is routed by its
 // path; the sign-out is the one DELETE.
 async function route(req: Request, app: tApp): Promise<Response> {
@@ -122,6 +123,7 @@ async function route(req: Request, app: tApp): Promise<Response> {
       return reply(404, { error: "NotFound" });
   }
 }
+// #endregion route
 
 // #region sign-out
 // The listener signed out of Apple Music in the page: the Worker forgets its
