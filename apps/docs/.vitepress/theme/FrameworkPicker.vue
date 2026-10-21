@@ -94,9 +94,12 @@ function keysUp(event) {
   event.stopPropagation();
 }
 
-// Focus that leaves a choice, by Tab, closes its menu.
+// Focus that leaves a choice for something else, by Tab, closes its menu. Focus that goes nowhere is left to the
+// press outside: Safari and Firefox on macOS don't focus a button that is clicked, so a click on an item takes the
+// focus from the one before it, and closing then would hide the item before its click.
 function leave(event, axis) {
-  if (open.value === axis && !event.currentTarget.contains(event.relatedTarget)) open.value = undefined;
+  if (open.value !== axis || event.relatedTarget === null) return;
+  if (!event.currentTarget.contains(event.relatedTarget)) open.value = undefined;
 }
 </script>
 
