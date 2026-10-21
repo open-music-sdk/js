@@ -6,8 +6,10 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { AXES, AXIS_LABELS, VALUES, settle } from "../frameworks.mjs";
 
-// The server render shows the defaults; the head script has already put the reader's own on <html>.
+// The server render shows the defaults; the head script has already put the reader's own on <html>. So the picker
+// stays hidden, in its place, until it shows theirs, and with scripts off, where it would do nothing.
 const choice = ref({ page: VALUES.page[0], server: VALUES.server[0] });
+const mounted = ref(false);
 
 function follow(event) {
   choice.value = event.detail;
@@ -16,6 +18,7 @@ function follow(event) {
 onMounted(() => {
   const { page, server } = document.documentElement.dataset;
   choice.value = { page, server };
+  mounted.value = true;
   window.addEventListener("frameworks", follow);
 });
 
@@ -30,7 +33,7 @@ function pick(axis, value) {
 </script>
 
 <template>
-  <div class="framework-picker">
+  <div class="framework-picker" :class="{ mounted }">
     <label v-for="(frameworks, axis) in AXES" :key="axis">
       <span>{{ AXIS_LABELS[axis] }}</span>
       <select
