@@ -38,7 +38,8 @@ export const labelOf = (axis, value) => AXES[axis].find((framework) => framework
  * returns it. `values` is `VALUES`, `url` the address being shown, and `wanted` a choice made in the picker.
  *
  * Each choice takes the first of these that names one of its frameworks: `wanted`; an anchor that names a variant,
- * such as `#after-sign-in--react`; the address's `?page=` or `?server=`; what was kept; and else the first framework.
+ * such as `#after-sign-in--react`; the address's `?page=` or `?server=`, which it then takes out of the address;
+ * what was kept; and else the first framework.
  * Next.js on one side means Next.js on both, unless the other side was asked for by something earlier in that list,
  * and then the side with Next.js goes back to its first framework.
  *
@@ -94,6 +95,13 @@ export function settle(values, url, wanted = {}) {
     localStorage.setItem(KEY, JSON.stringify(choice));
   } catch {
     // A browser that keeps nothing still shows this page in the chosen frameworks.
+  }
+  // A link's choice is taken once. Left in the address, it would outrank every choice the reader makes after it.
+  const here = new URL(location.href);
+  if (here.searchParams.has("page") || here.searchParams.has("server")) {
+    here.searchParams.delete("page");
+    here.searchParams.delete("server");
+    history.replaceState(history.state, "", here.href);
   }
   return choice;
 }
