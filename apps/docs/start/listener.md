@@ -78,8 +78,9 @@ Once you say Send it, the page applies the plan:
 
 <<< @/../../samples/web-vanilla/src/send.ts#apply{ts}
 
-Sending the same crate again adds nothing: the plan finds every song in the playlist already. See
-[Import a playlist](../guides/import-playlist).
+Sending the same crate again adds nothing, once Apple shows what the first send added: the plan finds every song
+in the playlist already. Apple carries a write out after it answers, so the page says whether it shows the songs
+yet, and a send made before it does can add them twice. See [Import a playlist](../guides/import-playlist).
 
 ## 6. Start every screen
 
@@ -102,7 +103,8 @@ which storefront you're digging in, and a Library tab appears.
 - Love a song, and add one to your library.
 - Open the Library tab. The first crate, recently played, is the one your server asked Apple for.
 - Put a few songs in your crate, open the Your crate tab, and send it to a new playlist. Plan it, read the plan,
-  and press Send it. Then send it again, and see that the plan adds nothing.
+  and press Send it. If the page says the songs can take a few seconds to show, wait that long. Then send it
+  again, and see that the plan adds nothing.
 
 ## 8. When you're done
 
