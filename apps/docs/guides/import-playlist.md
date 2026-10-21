@@ -244,9 +244,10 @@ The four functions run in a page too, with the client `useMusic()` gives once th
 ::::
 
 :::: for page=nextjs
-The [Next sample](../samples) runs the four functions on the server, in server actions, with the client
-`music.forUser(session)` gives for the listener. Each action checks what the page sent it, and the send plans
-again from what the playlist holds then, rather than trusting a plan from the page:
+The [Next sample](../samples) runs the four functions on the server, in server actions. `resolve` uses the
+server's own client, since it needs no listener, and the others the client `music.forUser(session)` gives for the
+listener. Each action checks what the page sent it, and the send plans again from what the playlist holds then,
+rather than trusting a plan from the page:
 
 ::: code-group
 
