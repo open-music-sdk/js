@@ -14,37 +14,117 @@ The guides show code from them, and every sample is in the repository's
 You need Node 24, pnpm, [a MusicKit key](./guides/musickit-key), and an Apple Account with an Apple Music
 subscription.
 
-1. Clone the repository, and install from its root:
+Pick the page and the server to run. Either Vite page runs with either server, and the Next app is both: it's its
+own server.
 
-   ```sh
-   git clone https://github.com/open-music-sdk/js.git open-music-sdk
-   cd open-music-sdk
-   pnpm install
-   ```
+<FrameworkPicker />
 
-2. Copy `samples/.env.example` to the server you run, and fill it in: `samples/express-server/.env`,
-   `samples/worker-server/.env`, or `samples/web-nextjs/.env.local` for the Next app, which is its own server.
+### 1. Get the repository
 
-3. Run a page with a server, or the Next app alone, from the repository's root:
+Clone it, and install from its root:
 
-   ```sh
-   pnpm turbo dev --filter=web-vanilla --filter=express-server
-   pnpm turbo dev --filter=web-nextjs
-   ```
+```sh
+git clone https://github.com/open-music-sdk/js.git open-music-sdk
+cd open-music-sdk
+pnpm install
+```
 
-4. Open `http://localhost:2728` in your browser. Use `localhost`, not `127.0.0.1`: the developer token is bound to
-   that origin.
+### 2. Add your key
 
-5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
-   `localhost:2728`, which any other app you later serve on that port could read.
+Copy `samples/.env.example` to the server you run, and fill it in:
 
-Either Vite page runs with either server: swap `web-vanilla` for `web-react`, or `express-server` for
-`worker-server`. Every page sample serves on `localhost:2728`, so only one runs at a time.
+::: for server=express
+```sh
+cp samples/.env.example samples/express-server/.env
+```
+:::
 
-::: warning Keep the key in a file named `.env`
-The file you copied holds your private key. The repository ignores it, and the Vite pages' dev server refuses to
-serve it. The Worker reads `.env` rather than Wrangler's usual `.dev.vars` for that reason: the dev server would
-serve a `.dev.vars` to any page that asked for it. Next serves nothing from its project folder but `public`.
+::: for server=workers
+```sh
+cp samples/.env.example samples/worker-server/.env
+```
+
+The Worker reads `.env` rather than Wrangler's usual `.dev.vars`. The page's dev server refuses to serve a file
+named `.env`, and would serve a `.dev.vars` to any page that asked for it.
+:::
+
+::: for server=nextjs
+```sh
+cp samples/.env.example samples/web-nextjs/.env.local
+```
+:::
+
+The file holds your private key. The repository ignores it, and neither the Vite pages' dev server nor Next serves
+it. Never commit it.
+
+### 3. Run the pair
+
+From the repository's root. Turborepo builds the packages first:
+
+::: for page=vanilla server=express
+```sh
+pnpm turbo dev --filter=web-vanilla --filter=express-server
+```
+:::
+
+::: for page=vanilla server=workers
+```sh
+pnpm turbo dev --filter=web-vanilla --filter=worker-server
+```
+:::
+
+::: for page=react server=express
+```sh
+pnpm turbo dev --filter=web-react --filter=express-server
+```
+:::
+
+::: for page=react server=workers
+```sh
+pnpm turbo dev --filter=web-react --filter=worker-server
+```
+:::
+
+::: for page=nextjs server=nextjs
+```sh
+pnpm turbo dev --filter=web-nextjs
+```
+:::
+
+Every page sample serves on `localhost:2728`, so only one runs at a time.
+
+The build writes the generated files under `packages/types/src` and `packages/validate/src` again, with LF line
+endings. On a checkout with CRLF endings, git then shows them changed with nothing in them changed;
+`git checkout -- packages/types/src packages/validate/src` puts them back.
+
+### 4. Open it
+
+Open `http://localhost:2728` in your browser. Use `localhost`, not `127.0.0.1`: the developer token is bound to that
+origin.
+
+### 5. Stop it
+
+Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of `localhost:2728`,
+which any other app you later serve on that port could read.
+
+Then press Ctrl+C in the terminal. On Windows, Turborepo can stay at "tasks shutting down…" after the first one,
+with a `Terminate batch job (Y/N)?` line for each task: pnpm's own command is a batch file there, and the question
+it leaves waits for an answer nobody can give. Press Ctrl+C again, and Turborepo ends the tasks. The
+`ELIFECYCLE … -1073741510` beside each question is Windows' code for a program that Ctrl+C ended, not an error.
+
+::: for server=workers
+On Windows, Wrangler's `workerd` can outlive the run. If `127.0.0.1:8787` is still taken, end it in PowerShell:
+
+```powershell
+Get-Process workerd -ErrorAction SilentlyContinue | Stop-Process
+```
+
+The Worker keeps the tokens it took in `samples/worker-server/.wrangler/state`, in plain text, after it stops.
+Delete that folder when you're done.
+:::
+
+::: for server=express,nextjs
+The server forgets the tokens it took when it stops.
 :::
 
 ## The samples
@@ -60,6 +140,16 @@ serve a `.dev.vars` to any page that asked for it. Next serves nothing from its 
 The two servers answer the same routes. Each page sample has the same crates and screens, and the two Vite pages
 keep them in files of the same names, so two samples side by side show what a framework changes. Each file starts
 with a comment that names the exports it shows and the guide it pairs with.
+
+Every pair, for reference:
+
+| Page | Server | Key file | Command, from the repository's root |
+| --- | --- | --- | --- |
+| Vanilla | Express | `samples/express-server/.env` | `pnpm turbo dev --filter=web-vanilla --filter=express-server` |
+| Vanilla | Workers | `samples/worker-server/.env` | `pnpm turbo dev --filter=web-vanilla --filter=worker-server` |
+| React | Express | `samples/express-server/.env` | `pnpm turbo dev --filter=web-react --filter=express-server` |
+| React | Workers | `samples/worker-server/.env` | `pnpm turbo dev --filter=web-react --filter=worker-server` |
+| Next.js | Next.js | `samples/web-nextjs/.env.local` | `pnpm turbo dev --filter=web-nextjs` |
 
 ## How a page and its server talk
 

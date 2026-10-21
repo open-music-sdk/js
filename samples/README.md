@@ -43,6 +43,15 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
 5. Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of
    `localhost:2728`, which any other app you later serve on that port could read.
 
+6. Press Ctrl+C. On Windows, Turborepo can stay at "tasks shutting down…" after the first one, with a
+   `Terminate batch job (Y/N)?` line for each task: pnpm's own command is a batch file there, and its question
+   waits for an answer nobody can give. Press Ctrl+C again. The `ELIFECYCLE … -1073741510` beside each question
+   is Windows' code for a program that Ctrl+C ended, not an error.
+
+   After the Worker, check that nothing still holds `127.0.0.1:8787`: on Windows, Wrangler's `workerd` can outlive
+   the run (`Get-Process workerd | Stop-Process` in PowerShell). The Worker's tokens stay in
+   `samples/worker-server/.wrangler/state`, in plain text, until you delete it.
+
 The build that `pnpm turbo dev` starts with writes the generated files under `packages/types/src` and
 `packages/validate/src` again, with LF line endings. On a checkout with CRLF endings git then shows them changed,
 with nothing in them changed. `git checkout -- packages/types/src packages/validate/src` puts them back.

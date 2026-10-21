@@ -27,11 +27,14 @@ export function parseFor(text) {
   return wanted;
 }
 
-/** How the reader sees what a block is for, such as `Vanilla, React` or `React · Workers`. */
-export const labelFor = (wanted) =>
-  Object.entries(wanted)
-    .map(([axis, values]) => values.map((value) => labelOf(axis, value)).join(", "))
-    .join(" · ");
+/**
+ * How the reader sees what a block is for, such as `Vanilla, React` or `React · Workers`. The Next app, which is
+ * both, is `Next.js` once.
+ */
+export const labelFor = (wanted) => {
+  const sides = Object.entries(wanted).map(([axis, values]) => values.map((value) => labelOf(axis, value)).join(", "));
+  return [...new Set(sides)].join(" · ");
+};
 
 /**
  * The `for` container. A block's id is the heading above it and its frameworks, so a link can name the variant:
