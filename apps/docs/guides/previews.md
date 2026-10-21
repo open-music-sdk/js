@@ -56,9 +56,11 @@ export function AlbumPreviews({ id }: { id: string }) {
 }
 ```
 
-A query's list keeps its identity between renders, which the player in step 2, `Previews`, needs. A Next app can
-fetch the tracks in a server component instead, with the server's client, and hand them to `Previews`: they're
-plain data.
+A query's list keeps its identity between renders, which the player in step 2, `Previews`, needs.
+
+In Next.js, `AlbumPreviews` and `Previews` are client components, whose files start with `"use client"`. A Next
+app can fetch the tracks in a server component instead, with the server's client, and hand them to `Previews`:
+they're plain data.
 :::
 
 Any catalog function that hands over songs or music videos works: a search, a chart, or `resolve` from
@@ -80,7 +82,7 @@ of track you feed it, and is what `player.state.track` is typed as.
 :::
 
 ::: for page=react,nextjs
-In a client component, `usePreviewPlayer` gives you the player's state and its functions. Load the tracks from an
+In a component, `usePreviewPlayer` gives you the player's state and its functions. Load the tracks from an
 effect:
 
 ```tsx

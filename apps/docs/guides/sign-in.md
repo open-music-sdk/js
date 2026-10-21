@@ -85,6 +85,8 @@ function SignIn() {
   // … the button, as in steps 3 to 5
 }
 ```
+
+In Next.js, `SignIn` is a client component, whose file starts with `"use client"`.
 :::
 
 `app` is what Apple's script is configured with. You can add `app.build`, your app's version.
