@@ -222,7 +222,7 @@ html[data-server="nextjs"] .for-notice[data-server]:not([data-server~="nextjs"])
   width: 100%;
 }
 
-/* The nav's own items take it to about 1366px wide with the picker in it, and past the screen's edge below that. */
+/* In the nav from 1400px wide. Below that, the room goes to the search box, and the picker to the sidebar. */
 @media (min-width: 1400px) {
   .framework-picker-nav {
     display: flex;
@@ -231,6 +231,18 @@ html[data-server="nextjs"] .for-notice[data-server]:not([data-server~="nextjs"])
 
   .framework-picker-sidebar {
     display: none;
+  }
+}
+
+/* The search box, between the picker and the nav's links, takes all the room they leave. */
+@media (min-width: 768px) {
+  #local-search {
+    flex-grow: 1;
+    margin-right: 12px;
+  }
+
+  #local-search .DocSearch-Button {
+    justify-content: space-between;
   }
 }
 
