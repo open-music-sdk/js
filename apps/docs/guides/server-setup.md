@@ -172,10 +172,11 @@ when you're done.
 
 ::: for server=nextjs
 ```sh
-pnpm next dev --port 2728
+pnpm next dev --port 2728 --hostname localhost
 ```
 
-Your server and your pages run as one app, on one origin: the port of `PAGE_ORIGIN`.
+Your server and your pages run as one app, on one origin: the port of `PAGE_ORIGIN`. Without `--hostname
+localhost`, `next dev` listens on every network your machine is on, where anyone can reach your token route.
 :::
 
 A server with no routes does nothing for a page yet. Its first route hands your pages a developer token.

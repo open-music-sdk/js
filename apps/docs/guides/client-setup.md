@@ -56,10 +56,10 @@ another app served on the same port could read.
 
 ::: for client=nextjs
 A Next app is its own server. Its pages and its routes share one origin, so the token route is at
-`/api/music/token`, with nothing to forward. Run it on the port of `PAGE_ORIGIN`:
+`/api/music/token`, with nothing to forward. Run it on the port of `PAGE_ORIGIN`, on your machine alone:
 
 ```sh
-pnpm next dev --port 2728
+pnpm next dev --port 2728 --hostname localhost
 ```
 :::
 
