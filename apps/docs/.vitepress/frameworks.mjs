@@ -41,7 +41,7 @@ export const labelOf = (axis, value) => AXES[axis].find((framework) => framework
  * such as `#after-sign-in--react`; the address's `?page=` or `?server=`, which it then takes out of the address;
  * what was kept; and else the first framework.
  * Next.js on one side means Next.js on both, unless the other side was asked for by something earlier in that list,
- * and then the side with Next.js goes back to its first framework.
+ * and then the side with Next.js goes back to the framework kept for it from before Next.js, else to its first.
  *
  * Every page's head runs this, from its source, before the first paint, so it uses nothing from outside itself.
  */
@@ -82,17 +82,21 @@ export function settle(values, url, wanted = {}) {
     choice[axis] = found === -1 ? allowed[0] : asked[found];
     rank[axis] = found === -1 ? asked.length : found;
   }
+  // Each side's last framework other than Next.js, so that leaving Next.js finds React and Workers again.
+  const away = kept.away ?? {};
   if ((choice.page === NEXT) !== (choice.server === NEXT)) {
     const next = choice.page === NEXT ? "page" : "server";
     const other = next === "page" ? "server" : "page";
     if (rank[next] <= rank[other]) choice[other] = NEXT;
-    else choice[next] = values[next][0];
+    else choice[next] = away[next] !== NEXT && values[next].includes(away[next]) ? away[next] : values[next][0];
   }
 
   document.documentElement.dataset.page = choice.page;
   document.documentElement.dataset.server = choice.server;
   try {
-    localStorage.setItem(KEY, JSON.stringify(choice));
+    const before = {};
+    for (const axis of ["page", "server"]) before[axis] = choice[axis] === NEXT ? away[axis] : choice[axis];
+    localStorage.setItem(KEY, JSON.stringify({ ...choice, away: before }));
   } catch {
     // A browser that keeps nothing still shows this page in the chosen frameworks.
   }
