@@ -42,14 +42,16 @@ CI runs `build` on every pull request that changes the docs or a package, and it
 - a link to a page that is not there (VitePress);
 - a link to an `#anchor` that names nothing on its page ([check-anchors.mjs](./check-anchors.mjs));
 - a snippet of a sample app's file, `<<< @/../../samples/…#region`, whose file or region is gone
-  ([check-snippets.mjs](./check-snippets.mjs)). VitePress would show the whole file instead, with no error;
+  ([check-snippets.mjs](./check-snippets.mjs)). VitePress would show the whole file instead, with no error. So
+  is a snippet of a whole file that has regions, whose region lines the reader would see;
 - a code block with a line over 80 characters, which the site would scroll (the same script);
 - a group of framework variants that leaves out a framework, has two blocks for one, or has two blocks that show
   the same thing, and a heading inside a variant (the same script, as below).
 
 A guide shows a sample's code with `<<<` rather than a copy of it, so that the code on the page is the code that
 runs. A sample marks the lines a guide shows with `// #region <name>` and `// #endregion <name>`; rename one in
-both places at once.
+both places at once. The `#endregion` names its region, or VitePress doesn't end the region there. A file a page
+shows whole, below its opening comment, is the region `file`, and the region lines inside it are left out.
 
 ## Code for each framework
 

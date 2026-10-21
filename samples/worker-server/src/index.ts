@@ -1,6 +1,7 @@
 // Shows: createServerClient, createRateLimiter, tokenEndpoint, userTokenIntake,
 // KvUserTokenStore, forUser, isAppleMusicError. Guides:
 // /guides/cloudflare-workers, /guides/token-endpoint, /guides/store-user-tokens
+// #region file
 import {
   KvUserTokenStore,
   createRateLimiter,
@@ -170,3 +171,4 @@ function reply(status: number, body: unknown): Response {
     headers: { "cache-control": "no-store" },
   });
 }
+// #endregion file

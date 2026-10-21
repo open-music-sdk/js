@@ -17,15 +17,26 @@ const walk = (dir) =>
   });
 const pages = walk("");
 
+// A region's lines, `// #region <name>` and `// #endregion <name>`, as VitePress 1.6 reads them.
+const MARKER = /^\/\/ ?#?((?:end)?region) ([\w*-]+)$/;
+
 /**
- * Whether `text` has the region as VitePress finds one: a line that is `// #region <name>` and nothing else, then a
- * later `// #endregion`, with the name or without it. A name that only starts another, `play` for `play-from`, is not it.
+ * A region's lines as VitePress 1.6 shows them, or undefined when it finds none: from the line `// #region <name>`
+ * to the first `// #endregion <name>` after it, an #endregion without the name not ending it, and with every region
+ * line inside left out. A name that only starts another, `play` for `play-from`, is not it.
  */
-function hasRegion(text, name) {
+function findRegion(text, name) {
   const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^\s*\/\/\s*#region\s+(\S+)\s*$/.exec(line)?.[1] === name);
-  return start >= 0 && lines.slice(start + 1).some((line) => /^\s*\/\/\s*#endregion(?:\s+(\S+))?\s*$/.test(line) && [undefined, name].includes(/#endregion\s+(\S+)/.exec(line)?.[1]));
+  const marker = (line, tag) => {
+    const [, found, named] = MARKER.exec(line.trim()) ?? [];
+    return found === tag && named === name;
+  };
+  const start = lines.findIndex((line) => marker(line, "region"));
+  const end = lines.findIndex((line, i) => i > start && marker(line, "endregion"));
+  if (start === -1 || end === -1) return undefined;
+  return lines.slice(start + 1, end).filter((line) => !MARKER.test(line.trim()));
 }
+const hasRegion = (text, name) => findRegion(text, name) !== undefined;
 
 const broken = [];
 let snippets = 0;
@@ -34,7 +45,10 @@ for (const page of pages)
     snippets += 1;
     const file = `${root}/${path}`;
     if (!existsSync(file)) broken.push(`${page} shows ${path}, which is not there`);
-    else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that ends`);
+    else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that an #endregion of its name ends`);
+    // A whole file is shown as it is, its region lines among it; a region is shown without them.
+    else if (region === undefined && /^\s*\/\/\s*#(?:end)?region\b/m.test(readFileSync(file, "utf8")))
+      broken.push(`${page} shows the whole of ${path}, whose #region lines the reader would see; show a region around all of it instead`);
   }
 
 // A code block on the site shows about 86 characters before it scrolls, margins aside, so a block of code a reader
@@ -66,11 +80,8 @@ for (const page of pages.filter((page) => page !== "README.md")) {
 // their snippets are read in, are one block for both frameworks. And a block holds no heading, which the page's
 // outline would list while the block is hidden.
 const regionText = (file, region) => {
-  const lines = readFileSync(file, "utf8").split(/\r?\n/);
-  if (region === undefined) return lines;
-  const start = lines.findIndex((line) => /^\s*\/\/\s*#region\s+(\S+)\s*$/.exec(line)?.[1] === region);
-  const end = lines.findIndex((line, i) => i > start && /^\s*\/\/\s*#endregion\b/.test(line));
-  return lines.slice(start + 1, end);
+  const text = readFileSync(file, "utf8");
+  return region === undefined ? text.split(/\r?\n/) : (findRegion(text, region) ?? []);
 };
 /** What a block shows, with its snippets read in and blank lines and indentation left out, to compare blocks by. */
 const resolved = (lines) =>
@@ -172,7 +183,7 @@ for (const page of pages.filter((page) => page !== "README.md"))
           variants.push(`${page}:${group[b].line}: "::: for ${named(group[b])}" shows the same as "::: for ${named(group[a])}"; make them one block for both`);
   }
 
-if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there:\n${broken.join("\n")}`);
+if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there, or of a whole file with region lines:\n${broken.join("\n")}`);
 if (wide.length) console.error(`${wide.length} line(s) of code blocks over ${WIDTH} characters, which the site would scroll:\n${wide.join("\n")}`);
 if (variants.length) console.error(`${variants.length} problem(s) with the framework variants:\n${variants.join("\n")}`);
 if (broken.length || wide.length || variants.length) process.exit(1);

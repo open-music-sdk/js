@@ -1,4 +1,5 @@
 // Shows: previewPlayer, artworkUrl. Guide: /guides/previews
+// #region file
 import {
   artworkUrl,
   previewPlayer,
@@ -76,3 +77,4 @@ player.subscribe(() => {
   // Left alone while the listener drags it.
   if (document.activeElement !== position) position.value = String(at);
 });
+// #endregion file

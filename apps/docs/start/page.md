@@ -127,7 +127,7 @@ for the page a sleeve opens, at an address of its own so that Back works.
 cp samples/web-vanilla/src/player.ts samples/my-page/src/
 ```
 
-<<< @/../../samples/web-vanilla/src/player.ts{ts}
+<<< @/../../samples/web-vanilla/src/player.ts#file{ts}
 
 - `previewPlayer` plays the short clips that come with each song, through an audio element of its own. It asks
   Apple for nothing.

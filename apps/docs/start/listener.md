@@ -10,7 +10,7 @@ Music library, so sign in with an account you don't mind adding a few songs and 
 cp samples/web-vanilla/src/sign-in.ts samples/my-page/src/
 ```
 
-<<< @/../../samples/web-vanilla/src/sign-in.ts{ts}
+<<< @/../../samples/web-vanilla/src/sign-in.ts#file{ts}
 
 - `createConnect` is made as the page loads, not when the button is clicked, so that Apple's script is loaded and
   configured before the click. A browser opens Apple's sign-in window only inside a click.

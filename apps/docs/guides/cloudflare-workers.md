@@ -57,7 +57,7 @@ that asks for it, except those on its deny list, and that list names `.env` but 
 
 The Worker below is the [worker-server sample](../samples), complete, as it runs on a developer's machine.
 
-<<< @/../../samples/worker-server/src/index.ts{ts}
+<<< @/../../samples/worker-server/src/index.ts#file{ts}
 
 The `// #region` lines mark the parts other guides show, and do nothing.
 
