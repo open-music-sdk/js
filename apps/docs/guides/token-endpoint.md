@@ -36,6 +36,9 @@ from 60 to 86,400 (one day).
 A page on one of your origins can read the token even when the route is on another origin, such as a Worker in
 front of a static site. The route sends the CORS header for your origins only, and for nothing but the token.
 
+`tokenEndpoint` checks its options when it's called, so the route above needs the key wherever its module is
+loaded. A build that loads it with no key, as `next build` does, fails there.
+
 ::: for server=workers
 The [Workers sample](../samples) hands the route the Worker's request as it comes, since a Worker's requests are
 web `Request`s:
@@ -86,8 +89,7 @@ expires. A relative URL is resolved against the page's address when you create t
 Use the route's final URL. The client refuses a redirect, so that a token only ever comes from the URL you gave
 it. If your framework redirects `/api/music/token` to `/api/music/token/`, use the second.
 
-In React, `createBrowserClient` comes from `@open-music-sdk/react` and is used the same way. In Next.js, the
-route needs one more line so it's never built ahead of time: see [Next.js](./nextjs).
+In React, `createBrowserClient` comes from `@open-music-sdk/react` and is used the same way.
 
 ## 3. Limit who can take tokens
 

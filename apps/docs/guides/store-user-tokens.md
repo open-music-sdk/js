@@ -37,6 +37,10 @@ export const music = createServerClient({
 `MemoryUserTokenStore` loses every token when the process restarts. [Choose a store](#choose-a-store) covers the
 others.
 
+`createServerClient` checks the key when it's called, so this module needs the key wherever it's loaded. A build
+that loads it with no key, as `next build` does, fails there. The [Next sample](../samples) makes its store and
+client on first use instead.
+
 ## 2. Mount the intake route
 
 On your server, mount `userTokenIntake` as the `POST` handler of a route, here `/api/music/user-token`. It takes a
