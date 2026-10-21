@@ -10,6 +10,11 @@ Before you start, you need:
 The code below comes from the [sample apps](../samples)' servers, for the server you pick in the nav: Express,
 Cloudflare Workers, or a Next.js app, which is its own server.
 
+::: info Not on npm yet
+Nothing is published to npm yet, so the install commands below work from the first release. Until then, run the
+[sample apps](../samples), which use the packages from the repository.
+:::
+
 ## 1. Install the package
 
 ::: for server=express
