@@ -48,12 +48,23 @@ pnpm add @tanstack/react-query
 
 ## 2. Let it reach your server
 
-::: for client=vanilla,react
+::: for client=vanilla
 Serve the page from the origin your server's developer tokens are bound to, its `PAGE_ORIGIN`, and forward `/api`
-to your server, so that the page and its server share one origin. The Vite samples' config does both, and refuses to
-serve your key or any other secret in the repository to a page that asks:
+to your server, so that the page and its server share one origin. The vanilla sample's `vite.config.ts` does both,
+and refuses to serve your key or any other secret in the repository to a page that asks:
 
 <<< @/../../samples/web-vanilla/vite.config.ts{ts}
+
+Port 2728 is the page's own. Apple's script keeps a listener's token in the storage of the page's origin, which
+another app served on the same port could read.
+:::
+
+::: for client=react
+Serve the page from the origin your server's developer tokens are bound to, its `PAGE_ORIGIN`, and forward `/api`
+to your server, so that the page and its server share one origin. The React sample's `vite.config.ts` does both,
+with React's plugin, and refuses to serve your key or any other secret in the repository to a page that asks:
+
+<<< @/../../samples/web-react/vite.config.ts{ts}
 
 Port 2728 is the page's own. Apple's script keeps a listener's token in the storage of the page's origin, which
 another app served on the same port could read.
