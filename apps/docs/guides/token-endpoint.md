@@ -128,6 +128,7 @@ What limits the damage:
 
 ## Next steps
 
+- [Set up your client](./client-setup), the page that fetches its tokens from this route.
 - [Sign a listener in](./sign-in), which needs this route too.
 - [Security model](../concepts/security), for everything a page can and can't keep secret.
 - The reference for [`tokenEndpoint`](../reference/@open-music-sdk/server/functions/tokenEndpoint) and

@@ -47,13 +47,13 @@ const guides = [
     items: [
       { text: "Set up your MusicKit key", link: "/guides/musickit-key" },
       { text: "Set up your server", link: "/guides/server-setup" },
+      { text: "Serve a developer token to a page", link: "/guides/token-endpoint" },
       { text: "Set up your client", link: "/guides/client-setup" },
     ],
   },
   {
     text: "Guides",
     items: [
-      { text: "Serve a developer token to a page", link: "/guides/token-endpoint" },
       { text: "Sign a listener in", link: "/guides/sign-in" },
       { text: "Keep a listener's token on your server", link: "/guides/store-user-tokens" },
       { text: "Play song previews", link: "/guides/previews" },
