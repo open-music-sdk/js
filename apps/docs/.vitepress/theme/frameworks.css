@@ -91,7 +91,8 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
   display: contents;
 }
 
-@media (min-width: 1280px) {
+/* The nav's own items take it to about 1366px wide with the picker in it, and past the screen's edge below that. */
+@media (min-width: 1400px) {
   .framework-picker-nav {
     display: flex;
     align-items: center;
