@@ -49,8 +49,8 @@ You need Node 24, pnpm, a MusicKit key, and an Apple Account with an Apple Music
    is Windows' code for a program that Ctrl+C ended, not an error.
 
    After the Worker, check that nothing still holds `127.0.0.1:8787`: on Windows, Wrangler's `workerd` can outlive
-   the run (`Get-Process workerd | Stop-Process` in PowerShell). The Worker's tokens stay in
-   `samples/worker-server/.wrangler/state`, in plain text, until you delete it.
+   the run. In PowerShell, `Get-Process workerd -ErrorAction SilentlyContinue | Stop-Process` ends it. The Worker's
+   tokens stay in `samples/worker-server/.wrangler/state`, in plain text, until you delete it.
 
 The build that `pnpm turbo dev` starts with writes the generated files under `packages/types/src` and
 `packages/validate/src` again, with LF line endings. On a checkout with CRLF endings git then shows them changed,
