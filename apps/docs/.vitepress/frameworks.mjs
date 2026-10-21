@@ -55,7 +55,13 @@ export function settle(values, url, wanted = {}) {
     kept = {};
   }
   const address = new URL(url);
-  const parts = decodeURIComponent(address.hash).split("--");
+  let hash = address.hash;
+  try {
+    hash = decodeURIComponent(hash);
+  } catch {
+    // An anchor such as #50% isn't escaped as a URL's should be, and names no variant either way.
+  }
+  const parts = hash.split("--");
   const named = parts.length > 1 ? parts[parts.length - 1].split("-") : [];
   const known = [...values.page, ...values.server];
   const variant = named.length > 0 && named.every((name) => known.includes(name)) ? named : [];
