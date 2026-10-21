@@ -5,7 +5,7 @@ and only Apple can issue one. In this guide you add a button that opens Apple's 
 gives, and sign the listener out again.
 
 To sign yourself in, to try the API with your own account or to run a script, you don't need a page of your own:
-the CLI's `login` does it from the terminal. See [The command-line tool](../concepts/packages#the-command-line-tool).
+the CLI's `login` does it from the terminal. See [The command-line tool](../cli).
 
 Before you start, you need:
 

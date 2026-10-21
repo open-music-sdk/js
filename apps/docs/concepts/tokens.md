@@ -52,7 +52,7 @@ it runs Apple's script for you: `createConnect` in `browser`, or `useConnect` in
 
 For your own account, you need no page of your own. The CLI's `login` runs the same sign-in from a page it serves
 on `localhost`, keeps the token, and `token` prints it for a script to read. See
-[The command-line tool](./packages#the-command-line-tool).
+[The command-line tool](../cli).
 
 Once your page has the token, you decide where it goes next. There are three ways to set an app up:
 

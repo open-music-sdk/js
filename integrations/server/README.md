@@ -69,7 +69,7 @@ the parts, install the packages themselves.
 ## Learn more
 
 - [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
-- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), to check
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), to check
   your key and get a Music User Token for your own account
 - [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)

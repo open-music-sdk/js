@@ -219,7 +219,7 @@ build makes.
 
 ## Learn more
 
-- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), and how it
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), and how it
   fits beside the packages
 - [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens)
 - [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), for your listeners' tokens, from your

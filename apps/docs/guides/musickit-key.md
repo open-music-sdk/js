@@ -68,7 +68,7 @@ your server instead: see [Serve a developer token to a page](./token-endpoint).
 
 The quickest check is the CLI's `doctor`. It asks Apple, with `GET /v1/test`, whether it takes a token signed with
 your key, and prints nothing secret. It reads the three variables from your shell, and asks for any that aren't
-set. [The command-line tool](../concepts/packages#the-command-line-tool) shows how to add it.
+set. [The command-line tool](../cli) shows how to add it.
 
 ```sh
 open-music-sdk doctor

@@ -59,7 +59,7 @@ stores are classes, which you give `createClient` as `userTokenStore`.
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens): the
   intake route, its answers, `acceptUserToken` for other frameworks, and choosing a store
 - [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), which gets the token in your page
-- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), which gets
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), which gets
   one for your own account
 - [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers), for `KvUserTokenStore` on
   Workers KV
