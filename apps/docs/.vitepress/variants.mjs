@@ -39,7 +39,7 @@ export const labelFor = (wanted) => {
 /**
  * The `for` container. A block's id is the heading above it and its frameworks, so a link can name the variant:
  * `#after-sign-in--react`. A second block for the same frameworks under one heading has `-2` after the heading's
- * part, which keeps the frameworks at the end of the id.
+ * part, or the next number no other block of the page has, which keeps the frameworks at the end of the id.
  */
 export function variantBlocks(md) {
   md.use(container, "for", {
@@ -56,10 +56,11 @@ export function variantBlocks(md) {
         }
       }
       const frameworks = Object.values(wanted).flat().join("-");
-      env.variantIds ??= new Map();
-      const count = (env.variantIds.get(`${heading}--${frameworks}`) ?? 0) + 1;
-      env.variantIds.set(`${heading}--${frameworks}`, count);
-      const id = count === 1 ? `${heading}--${frameworks}` : `${heading}-${count}--${frameworks}`;
+      env.variantIds ??= new Set();
+      let id = `${heading}--${frameworks}`;
+      // The next number free, since another heading's id can end in one too: a second "Install" is `install-1`.
+      for (let n = 2; env.variantIds.has(id); n++) id = `${heading}-${n}--${frameworks}`;
+      env.variantIds.add(id);
       const label = labelFor(wanted);
       const data = Object.entries(wanted)
         .map(([axis, values]) => ` data-${axis}="${values.join(" ")}"`)
