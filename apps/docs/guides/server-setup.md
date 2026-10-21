@@ -86,7 +86,7 @@ It holds your private key. Add it to `.gitignore` before you write the key into 
 
 ## 3. Make its client once
 
-::: for server=express
+:::: for server=express
 Make one client for the whole server, as it starts. The Express sample reads its settings first, so a missing one
 stops the server at once, with the setting's name:
 
@@ -94,7 +94,21 @@ stops the server at once, with the setting's name:
 
 `MemoryUserTokenStore` keeps listeners' tokens in the process, and loses them when it stops. See
 [Choose a store](./store-user-tokens#choose-a-store) for one that lasts.
+
+Then make the app, and listen. The sample's app refuses a request sent by any name but its own or the page's, and
+listens on your machine's loopback address alone. The routes go between the two, as
+[Serve a developer token to a page](./token-endpoint) and [Keep a listener's token on your server](./store-user-tokens)
+show:
+
+::: code-group
+
+<<< @/../../samples/express-server/src/server.ts#app{ts} [app]
+
+<<< @/../../samples/express-server/src/server.ts#listen{ts} [listen]
+
 :::
+
+::::
 
 :::: for server=workers
 A Worker is handed its secrets with each request, in `env`. Make the client from them on the first request, and

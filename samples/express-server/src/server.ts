@@ -52,6 +52,7 @@ const music = createServerClient({
 });
 // #endregion server-client
 
+// #region app
 const app = express();
 
 // Only requests sent to this server by its own name or the page's: a site whose
@@ -62,6 +63,7 @@ app.use((req, res, next) => {
   if (hosts.has(req.headers.host ?? "")) next();
   else res.status(421).json({ error: "MisdirectedRequest" });
 });
+// #endregion app
 
 // A listener is a random id in a cookie, given with the first answer under
 // /api. A real app has its own sessions.
@@ -186,6 +188,7 @@ app.use((e: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(code).json({ error: STATUS_CODES[code]?.replaceAll(" ", "") });
 });
 
+// #region listen
 // On this machine's loopback address alone: the samples are never meant to be
 // reached from elsewhere.
 app.listen(8787, "127.0.0.1", (error) => {
@@ -194,3 +197,4 @@ app.listen(8787, "127.0.0.1", (error) => {
     `Listening on http://127.0.0.1:8787, handing tokens to ${pageOrigin}`,
   );
 });
+// #endregion listen

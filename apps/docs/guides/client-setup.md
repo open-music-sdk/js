@@ -16,15 +16,19 @@ app.
 ::: for client=vanilla
 ```sh
 pnpm add @open-music-sdk/browser
+pnpm add -D vite
 ```
+
+Vite serves the page while you work, and builds it.
 :::
 
 ::: for client=react
 ```sh
-pnpm add @open-music-sdk/react @tanstack/react-query
+pnpm add @open-music-sdk/react @tanstack/react-query react react-dom
+pnpm add -D vite @vitejs/plugin-react
 ```
 
-`@open-music-sdk/react` doesn't depend on TanStack Query. It gives the objects TanStack Query's hooks take, so the
+Vite serves the page while you work, and builds it. `@open-music-sdk/react` doesn't depend on TanStack Query. It gives the objects TanStack Query's hooks take, so the
 examples here use it, as the [React sample](../samples) does.
 :::
 
@@ -62,7 +66,7 @@ pnpm next dev --port 2728
 ## 3. Make the page's client once
 
 ::: for client=vanilla
-Make one client for the page, in a module the rest of the page imports:
+Make one client for the page, in a module the rest of the page imports. In `src/music.ts`:
 
 ```ts
 import { createBrowserClient } from "@open-music-sdk/browser";
@@ -76,7 +80,7 @@ export const music = createBrowserClient({
 
 ::: for client=react
 Make the client once, outside the tree, and hand it to `MusicProvider`, inside TanStack Query's
-`QueryClientProvider`:
+`QueryClientProvider`. In `src/main.tsx`:
 
 ```tsx
 import { MusicProvider, createBrowserClient } from "@open-music-sdk/react";
@@ -155,9 +159,11 @@ token from `tokenUrl` the first time a request needs one, and fetches the next b
 ## 4. Make a first request
 
 ::: for client=vanilla
-Read an album from the catalog, and show its name:
+Read an album from the catalog, and show its name. In `src/main.ts`:
 
 ```ts
+import { music } from "./music";
+
 const album = await music.catalog.getAlbum("1613600183");
 const heading = document.querySelector("h1");
 if (heading) heading.textContent = album.attributes?.name ?? "";
@@ -177,6 +183,8 @@ export function Album({ id }: { id: string }) {
   return <h1>{album?.attributes?.name}</h1>;
 }
 ```
+
+Render it from `App`, as `<Album id="1613600183" />`.
 :::
 
 ::: for client=nextjs
@@ -212,7 +220,58 @@ time, and stops with an error that names `Date.now()`, so `await connection()` m
 The page's own client is for what runs in the browser: the listener's sign-in, previews, and queries.
 :::
 
-Open the page. The album's name on it means the whole path works, from your key to Apple.
+## 5. Open it
+
+::: for client=vanilla
+Give the page an `index.html` beside `package.json`, with the heading the code fills in, and start Vite:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>An album</title>
+  </head>
+  <body>
+    <h1></h1>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+```
+
+```sh
+pnpm vite
+```
+:::
+
+::: for client=react
+Give the page an `index.html` beside `package.json`, with the element React draws into, and start Vite:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>An album</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+```sh
+pnpm vite
+```
+:::
+
+::: for client=nextjs
+`next dev`, from step 2, serves the page.
+:::
+
+Open `http://localhost:2728`, with your server running too. The album's name on the page means the whole path works,
+from your key to Apple.
 
 ## Next steps
 
