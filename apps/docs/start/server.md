@@ -150,8 +150,9 @@ In another terminal, ask it for a developer token. In PowerShell, write `curl.ex
 curl http://127.0.0.1:8787/api/music/token
 ```
 
-It answers with a token, `{"token":"eyJ…"}`, signed with your key. If the server stops at once instead, it names
-the setting it couldn't find in your `.env`.
+It answers with a token, `{"token":"eyJ…"}`, signed with your key. If the server fails to start instead, its error
+names the setting it couldn't find in your `.env`. Fill that in, then stop the server with Ctrl+C and start it
+again: it restarts when `src` changes, not `.env`.
 
 Stop the server with Ctrl+C. In part 2 you run it together with your page. On Windows, a first Ctrl+C can leave
 Turborepo waiting: see [Stop it](../samples#_5-stop-it) on the Samples page.

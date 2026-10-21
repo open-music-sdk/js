@@ -25,8 +25,8 @@ function required(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(
-      `${name} is not set. Copy samples/.env.example to `
-        + "samples/express-server/.env and fill it in.",
+      `${name} is not set. Copy samples/.env.example to .env in this `
+        + "server's folder and fill it in.",
     );
   }
   return value;
