@@ -79,7 +79,8 @@ The Next sample does it this way:
 - A block can name both choices, `page=react server=workers`. A group of those covers every page and server the
   samples run together: either Vite page with either server, and the Next app alone.
 - A block that holds a container of its own, such as a code group, opens with four colons, `:::: for page=react`,
-  and closes with four, so that the inner `:::` doesn't close it.
+  and closes with four, so that the inner `:::` doesn't close it. A line of colons alone closes a block even inside
+  a code block, and the check fails either mistake.
 - A heading goes above the blocks, never in one. A block's id is the heading's, then its frameworks, such as
   `#act-on-each-kind--nextjs`, and the search lists each block as a result of its own under that heading. A link to
   that id switches the reader to those frameworks.

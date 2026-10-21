@@ -88,38 +88,45 @@ function variantGroups(page) {
   const lines = readFileSync(`${root}/${page}`, "utf8").split(/\r?\n/);
   const groups = [];
   let block;
-  let depth = 0;
   let fence;
   let lastClose = -2;
   lines.forEach((line, i) => {
     const fenceMark = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    const [, colons = "", rest = ""] = /^\s*(:{3,})(.*)$/.exec(line) ?? [];
+    if (block) {
+      // As markdown-it-container does, the first line of at least the block's colons and nothing else closes it,
+      // even inside a code fence. A container inside it, such as a code group, needs fewer colons than the block.
+      if (colons.length >= block.colons) {
+        if (rest.trim() === "") {
+          if (fence !== undefined) block.fenceCut = true;
+          lastClose = i;
+          block = undefined;
+          fence = undefined;
+          return;
+        }
+        block.inner = true;
+      }
+      if (fence !== undefined) {
+        if (fenceMark?.startsWith(fence)) fence = undefined;
+      } else if (fenceMark) fence = fenceMark;
+      else if (/^\s*#{1,6}\s/.test(line)) block.heading = true;
+      block.lines.push(line);
+      return;
+    }
     if (fence !== undefined) {
       if (fenceMark?.startsWith(fence)) fence = undefined;
-      if (block) block.lines.push(line);
       return;
     }
-    if (fenceMark) fence = fenceMark;
-    const opening = /^\s*:::+\s*for(?:\s+(.*))?$/.exec(line);
-    if (opening && block === undefined) {
-      block = { page, line: i + 1, wanted: parseFor(opening[1] ?? ""), lines: [] };
-      const between = lines.slice(lastClose + 1, i);
-      if (lastClose >= 0 && between.every((text) => text.trim() === "")) groups.at(-1).push(block);
-      else groups.push([block]);
+    if (fenceMark) {
+      fence = fenceMark;
       return;
     }
-    if (block === undefined) return;
-    if (fenceMark === undefined && /^\s*#{1,6}\s/.test(line)) block.heading = true;
-    // A container inside the block, such as a code group, opens with its name; a line of colons alone closes one.
-    if (/^\s*:::+\s*[^:\s]/.test(line)) depth += 1;
-    else if (/^\s*:::+\s*$/.test(line)) {
-      if (depth === 0) {
-        lastClose = i;
-        block = undefined;
-        return;
-      }
-      depth -= 1;
-    }
-    block.lines.push(line);
+    const opening = /^for(?:\s+(.*))?$/.exec(rest.trim());
+    if (colons === "" || opening === null) return;
+    block = { page, line: i + 1, colons: colons.length, wanted: parseFor(opening[1] ?? ""), lines: [] };
+    const between = lines.slice(lastClose + 1, i);
+    if (lastClose >= 0 && between.every((text) => text.trim() === "")) groups.at(-1).push(block);
+    else groups.push([block]);
   });
   return groups;
 }
@@ -132,8 +139,13 @@ for (const page of pages.filter((page) => page !== "README.md"))
     groupCount += 1;
     const where = `${page}:${group[0].line}`;
     const axes = [...new Set(group.flatMap((block) => Object.keys(block.wanted)))];
-    for (const block of group)
+    for (const block of group) {
       if (block.heading) variants.push(`${page}:${block.line} has a heading inside "::: for ${named(block)}"; put it above the block`);
+      if (block.inner)
+        variants.push(`${page}:${block.line}: a container inside "::: for ${named(block)}" has as many colons as the block, so its closing line would end the block; give the block one more colon`);
+      if (block.fenceCut)
+        variants.push(`${page}:${block.line}: a code block inside "::: for ${named(block)}" has a line of colons alone, which ends the block; give the block more colons than that line`);
+    }
     if (axes.length === 1) {
       const [axis] = axes;
       const seen = group.flatMap((block) => block.wanted[axis]);
