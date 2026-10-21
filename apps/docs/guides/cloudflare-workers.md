@@ -37,10 +37,11 @@ written as `\n`.
 Make a namespace at Cloudflare for listeners' tokens:
 
 ```sh
-npx wrangler kv namespace create music-user-tokens
+npx wrangler kv namespace create music-user-tokens --binding MUSIC_USER_TOKENS
 ```
 
-Put the `id` it prints in place of the sample's placeholder, under the binding `MUSIC_USER_TOKENS`.
+Wrangler offers to put the namespace in your config, under the binding you named. Afterwards, check that
+`MUSIC_USER_TOKENS` holds the `id` Wrangler printed, and that no placeholder id is left in the config.
 
 `KvUserTokenStore` keeps each token in the namespace under `music-user-token:` and the user's id. To share a
 namespace with other data, give it a prefix of your own:
