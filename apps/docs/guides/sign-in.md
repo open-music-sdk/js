@@ -112,17 +112,21 @@ second helper for a different `app` is a `TypeError`.
 ## 3. Enable the button once the script is ready
 
 ::: for page=vanilla
-`ready` settles once the script is loaded and configured. Keep the button disabled until then:
+`ready` settles once the script is loaded and configured, or has failed to be. Keep the button disabled until
+then:
 
 ```ts
 button.disabled = true;
-signIn.ready.then(
-  (restored) => {
+signIn.ready
+  .then(
+    (restored) => {
+      if (restored) signedIn(music.as(restored));
+    },
+    (e) => showWhyNot(e),
+  )
+  .finally(() => {
     button.disabled = false;
-    if (restored) signedIn(music.as(restored));
-  },
-  (e) => showWhyNot(e),
-);
+  });
 ```
 
 `ready` resolves to a token when Apple's script restored one for a returning listener, who then needs no click.
@@ -133,13 +137,15 @@ when the developer token can't be fetched from your route.
 :::
 
 ::: for page=react,nextjs
-`isReady` is `true` once the script is loaded and configured. Keep the button disabled until then:
+`isReady` is `true` once the script is loaded and configured, and `error` is set once it has failed to be. Keep
+the button disabled until one of them is:
 
 ```tsx
 if (token) return <button onClick={signOut}>Sign out</button>;
+const settled = isReady || error !== undefined;
 return (
   <>
-    <button disabled={!isReady} onClick={signIn}>
+    <button disabled={!settled} onClick={signIn}>
       Connect Apple Music
     </button>
     {error !== undefined && (
@@ -156,7 +162,8 @@ click.
 `DeveloperTokenUnavailable` when the developer token can't be fetched from your route.
 :::
 
-After a failure, the next `connect()` loads and configures the script again before it opens the window.
+The button works after a failure too: the next `connect()` loads and configures the script again before it opens
+the window.
 
 While the helper lives, it keeps Apple's script supplied with a current developer token, so `connect()` has
 nothing to wait for at the click. It asks the client's token provider again halfway through the token's life and

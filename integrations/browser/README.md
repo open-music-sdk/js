@@ -28,9 +28,10 @@ const player = previewPlayer();
 player.load(results.songs?.data ?? []);
 playButton.onclick = () => void player.play().catch(showError); // sound has to start from a click
 
-// Create the sign-in helper where the button is shown, and enable the button once Apple's script is ready.
+// Create the sign-in helper where the button is shown, and enable the button once Apple's script is ready, or
+// has failed to load: a click then loads it again.
 const signIn = createConnect(music, { app: { name: "Vinyl Collector Simulator" } });
-void signIn.ready.then(() => (connectButton.disabled = false), showError);
+void signIn.ready.catch(showError).finally(() => (connectButton.disabled = false));
 connectButton.onclick = async () => {
   try {
     const token = await signIn.connect(); // opens Apple's sign-in window
