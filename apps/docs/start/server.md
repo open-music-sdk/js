@@ -138,7 +138,11 @@ From the root, start your server:
 pnpm turbo dev --filter=my-server
 ```
 
-Turborepo builds the SDK's packages first, then starts the server, which says:
+Turborepo builds the SDK's packages first, then starts the server. On Windows, `git status` may then list the
+SDK's generated types as changed, though their text is the same: the generator writes Unix line endings.
+[When you're done](./listener#_8-when-you-re-done) puts them back too.
+
+The server says:
 
 ```
 express-server: http://127.0.0.1:8787, handing tokens to http://localhost:2728

@@ -119,13 +119,14 @@ Everything the page wrote is in your Apple Music account. Undo in Apple Music wh
 - an album you made a favorite on its page.
 
 Your two folders are yours to keep, and the repository ignores them. To put the repository back as you cloned it,
-delete them and restore the lockfile pnpm wrote them into, from the root:
+delete them, restore the lockfile pnpm wrote them into, and restore the generated types, from the root:
 
 ```sh
 rm -r samples/my-page
 rm -r samples/my-server
 git checkout pnpm-lock.yaml
 pnpm install
+git checkout packages/types/src packages/validate/src
 ```
 
 ## Where next
