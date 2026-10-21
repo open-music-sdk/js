@@ -84,7 +84,10 @@ const scoped = (groups) =>
     }),
   }));
 
-const concepts = [
+// The concepts, the samples and the CLI share the guides' sidebar, under the nav's Guides, so the pager runs through
+// all of them. Their pages keep their addresses.
+const guidesSidebar = scoped([
+  ...guides,
   {
     text: "Concepts",
     items: [
@@ -95,7 +98,9 @@ const concepts = [
       { text: "Design principles", link: "/concepts/principles" },
     ],
   },
-];
+  { text: "Samples", items: [{ text: "Sample apps", link: "/samples" }] },
+  { text: "CLI", items: [{ text: "The command-line tool", link: "/cli" }] },
+]);
 
 // A package README links to the site by its full URL, so the link works on GitHub and npm too. On the site it is
 // made relative, which keeps it in the same tab and puts it under VitePress's check for dead links. It runs after
@@ -144,16 +149,16 @@ export default defineConfig({
   themeConfig: {
     logo: "/logo.svg",
     nav: [
-      { text: "Guides", link: "/guides/musickit-key", activeMatch: "^/guides/" },
-      { text: "Concepts", link: "/concepts/packages", activeMatch: "^/concepts/" },
+      { text: "Guides", link: "/guides/musickit-key", activeMatch: "^/(guides/|concepts/|samples|cli)" },
       { text: "Reference", link: "/reference/", activeMatch: "^/(reference/|differences|glossary)" },
-      { text: "Samples", link: "/samples" },
       { text: "Status", link: "/status" },
     ],
     // The longest matching path wins, so a package's own sidebar is used under its folder.
     sidebar: {
-      "/guides/": scoped(guides),
-      "/concepts/": concepts,
+      "/guides/": guidesSidebar,
+      "/concepts/": guidesSidebar,
+      "/samples": guidesSidebar,
+      "/cli": guidesSidebar,
       "/reference/": referenceSidebar(),
       "/differences": referenceSidebar(),
       "/glossary": referenceSidebar(),
