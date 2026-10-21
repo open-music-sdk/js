@@ -36,7 +36,7 @@ The package runs on Workers as it is. It needs nothing but `fetch` and WebCrypto
 pnpm add @open-music-sdk/server @open-music-sdk/react
 ```
 
-Route handlers, server components and server actions use `@open-music-sdk/server`, which can hold your private
+This is for a Next.js 16 app that uses the App Router. Route handlers, server components and server actions use `@open-music-sdk/server`, which can hold your private
 key. Client components use `@open-music-sdk/react`, which can't.
 
 `@open-music-sdk/react` puts the `"use client"` directive on the one file that holds `MusicProvider` and the
@@ -131,16 +131,40 @@ Don't make it per request. A client made per request imports the key and signs a
 kept in the module signs a token once, reuses it for every request the isolate serves, and replaces it in the
 background halfway through its life.
 
-The Worker keeps listeners' tokens in a Workers KV namespace, bound in its Wrangler config as `MUSIC_USER_TOKENS`:
+`route` hands each request to the Worker's routes, which [Serve a developer token to a page](./token-endpoint) and
+[Keep a listener's token on your server](./store-user-tokens) show. `sessionOf` reads the sample's session cookie,
+where your app reads its own sessions.
 
-<<< @/../../samples/worker-server/wrangler.jsonc{jsonc}
+The Worker keeps listeners' tokens in a Workers KV namespace, bound as `MUSIC_USER_TOKENS` in your Wrangler config,
+and `wrangler dev` listens on your machine's loopback address alone:
+
+```jsonc
+{
+  "name": "my-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "kv_namespaces": [
+    { "binding": "MUSIC_USER_TOKENS", "id": "00000000000000000000000000000000" }
+  ],
+  "dev": { "ip": "127.0.0.1", "port": 8787 }
+}
+```
+
+`wrangler dev` keeps the namespace on your machine, so any id does until you deploy.
+[Deploy a Worker](./cloudflare-workers) makes a real one.
 ::::
 
-::: for server=nextjs
+:::: for server=nextjs
 Make one client for your whole server, in a module only server code imports. The Next sample makes it, with its
-store of listeners' tokens, in `src/lib/music.ts`:
+store of listeners' tokens, in `src/lib/music.ts`, from settings `src/lib/env.ts` reads:
 
-<<< @/../../samples/web-nextjs/src/lib/music.ts{ts}
+::: code-group
+
+<<< @/../../samples/web-nextjs/src/lib/music.ts{ts} [lib/music.ts]
+
+<<< @/../../samples/web-nextjs/src/lib/env.ts{ts} [lib/env.ts]
+
+:::
 
 - The client is made the first time it's asked for, not as the module loads. `next build` loads every route's
   modules with no key in its environment, and builds nothing that needs one.
@@ -153,7 +177,7 @@ one instance, or on serverless functions, use a store they all reach. See
 
 The client's other uses on a Next server, acting for a listener in a server action and caching catalog reads, are
 in [Act and cache on a Next.js server](./nextjs).
-:::
+::::
 
 The client signs one developer token, uses it for every request, and signs the next before it runs out. Its
 `rateLimit` is shared by every request your server makes for every listener, since they all spend the same token's
