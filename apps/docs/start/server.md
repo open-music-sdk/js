@@ -142,10 +142,10 @@ Turborepo builds the SDK's packages first, then starts the server. On Windows, `
 SDK's generated types as changed, though their text is the same: the generator writes Unix line endings.
 [When you're done](./listener#_8-when-you-re-done) puts them back too.
 
-The server says:
+The server says, after the name Turborepo gives each line of its output:
 
 ```
-express-server: http://127.0.0.1:8787, handing tokens to http://localhost:2728
+my-server:dev: Listening on http://127.0.0.1:8787, handing tokens to http://localhost:2728
 ```
 
 In another terminal, ask it for a developer token. In PowerShell, write `curl.exe` for `curl`:

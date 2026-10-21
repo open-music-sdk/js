@@ -193,6 +193,6 @@ app.use((e: unknown, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(8787, "127.0.0.1", (error) => {
   if (error) throw error;
   console.log(
-    `express-server: http://127.0.0.1:8787, handing tokens to ${pageOrigin}`,
+    `Listening on http://127.0.0.1:8787, handing tokens to ${pageOrigin}`,
   );
 });
