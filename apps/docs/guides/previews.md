@@ -207,6 +207,10 @@ player.subscribe(() => {
 
 `subscribe` calls your listener after each change and returns the function that stops it. While a clip plays,
 `position` changes several times a second.
+
+A listener may call the player back, for example to pause or load another queue, and what it does stands. A
+listener that throws stops neither the player nor the other listeners. The first error is then thrown to
+whoever called the player, or out through the element's event.
 :::
 
 ::: for page=react,nextjs
@@ -235,10 +239,6 @@ queue as `tracks`, the current `index` and `track`, the clip's `position` and `d
 `status` is one of `idle`, `loading`, `playing`, `paused`, `ended` and `error`, which
 [`tPreviewStatus`](../reference/@open-music-sdk/lib-preview-player/type-aliases/tPreviewStatus) explains. After an
 `error`, `next()` moves on, and `play()` asks for the same clip again.
-
-A listener may call the player back, for example to pause or load another queue, and what it does stands. A
-listener that throws stops neither the player nor the other listeners. The first error is then thrown to
-whoever called the player, or out through the element's event.
 
 ## 5. Play through your own audio element
 
@@ -329,8 +329,8 @@ first click. Changing your options object afterwards changes nothing.
 ## When something goes wrong
 
 - A mistake in how you call a function is a `TypeError` that names the function and the argument, such as
-  `previewPlayer.seek: seconds must be …`. `load`, `seek`, `setVolume` and `subscribe` throw it, and `play`,
-  `next` and `previous` reject with it. No such error repeats the value you passed.
+  `previewPlayer.seek: seconds must be …`. `load`, `seek`, `setVolume` and `previewPlayer`'s `subscribe` throw
+  it, and `play`, `next` and `previous` reject with it. No such error repeats the value you passed.
 - What the element refuses reaches you as the browser made it, such as the `NotAllowedError` in step 3.
 - No error here is an `AppleMusicError`, because the player asks Apple for nothing.
 
