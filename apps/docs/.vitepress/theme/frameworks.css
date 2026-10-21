@@ -25,10 +25,8 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
 
 .framework-picker {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
-  font-size: 13px;
-  color: var(--vp-c-text-2);
 }
 
 /* Until it shows the reader's choice, which only its script knows. */
@@ -36,35 +34,108 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
   visibility: hidden;
 }
 
-.framework-picker label {
+.framework-choice {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
-/* VitePress's reset takes the arrow off a select, so a chevron drawn in the text's colour says it opens. */
-.framework-picker select {
-  appearance: none;
-  padding: 2px 24px 2px 8px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 6px;
-  background-color: var(--vp-c-bg-soft);
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--vp-c-text-2) 50%),
-    linear-gradient(135deg, var(--vp-c-text-2) 50%, transparent 50%);
-  background-position:
-    calc(100% - 13px) 55%,
-    calc(100% - 9px) 55%;
-  background-size: 4px 4px;
-  background-repeat: no-repeat;
-  color: var(--vp-c-text-1);
-  font: inherit;
-  cursor: pointer;
+.framework-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
 }
 
-.framework-picker select:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 1px;
+.framework-control {
+  position: relative;
+}
+
+/* The theme's search button, beside it in the nav: its ground, its corners, and its border on hover. */
+.framework-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background-color: var(--vp-c-bg-alt);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+  white-space: nowrap;
+  transition: border-color 0.25s;
+}
+
+.framework-button:hover,
+.framework-choice.open .framework-button {
+  border-color: var(--vp-c-brand-1);
+}
+
+.framework-chevron {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--vp-c-text-3);
+}
+
+.framework-logo {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* The theme's menus, as its nav's own drop-downs draw them. */
+.framework-menu,
+.vp-doc .framework-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 100%;
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background-color: var(--vp-c-bg-elv);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.vp-doc .framework-menu li + li {
+  margin-top: 0;
+}
+
+.framework-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: 6px;
+  line-height: 32px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--vp-c-text-1);
+  white-space: nowrap;
+  transition:
+    background-color 0.25s,
+    color 0.25s;
+}
+
+.framework-item:hover,
+.framework-item:focus-visible {
+  color: var(--vp-c-brand-1);
+  background-color: var(--vp-c-default-soft);
+}
+
+.framework-item:focus-visible {
+  outline: none;
+}
+
+.framework-item[aria-current="true"] {
+  color: var(--vp-c-brand-1);
 }
 
 /* In the nav where there's room for it, and at the top of the sidebar, which is also the narrow screens' menu,
@@ -74,7 +145,7 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
   padding-left: 24px;
 }
 
-/* The sidebar is too narrow for the two side by side, so they stack, each select as wide as the other. */
+/* The sidebar is too narrow for the two side by side, so they stack, each button as wide as the other. */
 .framework-picker-sidebar {
   padding: 16px 0 12px;
   border-bottom: 1px solid var(--vp-c-divider);
@@ -82,13 +153,19 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
 }
 
 .framework-picker-sidebar .framework-picker {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 8px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
 
-.framework-picker-sidebar .framework-picker label {
-  display: contents;
+.framework-picker-sidebar .framework-label {
+  width: 44px;
+}
+
+.framework-picker-sidebar .framework-control,
+.framework-picker-sidebar .framework-button {
+  flex: 1;
+  width: 100%;
 }
 
 /* The nav's own items take it to about 1366px wide with the picker in it, and past the screen's edge below that. */
