@@ -120,7 +120,6 @@ function leave(event, axis) {
           :id="`${id}-${axis}`"
           type="button"
           class="framework-button"
-          aria-haspopup="true"
           :aria-expanded="open === axis"
           :aria-controls="`${id}-${axis}-menu`"
           :aria-labelledby="`${id}-${axis}-label ${id}-${axis}`"

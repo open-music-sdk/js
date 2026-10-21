@@ -25,6 +25,10 @@ const names = (wanted) => {
 function show() {
   const settled = settle(VALUES, location.href, first.value);
   window.dispatchEvent(new CustomEvent("frameworks", { detail: settled }));
+  // The notice, and the button in it, are hidden now, so the focus goes on to the page's heading.
+  const heading = document.querySelector(".vp-doc h1");
+  heading?.setAttribute("tabindex", "-1");
+  heading?.focus();
 }
 </script>
 
