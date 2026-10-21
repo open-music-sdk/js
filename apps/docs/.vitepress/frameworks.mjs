@@ -34,6 +34,41 @@ export const PAIRS = [
 export const labelOf = (axis, value) => AXES[axis].find((framework) => framework.value === value)?.label ?? value;
 
 /**
+ * What a block, or a page, is for, from what follows `for`: `client=vanilla,react server=workers` is
+ * `{ client: ["vanilla", "react"], server: ["workers"] }`. A choice or a framework that doesn't exist is an error,
+ * which stops the build at the page that names it.
+ */
+export function parseFor(text) {
+  const wanted = {};
+  for (const part of text.trim().split(/\s+/).filter(Boolean)) {
+    const [axis, list] = part.split("=");
+    if (!(axis in AXES) || list === undefined || axis in wanted) {
+      throw new Error(`"for ${text.trim()}": write each choice once, as client=… or server=…`);
+    }
+    wanted[axis] = list.split(",");
+    for (const value of wanted[axis]) {
+      if (!AXES[axis].some((framework) => framework.value === value)) {
+        throw new Error(`"for ${text.trim()}": ${axis} has no framework "${value}"`);
+      }
+    }
+  }
+  if (Object.keys(wanted).length === 0) throw new Error(`"for": name the frameworks, as client=react`);
+  return wanted;
+}
+
+/** What a page is for, from the `for:` in its frontmatter, as `client=react,nextjs`: `{}` for a page for every one. */
+export const pageScope = (markdown) => {
+  const line = /^---\r?\n(?:.*\r?\n)*?for:\s*(.+?)\s*\r?\n(?:.*\r?\n)*?---/.exec(markdown)?.[1];
+  return line === undefined ? {} : parseFor(line);
+};
+
+/** What something is for, as the attributes the CSS reads: ` data-client="vanilla react" data-server="workers"`. */
+export const dataAttributes = (wanted) =>
+  Object.entries(wanted)
+    .map(([axis, values]) => ` data-${axis}="${values.join(" ")}"`)
+    .join("");
+
+/**
  * Settles the reader's choice, puts it on `<html>` as `data-client` and `data-server`, keeps it in the browser, and
  * returns it. `values` is `VALUES`, `url` the address being shown, and `wanted` a choice made in the picker.
  *

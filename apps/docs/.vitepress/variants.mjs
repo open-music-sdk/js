@@ -2,30 +2,7 @@
 // more frameworks show, and CSS shows the blocks of the frameworks the reader chose. Every block is in the built
 // page, and the search finds each one as a result of its own, named for its frameworks.
 import container from "markdown-it-container";
-import { AXES, labelOf } from "./frameworks.mjs";
-
-/**
- * What a block is for, from what follows `for`: `client=vanilla,react server=workers` is
- * `{ client: ["vanilla", "react"], server: ["workers"] }`. A choice or a framework that doesn't exist is an error,
- * which stops the build at the page that names it.
- */
-export function parseFor(text) {
-  const wanted = {};
-  for (const part of text.trim().split(/\s+/).filter(Boolean)) {
-    const [axis, list] = part.split("=");
-    if (!(axis in AXES) || list === undefined || axis in wanted) {
-      throw new Error(`"::: for ${text.trim()}": write each choice once, as client=… or server=…`);
-    }
-    wanted[axis] = list.split(",");
-    for (const value of wanted[axis]) {
-      if (!AXES[axis].some((framework) => framework.value === value)) {
-        throw new Error(`"::: for ${text.trim()}": ${axis} has no framework "${value}"`);
-      }
-    }
-  }
-  if (Object.keys(wanted).length === 0) throw new Error(`"::: for": name the frameworks, as client=react`);
-  return wanted;
-}
+import { dataAttributes, labelOf, parseFor } from "./frameworks.mjs";
 
 /**
  * How the reader sees what a block is for, such as `Vanilla, React` or `React · Workers`. The Next app, which is
@@ -62,10 +39,7 @@ export function variantBlocks(md) {
       for (let n = 2; env.variantIds.has(id); n++) id = `${heading}-${n}--${frameworks}`;
       env.variantIds.add(id);
       const label = labelFor(wanted);
-      const data = Object.entries(wanted)
-        .map(([axis, values]) => ` data-${axis}="${values.join(" ")}"`)
-        .join("");
-      return `<div class="for" id="${id}"${data} data-label="${label}" style="--for-label: '${label}'">\n`;
+      return `<div class="for" id="${id}"${dataAttributes(wanted)} data-label="${label}" style="--for-label: '${label}'">\n`;
     },
   });
 }

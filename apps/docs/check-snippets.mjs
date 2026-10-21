@@ -3,8 +3,7 @@
 // fails on a snippet whose file or region is missing.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { PAIRS, VALUES, labelOf } from "./.vitepress/frameworks.mjs";
-import { parseFor } from "./.vitepress/variants.mjs";
+import { PAIRS, VALUES, labelOf, pageScope, parseFor } from "./.vitepress/frameworks.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 // What the site is built from, not what it depends on or what is generated.
@@ -76,9 +75,10 @@ for (const page of pages.filter((page) => page !== "README.md")) {
 // A guide's code follows the reader's frameworks, in `::: for client=react` blocks (see .vitepress/variants.mjs).
 // Blocks next to each other, with nothing but blank lines between them, are one group, and the reader sees exactly
 // one block of a group: so a group covers every framework of its choice once, or, where its blocks name both
-// choices, every client and server the samples run together once. Two blocks of a group that come out the same, once
-// their snippets are read in, are one block for both frameworks. And a block holds no heading, which the page's
-// outline would list while the block is hidden.
+// choices, every client and server the samples run together once. A page for some frameworks alone, with `for:` in
+// its frontmatter, covers those alone. Two blocks of a group that come out the same, once their snippets are read in,
+// are one block for both frameworks. And a block holds no heading, which the page's outline would list while the
+// block is hidden.
 const regionText = (file, region) => {
   const text = readFileSync(file, "utf8");
   return region === undefined ? text.split(/\r?\n/) : (findRegion(text, region) ?? []);
@@ -145,7 +145,9 @@ function variantGroups(page) {
 const named = (block) => Object.entries(block.wanted).map(([axis, values]) => `${axis}=${values.join(",")}`).join(" ");
 const variants = [];
 let groupCount = 0;
-for (const page of pages.filter((page) => page !== "README.md"))
+for (const page of pages.filter((page) => page !== "README.md")) {
+  const scope = pageScope(readFileSync(`${root}/${page}`, "utf8"));
+  const allowed = (axis) => scope[axis] ?? VALUES[axis];
   for (const group of variantGroups(page)) {
     groupCount += 1;
     const where = `${page}:${group[0].line}`;
@@ -160,15 +162,17 @@ for (const page of pages.filter((page) => page !== "README.md"))
     if (axes.length === 1) {
       const [axis] = axes;
       const seen = group.flatMap((block) => block.wanted[axis]);
-      const missing = VALUES[axis].filter((value) => !seen.includes(value));
-      const twice = VALUES[axis].filter((value) => seen.filter((other) => other === value).length > 1);
+      const missing = allowed(axis).filter((value) => !seen.includes(value));
+      const twice = allowed(axis).filter((value) => seen.filter((other) => other === value).length > 1);
+      const outside = [...new Set(seen.filter((value) => !allowed(axis).includes(value)))];
       if (missing.length) variants.push(`${where}: the group has no block for ${missing.map((value) => labelOf(axis, value)).join(", ")}`);
       if (twice.length) variants.push(`${where}: the group has more than one block for ${twice.map((value) => labelOf(axis, value)).join(", ")}`);
+      if (outside.length) variants.push(`${where}: the page is not for ${outside.map((value) => labelOf(axis, value)).join(", ")}, which a block names`);
     } else if (group.some((block) => Object.keys(block.wanted).length !== 2)) {
       variants.push(`${where}: some blocks of the group name both choices, so each of them has to`);
     } else {
       const pairs = group.flatMap((block) => block.wanted.client.flatMap((client) => block.wanted.server.map((server) => `${client}+${server}`)));
-      const runs = PAIRS.map(({ client, server }) => `${client}+${server}`);
+      const runs = PAIRS.filter(({ client, server }) => allowed("client").includes(client) && allowed("server").includes(server)).map(({ client, server }) => `${client}+${server}`);
       const missing = runs.filter((pair) => !pairs.includes(pair));
       const twice = runs.filter((pair) => pairs.filter((other) => other === pair).length > 1);
       const never = [...new Set(pairs.filter((pair) => !runs.includes(pair)))];
@@ -182,6 +186,7 @@ for (const page of pages.filter((page) => page !== "README.md"))
         if (resolved(group[a].lines) === resolved(group[b].lines))
           variants.push(`${page}:${group[b].line}: "::: for ${named(group[b])}" shows the same as "::: for ${named(group[a])}"; make them one block for both`);
   }
+}
 
 if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there, or of a whole file with region lines:\n${broken.join("\n")}`);
 if (wide.length) console.error(`${wide.length} line(s) of code blocks over ${WIDTH} characters, which the site would scroll:\n${wide.join("\n")}`);

@@ -5,6 +5,7 @@ import DefaultTheme from "vitepress/theme";
 import { h } from "vue";
 import { VALUES, settle } from "../frameworks.mjs";
 import FrameworkPicker from "./FrameworkPicker.vue";
+import FrameworkScope from "./FrameworkScope.vue";
 import "./frameworks.css";
 
 /** Settles the choice for the address about to be shown, so a variant it names is showing when it's scrolled to. */
@@ -19,6 +20,7 @@ export default {
     h(DefaultTheme.Layout, null, {
       "nav-bar-content-before": () => h("div", { class: "framework-picker-nav" }, [h(FrameworkPicker)]),
       "sidebar-nav-before": () => h("div", { class: "framework-picker-sidebar" }, [h(FrameworkPicker)]),
+      "doc-before": () => h(FrameworkScope),
     }),
   enhanceApp({ app, router }) {
     app.component("FrameworkPicker", FrameworkPicker);

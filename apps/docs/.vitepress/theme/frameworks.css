@@ -9,6 +9,56 @@ html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
   display: none;
 }
 
+/* A page for some frameworks alone: its sidebar entry and the pager's link to it, for a reader who chose others. Its
+   entry carries a mark of what it's for (see config.mjs). */
+html[data-client="vanilla"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="vanilla"])),
+html[data-client="react"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="react"])),
+html[data-client="nextjs"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="nextjs"])),
+html[data-server="express"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="express"])),
+html[data-server="workers"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="workers"])),
+html[data-server="nextjs"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="nextjs"])),
+html[data-client="vanilla"] .pager:has(.for-only[data-client]:not([data-client~="vanilla"])),
+html[data-client="react"] .pager:has(.for-only[data-client]:not([data-client~="react"])),
+html[data-client="nextjs"] .pager:has(.for-only[data-client]:not([data-client~="nextjs"])),
+html[data-server="express"] .pager:has(.for-only[data-server]:not([data-server~="express"])),
+html[data-server="workers"] .pager:has(.for-only[data-server]:not([data-server~="workers"])),
+html[data-server="nextjs"] .pager:has(.for-only[data-server]:not([data-server~="nextjs"])) {
+  display: none;
+}
+
+/* On such a page, the notice that it's for other frameworks than the reader's (see FrameworkScope.vue). */
+.for-notice {
+  display: none;
+  margin-bottom: 24px;
+  border: 1px solid var(--vp-custom-block-info-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background-color: var(--vp-custom-block-info-bg);
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--vp-custom-block-info-text);
+}
+
+html[data-client="vanilla"] .for-notice[data-client]:not([data-client~="vanilla"]),
+html[data-client="react"] .for-notice[data-client]:not([data-client~="react"]),
+html[data-client="nextjs"] .for-notice[data-client]:not([data-client~="nextjs"]),
+html[data-server="express"] .for-notice[data-server]:not([data-server~="express"]),
+html[data-server="workers"] .for-notice[data-server]:not([data-server~="workers"]),
+html[data-server="nextjs"] .for-notice[data-server]:not([data-server~="nextjs"]) {
+  display: block;
+}
+
+.for-notice button {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.for-notice button:hover {
+  color: var(--vp-c-brand-2);
+}
+
 /* A code block in a variant says which frameworks it's for, where the language sits on the other side. */
 .vp-doc .for > div[class*="language-"]::before,
 .vp-doc .for > .vp-code-group > .blocks > div[class*="language-"]::before {
