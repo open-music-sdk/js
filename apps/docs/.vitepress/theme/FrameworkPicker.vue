@@ -62,10 +62,15 @@ function pick(axis, value) {
   window.dispatchEvent(new CustomEvent("frameworks", { detail: settled }));
 }
 
+// The theme closes the phone's sidebar on an Escape it hears when the key comes up, so the one that closed a menu
+// goes no further than the picker.
+let escaped = false;
+
 // Down and Up open a menu and move through it, and Escape closes it.
 function keys(event, axis) {
   if (event.key === "Escape" && open.value === axis) {
     event.preventDefault();
+    escaped = true;
     close(axis);
     return;
   }
@@ -79,6 +84,12 @@ function keys(event, axis) {
   const at = list.indexOf(document.activeElement);
   const step = event.key === "ArrowDown" ? 1 : -1;
   list[(at + step + list.length) % list.length].focus();
+}
+
+function keysUp(event) {
+  if (event.key !== "Escape" || !escaped) return;
+  escaped = false;
+  event.stopPropagation();
 }
 
 // Focus that leaves a choice, by Tab, closes its menu.
@@ -95,6 +106,7 @@ function leave(event, axis) {
       class="framework-choice"
       :class="{ open: open === axis }"
       @keydown="keys($event, axis)"
+      @keyup="keysUp"
       @focusout="leave($event, axis)"
     >
       <span :id="`${id}-${axis}-label`" class="framework-label">{{ AXIS_LABELS[axis] }}</span>
