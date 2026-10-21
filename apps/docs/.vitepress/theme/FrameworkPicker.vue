@@ -83,7 +83,9 @@ function keys(event, axis) {
   const list = items(axis);
   const at = list.indexOf(document.activeElement);
   const step = event.key === "ArrowDown" ? 1 : -1;
-  list[(at + step + list.length) % list.length].focus();
+  // From the button, as after a click opened the menu: Down to the first item, Up to the last.
+  if (at === -1) list.at(step > 0 ? 0 : -1).focus();
+  else list[(at + step + list.length) % list.length].focus();
 }
 
 function keysUp(event) {
