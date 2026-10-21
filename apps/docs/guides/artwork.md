@@ -177,6 +177,77 @@ list.
 What comes back is a URL, not markup. Assigned to an element, or given to React, it's escaped for you. Written
 into HTML by hand, escape it like any other attribute value, and don't put it inside a CSS `url(…)` as it is.
 
+## With `next/image`
+
+In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
+offers, and Apple's image server makes each one, so Next's own optimizer is never used and your Next config needs
+no `remotePatterns` for Apple. The [Next sample](../samples) does this in one component, `Artwork`, in
+`src/components/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
+
+<<< @/../../samples/web-nextjs/src/components/artwork.tsx#artwork{tsx}
+
+In any component, server or client, give `Artwork` a resource's artwork and the width you show it at:
+
+```tsx
+import type { tAlbum } from "@open-music-sdk/react";
+import { Artwork } from "./artwork";
+
+export function AlbumHeading({ album }: { album: tAlbum }) {
+  const { name, artwork } = album.attributes ?? {};
+  return (
+    <header>
+      <Artwork artwork={artwork} width={240} alt="" loading="eager" />
+      <h1>{name}</h1>
+    </header>
+  );
+}
+```
+
+The `alt` is empty because the heading beside the cover names the album. A cover on its own takes the name as its
+`alt`, as any image does.
+
+`Artwork` takes:
+
+- `artwork`: a resource's `attributes.artwork`. With none, it draws an empty image in the same box, so a page laid
+  out around covers keeps its shape. You don't need to check for artwork first.
+- `width` and `height`, as `next/image` takes them. Leave out `height` and the artwork's own shape decides it: a
+  1920 by 1080 still shown 320 wide is 180 high.
+- `fill` and `sizes`, as `next/image` takes them, for a box sized by CSS.
+- `format`, such as `"webp"`, as in step 5.
+- `hosts`, the hosts the URL may point to, as in step 6.
+- Everything else `next/image` takes, such as `className`, `loading` and `preload`. The exceptions are `src` and
+  `loader`, which `Artwork` sets, and `quality` and `unoptimized`, which only Next's own optimizer would use.
+
+While the image loads, the box shows the artwork's `bgColor`.
+
+For a cover that fills a grid cell, give the cell a position and a shape, and say how wide it is shown in `sizes`:
+
+```tsx
+<div style={{ position: "relative", aspectRatio: 1 }}>
+  <Artwork
+    artwork={artwork}
+    fill
+    sizes="(max-width: 640px) 50vw, 240px"
+    alt={name}
+  />
+</div>
+```
+
+What the sample showed, on 20 October 2026, in Next 16:
+
+- Next picks the widths from its own list, not from the width you show the image at. A cover shown at 240 asks
+  for `256x256`, labelled `1x`, and `640x640`, labelled `2x`: for each density, the first of Next's `imageSizes`
+  and `deviceSizes` at least that wide. `artworkImage` asks for exactly `240x240` and `480x480`.
+- `remotePatterns` in your Next config doesn't apply under a loader of your own, so nothing checks where the URL
+  points but `hosts`, as in step 6. Pass `hosts` to `Artwork` for artwork from anywhere but Apple's API.
+- A URL with no size to fill in, as the artwork of a listener's own playlist has, is the same image at every width.
+  Next warns about a loader that can't honour a width, so `Artwork` passes `unoptimized` for such a URL. Next then
+  calls no loader and uses `src` as it is, so `Artwork` makes that `src` with `artworkUrl` too, where `hosts` is
+  checked.
+- The artwork's `bgColor` goes into a style that the server writes into the page's HTML without parsing it first.
+  `Artwork` uses it only if it is six hex digits, as Apple sends it, so a colour from elsewhere can't add CSS
+  declarations of its own.
+
 ## When something goes wrong
 
 An argument that isn't what the function takes is a `TypeError`, and so, with `hosts`, is an artwork whose URL
@@ -186,6 +257,7 @@ the URL. Each function's reference, linked below, lists every case.
 ## Next steps
 
 - [Play song previews](./previews), with the artwork of the track that is playing.
+- [Next.js](./nextjs), for the rest of a Next app.
 - The reference for [`artworkImage`](../reference/@open-music-sdk/util-artwork/functions/artworkImage),
   [`artworkUrl`](../reference/@open-music-sdk/util-artwork/functions/artworkUrl),
   [`artworkSrcSet`](../reference/@open-music-sdk/util-artwork/functions/artworkSrcSet) and their

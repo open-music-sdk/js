@@ -138,7 +138,8 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 [Handle errors](./errors).
 
 When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`. The
-samples' servers take a `DELETE` on the same route, which the page sends once Apple's sign-out is done:
+samples' servers take a `DELETE` on the same route. The page sends it before Apple's sign-out, so that a sign-out
+Apple's script fails still leaves no token on the server:
 
 ::: code-group
 

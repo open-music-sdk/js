@@ -6,9 +6,10 @@ API, on Windows, the CLI's sign-in has run. Its `check` has asked, in one storef
 - every endpoint function that reads, each answer held to its generated type;
 - what the SDK takes on trust, through the functions that take it.
 
-With `--write`, it has set and taken away a rating of each type and made a playlist folder too. Nothing has run in a
-React app outside its tests. This table is the source of truth for what works. Expect everything else to be missing or to
-change.
+With `--write`, it has set and taken away a rating of each type and made a playlist folder too. The React and
+Next.js samples have run against it in a headless browser, signed out, and the Next sample's listener pages too, with
+a token handed to its server. Apple's sign-in in a React app is still to be run by hand. This table is the source of
+truth for what works. Expect everything else to be missing or to change.
 :::
 
 The SDK is a family of small packages that share one core and one generated type layer, in the manner of the AWS
@@ -33,10 +34,10 @@ ships the same version number. See
 | [`@open-music-sdk/lib-preview-player`](./reference/@open-music-sdk/lib-preview-player/) | 🚧 In progress | 80% | `previewPlayer()` · a queue of preview clips around one audio element · play, pause, next, previous, seek, volume · one frozen state to subscribe to · opt-in host check · no framework · the hosts of live clips seen once, through the CLI's `check`; untested in a browser against the live API |
 | [`@open-music-sdk/server`](./reference/@open-music-sdk/server/) | 🚧 In progress | 80% | `createServerClient()` that mints its own token, with `catalog`, `user` and `playlists` on it · `tokenEndpoint()` for a page's token, bound to its origins · what an app uses of the other packages, from one path · one build for Node, Workers, Bun and Deno · the client, `tokenEndpoint` and the intake met the live API once, through the CLI's sign-in, and again on Node and on workerd, through the server samples |
 | [`@open-music-sdk/browser`](./reference/@open-music-sdk/browser/) | 🚧 In progress | 80% | `createBrowserClient()` over the token endpoint, with the same namespaces · `createConnect()` running Apple's sign-in, the token kept fresh off the click · no signing code, which a bundle test holds it to · signed in once against Apple's live script, from the CLI's page, in one browser on Windows |
-| [`@open-music-sdk/react`](./reference/@open-music-sdk/react/) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone · untested in a React app outside its tests |
+| [`@open-music-sdk/react`](./reference/@open-music-sdk/react/) | 🚧 In progress | 80% | `MusicProvider` holding the client and the listener's token · `useMusic`, `useMusicUserToken`, `useConnect`, `usePreviewPlayer` · `musicQueries` over every read function for TanStack Query · `"use client"` on the hooks' file alone, which a Next build reads as meant · run in the React and Next.js samples, under StrictMode, in a headless browser; Apple's sign-in through `useConnect` still to be run by hand |
 | [Docs site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | 🚧 In progress | 70% | The reference: TypeDoc over every package's doc comments, with arguments, returns and throws on every function, which CI checks · one VitePress site with guides, concepts and the reference, published to GitHub Pages from `main` · package READMEs cut to a short template · a tutorial once the samples exist |
 | [`@open-music-sdk/cli`, `apps/cli`](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) | 🚧 In progress | 60% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style, on a loopback page made of `server`'s token endpoint and intake and `browser`'s sign-in · `token`, `doctor`, `logout` · `check`, a diagnostic of every endpoint function of both clients, each answer held to its type, and of what the SDK takes on trust, each by its name · tested against fakes, and run against the live API on Windows: sign-in, `doctor` and `check`, with its writes |
-| [Sample apps, `samples/`](./samples) | 🚧 In progress | 50% | Vinyl Collector Simulator, one demo written once per way of using the SDK · Express, Worker and a vanilla page, any page with any server from one command · React and Next.js to come · a test holds them to using every export · their requests met the live API from Node; in a browser, by hand, still to come |
+| [Sample apps, `samples/`](./samples) | 🚧 In progress | 70% | Vinyl Collector Simulator, one demo written once per way of using the SDK · Express, Worker, a vanilla page and a React page, either page with either server from one command · a Next.js app, its own server, whose build CI runs with no key · a test holds them to using every export · their requests met the live API from Node, and the React and Next pages in a headless browser; Apple's sign-in in a browser, by hand, still to come |
 | First release | ⬜ Not started | 0% | One version across the family · npm provenance |
 
 Progress is a judgement of how much of the described scope exists and is tested.

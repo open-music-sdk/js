@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import * as browser from "@open-music-sdk/browser";
 import * as clientCatalog from "@open-music-sdk/client-catalog";
 import * as clientUser from "@open-music-sdk/client-user";
+import * as react from "@open-music-sdk/react";
 import * as server from "@open-music-sdk/server";
 import { describe, expect, test } from "vitest";
 
@@ -24,7 +25,7 @@ const UNUSED: ReadonlyMap<string, string> = new Map([
 ]);
 
 const samples = fileURLToPath(new URL("../..", import.meta.url));
-const SKIPPED = new Set(["export-check", "node_modules", "dist", ".wrangler"]);
+const SKIPPED = new Set(["export-check", "node_modules", "dist", ".wrangler", ".next"]);
 
 /** What a file says in code: a name in a comment, such as a file's "Shows:" line, is no use of it. */
 const code = (text: string) =>
@@ -54,6 +55,7 @@ const endpoints = new Set([...Object.keys(clientCatalog), ...Object.keys(clientU
 describe.each([
   ["server", server],
   ["browser", browser],
+  ["react", react],
 ])("@open-music-sdk/%s", (_name, integration) => {
   const exports = Object.keys(integration).filter((name) => !endpoints.has(name));
 
@@ -68,7 +70,8 @@ describe.each([
 });
 
 test("the list holds no name that no integration exports", () => {
-  expect([...UNUSED.keys()].filter((name) => !(name in server) && !(name in browser))).toEqual([]);
+  const exported = (name: string) => name in server || name in browser || name in react;
+  expect([...UNUSED.keys()].filter((name) => !exported(name))).toEqual([]);
 });
 
 test("the endpoint functions the samples call by name, for the status page", () => {

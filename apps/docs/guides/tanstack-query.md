@@ -84,6 +84,11 @@ export function Library() {
 }
 ```
 
+The [React sample](../samples) draws its Library only while a listener is signed in, so its queries need no
+`enabled`. It pages through the listener's playlists as they flip toward the back of a crate, which calls `more`:
+
+<<< @/../../samples/web-react/src/library.tsx#your-playlists{tsx}
+
 Each page is Apple's [page](../glossary#page-next-link), with the `next` link Apple sent, as it came in Apple's
 answer even when you pass a `schema`. Later pages are asked for as `paginate` asks for them: a catalog walk's never
 send the listener's token, wherever the link points, and a listener's walk's do.
@@ -96,24 +101,9 @@ send the listener's token, wherever the link points, and a listener's walk's do.
 ## 3. Write with `useMutation`
 
 A write has no query. In a component, call the function on the client from `useMusic()`, which is bound to the
-listener once they've signed in:
+listener once they've signed in. The React sample adds a song or a music video this way:
 
-```tsx
-import { useMusic } from "@open-music-sdk/react";
-import { useMutation } from "@tanstack/react-query";
-
-export function AddToLibrary({ songId }: { songId: string }) {
-  const music = useMusic();
-  const add = useMutation({
-    mutationFn: () => music.user.addToLibrary({ songs: [songId] }),
-  });
-  return (
-    <button disabled={add.isPending} onClick={() => add.mutate()}>
-      Add to library
-    </button>
-  );
-}
-```
+<<< @/../../samples/web-react/src/songs.tsx#add-to-library{tsx}
 
 `addToLibrary` resolves once Apple has accepted the request, which is before the songs appear in the library. A
 query of the library refetched at once may not show them yet.
@@ -121,7 +111,7 @@ query of the library refetched at once may not show them yet.
 ## 4. Prefetch the catalog on the server
 
 On the server, `musicQueries` over the server's client gives the same queries, which you can prefetch and hand to
-the page. In a Next.js server component, `app/album/[id]/page.tsx`:
+the page. In a Next.js server component, `src/app/album/[id]/page.tsx`:
 
 ```tsx
 import { musicQueries } from "@open-music-sdk/react";
@@ -130,17 +120,27 @@ import {
   QueryClient,
   dehydrate,
 } from "@tanstack/react-query";
-import { music } from "@/lib/music"; // the client from createServerClient
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { getMusic } from "@/lib/music"; // the server's client, from Next.js
 import { Album } from "./album"; // the client component from step 1
 
-export default async function AlbumPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+type tParams = Promise<{ id: string }>;
+
+export default function AlbumPage({ params }: { params: tParams }) {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Prefetched params={params} />
+    </Suspense>
+  );
+}
+
+async function Prefetched({ params }: { params: tParams }) {
+  await connection();
   const { id } = await params;
   const queryClient = new QueryClient();
-  await queryClient.prefetchQuery(musicQueries(music).catalog.getAlbum(id));
+  const query = musicQueries(getMusic()).catalog.getAlbum(id);
+  await queryClient.prefetchQuery(query);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <Album id={id} />
@@ -149,16 +149,29 @@ export default async function AlbumPage({
 }
 ```
 
-`musicQueries(music)` builds its keys in scope 0, which is the page's scope until a listener signs in (see
+`<Suspense>` and `await connection()` are what a Next app with Cache Components asks of a read made at each
+request: see step 6 of [Next.js](./nextjs).
+
+`musicQueries(getMusic())` builds its keys in scope 0, which is the page's scope until a listener signs in (see
 step 5). So a prefetched query matches the page's query when both are called with the same arguments. Give the
 server's client and the page's client the same storefront: a key holds the call's arguments, not the client's
 storefront.
 
+The [Next sample](../samples) prefetches its album page so, naming the storefront and the schema in the call, and
+its client component calls `getAlbum` with the same arguments. `query` gives the album, which the page goes
+on to use:
+
+<<< @/../../samples/web-nextjs/src/app/(dig)/albums/[id]/page.tsx#prefetch{tsx}
+
 Prefetch the catalog only. A listener's queries are in a scope of the page's own, which no server prefetch
 matches, so the page fetches the listener's library itself.
 
-Importing `musicQueries` from `@open-music-sdk/react` into a server component hasn't been through a Next build
-yet. See [Next.js](./nextjs).
+A catalog query from `useMusicQueries()` changes scope at each sign-in too, so a prefetched one stops matching once
+a listener has signed in. The Next sample's album page builds its query with `musicQueries(music)` over the page's
+own client instead, in scope 0 whoever is signed in, and its server components draw the listener's library.
+
+`next build` imports `musicQueries` from `@open-music-sdk/react` into the Next sample's server components, and
+passes in CI.
 
 `useSuspenseQuery` also runs while Next renders a client component on the server. There, a relative `tokenUrl`
 has no page to resolve against, so a query that needs a token fails. Prefetch on the server, or use `useQuery`.

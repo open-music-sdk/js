@@ -30,19 +30,36 @@ The two runs, from the CLI's page on `localhost`, settled these:
   cookies, IndexedDB or Cache Storage. See the [security model](./concepts/security#in-a-page).
 - `disconnect()`, which runs the script's own sign-out, ends the token at Apple, and with it a copy your server
   stored: Apple refused the token as soon as the sign-out was done, and five minutes later.
+- A page that keeps the script's copy has the listener back on a reload. On the React sample's page in headless
+  Edge, on 20 October 2026, a token put under that key before a reload was what `ready` resolved to, and Apple took
+  it for the listener's requests.
 
 These are still open:
 
 - how sign-in goes in other browsers, Safari first, and on macOS and Linux, including whether loading the script
   ahead of the click keeps the window inside the click everywhere, and where they keep the script's copy;
-- what a configured instance holds for a returning listener on a page that keeps the script's copy, and whether it
-  takes a new developer token. On the CLI's page, which clears that copy, it held no token, and Apple's window
-  asked again as it did the first time;
+- whether a configured instance takes a new developer token for a returning listener. On the CLI's page, which
+  clears the script's copy, it held no token, and Apple's window asked again as it did the first time;
 - whether a `MusicKit` global the page loaded itself may be configured before its `musickitloaded` event;
 - whether a `Cross-Origin-Opener-Policy` of `same-origin` cuts the sign-in window off, as expected, where
   `same-origin-allow-popups` keeps it;
 - whether, after a token Apple wouldn't take, a second try in the same tab asks Apple again or hands back the same
   token.
+
+## [react](./reference/@open-music-sdk/react/)
+
+The React and Next.js samples ran against the live API in headless Edge on Windows on 20 October 2026, signed
+out, and the Next sample's pages for a listener too, with a token handed to its server. They settled these:
+
+- Under `<StrictMode>`, which mounts each component twice in development, the provider, `useConnect` and
+  `usePreviewPlayer` set up and undid what they set up, with no error or warning in the console.
+- `next build`, in Next 16 with Turbopack, reads the `"use client"` directive on the hooks' file alone. The Next
+  sample imports `musicQueries`, `schemas` and `isAppleMusicError` from the package into server components, and
+  into the words for an error that its server actions share with its page, and the build passes.
+- A query `musicQueries` builds on the server and prefetches into a `HydrationBoundary` is the query the page's
+  `useMusicQueries` builds for the same call: the album page is drawn without asking Apple again.
+
+Still open: Apple's sign-in through `useConnect`, in a browser, by hand.
 
 ## [cli](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme)
 
@@ -231,6 +248,10 @@ and image server were seen to do when the package was written:
 Against the live API on 18 October 2026, the 200 artwork templates of one storefront's charts all named their crop
 and format, with `{w}` and `{h}` their only placeholders, and were all on `mzstatic.com`. One of them, asked for in
 each of the six formats, came back in each, with its Content-Type.
+
+In the Next sample on 20 October 2026, `next/image` with `artworkUrl` as its loader asked for the widths of its own
+list, `256x256` and `640x640` for a cover shown at 240, and the artwork of a listener's own playlist, a URL with no
+size to fill in, needed `unoptimized`. See [With `next/image`](./guides/artwork#with-next-image).
 
 ## [types](./reference/@open-music-sdk/types/)
 

@@ -28,6 +28,7 @@ catalog:
   express: ^5
   "@types/express": ^5
   vite: ^8
+  "@vitejs/plugin-react": ^6
   wrangler: ^4
   # toolchain
   happy-dom: ^21
