@@ -23,7 +23,7 @@ const artwork = song.attributes?.artwork;
 ```
 
 Some resources have no artwork, and a resource can come without its attributes. The functions take an artwork,
-not the lack of one, so check before you call them. Every example below does.
+not the lack of one, so check before you call them. The one-line examples below leave the check out.
 
 `width` and `height` are the largest the image comes, in pixels. The artwork also carries colours you can use
 while the image loads: `bgColor` and `textColor1` to `textColor4`, each a hex colour without the `#`.
@@ -111,15 +111,41 @@ too.
 
 ## 4. Build a `srcset` alone with `artworkSrcSet`
 
+::: for page=vanilla
 In your page, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
 
 ```ts
 import { artworkSrcSet } from "@open-music-sdk/browser";
 
-img.srcset = artworkSrcSet(artwork, 300, { densities: [1, 2] });
-img.width = 300;
-img.height = 300;
+if (artwork) {
+  img.srcset = artworkSrcSet(artwork, 300, { densities: [1, 2] });
+  img.width = 300;
+  img.height = 300;
+}
 ```
+:::
+
+::: for page=react,nextjs
+In a component, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
+
+```tsx
+import { artworkSrcSet, type tSong } from "@open-music-sdk/react";
+
+export function Cover({ song }: { song: tSong }) {
+  const artwork = song.attributes?.artwork;
+  if (!artwork) return null;
+  const srcSet = artworkSrcSet(artwork, 300, { densities: [1, 2] });
+  return (
+    <img
+      srcSet={srcSet}
+      width={300}
+      height={300}
+      alt={song.attributes?.name}
+    />
+  );
+}
+```
+:::
 
 Each candidate is the image at the width times a density, labelled with that density. `densities` takes up to 16
 numbers, and defaults to `[1, 2, 3]`.

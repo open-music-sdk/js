@@ -16,6 +16,7 @@ listener with an Apple Music subscription.
 
 ## 1. Get the tracks from the catalog
 
+::: for page=vanilla
 In your page, fetch songs or music videos with the catalog. Here they are an album's tracks:
 
 ```ts
@@ -36,9 +37,29 @@ const album = await music.catalog.getAlbum("1613600183", {
 });
 const tracks = album.relationships?.tracks?.data ?? [];
 ```
+:::
 
-In React and Next.js, the same names come from `@open-music-sdk/react`. A Next app can fetch the tracks in a server
-component, with the server's client, and hand them to a client component that plays them: they're plain data.
+::: for page=react,nextjs
+In a component inside your `MusicProvider` and TanStack Query's `QueryClientProvider`, fetch songs or music videos
+with a catalog query. Here they are an album's tracks:
+
+```tsx
+import { useMusicQueries } from "@open-music-sdk/react";
+import { useQuery } from "@tanstack/react-query";
+
+export function AlbumPreviews({ id }: { id: string }) {
+  const { data: album } = useQuery(
+    useMusicQueries().catalog.getAlbum(id, { include: ["tracks"] }),
+  );
+  const tracks = album?.relationships?.tracks?.data;
+  return tracks ? <Previews tracks={tracks} /> : null;
+}
+```
+
+A query's list keeps its identity between renders, which the player in step 2, `Previews`, needs. A Next app can
+fetch the tracks in a server component instead, with the server's client, and hand them to `Previews`: they're
+plain data.
+:::
 
 Any catalog function that hands over songs or music videos works: a search, a chart, or `resolve` from
 [Import a playlist](./import-playlist). A song in a listener's library has no preview, and neither has a song
