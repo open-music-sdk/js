@@ -1,8 +1,8 @@
 /* The variants of the frameworks the reader didn't choose. The head script puts the choice on <html> before the
    first paint; without it, as with scripts off, every variant shows. */
-html[data-page="vanilla"] .for[data-page]:not([data-page~="vanilla"]),
-html[data-page="react"] .for[data-page]:not([data-page~="react"]),
-html[data-page="nextjs"] .for[data-page]:not([data-page~="nextjs"]),
+html[data-client="vanilla"] .for[data-client]:not([data-client~="vanilla"]),
+html[data-client="react"] .for[data-client]:not([data-client~="react"]),
+html[data-client="nextjs"] .for[data-client]:not([data-client~="nextjs"]),
 html[data-server="express"] .for[data-server]:not([data-server~="express"]),
 html[data-server="workers"] .for[data-server]:not([data-server~="workers"]),
 html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {

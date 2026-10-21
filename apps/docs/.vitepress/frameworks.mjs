@@ -1,9 +1,9 @@
-// The reader's choice of frameworks: which page code and which server code the guides show. The config writes the
+// The reader's choice of frameworks: which client code and which server code the guides show. The config writes the
 // choice into every page's head, the theme's picker changes it, and the snippet check holds the guides to it.
 
 /** The two choices, each with its frameworks, the first the default. A Next app is its own server, so Next.js is on both. */
 export const AXES = {
-  page: [
+  client: [
     { value: "vanilla", label: "Vanilla" },
     { value: "react", label: "React" },
     { value: "nextjs", label: "Next.js" },
@@ -16,29 +16,29 @@ export const AXES = {
 };
 
 /** What each choice is called where the reader makes it. */
-export const AXIS_LABELS = { page: "Page", server: "Server" };
+export const AXIS_LABELS = { client: "Client", server: "Server" };
 
-/** The frameworks of each choice, by value: `{ page: ["vanilla", "react", "nextjs"], server: [...] }`. */
+/** The frameworks of each choice, by value: `{ client: ["vanilla", "react", "nextjs"], server: [...] }`. */
 export const VALUES = Object.fromEntries(Object.entries(AXES).map(([axis, frameworks]) => [axis, frameworks.map((framework) => framework.value)]));
 
-/** Every page and server the samples run together: either Vite page with either server, and the Next app alone. */
+/** Every client and server the samples run together: either Vite client with either server, and the Next app alone. */
 export const PAIRS = [
-  { page: "vanilla", server: "express" },
-  { page: "vanilla", server: "workers" },
-  { page: "react", server: "express" },
-  { page: "react", server: "workers" },
-  { page: "nextjs", server: "nextjs" },
+  { client: "vanilla", server: "express" },
+  { client: "vanilla", server: "workers" },
+  { client: "react", server: "express" },
+  { client: "react", server: "workers" },
+  { client: "nextjs", server: "nextjs" },
 ];
 
 /** A framework's name as a reader sees it, such as `Next.js` for `nextjs`. */
 export const labelOf = (axis, value) => AXES[axis].find((framework) => framework.value === value)?.label ?? value;
 
 /**
- * Settles the reader's choice, puts it on `<html>` as `data-page` and `data-server`, keeps it in the browser, and
+ * Settles the reader's choice, puts it on `<html>` as `data-client` and `data-server`, keeps it in the browser, and
  * returns it. `values` is `VALUES`, `url` the address being shown, and `wanted` a choice made in the picker.
  *
  * Each choice takes the first of these that names one of its frameworks: `wanted`; an anchor that names a variant,
- * such as `#after-sign-in--react`; the address's `?page=` or `?server=`, which it then takes out of the address;
+ * such as `#after-sign-in--react`; the address's `?client=` or `?server=`, which it then takes out of the address;
  * what was kept; and else the first framework.
  * Next.js on one side means Next.js on both, unless the other side was asked for by something earlier in that list,
  * and then the side with Next.js goes back to the framework kept for it from before Next.js, else to its first.
@@ -64,12 +64,12 @@ export function settle(values, url, wanted = {}) {
   }
   const parts = hash.split("--");
   const named = parts.length > 1 ? parts[parts.length - 1].split("-") : [];
-  const known = [...values.page, ...values.server];
+  const known = [...values.client, ...values.server];
   const variant = named.length > 0 && named.every((name) => known.includes(name)) ? named : [];
 
   const choice = {};
   const rank = {};
-  for (const axis of ["page", "server"]) {
+  for (const axis of ["client", "server"]) {
     const allowed = values[axis];
     const inVariant = variant.filter((name) => allowed.includes(name));
     const asked = [
@@ -84,26 +84,26 @@ export function settle(values, url, wanted = {}) {
   }
   // Each side's last framework other than Next.js, so that leaving Next.js finds React and Workers again.
   const away = kept.away ?? {};
-  if ((choice.page === NEXT) !== (choice.server === NEXT)) {
-    const next = choice.page === NEXT ? "page" : "server";
-    const other = next === "page" ? "server" : "page";
+  if ((choice.client === NEXT) !== (choice.server === NEXT)) {
+    const next = choice.client === NEXT ? "client" : "server";
+    const other = next === "client" ? "server" : "client";
     if (rank[next] <= rank[other]) choice[other] = NEXT;
     else choice[next] = away[next] !== NEXT && values[next].includes(away[next]) ? away[next] : values[next][0];
   }
 
-  document.documentElement.dataset.page = choice.page;
+  document.documentElement.dataset.client = choice.client;
   document.documentElement.dataset.server = choice.server;
   try {
     const before = {};
-    for (const axis of ["page", "server"]) before[axis] = choice[axis] === NEXT ? away[axis] : choice[axis];
+    for (const axis of ["client", "server"]) before[axis] = choice[axis] === NEXT ? away[axis] : choice[axis];
     localStorage.setItem(KEY, JSON.stringify({ ...choice, away: before }));
   } catch {
     // A browser that keeps nothing still shows this page in the chosen frameworks.
   }
   // A link's choice is taken once. Left in the address, it would outrank every choice the reader makes after it.
   const here = new URL(location.href);
-  if (here.searchParams.has("page") || here.searchParams.has("server")) {
-    here.searchParams.delete("page");
+  if (here.searchParams.has("client") || here.searchParams.has("server")) {
+    here.searchParams.delete("client");
     here.searchParams.delete("server");
     history.replaceState(history.state, "", here.href);
   }

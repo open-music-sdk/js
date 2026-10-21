@@ -16,17 +16,17 @@ Before you start, you need:
 The SDK doesn't run a sign-in of its own. It loads Apple's [MusicKit on the Web](../glossary#musickit-on-the-web)
 script from Apple's CDN and runs Apple's sign-in for you.
 
-::: for page=vanilla
+::: for client=vanilla
 In the code below, `button`, `signOutButton` and `showWhyNot` stand for your own code. Step 7 shows a `signedIn`.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In the code below, `showWhyNot` stands for your own code.
 :::
 
 ## 1. Make the client
 
-::: for page=vanilla
+::: for client=vanilla
 In your page:
 
 ```ts
@@ -36,7 +36,7 @@ const music = createBrowserClient({ tokenUrl: "/api/music/token" });
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 Make the page's client once, outside the tree, and hand it to `<MusicProvider>`, which holds the listener's token in
 React state, in memory only. In a Next app, put this in a file of its own that starts with `"use client"`, as
 [Next.js](./nextjs#_5-wrap-the-app-in-musicprovider) shows:
@@ -60,7 +60,7 @@ Create the sign-in helper when you show the sign-in button, not when it's clicke
 inside a click, and a download that starts after the click can outlast it. Creating the helper early loads Apple's
 script and configures it before the click.
 
-::: for page=vanilla
+::: for client=vanilla
 ```ts
 import { createConnect } from "@open-music-sdk/browser";
 
@@ -70,7 +70,7 @@ const signIn = createConnect(music, {
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 `useConnect` creates it when the component that shows the button mounts, and disposes of it when the component
 unmounts. It reads its options on the first mount only.
 
@@ -113,7 +113,7 @@ second helper for a different `app` is a `TypeError`.
 
 ## 3. Enable the button once the script is ready
 
-::: for page=vanilla
+::: for client=vanilla
 `ready` settles once the script is loaded and configured, or has failed to be. Keep the button disabled until
 then:
 
@@ -138,7 +138,7 @@ Otherwise it resolves to `undefined`.
 when the developer token can't be fetched from your route.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 `isReady` is `true` once the script is loaded and configured, and `error` is set once it has failed to be. Keep
 the button disabled until one of them is:
 
@@ -174,7 +174,7 @@ holds until that one is due to be replaced.
 
 ## 4. Call `connect()` inside the click
 
-::: for page=vanilla
+::: for client=vanilla
 ```ts
 button.onclick = async () => {
   try {
@@ -189,7 +189,7 @@ button.onclick = async () => {
 `connect()` opens Apple's sign-in window and resolves to the listener's Music User Token.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 ```tsx
 const signIn = () => void connect().catch(showWhyNot);
 ```
@@ -208,13 +208,13 @@ it to the listener, and never print it to a log where a token might end up.
 
 ## 5. Sign the listener out
 
-::: for page=vanilla
+::: for client=vanilla
 ```ts
 signOutButton.onclick = () => void signIn.disconnect().catch(showWhyNot);
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 ```tsx
 const signOut = () => void disconnect().catch(showWhyNot);
 ```
@@ -231,12 +231,12 @@ next visit.
 `disconnect()` does nothing where Apple's script has no sign-out function, or where the page holds no
 configuration, as after a script that failed to load.
 
-::: for page=vanilla
+::: for client=vanilla
 When you no longer need the helper, call `signIn.dispose()`. It stops keeping the developer token fresh, and
 leaves Apple's script in the page.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 After a `UserTokenInvalid` error, call `setToken(undefined)` from `useMusicUserToken()`. The provider forgets the
 token, and takes no token Apple's script restores until the next `connect()`. The provider doesn't do this by
 itself: the component that made the call sees the error.
@@ -279,7 +279,7 @@ One sign-in has run against Apple's live script, from the CLI's page on `localho
 What you do with the token decides how your app is set up.
 [Developer tokens and Music User Tokens](../concepts/tokens) compares the setups.
 
-::: for page=vanilla
+::: for client=vanilla
 Client only: the page keeps the token in memory and calls Apple itself. `music.as(token)` gives a client for the
 listener, which is what `signedIn` received above:
 
@@ -292,7 +292,7 @@ async function signedIn(listener: typeof music) {
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 Client only: the provider keeps the token in memory, and the page calls Apple itself. `useMusic()` gives every
 component the client bound to the listener, or reads from TanStack Query as
 [TanStack Query](./tanstack-query) shows.
@@ -307,21 +307,21 @@ Hybrid: the page posts the token to your server, which stores it and calls Apple
 [Keep a listener's token on your server](./store-user-tokens). When the listener signs out, also have your server
 delete the token it stored.
 
-::: for page=vanilla
+::: for client=vanilla
 The [vanilla sample](../samples) does both. It posts the token, and once its server has kept it, it reads the
 listener's library from the page too:
 
 <<< @/../../samples/web-vanilla/src/sign-in.ts#after-sign-in{ts}
 :::
 
-::: for page=react
+::: for client=react
 The [React sample](../samples) does both. It posts the token the provider holds, and once its server has kept it,
 it reads the listener's library from the page too:
 
 <<< @/../../samples/web-react/src/sign-in.tsx#after-sign-in{tsx}
 :::
 
-::: for page=nextjs
+::: for client=nextjs
 The [Next sample](../samples) is hybrid alone. It posts the token, has the provider forget it, and loads the page
 again, which its server then draws for the listener:
 

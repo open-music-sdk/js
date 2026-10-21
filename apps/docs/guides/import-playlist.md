@@ -211,7 +211,7 @@ underneath `delayMs`. These options set how hard one call pushes; the client set
 Each sample sends its crate of songs to the listener's library: it finds a pasted tracklist, shows the plan, and
 applies it only when the listener says to. `resolve` needs no token at all.
 
-:::: for page=vanilla
+:::: for client=vanilla
 The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in. The
 [vanilla sample](../samples) shows the plan in a dialog:
 
@@ -227,7 +227,7 @@ The four functions run in a page too, with the client `music.as(token)` gives on
 
 ::::
 
-:::: for page=react
+:::: for client=react
 The four functions run in a page too, with the client `useMusic()` gives once the listener has signed in. The
 [React sample](../samples) shows the plan in a dialog, and sends the crate from a mutation:
 
@@ -243,7 +243,7 @@ The four functions run in a page too, with the client `useMusic()` gives once th
 
 ::::
 
-:::: for page=nextjs
+:::: for client=nextjs
 The [Next sample](../samples) runs the four functions on the server, in server actions. `resolve` uses the
 server's own client, since it needs no listener, and the others the client `music.forUser(session)` gives for the
 listener. Each action checks what the page sent it, and the send plans again from what the playlist holds then,

@@ -30,7 +30,7 @@ while the image loads: `bgColor` and `textColor1` to `textColor4`, each a hex co
 
 ## 2. Fill in an `<img>` with `artworkImage`
 
-::: for page=vanilla
+::: for client=vanilla
 In your page, give `artworkImage` the artwork and the width you show the image at, in CSS pixels:
 
 ```ts
@@ -45,7 +45,7 @@ if (artwork) Object.assign(img, artworkImage(artwork, 300));
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In a component, give `artworkImage` the artwork and the width you show the image at, in CSS pixels. React spells
 the attribute `srcSet`:
 
@@ -65,21 +65,21 @@ export function Cover({ song }: { song: tSong }) {
 `src` as the 1x image wherever the `srcset` doesn't offer one, and lays out an image that has no `width` and
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
-::: for page=vanilla
+::: for client=vanilla
 The [vanilla sample](../samples) draws every sleeve with one function. A resource with no artwork gets an empty box
 of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
 
 <<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
 :::
 
-::: for page=react
+::: for client=react
 The [React sample](../samples) draws every sleeve with one component. A resource with no artwork gets an empty box
 of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
 
 <<< @/../../samples/web-react/src/artwork.tsx#artwork{tsx}
 :::
 
-::: for page=nextjs
+::: for client=nextjs
 The [Next sample](../samples) draws every sleeve with `next/image` instead, through a component of its own that you
 can take into your app: see [With `next/image`](#with-next-image).
 :::
@@ -111,7 +111,7 @@ too.
 
 ## 4. Build a `srcset` alone with `artworkSrcSet`
 
-::: for page=vanilla
+::: for client=vanilla
 In your page, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
 
 ```ts
@@ -125,7 +125,7 @@ if (artwork) {
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In a component, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
 
 ```tsx

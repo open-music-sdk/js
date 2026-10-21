@@ -14,7 +14,7 @@ The guides show code from them, and every sample is in the repository's
 You need Node 24, pnpm, [a MusicKit key](./guides/musickit-key), and an Apple Account with an Apple Music
 subscription.
 
-Pick the page and the server to run. Either Vite page runs with either server, and the Next app is both: it's its
+Pick the client and the server to run. Either Vite page runs with either server, and the Next app is both: it's its
 own server.
 
 <FrameworkPicker />
@@ -61,31 +61,31 @@ it. Never commit it.
 
 From the repository's root. Turborepo builds the packages first:
 
-::: for page=vanilla server=express
+::: for client=vanilla server=express
 ```sh
 pnpm turbo dev --filter=web-vanilla --filter=express-server
 ```
 :::
 
-::: for page=vanilla server=workers
+::: for client=vanilla server=workers
 ```sh
 pnpm turbo dev --filter=web-vanilla --filter=worker-server
 ```
 :::
 
-::: for page=react server=express
+::: for client=react server=express
 ```sh
 pnpm turbo dev --filter=web-react --filter=express-server
 ```
 :::
 
-::: for page=react server=workers
+::: for client=react server=workers
 ```sh
 pnpm turbo dev --filter=web-react --filter=worker-server
 ```
 :::
 
-::: for page=nextjs server=nextjs
+::: for client=nextjs server=nextjs
 ```sh
 pnpm turbo dev --filter=web-nextjs
 ```

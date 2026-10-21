@@ -1,5 +1,5 @@
 <!--
-  The reader's choice of page and server frameworks. Every copy on the page shows the same choice: a change in one
+  The reader's choice of client and server frameworks. Every copy on the page shows the same choice: a change in one
   settles it, and the `frameworks` event tells the others.
 -->
 <script setup>
@@ -8,7 +8,7 @@ import { AXES, AXIS_LABELS, VALUES, settle } from "../frameworks.mjs";
 
 // The server render shows the defaults; the head script has already put the reader's own on <html>. So the picker
 // stays hidden, in its place, until it shows theirs, and with scripts off, where it would do nothing.
-const choice = ref({ page: VALUES.page[0], server: VALUES.server[0] });
+const choice = ref({ client: VALUES.client[0], server: VALUES.server[0] });
 const mounted = ref(false);
 
 function follow(event) {
@@ -16,8 +16,8 @@ function follow(event) {
 }
 
 onMounted(() => {
-  const { page, server } = document.documentElement.dataset;
-  choice.value = { page, server };
+  const { client, server } = document.documentElement.dataset;
+  choice.value = { client, server };
   mounted.value = true;
   window.addEventListener("frameworks", follow);
 });

@@ -16,7 +16,7 @@ listener with an Apple Music subscription.
 
 ## 1. Get the tracks from the catalog
 
-::: for page=vanilla
+::: for client=vanilla
 In your page, fetch songs or music videos with the catalog. Here they are an album's tracks:
 
 ```ts
@@ -39,7 +39,7 @@ const tracks = album.relationships?.tracks?.data ?? [];
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In a component inside your `MusicProvider` and TanStack Query's `QueryClientProvider`, fetch songs or music videos
 with a catalog query. Here they are an album's tracks:
 
@@ -69,7 +69,7 @@ fetched without its attributes.
 
 ## 2. Load them into a player
 
-::: for page=vanilla
+::: for client=vanilla
 In your page, make a player and load the tracks:
 
 ```ts
@@ -81,7 +81,7 @@ const { tracks: queue, skipped } = player.load(tracks);
 of track you feed it, and is what `player.state.track` is typed as.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In a component, `usePreviewPlayer` gives you the player's state and its functions. Load the tracks from an
 effect:
 
@@ -134,7 +134,7 @@ Loading a new queue stops what was playing, takes the old clip off the element, 
 Browsers don't let a page start sound on its own: the first sound has to follow something the listener did. So
 call `play`, `next` or `previous` from a click or a key press.
 
-::: for page=vanilla
+::: for client=vanilla
 In your page:
 
 ```ts
@@ -147,7 +147,7 @@ previousButton.onclick = () => void player.previous().catch(showWhyNot);
 The buttons and `showWhyNot` stand for your own code.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In the component, from the buttons' `onClick`:
 
 ```tsx
@@ -181,13 +181,13 @@ the player hasn't played a clip from the live API in a browser yet. See
 A list with a Play button on each row plays the whole list, from the row that was clicked. The track's place in
 the queue `load` gives back can differ from its place in your list, since tracks with no clip are left out.
 
-::: for page=vanilla
+::: for client=vanilla
 The [vanilla sample](../samples) does it this way:
 
 <<< @/../../samples/web-vanilla/src/player.ts#play-from{ts}
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 The [React and Next samples](../samples) do it this way, with the functions from `usePreviewPlayer`:
 
 <<< @/../../samples/web-react/src/player.tsx#play-from{tsx}
@@ -195,7 +195,7 @@ The [React and Next samples](../samples) do it this way, with the functions from
 
 ## 4. Draw the player's state
 
-::: for page=vanilla
+::: for client=vanilla
 In your page, subscribe to the player and draw from `player.state`:
 
 ```ts
@@ -215,7 +215,7 @@ listener that throws stops neither the player nor the other listeners. The first
 whoever called the player, or out through the element's event.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 In the component, draw from `state`. The component renders again after each change:
 
 ```tsx
@@ -246,7 +246,7 @@ queue as `tracks`, the current `index` and `track`, the clip's `position` and `d
 
 To keep an `<audio>` element's own controls on the page, hand the element to the player.
 
-::: for page=vanilla
+::: for client=vanilla
 In your page:
 
 ```ts
@@ -255,7 +255,7 @@ const player = previewPlayer<tSong>({ audio });
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 Pass the element or a ref to it. The hook reads the ref when the component mounts, and a ref with nothing in it
 then is a `TypeError`:
 
@@ -277,7 +277,7 @@ The player never adds the element to the page or takes it out. It sets the eleme
 Whatever else pauses the element, such as its own controls, shows as `paused` in the state, and a volume set on
 the element shows as the state's volume.
 
-::: for page=vanilla
+::: for client=vanilla
 When you're done with the player, call `player.dispose()`. It pauses, takes the clip and the player's listeners
 off the element, and forgets the queue and your subscribers. The element is yours again. After that, `play`,
 `next` and `previous` reject with a `TypeError`, `load`, `pause`, `seek`, `setVolume` and `subscribe` throw one,
@@ -285,7 +285,7 @@ and `dispose()` again does nothing. Where the runtime has `Symbol.asyncDispose`,
 `await using player = previewPlayer()` disposes it for you; in a browser without it, call `dispose()`.
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 The hook disposes of the player when the component unmounts. It pauses, takes the clip and the player's listeners
 off the element, and forgets the queue. The element is yours again.
 :::
@@ -302,13 +302,13 @@ element will request it. See [URLs in Apple's answers](../concepts/security#urls
 
 For tracks like those, pass `hosts` when you make the player:
 
-::: for page=vanilla
+::: for client=vanilla
 ```ts
 const player = previewPlayer<tSong>({ hosts: ["itunes.apple.com"] });
 ```
 :::
 
-::: for page=react,nextjs
+::: for client=react,nextjs
 ```tsx
 const { state, load, play } = usePreviewPlayer<tSong>({
   hosts: ["itunes.apple.com"],

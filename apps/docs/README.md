@@ -55,18 +55,18 @@ shows whole, below its opening comment, is the region `file`, and the region lin
 
 ## Code for each framework
 
-The reader picks a page framework (Vanilla, React or Next.js) and a server framework (Express, Workers or Next.js)
+The reader picks a client framework (Vanilla, React or Next.js) and a server framework (Express, Workers or Next.js)
 in the nav, and each guide shows the code for those. Next.js on either side sets both, since a Next app is its own
 server. The prose is the same for everyone; a block holds only what differs:
 
 ```md
-::: for page=vanilla,react
+::: for client=vanilla,react
 The vanilla and React samples do it this way:
 
 <<< @/../../samples/web-vanilla/src/errors.ts#explain{ts}
 :::
 
-::: for page=nextjs
+::: for client=nextjs
 The Next sample does it this way:
 
 <<< @/../../samples/web-nextjs/src/lib/errors.ts#explain{ts}
@@ -75,19 +75,19 @@ The Next sample does it this way:
 
 - Blocks next to each other, with only blank lines between, are one group, and the reader sees one block of it. A
   group covers every framework of its choice exactly once.
-- What some frameworks share is one block for all of them, `page=vanilla,react`. What all of them share goes
+- What some frameworks share is one block for all of them, `client=vanilla,react`. What all of them share goes
   outside any block. Two blocks of a group that show the same thing, once their snippets are read in, fail the
   check.
-- A block can name both choices, `page=react server=workers`. A group of those covers every page and server the
+- A block can name both choices, `client=react server=workers`. A group of those covers every client and server the
   samples run together: either Vite page with either server, and the Next app alone.
-- A block that holds a container of its own, such as a code group, opens with four colons, `:::: for page=react`,
+- A block that holds a container of its own, such as a code group, opens with four colons, `:::: for client=react`,
   and closes with four, so that the inner `:::` doesn't close it. A line of colons alone closes a block even inside
   a code block, and the check fails either mistake.
 - A heading goes above the blocks, never in one. A block's id is the heading's, then its frameworks, such as
   `#_2-act-on-each-kind--nextjs`, and the search lists each block as a result of its own under that heading. A link to
   that id switches the reader to those frameworks. In the search's detailed view such a result shows no excerpt:
   VitePress cuts excerpts at headings, keyed by the heading's id, and the block's id is no heading's.
-- A link can also carry a choice, `?page=react&server=workers`.
+- A link can also carry a choice, `?client=react&server=workers`.
 
 A platform's own guide, Next.js or Cloudflare Workers, stays a page of its own and needs no blocks.
 

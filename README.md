@@ -70,7 +70,7 @@ console.log(album.attributes?.name);
 ## Documentation
 
 - [Guides](https://open-music-sdk.github.io/js/guides/musickit-key): set up your key, sign a listener in, use
-  Next.js or Cloudflare Workers, and more, with the code for the page and the server you pick.
+  Next.js or Cloudflare Workers, and more, with the code for the client and the server you pick.
 - [Concepts](https://open-music-sdk.github.io/js/concepts/packages): tokens, security, errors and the design
   principles every package follows.
 - [Reference](https://open-music-sdk.github.io/js/reference/): every function, type and option.

@@ -1,12 +1,12 @@
-// A guide's code follows the reader's frameworks. A block such as `::: for page=react` … `:::` holds what one or
+// A guide's code follows the reader's frameworks. A block such as `::: for client=react` … `:::` holds what one or
 // more frameworks show, and CSS shows the blocks of the frameworks the reader chose. Every block is in the built
 // page, and the search finds each one as a result of its own, named for its frameworks.
 import container from "markdown-it-container";
 import { AXES, labelOf } from "./frameworks.mjs";
 
 /**
- * What a block is for, from what follows `for`: `page=vanilla,react server=workers` is
- * `{ page: ["vanilla", "react"], server: ["workers"] }`. A choice or a framework that doesn't exist is an error,
+ * What a block is for, from what follows `for`: `client=vanilla,react server=workers` is
+ * `{ client: ["vanilla", "react"], server: ["workers"] }`. A choice or a framework that doesn't exist is an error,
  * which stops the build at the page that names it.
  */
 export function parseFor(text) {
@@ -14,7 +14,7 @@ export function parseFor(text) {
   for (const part of text.trim().split(/\s+/).filter(Boolean)) {
     const [axis, list] = part.split("=");
     if (!(axis in AXES) || list === undefined || axis in wanted) {
-      throw new Error(`"::: for ${text.trim()}": write each choice once, as page=… or server=…`);
+      throw new Error(`"::: for ${text.trim()}": write each choice once, as client=… or server=…`);
     }
     wanted[axis] = list.split(",");
     for (const value of wanted[axis]) {
@@ -23,7 +23,7 @@ export function parseFor(text) {
       }
     }
   }
-  if (Object.keys(wanted).length === 0) throw new Error(`"::: for": name the frameworks, as page=react`);
+  if (Object.keys(wanted).length === 0) throw new Error(`"::: for": name the frameworks, as client=react`);
   return wanted;
 }
 

@@ -60,14 +60,14 @@ An `ApiError` can also come from a successful answer that isn't what the call ne
 from a function on `music.catalog` or `music.user` that hands over one resource, an answer that holds none. Its
 `status` is then the success's, such as `200`.
 
-::: for page=vanilla,react
+::: for client=vanilla,react
 The [vanilla and React samples](../samples) send every error through one function, which says each kind in words
 a listener can act on:
 
 <<< @/../../samples/web-vanilla/src/errors.ts#explain{ts}
 :::
 
-::: for page=nextjs
+::: for client=nextjs
 The [Next sample](../samples) sends every error through one function, which says each kind in words a listener
 can act on. Its server actions answer with these words rather than throw, because Next keeps a thrown error's
 message from the page in production:

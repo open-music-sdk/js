@@ -73,10 +73,10 @@ for (const page of pages.filter((page) => page !== "README.md")) {
   });
 }
 
-// A guide's code follows the reader's frameworks, in `::: for page=react` blocks (see .vitepress/variants.mjs).
+// A guide's code follows the reader's frameworks, in `::: for client=react` blocks (see .vitepress/variants.mjs).
 // Blocks next to each other, with nothing but blank lines between them, are one group, and the reader sees exactly
 // one block of a group: so a group covers every framework of its choice once, or, where its blocks name both
-// choices, every page and server the samples run together once. Two blocks of a group that come out the same, once
+// choices, every client and server the samples run together once. Two blocks of a group that come out the same, once
 // their snippets are read in, are one block for both frameworks. And a block holds no heading, which the page's
 // outline would list while the block is hidden.
 const regionText = (file, region) => {
@@ -167,12 +167,12 @@ for (const page of pages.filter((page) => page !== "README.md"))
     } else if (group.some((block) => Object.keys(block.wanted).length !== 2)) {
       variants.push(`${where}: some blocks of the group name both choices, so each of them has to`);
     } else {
-      const pairs = group.flatMap((block) => block.wanted.page.flatMap((page) => block.wanted.server.map((server) => `${page}+${server}`)));
-      const runs = PAIRS.map(({ page, server }) => `${page}+${server}`);
+      const pairs = group.flatMap((block) => block.wanted.client.flatMap((client) => block.wanted.server.map((server) => `${client}+${server}`)));
+      const runs = PAIRS.map(({ client, server }) => `${client}+${server}`);
       const missing = runs.filter((pair) => !pairs.includes(pair));
       const twice = runs.filter((pair) => pairs.filter((other) => other === pair).length > 1);
       const never = [...new Set(pairs.filter((pair) => !runs.includes(pair)))];
-      const say = (pair) => pair.split("+").map((value, i) => labelOf(i === 0 ? "page" : "server", value)).join(" with ");
+      const say = (pair) => pair.split("+").map((value, i) => labelOf(i === 0 ? "client" : "server", value)).join(" with ");
       if (missing.length) variants.push(`${where}: the group has no block for ${missing.map(say).join(", ")}`);
       if (twice.length) variants.push(`${where}: the group has more than one block for ${twice.map(say).join(", ")}`);
       if (never.length) variants.push(`${where}: no sample runs ${never.map(say).join(", ")}`);

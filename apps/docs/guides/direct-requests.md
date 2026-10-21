@@ -69,21 +69,21 @@ Apple for once.
 Apple answers `404` for an album the listener doesn't hold, as it did against the live API on 18 October 2026,
 and with their copy for one they hold a song of.
 
-::: for page=vanilla
+::: for client=vanilla
 The [vanilla sample](../samples) turns that into a yes or a no, with the client `music.as(token)` gave it at
 sign-in:
 
 <<< @/../../samples/web-vanilla/src/pages.ts#in-library{ts}
 :::
 
-::: for page=react
+::: for client=react
 The [React sample](../samples) turns that into a yes or a no, in a query, with the client `useMusic()` gives once
 the listener is signed in:
 
 <<< @/../../samples/web-react/src/pages.tsx#in-library{tsx}
 :::
 
-::: for page=nextjs
+::: for client=nextjs
 The [Next sample](../samples) turns that into a yes or a no on the server, as it draws the album page, with the
 client `music.forUser(session)` gives for the listener:
 
