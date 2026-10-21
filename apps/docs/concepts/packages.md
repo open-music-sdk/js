@@ -16,7 +16,7 @@ registry until the first release.
 | Code that runs on a server: a Node service, a Cloudflare Worker, Bun, Deno, a command-line tool or an Electron main process | [`server`](../reference/@open-music-sdk/server/) |
 | A web page without React | [`browser`](../reference/@open-music-sdk/browser/) |
 | A React app | [`react`](../reference/@open-music-sdk/react/) |
-| A Next.js app | `server` for route handlers, server components and actions, and `react` for client components. See [Next.js](../guides/nextjs). |
+| A Next.js app | `server` for route handlers, server components and actions, and `react` for client components. See [Set up your server](../guides/server-setup#_1-install-the-package--nextjs). |
 | Your own client, from the parts | `core`, and the client and library packages you need. See [Build your own client from the parts](../guides/own-client). |
 | A Music User Token for your own account, to try the API or run a script | The CLI, `@open-music-sdk/cli`, beside any of the above. See [The command-line tool](#the-command-line-tool). |
 
@@ -165,7 +165,7 @@ runtime.
 
 - `server` is one build that runs on Node, Cloudflare Workers, Bun and Deno, since each has the same `fetch` and
   WebCrypto. It's also for a command-line tool or an Electron main process. See
-  [Cloudflare Workers](../guides/cloudflare-workers).
+  [Set up your server](../guides/server-setup#_1-install-the-package--workers).
 - `browser` runs in a page. Nothing a page bundles from it signs a token, holds a key or touches the page's
   storage.
 - `react` runs in a page too, with React 19 as a peer dependency. TanStack Query isn't a dependency:

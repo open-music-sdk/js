@@ -1,7 +1,6 @@
 // Shows: createServerClient, createRateLimiter, tokenEndpoint, userTokenIntake,
 // KvUserTokenStore, forUser, isAppleMusicError. Guides:
-// /guides/cloudflare-workers, /guides/token-endpoint, /guides/store-user-tokens
-// #region file
+// /guides/server-setup, /guides/token-endpoint, /guides/store-user-tokens
 import {
   KvUserTokenStore,
   createRateLimiter,
@@ -35,6 +34,7 @@ interface tApp {
   readonly hosts: ReadonlySet<string>;
 }
 
+// #region server-client
 // Made on the first request, from the secrets that request brings, and kept for
 // every request after it: a client made per request would sign a new developer
 // token every time.
@@ -78,6 +78,7 @@ function setUp(env: tEnv): tApp {
   const hosts = new Set([new URL(pageOrigin).host, "127.0.0.1:8787"]);
   return { music, store, token, intake, hosts };
 }
+// #endregion server-client
 
 // A listener is a random id in a cookie, given with the first answer. A real
 // app has its own sessions.
@@ -87,6 +88,7 @@ function sessionOf(req: Request): string | undefined {
   return SESSION_COOKIE.exec(req.headers.get("cookie") ?? "")?.[1];
 }
 
+// #region fetch
 export default {
   async fetch(req: Request, env: tEnv): Promise<Response> {
     app ??= setUp(env);
@@ -102,6 +104,7 @@ export default {
     return withSession;
   },
 };
+// #endregion fetch
 
 // #region route
 // The two SDK handlers answer methods themselves, so each is routed by its
@@ -173,4 +176,3 @@ function reply(status: number, body: unknown): Response {
     headers: { "cache-control": "no-store" },
   });
 }
-// #endregion file

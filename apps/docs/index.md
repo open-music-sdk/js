@@ -45,11 +45,14 @@ exists.
 1. Read [Which package to install](./concepts/packages). Most apps need one package.
 2. [Set up your MusicKit key](./guides/musickit-key). Every request needs a developer token, and you sign it
    with this key. The CLI's `doctor` tells you whether Apple takes it.
-3. Follow the example in the reference page of your package: [`server`](./reference/@open-music-sdk/server/),
-   [`browser`](./reference/@open-music-sdk/browser/) or [`react`](./reference/@open-music-sdk/react/).
+3. [Set up your server](./guides/server-setup) and [your client](./guides/client-setup), with the code for the ones
+   you pick in the nav: a page with no framework, React or Next.js, and Express, Cloudflare Workers or Next.js.
 4. To try the listener's side with your own account before your app has a sign-in, get a Music User Token with
    the CLI's `login`. See [The command-line tool](./concepts/packages#the-command-line-tool).
-5. To see it all working together, run one of the [sample apps](./samples) on your machine.
+5. To see it all working together, run one of the [sample apps](./samples) on your machine. The example in each
+   package's reference page, [`server`](./reference/@open-music-sdk/server/),
+   [`browser`](./reference/@open-music-sdk/browser/) or [`react`](./reference/@open-music-sdk/react/), is the
+   shortest.
 
 ## A first look
 

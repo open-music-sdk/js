@@ -1,12 +1,16 @@
-# TanStack Query
+---
+for: client=react,nextjs
+---
 
-In this guide you fetch the catalog and a listener's library with TanStack Query's hooks, write with
-`useMutation`, and prefetch the catalog on the server.
+# Read and write with TanStack Query
+
+In this guide you fetch the catalog and a listener's library with TanStack Query's hooks, and write with
+`useMutation`. In a Next app, you also prefetch the catalog on the server.
 
 Before you start, you need:
 
-- a React app with `MusicProvider` around it. See [Next.js](./nextjs) for one way to set it up.
-- `@tanstack/react-query` 5, with a `QueryClientProvider` around the app.
+- a React or Next.js app with `MusicProvider` and TanStack Query's `QueryClientProvider` around it, version 5. See
+  [Set up your client](./client-setup).
 
 `@open-music-sdk/react` doesn't depend on TanStack Query. `musicQueries` gives the objects `useQuery` and
 `useInfiniteQuery` take, and imports nothing from TanStack Query.
@@ -110,8 +114,13 @@ query of the library refetched at once may not show them yet.
 
 ## 4. Prefetch the catalog on the server
 
+::: for client=react
+A Vite app draws its pages in the browser, with no server render to prefetch for. Go on to step 5.
+:::
+
+::: for client=nextjs
 On the server, `musicQueries` over the server's client gives the same queries, which you can prefetch and hand to
-the page. In a Next.js server component, `src/app/album/[id]/page.tsx`:
+the page. In a server component, `src/app/album/[id]/page.tsx`:
 
 ```tsx
 import { musicQueries } from "@open-music-sdk/react";
@@ -122,7 +131,7 @@ import {
 } from "@tanstack/react-query";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { getMusic } from "@/lib/music"; // the server's client, from Next.js
+import { getMusic } from "@/lib/music"; // the server's client
 import { Album } from "./album"; // the client component from step 1
 
 type tParams = Promise<{ id: string }>;
@@ -150,7 +159,8 @@ async function Prefetched({ params }: { params: tParams }) {
 ```
 
 `<Suspense>` and `await connection()` are what a Next app with Cache Components asks of a read made at each
-request: see step 6 of [Next.js](./nextjs).
+request: see [Make a first request](./client-setup#_4-make-a-first-request). `getMusic` is the server's client from
+[Set up your server](./server-setup#_3-make-its-client-once).
 
 `musicQueries(getMusic())` builds its keys in scope 0, which is the page's scope until a listener signs in (see
 step 5). So a prefetched query matches the page's query when both are called with the same arguments. Give the
@@ -175,6 +185,7 @@ passes in CI.
 
 `useSuspenseQuery` also runs while Next renders a client component on the server. There, a relative `tokenUrl`
 has no page to resolve against, so a query that needs a token fails. Prefetch on the server, or use `useQuery`.
+:::
 
 ## 5. Know what the keys hold
 
@@ -201,7 +212,7 @@ defaults to 0.
 
 ## Next steps
 
-- [Next.js](./nextjs), for the server's client and the provider these examples use.
+- [Set up your client](./client-setup), for the providers these examples use.
 - [Sign a listener in](./sign-in), which starts a listener's scope.
 - The reference for [`musicQueries`](../reference/@open-music-sdk/react/functions/musicQueries) and
   [`useMusicQueries`](../reference/@open-music-sdk/react/functions/useMusicQueries).

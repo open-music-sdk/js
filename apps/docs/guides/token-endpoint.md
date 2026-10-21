@@ -69,7 +69,8 @@ request instead of a web `Request`:
 
 ::: for server=nextjs
 The [Next sample](../samples) mounts the route as a route handler. It makes the handler on the first request, since
-`next build` runs with no key, and awaits `connection()` first, so the route is never built ahead of time:
+`next build` runs with no key, and awaits `connection()` first, so the route is never built ahead of time. A token
+minted while building would be served to everyone who asked, from the build's output:
 
 <<< @/../../samples/web-nextjs/src/app/api/music/token/route.ts#token-route{ts}
 :::

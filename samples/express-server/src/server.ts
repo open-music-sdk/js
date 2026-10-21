@@ -1,6 +1,6 @@
 // Shows: createServerClient, createRateLimiter, tokenEndpoint, acceptUserToken,
 // parseToken, MemoryUserTokenStore, forUser, isAppleMusicError. Guides:
-// /guides/token-endpoint, /guides/store-user-tokens
+// /guides/server-setup, /guides/token-endpoint, /guides/store-user-tokens
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import express, {

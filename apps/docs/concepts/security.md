@@ -79,7 +79,8 @@ deployment, since anyone who fetches a token can read every origin in it.
 Two more things are yours:
 
 - Make sure your framework never builds the route ahead of time. A token signed at build time would be served to
-  everyone. [Next.js](../guides/nextjs) shows the line that prevents it there.
+  everyone. [Serve a developer token to a page](../guides/token-endpoint#_1-add-the-route--nextjs) shows the line
+  that prevents it in Next.js.
 - If you write your own endpoint with `developerTokenMinter` instead, set `origin` on every token a browser will
   see, and send `Cache-Control: no-store` with it.
 

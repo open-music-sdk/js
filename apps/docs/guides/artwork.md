@@ -302,7 +302,6 @@ the URL. Each function's reference, linked below, lists every case.
 ## Next steps
 
 - [Play song previews](./previews), with the artwork of the track that is playing.
-- [Next.js](./nextjs), for the rest of a Next app.
 - The reference for [`artworkImage`](../reference/@open-music-sdk/util-artwork/functions/artworkImage),
   [`artworkUrl`](../reference/@open-music-sdk/util-artwork/functions/artworkUrl),
   [`artworkSrcSet`](../reference/@open-music-sdk/util-artwork/functions/artworkSrcSet) and their

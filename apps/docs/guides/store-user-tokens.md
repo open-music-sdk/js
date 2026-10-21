@@ -253,8 +253,9 @@ const store = new KvUserTokenStore(env.MUSIC_TOKENS, {
 });
 ```
 
-Workers KV is eventually consistent, which the [security model](../concepts/security#on-your-server) covers. See
-[Cloudflare Workers](./cloudflare-workers) for where to create the store in a Worker.
+Workers KV is eventually consistent, which the [security model](../concepts/security#on-your-server) covers.
+[Set up your server](./server-setup#_3-make-its-client-once--workers) makes the store in a Worker, and
+[Deploy a Worker](./cloudflare-workers) makes its namespace at Cloudflare.
 
 For anything else, write a store of your own: an object with the three methods `forUser` and the intake need.
 
@@ -283,7 +284,7 @@ platform provides, and keep tokens out of logs, URLs and browser storage. See th
 ## Next steps
 
 - [Handle errors](./errors), for the other errors a listener's request can end in.
-- [Cloudflare Workers](./cloudflare-workers) and [Next.js](./nextjs), for this setup on each platform.
+- [Set up your server](./server-setup), for the store and the client on each server.
 - The reference for [`userTokenIntake`](../reference/@open-music-sdk/user-token/functions/userTokenIntake),
   [`acceptUserToken`](../reference/@open-music-sdk/user-token/functions/acceptUserToken),
   [`MemoryUserTokenStore`](../reference/@open-music-sdk/user-token/classes/MemoryUserTokenStore) and

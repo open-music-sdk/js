@@ -1,4 +1,4 @@
-// Shows: tokenEndpoint. Guides: /guides/token-endpoint, /guides/nextjs
+// Shows: tokenEndpoint. Guide: /guides/token-endpoint
 import { tokenEndpoint, type tTokenEndpoint } from "@open-music-sdk/server";
 import { connection } from "next/server";
 import { required } from "@/lib/env";

@@ -59,8 +59,9 @@ the change or have the right to submit it under the MIT license.
 
 ## Writing docs
 
-The docs site, in [`apps/docs`](./apps/docs/README.md), follows [Diátaxis](https://diataxis.fr/). Every page is
-one of four kinds, and stays that kind:
+The docs site, in [`apps/docs`](./apps/docs/README.md), follows [Diátaxis](https://diataxis.fr/), without its
+tutorials: Getting started's guides set up a server and a client, and the guides take it from there. Every page is
+one of three kinds, and stays that kind:
 
 | Kind | Where | What it does | What it leaves out |
 | --- | --- | --- | --- |

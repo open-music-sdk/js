@@ -39,7 +39,7 @@ const music = createBrowserClient({ tokenUrl: "/api/music/token" });
 ::: for client=react,nextjs
 Make the page's client once, outside the tree, and hand it to `<MusicProvider>`, which holds the listener's token in
 React state, in memory only. In a Next app, put this in a file of its own that starts with `"use client"`, as
-[Next.js](./nextjs#_5-wrap-the-app-in-musicprovider) shows:
+[Set up your client](./client-setup#_3-make-the-page-s-client-once--nextjs) shows:
 
 ```tsx
 import { MusicProvider, createBrowserClient } from "@open-music-sdk/react";
@@ -295,7 +295,7 @@ async function signedIn(listener: typeof music) {
 ::: for client=react,nextjs
 Client only: the provider keeps the token in memory, and the page calls Apple itself. `useMusic()` gives every
 component the client bound to the listener, or reads from TanStack Query as
-[TanStack Query](./tanstack-query) shows.
+[Read and write with TanStack Query](./tanstack-query) shows.
 
 The provider takes no token as a prop, because a prop from a server component is written into the page. A token
 your server stored reaches it through `setToken`, after an authenticated `no-store` fetch.
@@ -323,7 +323,9 @@ it reads the listener's library from the page too:
 
 ::: for client=nextjs
 The [Next sample](../samples) is hybrid alone. It posts the token, has the provider forget it, and loads the page
-again, which its server then draws for the listener:
+again, which its server then draws for the listener. `router.refresh()` would draw only the route that is open:
+Next keeps the pages visited before, hidden, for Back, as they were drawn for no one. Sign-out loads the page again
+for the same reason:
 
 <<< @/../../samples/web-nextjs/src/components/sign-in.tsx#after-sign-in{tsx}
 :::
@@ -338,7 +340,7 @@ still signed in, so a cross-site scripting hole on your origin exposes the token
 
 - [Keep a listener's token on your server](./store-user-tokens), for the hybrid setup.
 - [Handle errors](./errors), including a token Apple no longer accepts.
-- [TanStack Query](./tanstack-query), to read the listener's library from React components.
+- [Read and write with TanStack Query](./tanstack-query), to read the listener's library from React components.
 - The reference for [`createConnect`](../reference/@open-music-sdk/browser/functions/createConnect),
   [`MUSICKIT_SCRIPT`](../reference/@open-music-sdk/browser/variables/MUSICKIT_SCRIPT) and
   [`useConnect`](../reference/@open-music-sdk/react/functions/useConnect).

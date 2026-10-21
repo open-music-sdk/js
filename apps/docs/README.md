@@ -88,8 +88,12 @@ The Next sample does it this way:
   that id switches the reader to those frameworks. In the search's detailed view such a result shows no excerpt:
   VitePress cuts excerpts at headings, keyed by the heading's id, and the block's id is no heading's.
 - A link can also carry a choice, `?client=react&server=workers`.
+- A page for some frameworks alone says so in its frontmatter, `for: client=react,nextjs`. The sidebar and the
+  pager leave it out for a reader who chose others, the page tells such a reader so, with a button that switches,
+  and the check holds its groups to those frameworks alone.
 
-A platform's own guide, Next.js or Cloudflare Workers, stays a page of its own and needs no blocks.
+Getting started's two pages set up each server and client in blocks, as the guides do. What only one framework
+does, such as caching on a Next server or deploying a Worker, is a guide with `for:`.
 
 The plugin also:
 

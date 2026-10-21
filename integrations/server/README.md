@@ -75,6 +75,6 @@ the parts, install the packages themselves.
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
 - [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
   the listener's token
-- [Cloudflare Workers](https://open-music-sdk.github.io/js/guides/cloudflare-workers) and
-  [Next.js](https://open-music-sdk.github.io/js/guides/nextjs)
+- [Set up your server](https://open-music-sdk.github.io/js/guides/server-setup) and
+  [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers)
 - [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/server/)

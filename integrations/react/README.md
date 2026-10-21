@@ -60,7 +60,7 @@ imports them so, and `next build` passes in CI.
 - [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
 - [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), and the
   [security model](https://open-music-sdk.github.io/js/concepts/security) for where the provider keeps the token
-- [TanStack Query](https://open-music-sdk.github.io/js/guides/tanstack-query) and
-  [Next.js](https://open-music-sdk.github.io/js/guides/nextjs)
+- [Set up your client](https://open-music-sdk.github.io/js/guides/client-setup) and
+  [Read and write with TanStack Query](https://open-music-sdk.github.io/js/guides/tanstack-query)
 - [Play song previews](https://open-music-sdk.github.io/js/guides/previews)
 - [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/react/)
