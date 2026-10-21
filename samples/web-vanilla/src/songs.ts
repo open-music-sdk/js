@@ -71,7 +71,6 @@ function actions(
   return buttons;
 }
 
-// #region love
 /**
  * Which of these songs the listener loves, from one request for all of them.
  * Songs never rated are left out.
@@ -120,9 +119,7 @@ function love(id: string, loved: Set<string>): HTMLButtonElement {
   };
   return heart;
 }
-// #endregion love
 
-// #region add-to-library
 async function add(track: tTrack): Promise<void> {
   const ids = track.type === "songs"
     ? { songs: [track.id] }
@@ -140,4 +137,3 @@ async function add(track: tTrack): Promise<void> {
     showError(e);
   }
 }
-// #endregion add-to-library

@@ -64,7 +64,6 @@ one of four kinds, and stays that kind:
 
 | Kind | Where | What it does | What it leaves out |
 | --- | --- | --- | --- |
-| Tutorial | `apps/docs/start/` | Teaches a newcomer by building something that works | Choices, edge cases, long explanations |
 | Guide | `apps/docs/guides/` | Gets a reader who knows the basics to one goal | Teaching the basics, explaining why at length |
 | Concept | `apps/docs/concepts/` | Explains how something works and why | Steps to follow |
 | Reference | Doc comments, and each package's README | States the facts: arguments, options, returns, errors | Advice and opinion |

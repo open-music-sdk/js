@@ -8,7 +8,6 @@ import type { tSleeve } from "./sleeve";
 import { songCrate } from "./songs";
 import { drawFloor, drawPage } from "./view";
 
-// #region charts
 // The floor, before anyone searches: the storefront's top charts, then a crate
 // for each genre the charts are kept by.
 async function theFloor(): Promise<HTMLElement[]> {
@@ -73,7 +72,6 @@ async function genreAlbums(
   });
   return sleeves(results.albums[0]?.data ?? []);
 }
-// #endregion charts
 
 /**
  * A crate filled once it scrolls into view, so a floor of them asks Apple only
@@ -100,7 +98,6 @@ function fillWhenSeen(
   return waiting;
 }
 
-// #region storefronts
 // Signed out, the listener picks the storefront. Signed in, it is their own,
 // from Apple, and the picker goes.
 const picker = byId("storefront", HTMLSelectElement);
@@ -119,7 +116,6 @@ async function fillPicker(): Promise<void> {
 picker.onchange = () => {
   change({ storefront: picker.value });
 };
-// #endregion storefronts
 
 // Signing in or out, or another storefront, draws the floor and the open page
 // again. A page a returning listener reloads opens in their storefront; an id

@@ -45,7 +45,6 @@ function byLine(item: tCatalogItem): string | undefined {
   return undefined;
 }
 
-// #region validate
 route("albums", async (id) => {
   // Held to the album's generated type as it arrives: an answer in another
   // shape is a ValidationError here, with the path of each value that differs,
@@ -60,7 +59,6 @@ route("albums", async (id) => {
   const { name, artistName, artwork } = album.attributes ?? {};
   return [heading(name, artistName, artwork), ...actions, tracklist];
 });
-// #endregion validate
 
 route("artists", async (id) => {
   const { storefront } = now;

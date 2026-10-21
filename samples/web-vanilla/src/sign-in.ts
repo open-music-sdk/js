@@ -1,6 +1,5 @@
 // Shows: createConnect, as, getUserStorefront. Guides: /guides/sign-in,
 // /guides/store-user-tokens
-// #region file
 import { createConnect } from "@open-music-sdk/browser";
 import { byId } from "./dom";
 import { fromServer, say, showError } from "./errors";
@@ -94,4 +93,3 @@ onChange(() => {
   signInButton.hidden = now.listener !== undefined;
   signOutButton.hidden = now.listener === undefined;
 });
-// #endregion file

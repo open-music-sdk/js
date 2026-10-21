@@ -66,18 +66,6 @@ const guides = [
   },
 ];
 
-const tutorial = [
-  {
-    text: "Tutorial",
-    items: [
-      { text: "Build Vinyl Collector Simulator", link: "/start/" },
-      { text: "Part 1: The server", link: "/start/server" },
-      { text: "Part 2: The page and the catalog", link: "/start/page" },
-      { text: "Part 3: The listener", link: "/start/listener" },
-    ],
-  },
-];
-
 const concepts = [
   {
     text: "Concepts",
@@ -138,7 +126,6 @@ export default defineConfig({
   themeConfig: {
     logo: "/logo.svg",
     nav: [
-      { text: "Tutorial", link: "/start/", activeMatch: "^/start/" },
       { text: "Guides", link: "/guides/musickit-key", activeMatch: "^/guides/" },
       { text: "Concepts", link: "/concepts/packages", activeMatch: "^/concepts/" },
       { text: "Reference", link: "/reference/", activeMatch: "^/(reference/|differences|glossary)" },
@@ -147,7 +134,6 @@ export default defineConfig({
     ],
     // The longest matching path wins, so a package's own sidebar is used under its folder.
     sidebar: {
-      "/start/": tutorial,
       "/guides/": guides,
       "/concepts/": concepts,
       "/reference/": referenceSidebar(),
