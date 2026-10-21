@@ -100,7 +100,8 @@ Open `http://localhost:2728`, and click Sign in with Apple Music. Sign in in App
 which storefront you're digging in, and a Library tab appears.
 
 - Reload the page. Apple's script restores you, with no click.
-- Love a song, and add one to your library.
+- Love a song you haven't rated, and add one that isn't in your library yet. Taking the love away deletes the
+  song's rating, whatever it was before.
 - Open the Library tab. The first crate, recently played, is the one your server asked Apple for.
 - Put a few songs in your crate, open the Your crate tab, and send it to a new playlist. Plan it, read the plan,
   and press Send it. If the page says the songs can take a few seconds to show, wait that long. Then send it
@@ -111,8 +112,11 @@ which storefront you're digging in, and a Library tab appears.
 Sign out before you stop. Apple's script keeps a copy of your Music User Token in the storage of `localhost:2728`,
 which any other app you later serve on that port could read. Then stop the pair with Ctrl+C.
 
-The playlist the page made is named Vinyl Collector Simulator, and its description says it was made here. Delete it
-in Apple Music if you don't want it, and the songs you added and loved.
+Everything the page wrote is in your Apple Music account. Undo in Apple Music what you don't want to keep:
+
+- the playlist the page made, named Vinyl Collector Simulator, whose description says it was made here;
+- the songs you loved, and the songs and albums you added to your library;
+- an album you made a favorite on its page.
 
 Your two folders are yours to keep, and the repository ignores them. To put the repository back as you cloned it,
 delete them and restore the lockfile pnpm wrote them into, from the root:
