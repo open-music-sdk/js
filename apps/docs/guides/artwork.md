@@ -66,21 +66,21 @@ export function Cover({ song }: { song: tSong }) {
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
 ::: for page=vanilla
-The [vanilla sample](../samples) draws every cover with one function. A resource with no artwork gets an empty box
+The [vanilla sample](../samples) draws every sleeve with one function. A resource with no artwork gets an empty box
 of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
 
 <<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
 :::
 
 ::: for page=react
-The [React sample](../samples) draws every cover with one component. A resource with no artwork gets an empty box
+The [React sample](../samples) draws every sleeve with one component. A resource with no artwork gets an empty box
 of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
 
 <<< @/../../samples/web-react/src/artwork.tsx#artwork{tsx}
 :::
 
 ::: for page=nextjs
-The [Next sample](../samples) draws every cover with `next/image` instead, through a component of its own that you
+The [Next sample](../samples) draws every sleeve with `next/image` instead, through a component of its own that you
 can take into your app: see [With `next/image`](#with-next-image).
 :::
 
