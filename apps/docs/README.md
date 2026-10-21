@@ -84,7 +84,7 @@ The Next sample does it this way:
   and closes with four, so that the inner `:::` doesn't close it. A line of colons alone closes a block even inside
   a code block, and the check fails either mistake.
 - A heading goes above the blocks, never in one. A block's id is the heading's, then its frameworks, such as
-  `#act-on-each-kind--nextjs`, and the search lists each block as a result of its own under that heading. A link to
+  `#_2-act-on-each-kind--nextjs`, and the search lists each block as a result of its own under that heading. A link to
   that id switches the reader to those frameworks. In the search's detailed view such a result shows no excerpt:
   VitePress cuts excerpts at headings, keyed by the heading's id, and the block's id is no heading's.
 - A link can also carry a choice, `?page=react&server=workers`.
