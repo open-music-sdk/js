@@ -86,6 +86,10 @@ yet, and a send made before it does can add them twice. See [Import a playlist](
 
 Add the three screens to `samples/my-page/src/main.ts`, which is now the finished sample's:
 
+```sh
+cp samples/web-vanilla/src/main.ts samples/my-page/src/
+```
+
 <<< @/../../samples/web-vanilla/src/main.ts{ts}
 
 ## 7. Run it, and sign in
