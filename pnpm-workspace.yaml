@@ -47,3 +47,7 @@ catalog:
   typedoc-plugin-markdown: ^4.14.0
   typedoc-vitepress-theme: ^1.1.4
   vitepress: ^1.6.4
+  # the docs site's theme: Vue for the framework picker, and the container for a guide's variant blocks, which
+  # VitePress bundles inside itself and does not export
+  vue: ^3.5.13
+  markdown-it-container: ^4.0.0

@@ -2,6 +2,8 @@
 // reference is written to reference/ by TypeDoc before VitePress runs (see package.json), with a sidebar beside it.
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vitepress";
+import { VALUES, settle } from "./frameworks.mjs";
+import { splitIntoSections, variantBlocks } from "./variants.mjs";
 
 // TypeDoc lists the packages alphabetically. The sidebar groups them by tier, with what an app installs first.
 const tiers = {
@@ -101,7 +103,12 @@ export default defineConfig({
   metaChunk: true,
   // The app's own README is for whoever works on the site, not for its readers.
   srcExclude: ["README.md"],
-  head: [["link", { rel: "icon", href: "/js/logo.svg" }]],
+  // The reader's choice of frameworks is settled before the first paint, so a guide never shows another
+  // framework's code first and then swaps it.
+  head: [
+    ["link", { rel: "icon", href: "/js/logo.svg" }],
+    ["script", {}, `(${settle.toString()})(${JSON.stringify(VALUES)}, location.href);`],
+  ],
   // The one chunk past Vite's 500 kB warning is the search index, about 2.5 MB, which loads when the search box opens.
   // `pnpm --filter docs dev` serves files from the whole repository, as Vite does from a workspace's root. Its list of
   // refusals is restated with a MusicKit key and the sample Worker's files added, and no page on another origin may
@@ -110,7 +117,12 @@ export default defineConfig({
     build: { chunkSizeWarningLimit: 4000 },
     server: { cors: false, fs: { deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "*.p8", ".dev.vars", ".dev.vars.*", "**/.wrangler/**"] } },
   },
-  markdown: { config: siteLinks },
+  markdown: {
+    config: (md) => {
+      siteLinks(md);
+      variantBlocks(md);
+    },
+  },
   themeConfig: {
     logo: "/logo.svg",
     nav: [
@@ -129,7 +141,10 @@ export default defineConfig({
       "/glossary": referenceSidebar(),
       ...Object.fromEntries(Object.values(tiers).flat().map((name) => [`/reference/@open-music-sdk/${name}/`, referenceSidebar(name)])),
     },
-    search: { provider: "local" },
+    // Each variant of a guide is a search result of its own, titled with its frameworks, so a result says whether
+    // it's the React code or the Express code, and opening it switches the picker to match. The hook is underscored
+    // in VitePress's types: after an upgrade, check that the search still finds a variant by its framework.
+    search: { provider: "local", options: { miniSearch: { _splitIntoSections: splitIntoSections } } },
     outline: [2, 3],
     socialLinks: [{ icon: "github", link: "https://github.com/open-music-sdk/js" }],
     footer: {
