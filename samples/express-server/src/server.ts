@@ -19,6 +19,7 @@ import {
 } from "@open-music-sdk/server";
 import { web } from "./web.ts";
 
+// #region server-client
 /** A setting from .env, which has to be there. */
 function required(name: string): string {
   const value = process.env[name];
@@ -49,6 +50,7 @@ const music = createServerClient({
   userTokenStore: store,
   rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }),
 });
+// #endregion server-client
 
 const app = express();
 
@@ -61,6 +63,7 @@ app.use((req, res, next) => {
   else res.status(421).json({ error: "MisdirectedRequest" });
 });
 
+// #region session
 // A listener is a random id in a cookie, given with the first answer under
 // /api. A real app has its own sessions.
 const SESSION_COOKIE = /(?:^|;\s*)crate_session=([0-9a-f-]{36})(?:;|$)/;
@@ -80,6 +83,7 @@ app.use("/api", (req, res, next) => {
   res.set("cache-control", "no-store");
   next();
 });
+// #endregion session
 
 // #region token-route
 // The page's developer token, minted for the page's origin alone and

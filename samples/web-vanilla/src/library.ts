@@ -50,6 +50,7 @@ onChange(() => {
   }
 });
 
+// #region library-lists
 async function draw(listener: tBrowserMusic): Promise<void> {
   // The first page of each list is enough here, so each walk stops after one.
   const { user } = listener;
@@ -83,7 +84,9 @@ async function draw(listener: tBrowserMusic): Promise<void> {
   );
   view.replaceChildren(found, crates, tracks);
 }
+// #endregion library-lists
 
+// #region act-for-listener
 // One list the server asks for, with the token it kept for this listener when
 // they signed in.
 async function fromTheServer(): Promise<HTMLElement> {
@@ -97,7 +100,9 @@ async function fromTheServer(): Promise<HTMLElement> {
   const items = (await answer.json()) as tCard[];
   return crate(label, cards(items));
 }
+// #endregion act-for-listener
 
+// #region your-playlists
 /**
  * The listener's playlists, 25 at a time: flipping near the back of the crate
  * asks Apple for the next page.
@@ -126,6 +131,7 @@ function yourPlaylists(listener: tBrowserMusic): HTMLElement {
     empty: "No playlists in your library.",
   });
 }
+// #endregion your-playlists
 
 /**
  * A playlist of the listener's, with its tracks, under the crates. Songs in a
