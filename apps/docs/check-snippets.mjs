@@ -108,7 +108,9 @@ function variantGroups(page) {
       return;
     }
     if (block === undefined) return;
-    if (/^\s*:::+\s*\S/.test(line)) depth += 1;
+    if (fenceMark === undefined && /^\s*#{1,6}\s/.test(line)) block.heading = true;
+    // A container inside the block, such as a code group, opens with its name; a line of colons alone closes one.
+    if (/^\s*:::+\s*[^:\s]/.test(line)) depth += 1;
     else if (/^\s*:::+\s*$/.test(line)) {
       if (depth === 0) {
         lastClose = i;
@@ -131,8 +133,7 @@ for (const page of pages.filter((page) => page !== "README.md"))
     const where = `${page}:${group[0].line}`;
     const axes = [...new Set(group.flatMap((block) => Object.keys(block.wanted)))];
     for (const block of group)
-      for (const line of block.lines)
-        if (/^\s*#{1,6}\s/.test(line)) variants.push(`${page}:${block.line} has a heading inside "::: for ${named(block)}"; put it above the block`);
+      if (block.heading) variants.push(`${page}:${block.line} has a heading inside "::: for ${named(block)}"; put it above the block`);
     if (axes.length === 1) {
       const [axis] = axes;
       const seen = group.flatMap((block) => block.wanted[axis]);

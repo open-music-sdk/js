@@ -36,17 +36,32 @@ from 60 to 86,400 (one day).
 A page on one of your origins can read the token even when the route is on another origin, such as a Worker in
 front of a static site. The route sends the CORS header for your origins only, and for nothing but the token.
 
-The [sample apps](../samples) mount the route on a Worker, which takes the handler as it is, and on Express, which
-hands a route Node's request instead of a web `Request`:
+::: for server=workers
+The [Workers sample](../samples) hands the route the Worker's request as it comes, since a Worker's requests are
+web `Request`s:
+
+<<< @/../../samples/worker-server/src/index.ts#token-route{ts}
+:::
+
+:::: for server=express
+The [Express sample](../samples) mounts the route through a small adapter, since Express hands a route Node's
+request instead of a web `Request`:
 
 ::: code-group
 
-<<< @/../../samples/worker-server/src/index.ts#token-route{ts} [Cloudflare Workers]
+<<< @/../../samples/express-server/src/server.ts#token-route{ts} [server.ts]
 
-<<< @/../../samples/express-server/src/server.ts#token-route{ts} [Express]
+<<< @/../../samples/express-server/src/web.ts{ts} [web.ts]
 
-<<< @/../../samples/express-server/src/web.ts{ts} [Express: web.ts]
+:::
 
+::::
+
+::: for server=nextjs
+The [Next sample](../samples) mounts the route as a route handler. It makes the handler on the first request, since
+`next build` runs with no key, and awaits `connection()` first, so the route is never built ahead of time:
+
+<<< @/../../samples/web-nextjs/src/app/api/music/token/route.ts#token-route{ts}
 :::
 
 ## 2. Point the browser client at it

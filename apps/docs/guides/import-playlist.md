@@ -206,11 +206,14 @@ a write's answer was lost, rejects with that write's own error.
 Each function makes one request at a time. The client's own rate limiter, and its wait after a `429`, apply
 underneath `delayMs`. These options set how hard one call pushes; the client sets how hard your whole app does.
 
-## In a page
+## In the sample apps
 
-The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in.
-`resolve` needs no token at all. The [vanilla sample](../samples) sends its crate of songs this way: it finds a
-pasted tracklist, shows the plan in a dialog, and applies it only when the listener says to.
+Each sample sends its crate of songs to the listener's library: it finds a pasted tracklist, shows the plan, and
+applies it only when the listener says to. `resolve` needs no token at all.
+
+:::: for page=vanilla
+The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in. The
+[vanilla sample](../samples) shows the plan in a dialog:
 
 ::: code-group
 
@@ -221,6 +224,53 @@ pasted tracklist, shows the plan in a dialog, and applies it only when the liste
 <<< @/../../samples/web-vanilla/src/send.ts#apply{ts} [3. Apply]
 
 :::
+
+::::
+
+:::: for page=react
+The four functions run in a page too, with the client `useMusic()` gives once the listener has signed in. The
+[React sample](../samples) shows the plan in a dialog, and sends the crate from a mutation:
+
+::: code-group
+
+<<< @/../../samples/web-react/src/crate.tsx#resolve{tsx} [1. Resolve]
+
+<<< @/../../samples/web-react/src/send.tsx#plan{tsx} [2. Plan]
+
+<<< @/../../samples/web-react/src/send.tsx#apply{tsx} [3. Apply]
+
+:::
+
+::::
+
+:::: for page=nextjs
+The [Next sample](../samples) runs the four functions on the server, in server actions, with the client
+`music.forUser(session)` gives for the listener. Each action checks what the page sent it, and the send plans
+again from what the playlist holds then, rather than trusting a plan from the page:
+
+::: code-group
+
+<<< @/../../samples/web-nextjs/src/lib/actions.ts#resolve{ts} [1. Resolve]
+
+<<< @/../../samples/web-nextjs/src/lib/actions.ts#plan{ts} [2. Plan]
+
+<<< @/../../samples/web-nextjs/src/lib/actions.ts#apply{ts} [3. Apply]
+
+:::
+
+The page calls the actions from its crate, and shows the plan in a dialog:
+
+::: code-group
+
+<<< @/../../samples/web-nextjs/src/components/crate.tsx#resolve{tsx} [1. Resolve]
+
+<<< @/../../samples/web-nextjs/src/components/send.tsx#plan{tsx} [2. Plan]
+
+<<< @/../../samples/web-nextjs/src/components/send.tsx#apply{tsx} [3. Apply]
+
+:::
+
+::::
 
 ## When something goes wrong
 

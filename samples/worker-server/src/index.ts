@@ -66,9 +66,11 @@ function setUp(env: tEnv): tApp {
   // request as it comes: see route() below.
   const token = tokenEndpoint({ ...key, origin: [pageOrigin] });
   // #endregion token-route
+  // #region user-token
   // Asks Apple whether the posted token works, and keeps it under the session's
   // id only then.
   const intake = userTokenIntake(music, { store, userId: sessionOf });
+  // #endregion user-token
   // Requests sent to the Worker by its own name or the page's: a site whose
   // name a DNS trick points at 127.0.0.1 would otherwise reach it from the
   // listener's browser as if it were the page.

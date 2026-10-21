@@ -37,12 +37,16 @@ const album = await music.catalog.getAlbum("1613600183", {
 const tracks = album.relationships?.tracks?.data ?? [];
 ```
 
+In React and Next.js, the same names come from `@open-music-sdk/react`. A Next app can fetch the tracks in a server
+component, with the server's client, and hand them to a client component that plays them: they're plain data.
+
 Any catalog function that hands over songs or music videos works: a search, a chart, or `resolve` from
 [Import a playlist](./import-playlist). A song in a listener's library has no preview, and neither has a song
 fetched without its attributes.
 
 ## 2. Load them into a player
 
+::: for page=vanilla
 In your page, make a player and load the tracks:
 
 ```ts
@@ -52,10 +56,50 @@ const { tracks: queue, skipped } = player.load(tracks);
 
 `previewPlayer()` makes its own audio element with `new Audio()` and listens to it. The type parameter is the kind
 of track you feed it, and is what `player.state.track` is typed as.
+:::
+
+::: for page=react,nextjs
+In a client component, `usePreviewPlayer` gives you the player's state and its functions. Load the tracks from an
+effect:
+
+```tsx
+import {
+  usePreviewPlayer,
+  type tMusicVideo,
+  type tSong,
+} from "@open-music-sdk/react";
+import { useEffect } from "react";
+
+type tTrack = tSong | tMusicVideo;
+
+export function Previews({ tracks }: { tracks: readonly tTrack[] }) {
+  const { state, load, play, pause, next } = usePreviewPlayer<tTrack>();
+
+  useEffect(() => {
+    load(tracks);
+  }, [tracks, load]);
+
+  // … draw the player, as in step 4
+}
+```
+
+The type parameter is the kind of track you feed it, and is what `state.track` is typed as.
+
+- The hook makes the player, with its own audio element, when the component mounts, and disposes of it when the
+  component unmounts. It needs no `MusicProvider`.
+- `load`, `play`, `pause`, `next`, `previous`, `seek` and `setVolume` keep their identity for as long as the
+  component lives, so you can list them in an effect's dependencies.
+- Call them from a click or from an effect of the component that called the hook. One called before the player
+  exists, which only a child's effect can do, throws a `TypeError`.
+- The effect above loads the list again whenever `tracks` changes, which stops what is playing. Hand it a list that
+  keeps its identity between renders, such as one from a query.
+
+The hook reads its options on the first mount only.
+:::
 
 `load` replaces the queue with the tracks that have a clip, in the order you gave them, and plays nothing. Each
 entry of `skipped` is a track it left out, with its `index` in your list and a `reason`: `"no-preview"` for a track
-with no clip, `"host"` for a clip on a host you don't allow (see step 7). See
+with no clip, `"host"` for a clip on a host you don't allow (see step 6). See
 [`tSkippedPreview`](../reference/@open-music-sdk/lib-preview-player/interfaces/tSkippedPreview).
 
 A track without a clip is never an error, so you can draw it with its play button turned off.
@@ -65,7 +109,10 @@ Loading a new queue stops what was playing, takes the old clip off the element, 
 ## 3. Start sound from a click
 
 Browsers don't let a page start sound on its own: the first sound has to follow something the listener did. So
-call `play`, `next` or `previous` from a click or a key press. In your page:
+call `play`, `next` or `previous` from a click or a key press.
+
+::: for page=vanilla
+In your page:
 
 ```ts
 playButton.onclick = () => void player.play().catch(showWhyNot);
@@ -75,6 +122,19 @@ previousButton.onclick = () => void player.previous().catch(showWhyNot);
 ```
 
 The buttons and `showWhyNot` stand for your own code.
+:::
+
+::: for page=react,nextjs
+In the component, from the buttons' `onClick`:
+
+```tsx
+<button onClick={() => void play().catch(showWhyNot)}>Play</button>
+<button onClick={() => pause()}>Pause</button>
+<button onClick={() => void next().catch(showWhyNot)}>Next</button>
+```
+
+`showWhyNot` stands for your own code.
+:::
 
 - `play()` carries on with the current clip, or starts the first track. `play(2)` plays the third track from its
   start.
@@ -96,13 +156,23 @@ the player hasn't played a clip from the live API in a browser yet. See
 :::
 
 A list with a Play button on each row plays the whole list, from the row that was clicked. The track's place in
-the queue `load` gives back can differ from its place in your list, since tracks with no clip are left out. The
-[vanilla sample](../samples) does it this way:
+the queue `load` gives back can differ from its place in your list, since tracks with no clip are left out.
+
+::: for page=vanilla
+The [vanilla sample](../samples) does it this way:
 
 <<< @/../../samples/web-vanilla/src/player.ts#play-from{ts}
+:::
+
+::: for page=react,nextjs
+The [React and Next samples](../samples) do it this way, with the functions from `usePreviewPlayer`:
+
+<<< @/../../samples/web-react/src/player.tsx#play-from{tsx}
+:::
 
 ## 4. Draw the player's state
 
+::: for page=vanilla
 In your page, subscribe to the player and draw from `player.state`:
 
 ```ts
@@ -116,9 +186,29 @@ player.subscribe(() => {
 
 `subscribe` calls your listener after each change and returns the function that stops it. While a clip plays,
 `position` changes several times a second.
+:::
 
-`player.state` is a frozen snapshot, and stays the same object until something changes. It holds the `status`,
-the queue as `tracks`, the current `index` and `track`, the clip's `position` and `duration`, and the `volume`. See
+::: for page=react,nextjs
+In the component, draw from `state`. The component renders again after each change:
+
+```tsx
+return (
+  <div>
+    <p>{state.track?.attributes?.name}</p>
+    {state.status === "playing" ?
+      <button onClick={() => pause()}>Pause</button>
+    : <button onClick={() => void play().catch(showWhyNot)}>Play</button>}
+    <button onClick={() => void next().catch(showWhyNot)}>Next</button>
+  </div>
+);
+```
+
+While a clip plays, `position` changes several times a second. On the server, and before the component mounts,
+`state` is one idle snapshot, so a server render and a hydration agree.
+:::
+
+The state is a frozen snapshot, and stays the same object until something changes. It holds the `status`, the
+queue as `tracks`, the current `index` and `track`, the clip's `position` and `duration`, and the `volume`. See
 [`tPreviewPlayerState`](../reference/@open-music-sdk/lib-preview-player/interfaces/tPreviewPlayerState).
 
 `status` is one of `idle`, `loading`, `playing`, `paused`, `ended` and `error`, which
@@ -129,64 +219,22 @@ A listener may call the player back, for example to pause or load another queue,
 listener that throws stops neither the player nor the other listeners. The first error is then thrown to
 whoever called the player, or out through the element's event.
 
-## 5. In React, use `usePreviewPlayer`
+## 5. Play through your own audio element
 
-In a React component, `usePreviewPlayer` from `@open-music-sdk/react` gives you the player's state and its
-functions:
+To keep an `<audio>` element's own controls on the page, hand the element to the player.
 
-```tsx
-import {
-  usePreviewPlayer,
-  type tMusicVideo,
-  type tSong,
-} from "@open-music-sdk/react";
-import { useEffect } from "react";
-
-type tTrack = tSong | tMusicVideo;
-
-export function Previews({ tracks }: { tracks: readonly tTrack[] }) {
-  const { state, load, play, pause, next } = usePreviewPlayer<tTrack>();
-
-  useEffect(() => {
-    load(tracks);
-  }, [tracks, load]);
-
-  return (
-    <div>
-      <p>{state.track?.attributes?.name}</p>
-      {state.status === "playing" ?
-        <button onClick={() => pause()}>Pause</button>
-      : <button onClick={() => void play().catch(showWhyNot)}>Play</button>}
-      <button onClick={() => void next().catch(showWhyNot)}>Next</button>
-    </div>
-  );
-}
-```
-
-- The hook makes the player when the component mounts and disposes it when the component unmounts. It needs no
-  `MusicProvider`.
-- `state` is the player's own snapshot. On the server, and before the component mounts, it's one idle snapshot,
-  so a server render and a hydration agree.
-- `load`, `play`, `pause`, `next`, `previous`, `seek` and `setVolume` keep their identity for as long as the
-  component lives, so you can list them in an effect's dependencies.
-- Call them from a click or from an effect of the component that called the hook. One called before the player
-  exists, which only a child's effect can do, throws a `TypeError`.
-- The effect above loads the list again whenever `tracks` changes, which stops what is playing. Hand it a list that
-  keeps its identity between renders, such as one from a query.
-
-The hook reads its options on the first mount only.
-
-## 6. Play through your own audio element
-
-To keep an `<audio>` element's own controls on the page, hand the element to the player. In your page:
+::: for page=vanilla
+In your page:
 
 ```ts
 const audio = document.querySelector<HTMLAudioElement>("#preview")!;
 const player = previewPlayer<tSong>({ audio });
 ```
+:::
 
-In React, pass the element or a ref to it. The hook reads the ref when the component mounts, and a ref with
-nothing in it then is a `TypeError`:
+::: for page=react,nextjs
+Pass the element or a ref to it. The hook reads the ref when the component mounts, and a ref with nothing in it
+then is a `TypeError`:
 
 ```tsx
 import { usePreviewPlayer, type tSong } from "@open-music-sdk/react";
@@ -195,24 +243,31 @@ import { useRef } from "react";
 export function Player() {
   const audio = useRef<HTMLAudioElement>(null);
   const { state, load, play } = usePreviewPlayer<tSong>({ audio });
-  // … load and play as in step 5
+  // … load and play as in steps 2 and 3
   return <audio ref={audio} controls />;
 }
 ```
+:::
 
 The player never adds the element to the page or takes it out. It sets the element's `src`, `currentTime` and
 `volume`, calls `play()`, `pause()`, `load()` and `removeAttribute("src")`, and listens to eight of its events.
 Whatever else pauses the element, such as its own controls, shows as `paused` in the state, and a volume set on
 the element shows as the state's volume.
 
-When you're done with a player you made with `previewPlayer`, call `player.dispose()`. It pauses, takes the clip
-and the player's listeners off the element, and forgets the queue and your subscribers. The element is yours
-again. After that, `play`, `next` and `previous` reject with a `TypeError`, `load`, `pause`, `seek`, `setVolume`
-and `subscribe` throw one, and `dispose()` again does nothing. Where the runtime has `Symbol.asyncDispose`,
-`await using player = previewPlayer()` disposes it for you; in a browser without it, call `dispose()`. In React,
-the hook disposes the player for you.
+::: for page=vanilla
+When you're done with the player, call `player.dispose()`. It pauses, takes the clip and the player's listeners
+off the element, and forgets the queue and your subscribers. The element is yours again. After that, `play`,
+`next` and `previous` reject with a `TypeError`, `load`, `pause`, `seek`, `setVolume` and `subscribe` throw one,
+and `dispose()` again does nothing. Where the runtime has `Symbol.asyncDispose`,
+`await using player = previewPlayer()` disposes it for you; in a browser without it, call `dispose()`.
+:::
 
-## 7. Check where clips point
+::: for page=react,nextjs
+The hook disposes of the player when the component unmounts. It pauses, takes the clip and the player's listeners
+off the element, and forgets the queue. The element is yours again.
+:::
+
+## 6. Check where clips point
 
 A clip's URL comes from the track you load. A track that came from Apple's API a moment ago can be played as it
 is.
@@ -224,9 +279,19 @@ element will request it. See [URLs in Apple's answers](../concepts/security#urls
 
 For tracks like those, pass `hosts` when you make the player:
 
+::: for page=vanilla
 ```ts
 const player = previewPlayer<tSong>({ hosts: ["itunes.apple.com"] });
 ```
+:::
+
+::: for page=react,nextjs
+```tsx
+const { state, load, play } = usePreviewPlayer<tSong>({
+  hosts: ["itunes.apple.com"],
+});
+```
+:::
 
 `hosts` takes up to 16 bare host names, in lowercase. With it, a track whose clip isn't `https` on one of those
 hosts or a subdomain of one, with no port and no credentials, is skipped with the reason `"host"`. Without it,
@@ -237,8 +302,8 @@ chart songs were all on `audio-ssl.itunes.apple.com`, which `itunes.apple.com` a
 [Differences from Apple's documentation](../differences#lib-preview-player). Look at what your own answers hold
 before you set `hosts`.
 
-`previewPlayer` checks `audio` and `hosts` when it makes the player, so a mistake in either is a `TypeError`
-then, not on the first click. Changing your options object afterwards changes nothing.
+The player checks `audio` and `hosts` when it's made, so a mistake in either is a `TypeError` then, not on the
+first click. Changing your options object afterwards changes nothing.
 
 ## When something goes wrong
 

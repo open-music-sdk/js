@@ -56,6 +56,25 @@ export const POST = userTokenIntake(music, {
 stored under the id it returns. `userTokenIntake` checks `store` and `userId` when you create it, so a mistake is
 a `TypeError` at startup.
 
+::: for server=workers
+The [Workers sample](../samples) makes the route once, with a session cookie standing in for your own sessions, and
+hands it the Worker's request as it comes:
+
+<<< @/../../samples/worker-server/src/index.ts#user-token{ts}
+:::
+
+::: for server=express
+Express hands a route Node's request instead of a web `Request`, so the [Express sample](../samples) calls
+`acceptUserToken` itself, as [step 5](#_5-take-a-token-in-without-a-web-standard-request) shows.
+:::
+
+::: for server=nextjs
+The [Next sample](../samples) mounts the route as a route handler, with a session cookie standing in for your own
+sessions. It makes the handler on the first request, since `next build` runs with no key:
+
+<<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#user-token{ts}
+:::
+
 The route takes a `POST` with `Content-Type: application/json` and a body of `{ "token": "..." }`. It asks Apple
 whether the token works, stores it only if Apple accepts it, and answers:
 
@@ -141,24 +160,46 @@ When the listener signs out in your page, delete their token on your server too,
 samples' servers take a `DELETE` on the same route. The page sends it before Apple's sign-out, so that a sign-out
 Apple's script fails still leaves no token on the server:
 
+::: for server=workers
+<<< @/../../samples/worker-server/src/index.ts#sign-out{ts}
+:::
+
+::: for server=express
+<<< @/../../samples/express-server/src/server.ts#sign-out{ts}
+:::
+
+::: for server=nextjs
+<<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#sign-out{ts}
+:::
+
+The [sample apps](../samples)' servers act for the listener this way, with a session cookie standing in for your own
+sessions.
+
+::: for server=workers
+The Worker asks Apple what the listener played lately:
+
+<<< @/../../samples/worker-server/src/index.ts#act-for-listener{ts}
+:::
+
+::: for server=express
+The Express server asks Apple what the listener played lately:
+
+<<< @/../../samples/express-server/src/server.ts#act-for-listener{ts}
+:::
+
+:::: for server=nextjs
+The Next app acts for the listener as it draws each page. The function each page calls first makes the listener's
+client and forgets a token Apple refused, and the Library page asks what the listener played lately with it:
+
 ::: code-group
 
-<<< @/../../samples/worker-server/src/index.ts#sign-out{ts} [Cloudflare Workers]
+<<< @/../../samples/web-nextjs/src/lib/listener.ts#act-for-listener{ts} [lib/listener.ts]
 
-<<< @/../../samples/express-server/src/server.ts#sign-out{ts} [Express]
+<<< @/../../samples/web-nextjs/src/app/library/page.tsx#act-for-listener{tsx} [app/library/page.tsx]
 
 :::
 
-The [sample apps](../samples)' servers ask Apple what the listener played lately this way, with a session cookie
-standing in for your own sessions:
-
-::: code-group
-
-<<< @/../../samples/worker-server/src/index.ts#act-for-listener{ts} [Cloudflare Workers]
-
-<<< @/../../samples/express-server/src/server.ts#act-for-listener{ts} [Express]
-
-:::
+::::
 
 ## 5. Take a token in without a web-standard `Request`
 
