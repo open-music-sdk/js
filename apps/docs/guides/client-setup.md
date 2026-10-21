@@ -189,7 +189,8 @@ export function Album({ id }: { id: string }) {
 }
 ```
 
-Render it from `App`, as `<Album id="1613600183" />`.
+Render it from `App`, as `<Album id="1613600183" />`. [Read and write with TanStack Query](./tanstack-query) goes on
+from here: walks through pages, writes, and what the keys hold.
 :::
 
 ::: for client=nextjs
@@ -223,6 +224,10 @@ async function Album({ params }: { params: tParams }) {
 The client reads the clock to keep its developer token fresh. Next refuses that while it draws a page ahead of
 time, and stops with an error that names `Date.now()`, so `await connection()` makes the read wait for a request.
 The page's own client is for what runs in the browser: the listener's sign-in, previews, and queries.
+
+[Act and cache on a Next.js server](./nextjs) goes on from here: server actions that act for a listener, and catalog
+reads cached for everyone. [Read and write with TanStack Query](./tanstack-query) prefetches the catalog for a
+client component's query.
 :::
 
 ## 5. Open it

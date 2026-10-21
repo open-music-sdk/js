@@ -59,13 +59,14 @@ const guides = [
       { text: "Play song previews", link: "/guides/previews" },
       { text: "Show artwork", link: "/guides/artwork" },
       { text: "Import a playlist", link: "/guides/import-playlist" },
-      { text: "Read and write with TanStack Query", link: "/guides/tanstack-query" },
-      { text: "Act and cache on a Next.js server", link: "/guides/nextjs" },
-      { text: "Deploy a Worker", link: "/guides/cloudflare-workers" },
       { text: "Handle errors", link: "/guides/errors" },
       { text: "Validate Apple's responses", link: "/guides/validation" },
       { text: "Call an endpoint the clients don't cover", link: "/guides/direct-requests" },
       { text: "Build your own client from the parts", link: "/guides/own-client" },
+      // Last, so that the pager's run through the guides above has no gap where one of these is hidden.
+      { text: "Read and write with TanStack Query", link: "/guides/tanstack-query" },
+      { text: "Act and cache on a Next.js server", link: "/guides/nextjs" },
+      { text: "Deploy a Worker", link: "/guides/cloudflare-workers" },
     ],
   },
 ];

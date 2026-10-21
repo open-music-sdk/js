@@ -340,7 +340,6 @@ still signed in, so a cross-site scripting hole on your origin exposes the token
 
 - [Keep a listener's token on your server](./store-user-tokens), for the hybrid setup.
 - [Handle errors](./errors), including a token Apple no longer accepts.
-- [Read and write with TanStack Query](./tanstack-query), to read the listener's library from React components.
 - The reference for [`createConnect`](../reference/@open-music-sdk/browser/functions/createConnect),
   [`MUSICKIT_SCRIPT`](../reference/@open-music-sdk/browser/variables/MUSICKIT_SCRIPT) and
   [`useConnect`](../reference/@open-music-sdk/react/functions/useConnect).

@@ -16,14 +16,18 @@ html[data-client="react"] .VPSidebarItem:has(> .item .for-only[data-client]:not(
 html[data-client="nextjs"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="nextjs"])),
 html[data-server="express"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="express"])),
 html[data-server="workers"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="workers"])),
-html[data-server="nextjs"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="nextjs"])),
+html[data-server="nextjs"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="nextjs"])) {
+  display: none;
+}
+
+/* The pager's link keeps its place, so the other one stays on its own side. */
 html[data-client="vanilla"] .pager:has(.for-only[data-client]:not([data-client~="vanilla"])),
 html[data-client="react"] .pager:has(.for-only[data-client]:not([data-client~="react"])),
 html[data-client="nextjs"] .pager:has(.for-only[data-client]:not([data-client~="nextjs"])),
 html[data-server="express"] .pager:has(.for-only[data-server]:not([data-server~="express"])),
 html[data-server="workers"] .pager:has(.for-only[data-server]:not([data-server~="workers"])),
 html[data-server="nextjs"] .pager:has(.for-only[data-server]:not([data-server~="nextjs"])) {
-  display: none;
+  visibility: hidden;
 }
 
 /* On such a page, the notice that it's for other frameworks than the reader's (see FrameworkScope.vue). */

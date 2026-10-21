@@ -150,6 +150,9 @@ store of listeners' tokens, in `src/lib/music.ts`:
 `MemoryUserTokenStore` keeps tokens in one process only, and loses them on restart. If your app runs on more than
 one instance, or on serverless functions, use a store they all reach. See
 [Choose a store](./store-user-tokens#choose-a-store).
+
+The client's other uses on a Next server, acting for a listener in a server action and caching catalog reads, are
+in [Act and cache on a Next.js server](./nextjs).
 :::
 
 The client signs one developer token, uses it for every request, and signs the next before it runs out. Its
