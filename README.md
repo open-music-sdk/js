@@ -69,8 +69,10 @@ console.log(album.attributes?.name);
 
 ## Documentation
 
+- [Tutorial](https://open-music-sdk.github.io/js/start/): build a page and a server that dig through Apple's
+  catalog, play previews, sign you in, and send songs to your library, in about an hour.
 - [Guides](https://open-music-sdk.github.io/js/guides/musickit-key): set up your key, sign a listener in, use
-  Next.js or Cloudflare Workers, and more.
+  Next.js or Cloudflare Workers, and more, with the code for the page and the server you pick.
 - [Concepts](https://open-music-sdk.github.io/js/concepts/packages): tokens, security, errors and the design
   principles every package follows.
 - [Reference](https://open-music-sdk.github.io/js/reference/): every function, type and option.
