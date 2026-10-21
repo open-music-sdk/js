@@ -85,7 +85,8 @@ The Next sample does it this way:
   a code block, and the check fails either mistake.
 - A heading goes above the blocks, never in one. A block's id is the heading's, then its frameworks, such as
   `#act-on-each-kind--nextjs`, and the search lists each block as a result of its own under that heading. A link to
-  that id switches the reader to those frameworks.
+  that id switches the reader to those frameworks. In the search's detailed view such a result shows no excerpt:
+  VitePress cuts excerpts at headings, keyed by the heading's id, and the block's id is no heading's.
 - A link can also carry a choice, `?page=react&server=workers`.
 
 A platform's own guide, Next.js or Cloudflare Workers, stays a page of its own and needs no blocks.
