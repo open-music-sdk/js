@@ -112,7 +112,15 @@ which any other app you later serve on that port could read. Then stop the pair 
 The playlist the page made is named Vinyl Collector Simulator, and its description says it was made here. Delete it
 in Apple Music if you don't want it, and the songs you added and loved.
 
-Your two folders are yours to keep or delete. The repository doesn't track them.
+Your two folders are yours to keep, and the repository ignores them. To put the repository back as you cloned it,
+delete them and restore the lockfile pnpm wrote them into, from the root:
+
+```sh
+rm -r samples/my-page
+rm -r samples/my-server
+git checkout pnpm-lock.yaml
+pnpm install
+```
 
 ## Where next
 

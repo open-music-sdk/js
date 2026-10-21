@@ -45,6 +45,9 @@ package to your folder:
 pnpm install
 ```
 
+pnpm writes your folder into the repository's `pnpm-lock.yaml`. [When you're done](./listener#_8-when-you-re-done)
+puts it back.
+
 ## 2. Add your key
 
 Copy the example settings into your folder:
