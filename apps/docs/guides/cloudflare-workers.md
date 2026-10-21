@@ -59,8 +59,6 @@ The Worker below is the [worker-server sample](../samples), complete, as it runs
 
 <<< @/../../samples/worker-server/src/index.ts#file{ts}
 
-The `// #region` lines mark the parts other guides show, and do nothing.
-
 Before you deploy it, change what is there for the machine it runs on:
 
 - Put your own session lookup in place of `sessionOf`, one that resolves to the signed-in user's id or `undefined`,
