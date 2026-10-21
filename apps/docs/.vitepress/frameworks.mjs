@@ -58,7 +58,9 @@ export function parseFor(text) {
 
 /** What a page is for, from the `for:` in its frontmatter, as `client=react,nextjs`: `{}` for a page for every one. */
 export const pageScope = (markdown) => {
-  const line = /^---\r?\n(?:.*\r?\n)*?for:\s*(.+?)\s*\r?\n(?:.*\r?\n)*?---/.exec(markdown)?.[1];
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown)?.[1] ?? "";
+  // Quoted or not, as YAML, and so the theme's notice, reads it.
+  const line = /^for:\s*(["']?)(.+?)\1\s*$/m.exec(frontmatter)?.[2];
   return line === undefined ? {} : parseFor(line);
 };
 
