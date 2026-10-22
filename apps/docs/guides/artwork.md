@@ -69,16 +69,16 @@ export function Cover({ song }: { song: tSong }) {
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
 ::: for client=vanilla
-The [vanilla sample](../samples) draws every cover with one function, where `h(tag, props)` is a helper of its own
-that makes an element with those properties set. A resource with no artwork gets an empty box of the same size, so
-a page laid out around covers keeps its shape:
+The [vanilla sample](../samples) draws its 240-pixel covers with one function, where `h(tag, props)` is a helper of
+its own that makes an element with those properties set. A resource with no artwork gets an empty box of the same
+size, so a page laid out around covers keeps its shape:
 
 <<< @/../../samples/web-vanilla/src/artwork.ts#cover{ts}
 :::
 
 ::: for client=react
-The [React sample](../samples) draws every cover with one component. A resource with no artwork gets an empty box
-of the same size, so a page laid out around covers keeps its shape:
+The [React sample](../samples) draws its 240-pixel covers with one component. A resource with no artwork gets an
+empty box of the same size, so a page laid out around covers keeps its shape:
 
 <<< @/../../samples/web-react/src/artwork.tsx#cover{tsx}
 :::
