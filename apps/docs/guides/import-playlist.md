@@ -82,6 +82,9 @@ with a playlist, and a listener may have another playlist by the same name.
 
 A plan is plain, frozen JSON. You can write it to a file and apply it later.
 
+If your page shows the plan and your server applies it, plan again on the server when the listener confirms. Don't
+apply a plan the page sends back: it can name any playlist and any tracks.
+
 ## 3. Apply the plan
 
 On your server, carry the plan out:
