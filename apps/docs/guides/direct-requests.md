@@ -13,6 +13,9 @@ Every client has `request` and `paginate`, the two functions the named ones are 
 to `https://api.music.apple.com` and nowhere else, with the developer token, and turn every failure into the
 errors [Handle errors](./errors) describes.
 
+The code below imports types from `@open-music-sdk/server`. In a page, import them from `@open-music-sdk/browser`
+or `@open-music-sdk/react`, which export the same ones.
+
 ## 1. Make a request
 
 `request(path, init)` sends one request and resolves to the answer's parsed JSON, or to `undefined` when the
