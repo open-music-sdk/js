@@ -52,8 +52,9 @@ const guides = [
       { text: "Set up your client", link: "/guides/client-setup" },
     ],
   },
+  // Each entry reads on from the heading, as "How To: Handle errors", and each page stands on its own.
   {
-    text: "Guides",
+    text: "How To",
     items: [
       { text: "Sign a listener in", link: "/guides/sign-in" },
       { text: "Keep a listener's token on your server", link: "/guides/store-user-tokens" },
@@ -65,7 +66,7 @@ const guides = [
       { text: "Call an endpoint the clients don't cover", link: "/guides/direct-requests" },
       { text: "Build your own client from the parts", link: "/guides/own-client" },
       { text: "Read and write with TanStack Query", link: "/guides/tanstack-query" },
-      { text: "Act and cache on a Next.js server", link: "/guides/nextjs" },
+      { text: "Use server actions and caching in Next.js", link: "/guides/nextjs" },
       { text: "Deploy a Worker", link: "/guides/cloudflare-workers" },
     ],
   },

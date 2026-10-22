@@ -236,7 +236,7 @@ The client reads the clock to keep its developer token fresh. Next refuses that 
 time, and stops with an error that names `Date.now()`, so `await connection()` makes the read wait for a request.
 The page's own client is for what runs in the browser: the listener's sign-in, previews, and queries.
 
-[Act and cache on a Next.js server](./nextjs) goes on from here: server actions that act for a listener, and catalog
+[Use server actions and caching in Next.js](./nextjs) covers server actions that act for a listener, and catalog
 reads cached for everyone. [Read and write with TanStack Query](./tanstack-query) prefetches the catalog for a
 client component's query.
 :::
