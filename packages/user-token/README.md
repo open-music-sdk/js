@@ -18,7 +18,7 @@ pnpm add @open-music-sdk/user-token @open-music-sdk/core @open-music-sdk/develop
 
 ## Example
 
-On your server. `sessionUserId(req)` and `userId` stand for your own session lookup:
+On your server. `sessionOf(req)` and `userId` stand for your own session lookup:
 
 ```ts
 import { createClient } from "@open-music-sdk/core";
@@ -32,7 +32,7 @@ const music = createClient({
 });
 
 // The route your page posts { "token": "..." } to. Apple checks the token, and only then does the store keep it.
-export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
+export const POST = userTokenIntake(music, { store, userId: (req) => sessionOf(req) });
 
 // In any later request, the listener's token is looked up in the store.
 const playlists = await music.forUser(userId).request("v1/me/library/playlists");

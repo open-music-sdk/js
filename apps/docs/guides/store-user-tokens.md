@@ -6,12 +6,18 @@ it under your own user id. Later requests act for the listener by that id.
 
 Before you start, you need:
 
-- your MusicKit key on your server. See [Set up your MusicKit key](./musickit-key).
-- a page that signs the listener in. See [Sign a listener in](./sign-in).
+- your MusicKit key and its two IDs in your server's environment, as `APPLE_MUSIC_PRIVATE_KEY`,
+  `APPLE_MUSIC_TEAM_ID` and `APPLE_MUSIC_KEY_ID`. See [Set up your MusicKit key](./musickit-key).
+- a page that signs the listener in, and so holds their Music User Token. See [Sign a listener in](./sign-in).
 - sessions of your own, which tell your server which of your users sent a request.
 
-In the code below, `userId` is your own id for the signed-in user, and `sessionUserId`, `showSignInAgain` and
-`askListenerToReconnect` stand for your own code.
+In the code below, these stand for your own code:
+
+- `sessionOf(req)` is your own session lookup. It takes the request your framework hands you, and returns the
+  signed-in user's id, or `undefined` when there's none.
+- `userId` is that id, in a request from a signed-in user.
+- `showSignInAgain()` asks the listener, in your page, to sign in again.
+- `askListenerToReconnect(userId)` has that user asked to sign in again.
 
 ## 1. Make a store and a client
 
@@ -37,9 +43,9 @@ export const music = createServerClient({
 `MemoryUserTokenStore` loses every token when the process restarts. [Choose a store](#choose-a-store) covers the
 others.
 
-`createServerClient` checks the key when it's called, so this module needs the key wherever it's loaded. A build
-that loads it with no key, as `next build` does, fails there. The [Next sample](../samples) makes its store and
-client on first use instead.
+`createServerClient` checks the key when it's called, so this module needs the key wherever it's loaded. Where the
+key isn't there as modules load, make the store and client on first use instead, and keep them for every request
+after: `next build` loads your modules with no key, and a Worker is handed its secrets with each request, in `env`.
 
 ## 2. Mount the intake route
 
@@ -52,7 +58,7 @@ import { music, store } from "./music";
 
 export const POST = userTokenIntake(music, {
   store,
-  userId: (req) => sessionUserId(req),
+  userId: (req) => sessionOf(req),
 });
 ```
 
@@ -61,27 +67,30 @@ stored under the id it returns. `userTokenIntake` checks `store` and `userId` wh
 a `TypeError` at startup.
 
 :::: for server=workers
-The [Workers sample](../samples) makes the route once, with a session cookie standing in for your own sessions, and
-hands it the Worker's request as it comes:
+In a Worker, make the handler on the first request, with the store and client, and hand it the Worker's request as
+it comes. The [Workers sample](../samples) makes it in its `setUp`, and routes the path to it in its `fetch`
+handler, which sends a `DELETE` to the sign-out of step 4:
 
 ::: code-group
 
 <<< @/../../samples/worker-server/src/index.ts#user-token{ts} [setUp]
 
-<<< @/../../samples/worker-server/src/index.ts#route{ts} [route]
+<<< @/../../samples/worker-server/src/index.ts#user-token-route{ts} [route]
 
 :::
 
 ::::
 
 ::: for server=express
-Express hands a route Node's request instead of a web `Request`, so the [Express sample](../samples) calls
-`acceptUserToken` itself, as [step 5](#_5-take-a-token-in-without-a-web-standard-request) shows.
+Express hands a route Node's request instead of a web `Request`, so call `acceptUserToken` yourself, as
+[step 5](#_5-take-a-token-in-without-a-web-standard-request) shows.
 :::
 
 ::: for server=nextjs
-The [Next sample](../samples) mounts the route as a route handler, with a session cookie standing in for your own
-sessions. It makes the handler on the first request, since `next build` runs with no key:
+In Next, mount it as the `POST` of a route handler, here `src/app/api/music/user-token/route.ts`, and make it on the
+first request, since `next build` runs with no key. In the code below, from the [Next sample](../samples),
+`getMusic()` and `getStore()` return step 1's client and store, made on first use, and `sessionId()` resolves to
+the signed-in user's id, or `undefined`:
 
 <<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#user-token{ts}
 :::
@@ -119,7 +128,7 @@ The [security model](../concepts/security#on-your-server) explains each of these
 
 ## 3. Post the token from the page
 
-In your page, post the token `connect()` resolves to, in step 4 of [Sign a listener in](./sign-in):
+In your page, post the Music User Token your sign-in gives you, the one `connect()` resolves to:
 
 ```ts
 async function sendToken(musicUserToken: string): Promise<void> {
@@ -139,7 +148,7 @@ The page keeps nothing. Your server makes every later call to Apple.
 ## 4. Act for the listener
 
 On your server, in any later request, `music.forUser(userId)` gives a client for the listener. It looks their
-token up in the store at each request:
+token up in step 1's store at each request:
 
 ```ts
 import { isAppleMusicError } from "@open-music-sdk/server";
@@ -167,15 +176,17 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 `validateUserToken` tells the two apart: it rejects with `UserTokenInvalid` when the listener is the cause. See
 [Handle errors](./errors).
 
-When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`. The
-samples' servers take a `DELETE` on the same route. The page sends it before Apple's sign-out, so that a sign-out
-Apple's script fails still leaves no token on the server:
+When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`. Take
+a `DELETE` on the same route for it, and have the page send it before Apple's sign-out, so that a sign-out Apple's
+script fails still leaves no token on the server. The [sample apps](../samples)' servers do it this way:
 
 ::: for server=workers
 <<< @/../../samples/worker-server/src/index.ts#sign-out{ts}
 :::
 
 ::: for server=express
+Here and below, `app` is your Express app:
+
 <<< @/../../samples/express-server/src/server.ts#sign-out{ts}
 :::
 
@@ -183,11 +194,10 @@ Apple's script fails still leaves no token on the server:
 <<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#sign-out{ts}
 :::
 
-The [sample apps](../samples)' servers act for the listener this way, with a session cookie standing in for your own
-sessions.
+The samples' servers act for the listener this way.
 
 ::: for server=workers
-The Worker asks Apple what the listener played lately:
+The Worker asks Apple what the listener played lately. `reply(status, body)` answers with JSON that no cache keeps:
 
 <<< @/../../samples/worker-server/src/index.ts#act-for-listener{ts}
 :::
@@ -198,19 +208,14 @@ The Express server asks Apple what the listener played lately:
 <<< @/../../samples/express-server/src/server.ts#act-for-listener{ts}
 :::
 
-:::: for server=nextjs
+::: for server=nextjs
 The Next app acts for the listener as it draws each page. The function each page calls first makes the listener's
-client and forgets a token Apple refused, and the Library page asks what the listener played lately with it:
+client, and forgets a token Apple refused. In it, `session` is the signed-in user's id, `store` is `getStore()`, and
+`token` is the one the store held for them when the request began. It resolves to the listener's client and
+storefront, or `undefined`:
 
-::: code-group
-
-<<< @/../../samples/web-nextjs/src/lib/listener.ts#act-for-listener{ts} [lib/listener.ts]
-
-<<< @/../../samples/web-nextjs/src/app/library/page.tsx#act-for-listener{tsx} [app/library/page.tsx]
-
+<<< @/../../samples/web-nextjs/src/lib/listener.ts#act-for-listener{ts}
 :::
-
-::::
 
 ## 5. Take a token in without a web-standard `Request`
 
@@ -218,19 +223,19 @@ If your framework hands you something other than a web-standard `Request`, as Ex
 `acceptUserToken` yourself. It's what the intake route does once it has read the request: it asks Apple, and
 stores the token only if Apple accepts it.
 
-On your server, as the [Express sample](../samples) does it, with `sessionOf` reading its session cookie in place
-of your own sessions:
+On your server, take the token in an Express route, as the [Express sample](../samples) does. In its code, `app` is
+your Express app, `music` and `store` are step 1's, and `parseToken`, from `@open-music-sdk/server`, returns what
+was posted as a token, or `undefined` when it isn't one:
 
 <<< @/../../samples/express-server/src/server.ts#user-token{ts}
 
 It answers a token as the intake route does: `422` when it's no good, and `502` when Apple didn't confirm it. Check
 the session and require JSON here too, for the reasons in step 2. `express.json()` reads a body only when its
-content type is JSON. Answer every request with `Cache-Control: no-store`, as the sample does for everything under
-`/api`.
+content type is JSON. Send `Cache-Control: no-store` with every answer, as the intake route does.
 
-Check that what was posted is a token before you call `acceptUserToken`, rather than catching its `TypeError`. It
-throws one for a string that isn't a token, but a `pem` that isn't a key throws one too, at the first request, and
-a listener told their sign-in failed would never learn that your key is the problem.
+Check that what was posted is a token, with `parseToken`, before you call `acceptUserToken`, rather than catching
+its `TypeError`. It throws one for a string that isn't a token, but a `pem` that isn't a key throws one too, at the
+first request, and a listener told their sign-in failed would never learn that your key is the problem.
 
 ## Choose a store
 
