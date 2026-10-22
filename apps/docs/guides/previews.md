@@ -263,21 +263,21 @@ In your page:
 
 ```ts
 const audio = document.querySelector<HTMLAudioElement>("#preview")!;
-const player = previewPlayer<tSong>({ audio });
+const player = previewPlayer<tTrack>({ audio });
 ```
 :::
 
 ::: for client=react,nextjs
 Pass the element or a ref to it. The hook reads the ref when the component mounts, and a ref with nothing in it
-then is a `TypeError`:
+then is a `TypeError`. Here `tTrack` is step 2's:
 
 ```tsx
-import { usePreviewPlayer, type tSong } from "@open-music-sdk/react";
+import { usePreviewPlayer } from "@open-music-sdk/react";
 import { useRef } from "react";
 
 export function Player() {
   const audio = useRef<HTMLAudioElement>(null);
-  const { state, load, play } = usePreviewPlayer<tSong>({ audio });
+  const { state, load, play } = usePreviewPlayer<tTrack>({ audio });
   // … load and play as in steps 2 and 3
   return <audio ref={audio} controls />;
 }
@@ -316,13 +316,13 @@ For tracks like those, pass `hosts` when you make the player:
 
 ::: for client=vanilla
 ```ts
-const player = previewPlayer<tSong>({ hosts: ["itunes.apple.com"] });
+const player = previewPlayer<tTrack>({ hosts: ["itunes.apple.com"] });
 ```
 :::
 
 ::: for client=react,nextjs
 ```tsx
-const { state, load, play } = usePreviewPlayer<tSong>({
+const { state, load, play } = usePreviewPlayer<tTrack>({
   hosts: ["itunes.apple.com"],
 });
 ```
