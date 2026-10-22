@@ -46,7 +46,6 @@ function parseTracklist(text: string): tTrackDescription[] {
   return descriptions;
 }
 
-// #region resolve
 /**
  * Finds a pasted tracklist, one "Artist - Title" a line, in the catalog. No
  * sign-in needed: it asks the catalog only.
@@ -88,7 +87,6 @@ function offerCandidates(
   });
   unmatched.replaceChildren(h("ul", {}, ...lines));
 }
-// #endregion resolve
 
 /**
  * Your crate, drawn as the others are, with the sleeve at `at` in front. Its

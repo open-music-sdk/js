@@ -134,7 +134,6 @@ interface tPlanned {
   readonly lines: readonly string[];
 }
 
-// #region plan
 // Sending starts with a plan the listener sees before anything is written. The
 // server reads the playlist and plans; the page shows the plan in words.
 async function planFor(
@@ -147,9 +146,7 @@ async function planFor(
   say("");
   return { ids, target, lines: answered.value };
 }
-// #endregion plan
 
-// #region apply
 /**
  * The ids of the playlists this page made, by name. Apple lists a new playlist
  * only seconds after it is made, and a plan by its name before then would make
@@ -169,4 +166,3 @@ async function send({ ids, target }: tPlanned): Promise<void> {
   if ("name" in target) made.set(target.name, answered.value.id);
   say(answered.value.said);
 }
-// #endregion apply

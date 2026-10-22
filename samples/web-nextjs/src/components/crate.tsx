@@ -270,7 +270,6 @@ function PasteForm() {
   );
 }
 
-// #region resolve
 /**
  * Finds a pasted tracklist in the catalog, through the server, and puts the
  * songs it finds in the crate.
@@ -338,4 +337,3 @@ function Unmatched({ storefront, skipped }: tUnmatched) {
     </ul>
   );
 }
-// #endregion resolve
