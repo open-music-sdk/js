@@ -118,10 +118,8 @@ async function route(req: Request, app: tApp): Promise<Response> {
   switch (pathname) {
     case "/api/music/token":
       return token(req);
-    // #region user-token-route
     case "/api/music/user-token":
       return req.method === "DELETE" ? signOut(store, req) : intake(req);
-    // #endregion user-token-route
     case "/api/me/recent":
       return recent(music, req);
     default:

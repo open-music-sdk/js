@@ -21,8 +21,9 @@ In the code below, these stand for your own code:
 
 ## 1. Make a store and a client
 
-On your server, create one store and one client, and share them between your routes:
+On your server, create one store and one client, and share them between your routes.
 
+::: for server=express
 ```ts
 // music.ts
 import {
@@ -42,44 +43,132 @@ export const music = createServerClient({
 
 `MemoryUserTokenStore` loses every token when the process restarts. [Choose a store](#choose-a-store) covers the
 others.
+:::
 
-`createServerClient` checks the key when it's called, so this module needs the key wherever it's loaded. Where the
-key isn't there as modules load, make the store and client on first use instead, and keep them for every request
-after: `next build` loads your modules with no key, and a Worker is handed its secrets with each request, in `env`.
+::: for server=workers
+A Worker is handed its secrets with each request, in `env`, so make the store and the client on the first one, and
+keep them for the rest:
+
+```ts
+// src/music.ts
+import {
+  KvUserTokenStore,
+  createServerClient,
+  type tKvNamespace,
+  type tMusic,
+} from "@open-music-sdk/server";
+
+// What the Worker is handed in `env`: your key as secrets, and a KV
+// namespace bound as MUSIC_USER_TOKENS.
+export interface Env {
+  readonly APPLE_MUSIC_PRIVATE_KEY: string;
+  readonly APPLE_MUSIC_TEAM_ID: string;
+  readonly APPLE_MUSIC_KEY_ID: string;
+  readonly MUSIC_USER_TOKENS: tKvNamespace;
+}
+
+interface tServer {
+  readonly music: tMusic;
+  readonly store: KvUserTokenStore;
+}
+
+let made: tServer | undefined;
+
+export function setUp(env: Env): tServer {
+  if (made !== undefined) return made;
+  const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
+  const music = createServerClient({
+    pem: env.APPLE_MUSIC_PRIVATE_KEY,
+    teamId: env.APPLE_MUSIC_TEAM_ID,
+    keyId: env.APPLE_MUSIC_KEY_ID,
+    storefront: "us",
+    userTokenStore: store,
+  });
+  made = { music, store };
+  return made;
+}
+```
+
+`KvUserTokenStore` keeps the tokens in Workers KV, where every instance of your Worker finds them.
+[Deploy a Worker](./cloudflare-workers) makes the namespace at Cloudflare.
+:::
+
+::: for server=nextjs
+`next build` loads your modules with no key, so make the store and the client on first use:
+
+```ts
+// src/lib/music.ts
+import {
+  MemoryUserTokenStore,
+  createServerClient,
+  type tMusic,
+  type tUserTokenStore,
+} from "@open-music-sdk/server";
+
+interface tServer {
+  readonly music: tMusic;
+  readonly store: tUserTokenStore;
+}
+
+// Kept on globalThis: Next can load this module more than once, in each
+// route's bundle, and every copy has to find the same tokens.
+const held = globalThis as { musicServer?: tServer };
+
+function made(): tServer {
+  if (held.musicServer !== undefined) return held.musicServer;
+  const store = new MemoryUserTokenStore();
+  const music = createServerClient({
+    pem: process.env.APPLE_MUSIC_PRIVATE_KEY!,
+    teamId: process.env.APPLE_MUSIC_TEAM_ID!,
+    keyId: process.env.APPLE_MUSIC_KEY_ID!,
+    storefront: "us",
+    userTokenStore: store,
+  });
+  held.musicServer = { music, store };
+  return held.musicServer;
+}
+
+export const getMusic = (): tMusic => made().music;
+export const getStore = (): tUserTokenStore => made().store;
+```
+
+`MemoryUserTokenStore` loses every token when the server restarts. [Choose a store](#choose-a-store) covers the
+others.
+:::
 
 ## 2. Mount the intake route
 
-On your server, mount `userTokenIntake` as the `POST` handler of a route, here `/api/music/user-token`. It takes a
-web-standard `Request` and returns a `Response`:
+On your server, take the listener's token in at a route, here `/api/music/user-token`, with `userTokenIntake`. It
+takes a web-standard `Request` and returns a `Response`.
+
+::: for server=workers
+In your Worker, make the intake on the first request, with step 1's store and client:
 
 ```ts
-import { userTokenIntake } from "@open-music-sdk/server";
-import { music, store } from "./music";
+// src/index.ts
+import {
+  userTokenIntake,
+  type tUserTokenIntake,
+} from "@open-music-sdk/server";
+import { setUp, type Env } from "./music";
 
-export const POST = userTokenIntake(music, {
-  store,
-  userId: (req) => sessionOf(req),
-});
+let intake: tUserTokenIntake | undefined;
+
+export default {
+  async fetch(req: Request, env: Env): Promise<Response> {
+    if (new URL(req.url).pathname !== "/api/music/user-token") {
+      return new Response(null, { status: 404 });
+    }
+    const { music, store } = setUp(env);
+    intake ??= userTokenIntake(music, {
+      store,
+      userId: (req) => sessionOf(req),
+    });
+    return intake(req);
+  },
+};
 ```
-
-`userId` finds the signed-in user from your own session, and returns nothing when there's none. The token is
-stored under the id it returns. `userTokenIntake` checks `store` and `userId` when you create it, so a mistake is
-a `TypeError` at startup.
-
-:::: for server=workers
-In a Worker, make the handler on the first request, with the store and client, and hand it the Worker's request as
-it comes. The [Workers sample](../samples) makes it in its `setUp`, and routes the path to it in its `fetch`
-handler, which sends a `DELETE` to the sign-out of step 4:
-
-::: code-group
-
-<<< @/../../samples/worker-server/src/index.ts#user-token{ts} [setUp]
-
-<<< @/../../samples/worker-server/src/index.ts#user-token-route{ts} [route]
-
 :::
-
-::::
 
 ::: for server=express
 Express hands a route Node's request instead of a web `Request`, so call `acceptUserToken` yourself, as
@@ -87,13 +176,18 @@ Express hands a route Node's request instead of a web `Request`, so call `accept
 :::
 
 ::: for server=nextjs
-In Next, mount it as the `POST` of a route handler, here `src/app/api/music/user-token/route.ts`, and make it on the
-first request, since `next build` runs with no key. In the code below, from the [Next sample](../samples),
-`getMusic()` and `getStore()` return step 1's client and store, made on first use, and `sessionId()` resolves to
-the signed-in user's id, or `undefined`:
+Mount it as the `POST` of a route handler, here `src/app/api/music/user-token/route.ts`, and make it on the first
+request, since `next build` runs with no key. In the code below, from the [Next sample](../samples),
+`userTokenIntake` and the type `tUserTokenIntake` come from `@open-music-sdk/server`, and `getMusic()` and
+`getStore()` are step 1's. `sessionId()` is your session lookup in Next: it reads the request's cookies itself,
+and resolves to the signed-in user's id, or `undefined`:
 
 <<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#user-token{ts}
 :::
+
+`userId` finds the signed-in user from your own session, and returns nothing when there's none. The token is
+stored under the id it returns. `userTokenIntake` checks `store` and `userId` when you create it, so a mistake is
+a `TypeError` there.
 
 The route takes a `POST` with `Content-Type: application/json` and a body of `{ "token": "..." }`. It asks Apple
 whether the token works, stores it only if Apple accepts it, and answers:
@@ -148,11 +242,23 @@ The page keeps nothing. Your server makes every later call to Apple.
 ## 4. Act for the listener
 
 On your server, in any later request, `music.forUser(userId)` gives a client for the listener. It looks their
-token up in step 1's store at each request:
+token up in step 1's store at each request.
+
+::: for server=express
+In the code below, `music` and `store` are step 1's, imported from `./music`:
+:::
+
+::: for server=workers
+In the code below, `music` and `store` are the ones step 1's `setUp(env)` gives, in your `fetch` handler:
+:::
+
+::: for server=nextjs
+In the code below, `music` and `store` are step 1's `getMusic()` and `getStore()`, in a server component, a
+server action or a route handler:
+:::
 
 ```ts
 import { isAppleMusicError } from "@open-music-sdk/server";
-import { music, store } from "./music";
 
 const sent = await store.get(userId);
 try {
@@ -178,9 +284,13 @@ A listener who isn't signed in to Apple Music, or has no subscription, can get a
 
 When the listener signs out in your page, delete their token on your server too, with `store.delete(userId)`. Take
 a `DELETE` on the same route for it, and have the page send it before Apple's sign-out, so that a sign-out Apple's
-script fails still leaves no token on the server. The [sample apps](../samples)' servers do it this way:
+script fails still leaves no token on the server:
 
 ::: for server=workers
+In your Worker, send the route's `DELETE` to it before the intake, which answers anything but a `POST` with
+`405`: `if (req.method === "DELETE") return signOut(store, req);`. The type `tUserTokenStore` comes from
+`@open-music-sdk/server`:
+
 <<< @/../../samples/worker-server/src/index.ts#sign-out{ts}
 :::
 
@@ -224,8 +334,8 @@ If your framework hands you something other than a web-standard `Request`, as Ex
 stores the token only if Apple accepts it.
 
 On your server, take the token in an Express route, as the [Express sample](../samples) does. In its code, `app` is
-your Express app, `music` and `store` are step 1's, and `parseToken`, from `@open-music-sdk/server`, returns what
-was posted as a token, or `undefined` when it isn't one:
+your Express app, `music` and `store` are step 1's, and `acceptUserToken` and `parseToken` come from
+`@open-music-sdk/server`. `parseToken` returns what was posted as a token, or `undefined` when it isn't one:
 
 <<< @/../../samples/express-server/src/server.ts#user-token{ts}
 
@@ -252,15 +362,14 @@ isn't shared between processes or isolates. Use it for tests, scripts and a serv
 ```ts
 import { KvUserTokenStore } from "@open-music-sdk/server";
 
-// env.MUSIC_TOKENS is a KV namespace bound to your Worker.
-const store = new KvUserTokenStore(env.MUSIC_TOKENS, {
+// env.MUSIC_USER_TOKENS is a KV namespace bound to your Worker.
+const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS, {
   prefix: "apple-music:",
 });
 ```
 
 Workers KV is eventually consistent, which the [security model](../concepts/security#on-your-server) covers.
-[Set up your server](./server-setup#_3-make-its-client-once--workers) makes the store in a Worker, and
-[Deploy a Worker](./cloudflare-workers) makes its namespace at Cloudflare.
+[Deploy a Worker](./cloudflare-workers) makes a namespace at Cloudflare.
 
 For anything else, write a store of your own: an object with the three methods `forUser` and the intake need.
 
