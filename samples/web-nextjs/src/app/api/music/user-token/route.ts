@@ -1,4 +1,4 @@
-// Shows: userTokenIntake. Guides: /guides/store-user-tokens, /guides/nextjs
+// Shows: userTokenIntake. Guide: /guides/store-user-tokens
 import {
   userTokenIntake,
   type tUserTokenIntake,

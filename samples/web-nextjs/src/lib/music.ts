@@ -1,5 +1,5 @@
 // Shows: createServerClient, createRateLimiter, MemoryUserTokenStore.
-// Guide: /guides/nextjs
+// Guide: /guides/server-setup
 import {
   MemoryUserTokenStore,
   createRateLimiter,

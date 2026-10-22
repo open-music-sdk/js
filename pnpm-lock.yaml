@@ -206,6 +206,9 @@ catalogs:
     jose:
       specifier: ^6
       version: 6.2.12
+    markdown-it-container:
+      specifier: ^4.0.0
+      version: 4.0.0
     next:
       specifier: ^16
       version: 16.4.2
@@ -245,6 +248,9 @@ catalogs:
     vitest:
       specifier: ^4.0.0
       version: 4.1.11
+    vue:
+      specifier: ^3.5.13
+      version: 3.5.44
     wrangler:
       specifier: ^4
       version: 4.151.1
@@ -344,6 +350,9 @@ importers:
       '@open-music-sdk/validate':
         specifier: workspace:*
         version: link:../../packages/validate
+      markdown-it-container:
+        specifier: 'catalog:'
+        version: 4.0.0
       typedoc:
         specifier: 'catalog:'
         version: 0.28.20(typescript@6.0.3)
@@ -359,6 +368,9 @@ importers:
       vitepress:
         specifier: 'catalog:'
         version: 1.6.4(@algolia/client-search@5.60.0)(@types/node@24.19.1)(lightningcss@1.33.0)(postcss@8.5.30)(search-insights@2.17.3)(typescript@6.0.3)
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.44(typescript@6.0.3)
 
   clients/client-catalog:
     dependencies:
@@ -3228,6 +3240,9 @@ packages:
   mark.js@8.11.1:
     resolution: {integrity: sha512-1I+1qpDt4idfgLQG+BNWmrqku+7/2bi5nLf4YwF8y8zXvmfiTBY3PV3ZibfrjBueCByROpuBjLLFCajqkgYoLQ==}
 
+  markdown-it-container@4.0.0:
+    resolution: {integrity: sha512-HaNccxUH0l7BNGYbFbjmGpf5aLHAMTinqRZQAEQbMr2cdD3z91Q6kIo1oUn1CQndkT03jat6ckrdRYuwwqLlQw==}
+
   markdown-it@14.3.2:
     resolution: {integrity: sha512-sHHjZ5fJKlgrG4qns2YwVcdNep35h5fERrfkD2YNsb9UFk0UIHarbiTaHKVMlPuWAoiilyK8Fv/jAm11slsY7Q==}
     hasBin: true
@@ -6024,6 +6039,8 @@ snapshots:
       semver: 7.8.5
 
   mark.js@8.11.1: {}
+
+  markdown-it-container@4.0.0: {}
 
   markdown-it@14.3.2:
     dependencies:

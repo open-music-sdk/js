@@ -1,6 +1,6 @@
 "use client";
 // Shows: createBrowserClient, MusicProvider, musicQueries. Guide:
-// /guides/nextjs
+// /guides/client-setup
 //
 // What the page's client components read from: the page's own client, for
 // Apple's sign-in and the album's query, TanStack Query's cache, your crate,

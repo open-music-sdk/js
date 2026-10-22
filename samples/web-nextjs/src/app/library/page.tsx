@@ -75,7 +75,6 @@ async function Library({ searchParams }: { searchParams: tSearchParams }) {
   );
 }
 
-// #region act-for-listener
 /**
  * What the listener played lately, asked by the server with the token it
  * stored for them.
@@ -84,7 +83,6 @@ async function recentlyPlayed(listener: tMusic): Promise<tSleeveData[]> {
   const played = listener.user.listRecentlyPlayed({ limit: 10, maxPages: 1 });
   return cards(await first(played));
 }
-// #endregion act-for-listener
 
 interface tListCrateProps {
   readonly label: string;

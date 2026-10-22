@@ -1,6 +1,6 @@
 // Shows: createServerClient, createRateLimiter, tokenEndpoint, acceptUserToken,
 // parseToken, MemoryUserTokenStore, forUser, isAppleMusicError. Guides:
-// /guides/token-endpoint, /guides/store-user-tokens
+// /guides/server-setup, /guides/token-endpoint, /guides/store-user-tokens
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import express, {
@@ -19,13 +19,14 @@ import {
 } from "@open-music-sdk/server";
 import { web } from "./web.ts";
 
+// #region server-client
 /** A setting from .env, which has to be there. */
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(
-      `${name} is not set. Copy samples/.env.example to `
-        + "samples/express-server/.env and fill it in.",
+      `${name} is not set. Copy samples/.env.example to .env in this `
+        + "server's folder and fill it in.",
     );
   }
   return value;
@@ -49,7 +50,9 @@ const music = createServerClient({
   userTokenStore: store,
   rateLimit: createRateLimiter({ capacity: 20, refillPerSecond: 10 }),
 });
+// #endregion server-client
 
+// #region app
 const app = express();
 
 // Only requests sent to this server by its own name or the page's: a site whose
@@ -60,6 +63,7 @@ app.use((req, res, next) => {
   if (hosts.has(req.headers.host ?? "")) next();
   else res.status(421).json({ error: "MisdirectedRequest" });
 });
+// #endregion app
 
 // A listener is a random id in a cookie, given with the first answer under
 // /api. A real app has its own sessions.
@@ -141,7 +145,6 @@ app.delete("/api/music/user-token", async (req, res) => {
 });
 // #endregion sign-out
 
-// #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored
 // for them.
 app.get("/api/me/recent", async (req, res) => {
@@ -167,7 +170,6 @@ app.get("/api/me/recent", async (req, res) => {
     res.status(status).json({ error: e._tag });
   }
 });
-// #endregion act-for-listener
 
 // Anything a route throws, and a body express.json() cannot read, is answered
 // without the stack Express would print. Express tells an error handler by its
@@ -184,11 +186,13 @@ app.use((e: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(code).json({ error: STATUS_CODES[code]?.replaceAll(" ", "") });
 });
 
+// #region listen
 // On this machine's loopback address alone: the samples are never meant to be
 // reached from elsewhere.
 app.listen(8787, "127.0.0.1", (error) => {
   if (error) throw error;
   console.log(
-    `express-server: http://127.0.0.1:8787, handing tokens to ${pageOrigin}`,
+    `Listening on http://127.0.0.1:8787, handing tokens to ${pageOrigin}`,
   );
 });
+// #endregion listen

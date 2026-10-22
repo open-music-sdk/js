@@ -24,10 +24,12 @@
     "@open-music-sdk/user-token": "workspace:*",
     "@open-music-sdk/util-artwork": "workspace:*",
     "@open-music-sdk/validate": "workspace:*",
+    "markdown-it-container": "catalog:",
     "typedoc": "catalog:",
     "typedoc-plugin-markdown": "catalog:",
     "typedoc-vitepress-theme": "catalog:",
     "typescript": "catalog:",
-    "vitepress": "catalog:"
+    "vitepress": "catalog:",
+    "vue": "catalog:"
   }
 }

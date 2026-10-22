@@ -7,8 +7,7 @@ Before you start, you need:
 
 - a client from an integration, such as `createServerClient` or `createBrowserClient`.
 
-In the code below, `music` is your client, `key` holds your key and its two IDs as in
-[Set up your MusicKit key](./musickit-key), and `show`, `showNotFound` and `showError` stand for your own code.
+In the code below, `music` is your client, and `show`, `showNotFound` and `showError` stand for your own code.
 
 ## 1. Catch an `AppleMusicError` by its tag
 
@@ -60,10 +59,20 @@ An `ApiError` can also come from a successful answer that isn't what the call ne
 from a function on `music.catalog` or `music.user` that hands over one resource, an answer that holds none. Its
 `status` is then the success's, such as `200`.
 
-The [vanilla sample](../samples) sends every error through one function, which says each kind in words a listener
-can act on:
+::: for client=vanilla,react
+The [vanilla and React samples](../samples) send every error through one function, which says each kind in words
+a listener can act on:
 
 <<< @/../../samples/web-vanilla/src/errors.ts#explain{ts}
+:::
+
+::: for client=nextjs
+The [Next sample](../samples) sends every error through one function, which says each kind in words a listener
+can act on. Its server actions answer with these words rather than throw, because Next keeps a thrown error's
+message from the page in production:
+
+<<< @/../../samples/web-nextjs/src/lib/errors.ts#explain{ts}
+:::
 
 ### Writes that may have happened
 
@@ -90,7 +99,7 @@ with an `AppleMusicError`:
 ```ts
 const controller = new AbortController();
 try {
-  await music.catalog.searchCatalog(term, {
+  await music.catalog.searchCatalog("daft punk", {
     types: ["songs"],
     signal: controller.signal,
   });
@@ -110,11 +119,21 @@ By default the client tries a request once more when it fails with a `NetworkErr
 answered `429` or such a `5xx`. It waits for a `Retry-After` of up to 60 seconds. When Apple asks for a longer
 wait, the `RateLimited` error reaches you at once, with `retryAfterMs` set.
 
-To make one attempt only, pass `retry: false`:
+To make one attempt only, pass `retry: false` when you create the client. On your server, with your key and its
+two IDs read from the environment:
 
 ```ts
+import { createServerClient } from "@open-music-sdk/server";
+
+const key = {
+  pem: process.env.APPLE_MUSIC_PRIVATE_KEY!,
+  teamId: process.env.APPLE_MUSIC_TEAM_ID!,
+  keyId: process.env.APPLE_MUSIC_KEY_ID!,
+};
 const music = createServerClient({ ...key, retry: false });
 ```
+
+In a page, `createBrowserClient` takes `retry`, and step 5's `rateLimit`, in the same way.
 
 To change the policy, pass the fields you want. Each field you leave out keeps its default:
 
@@ -136,7 +155,8 @@ const music = createServerClient({
 ```
 
 `retryOn` decides which errors get another attempt. It's handed each `AppleMusicError` and returns `true` to try
-again. For a `POST`, it's asked only after the two failures that mean the write didn't happen.
+again. For a `POST`, it's asked only after a `RateLimited` or a `DeveloperTokenUnavailable`, the two failures that
+mean the write didn't happen.
 
 A client's `as()` and `forUser()` keep its policy. For a different policy on one route, create a second client.
 

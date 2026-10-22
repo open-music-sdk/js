@@ -25,7 +25,6 @@ form.onsubmit = (event) => {
   if (now.listener !== undefined) planFor(now.listener).catch(showError);
 };
 
-// #region plan
 // Sending starts with a plan the listener sees before anything is written:
 // Apple's API can add songs to the end of a playlist, but can neither take one
 // out nor move one.
@@ -78,7 +77,6 @@ function describe(
   }
   return lines;
 }
-// #endregion plan
 
 /**
  * The playlist the form names: one of the listener's, by its id, or a new one,
@@ -107,7 +105,6 @@ function showPlan(lines: readonly string[]): void {
   dialog.showModal();
 }
 
-// #region apply
 /**
  * The ids of the playlists this page made, by name, for each listener: each
  * sign-in has a client of its own. Apple lists a new playlist only seconds
@@ -164,7 +161,6 @@ async function send(
     : "They can take a few seconds to show.";
   say(`${added} ${shown}`);
 }
-// #endregion apply
 
 // The listener's playlists they may add to, for the form.
 onChange(() => {

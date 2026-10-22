@@ -69,12 +69,12 @@ the parts, install the packages themselves.
 ## Learn more
 
 - [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
-- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), to check
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), to check
   your key and get a Music User Token for your own account
 - [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
 - [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
   the listener's token
-- [Cloudflare Workers](https://open-music-sdk.github.io/js/guides/cloudflare-workers) and
-  [Next.js](https://open-music-sdk.github.io/js/guides/nextjs)
+- [Set up your server](https://open-music-sdk.github.io/js/guides/server-setup) and
+  [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers)
 - [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/server/)

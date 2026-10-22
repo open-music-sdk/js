@@ -242,7 +242,6 @@ interface tFound {
 /** At most this many lines of a paste are looked for. */
 const LINES = 200;
 
-// #region resolve
 /**
  * Finds a pasted tracklist, one "Artist - Title" a line, in the catalog. No
  * sign-in needed: it asks the catalog only. A line with no exact match comes
@@ -272,7 +271,6 @@ export async function findTracklist(
     return { storefront, tracks, skipped, leftOut };
   });
 }
-// #endregion resolve
 
 const APP_NAME = "Vinyl Collector Simulator";
 
@@ -310,7 +308,6 @@ function targetOf(target: unknown): tTarget {
 /** The longest name the page's form takes for a new playlist. */
 const NAME = 100;
 
-// #region plan
 // Sending starts with a plan the listener sees before anything is written:
 // Apple's API can add songs to the end of a playlist, but can neither take one
 // out nor move one.
@@ -378,7 +375,6 @@ function describe(
   }
   return lines;
 }
-// #endregion plan
 
 interface tSent {
   /** The playlist's id, by which the page plans it from now on. */
@@ -387,7 +383,6 @@ interface tSent {
   readonly said: string;
 }
 
-// #region apply
 /**
  * Sends the crate, once the listener has said "Send it" to its plan. It is
  * planned again first, from what the playlist holds now: a plan the page sent
@@ -417,4 +412,3 @@ export async function sendCrate(
     return { id: result.id, said: `${added} ${shown}` };
   });
 }
-// #endregion apply

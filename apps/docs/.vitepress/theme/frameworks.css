@@ -1,0 +1,295 @@
+/* The variants of the frameworks the reader didn't choose. The head script puts the choice on <html> before the
+   first paint; without it, as with scripts off, every variant shows. */
+html[data-client="vanilla"] .for[data-client]:not([data-client~="vanilla"]),
+html[data-client="react"] .for[data-client]:not([data-client~="react"]),
+html[data-client="nextjs"] .for[data-client]:not([data-client~="nextjs"]),
+html[data-server="express"] .for[data-server]:not([data-server~="express"]),
+html[data-server="workers"] .for[data-server]:not([data-server~="workers"]),
+html[data-server="nextjs"] .for[data-server]:not([data-server~="nextjs"]) {
+  display: none;
+}
+
+/* A page for some frameworks alone: its sidebar entry, for a reader who chose others. The entry carries a mark of what
+   it's for (see config.mjs). */
+html[data-client="vanilla"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="vanilla"])),
+html[data-client="react"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="react"])),
+html[data-client="nextjs"] .VPSidebarItem:has(> .item .for-only[data-client]:not([data-client~="nextjs"])),
+html[data-server="express"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="express"])),
+html[data-server="workers"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="workers"])),
+html[data-server="nextjs"] .VPSidebarItem:has(> .item .for-only[data-server]:not([data-server~="nextjs"])) {
+  display: none;
+}
+
+/* The pager of a page in Guides' sidebar (see FrameworkPager.vue), drawn as the theme draws its own. A link for some
+   frameworks alone is a variant, which the first rule above hides from the readers who chose others. */
+.framework-pager {
+  display: grid;
+  grid-row-gap: 8px;
+  margin-top: 64px;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 24px;
+}
+
+@media (min-width: 640px) {
+  .framework-pager {
+    grid-template-columns: repeat(2, 1fr);
+    grid-column-gap: 16px;
+  }
+}
+
+.framework-pager .pager-link {
+  display: block;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 11px 16px 13px;
+  width: 100%;
+  height: 100%;
+  transition: border-color 0.25s;
+}
+
+.framework-pager .pager-link:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.framework-pager .pager-link.next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.framework-pager .desc {
+  display: block;
+  line-height: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+}
+
+.framework-pager .title {
+  display: block;
+  line-height: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--vp-c-brand-1);
+  transition: color 0.25s;
+}
+
+/* On such a page, the notice that it's for other frameworks than the reader's (see FrameworkScope.vue). */
+.for-notice {
+  display: none;
+  margin-bottom: 24px;
+  border: 1px solid var(--vp-custom-block-info-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background-color: var(--vp-custom-block-info-bg);
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--vp-custom-block-info-text);
+}
+
+html[data-client="vanilla"] .for-notice[data-client]:not([data-client~="vanilla"]),
+html[data-client="react"] .for-notice[data-client]:not([data-client~="react"]),
+html[data-client="nextjs"] .for-notice[data-client]:not([data-client~="nextjs"]),
+html[data-server="express"] .for-notice[data-server]:not([data-server~="express"]),
+html[data-server="workers"] .for-notice[data-server]:not([data-server~="workers"]),
+html[data-server="nextjs"] .for-notice[data-server]:not([data-server~="nextjs"]) {
+  display: block;
+}
+
+.for-notice button {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.for-notice button:hover {
+  color: var(--vp-c-brand-2);
+}
+
+/* A code block in a variant says which frameworks it's for, where the language sits on the other side. */
+.vp-doc .for > div[class*="language-"]::before,
+.vp-doc .for > .vp-code-group > .blocks > div[class*="language-"]::before {
+  content: var(--for-label);
+  position: absolute;
+  top: 2px;
+  left: 12px;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 500;
+  user-select: none;
+  color: var(--vp-code-lang-color);
+}
+
+.framework-picker {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Until it shows the reader's choice, which only its script knows. */
+.framework-picker:not(.mounted) {
+  visibility: hidden;
+}
+
+.framework-choice {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.framework-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+}
+
+.framework-control {
+  position: relative;
+}
+
+/* The theme's search button, beside it in the nav: its ground, its corners, and its border on hover. */
+.framework-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background-color: var(--vp-c-bg-alt);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+  white-space: nowrap;
+  transition: border-color 0.25s;
+}
+
+.framework-button:hover,
+.framework-choice.open .framework-button {
+  border-color: var(--vp-c-brand-1);
+}
+
+.framework-chevron {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--vp-c-text-3);
+}
+
+.framework-logo {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* The theme's menus, as its nav's own drop-downs draw them. */
+.framework-menu,
+.vp-doc .framework-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 100%;
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background-color: var(--vp-c-bg-elv);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.vp-doc .framework-menu li + li {
+  margin-top: 0;
+}
+
+.framework-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: 6px;
+  line-height: 32px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--vp-c-text-1);
+  white-space: nowrap;
+  transition:
+    background-color 0.25s,
+    color 0.25s;
+}
+
+.framework-item:hover,
+.framework-item:focus-visible {
+  color: var(--vp-c-brand-1);
+  background-color: var(--vp-c-default-soft);
+}
+
+.framework-item:focus-visible {
+  outline: none;
+}
+
+.framework-item[aria-current="true"] {
+  color: var(--vp-c-brand-1);
+}
+
+/* In the nav where there's room for it, and at the top of the sidebar, which is also the narrow screens' menu,
+   where there isn't. */
+.framework-picker-nav {
+  display: none;
+  padding-left: 24px;
+}
+
+/* The sidebar is too narrow for the two side by side, so they stack, each button as wide as the other. */
+.framework-picker-sidebar {
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  margin-bottom: 8px;
+}
+
+.framework-picker-sidebar .framework-picker {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.framework-picker-sidebar .framework-label {
+  width: 44px;
+}
+
+.framework-picker-sidebar .framework-control,
+.framework-picker-sidebar .framework-button {
+  flex: 1;
+  width: 100%;
+}
+
+/* In the nav from 1400px wide. Below that, the room goes to the search box, and the picker to the sidebar. */
+@media (min-width: 1400px) {
+  .framework-picker-nav {
+    display: flex;
+    align-items: center;
+  }
+
+  .framework-picker-sidebar {
+    display: none;
+  }
+}
+
+/* The search box, between the picker and the nav's links, takes all the room they leave. */
+@media (min-width: 768px) {
+  #local-search {
+    flex-grow: 1;
+    margin-right: 12px;
+  }
+
+  #local-search .DocSearch-Button {
+    justify-content: space-between;
+  }
+}
+
+/* A picker a page places in its own text, as the Samples page does above its setup. */
+.vp-doc .framework-picker {
+  margin: 16px 0;
+}

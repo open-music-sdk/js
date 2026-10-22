@@ -49,8 +49,8 @@ Next runs a page's server actions one at a time. So the search hints, and the ne
 send or a pasted tracklist that is under way. The catalog's actions take the storefront the page was drawn in, so
 they ask Apple for nothing but what they read.
 
-`next build` runs in CI with no key in its environment, which is what proves the recipe in the
-[Next.js guide](https://open-music-sdk.github.io/js/guides/nextjs). The build is for that alone: the sample is not
+`next build` runs in CI with no key in its environment, which is what proves the setup in
+[Set up your server](https://open-music-sdk.github.io/js/guides/server-setup). The build is for that alone: the sample is not
 designed to deploy, and has no `start` script. Its dev script listens on `localhost` alone. `next start`, or
 `next dev` without `--hostname localhost`, listens on every network the machine is on, where only the host check in
 [`src/proxy.ts`](./src/proxy.ts) would stand between the app and the rest of the network.

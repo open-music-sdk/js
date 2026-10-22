@@ -18,7 +18,7 @@ pnpm add @open-music-sdk/user-token @open-music-sdk/core @open-music-sdk/develop
 
 ## Example
 
-On your server. `sessionUserId(req)` and `userId` stand for your own session lookup:
+On your server. `sessionOf(req)` and `userId` stand for your own session lookup:
 
 ```ts
 import { createClient } from "@open-music-sdk/core";
@@ -32,7 +32,7 @@ const music = createClient({
 });
 
 // The route your page posts { "token": "..." } to. Apple checks the token, and only then does the store keep it.
-export const POST = userTokenIntake(music, { store, userId: (req) => sessionUserId(req) });
+export const POST = userTokenIntake(music, { store, userId: (req) => sessionOf(req) });
 
 // In any later request, the listener's token is looked up in the store.
 const playlists = await music.forUser(userId).request("v1/me/library/playlists");
@@ -59,9 +59,10 @@ stores are classes, which you give `createClient` as `userTokenStore`.
 - [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens): the
   intake route, its answers, `acceptUserToken` for other frameworks, and choosing a store
 - [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), which gets the token in your page
-- [The command-line tool](https://open-music-sdk.github.io/js/concepts/packages#the-command-line-tool), which gets
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), which gets
   one for your own account
-- [Cloudflare Workers](https://open-music-sdk.github.io/js/guides/cloudflare-workers), for `KvUserTokenStore`
+- [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers), for `KvUserTokenStore` on
+  Workers KV
 - [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens): where the token
   can go, and how to treat it
 - [Security model](https://open-music-sdk.github.io/js/concepts/security#on-your-server), for what the intake route

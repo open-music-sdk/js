@@ -1,6 +1,5 @@
 "use client";
-// Shows: useConnect, useMusicUserToken. Guides: /guides/sign-in,
-// /guides/nextjs
+// Shows: useConnect, useMusicUserToken. Guide: /guides/sign-in
 import { useConnect, useMusicUserToken } from "@open-music-sdk/react";
 import { useEffect } from "react";
 import { fromServer } from "@/lib/errors";

@@ -59,12 +59,12 @@ the change or have the right to submit it under the MIT license.
 
 ## Writing docs
 
-The docs site, in [`apps/docs`](./apps/docs/README.md), follows [Diátaxis](https://diataxis.fr/). Every page is
-one of four kinds, and stays that kind:
+The docs site, in [`apps/docs`](./apps/docs/README.md), follows [Diátaxis](https://diataxis.fr/), without its
+tutorials: Getting started sets up a server and a client, and each How To guide stands on its own. Every page is
+one of three kinds, and stays that kind:
 
 | Kind | Where | What it does | What it leaves out |
 | --- | --- | --- | --- |
-| Tutorial | `apps/docs/start/` (once the samples exist) | Teaches a newcomer by building something that works | Choices, edge cases, long explanations |
 | Guide | `apps/docs/guides/` | Gets a reader who knows the basics to one goal | Teaching the basics, explaining why at length |
 | Concept | `apps/docs/concepts/` | Explains how something works and why | Steps to follow |
 | Reference | Doc comments, and each package's README | States the facts: arguments, options, returns, errors | Advice and opinion |
@@ -81,6 +81,12 @@ How to write:
 - Keep sentences short and give each paragraph one idea.
 - Explain a term the first time a page uses it, or link to the [glossary](./apps/docs/glossary.md).
 - Say a thing once, on the page it belongs to, and link to it everywhere else.
+- Make a guide stand on its own, for a reader who arrives from a search and has read no other guide. Every name its
+  code uses is imported from a package, defined in the guide, or declared as standing for the reader's own code.
+  What it needs from elsewhere goes in its "Before you start" list, and it teaches nothing beyond its own goal.
 - Say where every code example runs: on a server, in a page, or anywhere.
+- Show a sample's code with `<<<` rather than a copy of it. Where the code differs by framework, put each
+  framework's in a `::: for` block, as [the docs' README](./apps/docs/README.md#code-for-each-framework) shows,
+  and keep the prose around the blocks the same for every reader.
 - Use bold for warnings only. On the site, a warning that matters goes in a `::: warning` box.
 - Mark what has not been run against the live API, where it changes what a reader should rely on.

@@ -17,6 +17,6 @@ that the Worker bundles and uploads nothing.
 | [`src/index.ts`](./src/index.ts) | `createServerClient`, `createRateLimiter`, `tokenEndpoint`, `userTokenIntake`, `KvUserTokenStore`, `forUser`, `isAppleMusicError` |
 | [`wrangler.jsonc`](./wrangler.jsonc) | The KV binding, and the address the page's dev server forwards to |
 
-It is the Worker from the [Cloudflare Workers guide](https://open-music-sdk.github.io/js/guides/cloudflare-workers),
-with a session cookie of its own and `/api/me/recent` for the listener's list. It is never deployed, so the KV
+It is the Worker that [Set up your server](https://open-music-sdk.github.io/js/guides/server-setup) and the guides
+to its two routes show, with a session cookie of its own and `/api/me/recent` for the listener's list. It is never deployed, so the KV
 namespace's id in `wrangler.jsonc` is a placeholder.

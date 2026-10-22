@@ -61,7 +61,6 @@ async function Album({ params }: { params: Promise<{ id: string }> }) {
   );
 }
 
-// #region prefetch
 /**
  * The album, asked for as the page's query asks for it, into the cache the
  * page is handed with its HTML: the page draws it at once, and asks Apple
@@ -81,7 +80,6 @@ async function prefetchAlbum(
     }),
   );
 }
-// #endregion prefetch
 
 /**
  * What a signed-in listener can do with an album: add it to their library

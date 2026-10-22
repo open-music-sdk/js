@@ -1,6 +1,6 @@
 // Shows: createServerClient, createRateLimiter, tokenEndpoint, userTokenIntake,
 // KvUserTokenStore, forUser, isAppleMusicError. Guides:
-// /guides/cloudflare-workers, /guides/token-endpoint, /guides/store-user-tokens
+// /guides/server-setup, /guides/token-endpoint, /guides/store-user-tokens
 import {
   KvUserTokenStore,
   createRateLimiter,
@@ -34,6 +34,7 @@ interface tApp {
   readonly hosts: ReadonlySet<string>;
 }
 
+// #region server-client
 // Made on the first request, from the secrets that request brings, and kept for
 // every request after it: a client made per request would sign a new developer
 // token every time.
@@ -66,15 +67,18 @@ function setUp(env: tEnv): tApp {
   // request as it comes: see route() below.
   const token = tokenEndpoint({ ...key, origin: [pageOrigin] });
   // #endregion token-route
+  // #region user-token
   // Asks Apple whether the posted token works, and keeps it under the session's
   // id only then.
   const intake = userTokenIntake(music, { store, userId: sessionOf });
+  // #endregion user-token
   // Requests sent to the Worker by its own name or the page's: a site whose
   // name a DNS trick points at 127.0.0.1 would otherwise reach it from the
   // listener's browser as if it were the page.
   const hosts = new Set([new URL(pageOrigin).host, "127.0.0.1:8787"]);
   return { music, store, token, intake, hosts };
 }
+// #endregion server-client
 
 // A listener is a random id in a cookie, given with the first answer. A real
 // app has its own sessions.
@@ -84,6 +88,7 @@ function sessionOf(req: Request): string | undefined {
   return SESSION_COOKIE.exec(req.headers.get("cookie") ?? "")?.[1];
 }
 
+// #region fetch
 export default {
   async fetch(req: Request, env: tEnv): Promise<Response> {
     app ??= setUp(env);
@@ -99,7 +104,9 @@ export default {
     return withSession;
   },
 };
+// #endregion fetch
 
+// #region route
 // The two SDK handlers answer methods themselves, so each is routed by its
 // path; the sign-out is the one DELETE.
 async function route(req: Request, app: tApp): Promise<Response> {
@@ -119,6 +126,7 @@ async function route(req: Request, app: tApp): Promise<Response> {
       return reply(404, { error: "NotFound" });
   }
 }
+// #endregion route
 
 // #region sign-out
 // The listener signed out of Apple Music in the page: the Worker forgets its
@@ -136,7 +144,6 @@ async function signOut(
 }
 // #endregion sign-out
 
-// #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored
 // for them.
 async function recent(music: tMusic, req: Request): Promise<Response> {
@@ -159,7 +166,6 @@ async function recent(music: tMusic, req: Request): Promise<Response> {
     return reply(status, { error: e._tag });
   }
 }
-// #endregion act-for-listener
 
 /** A JSON answer that no cache keeps. */
 function reply(status: number, body: unknown): Response {

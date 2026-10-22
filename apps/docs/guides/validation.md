@@ -112,8 +112,8 @@ if (result.issues) {
 ## 5. Use a schema of your own
 
 Any Standard Schema works, such as one written with Zod. A schema that describes only the fields you use fits
-`request`, whose answer takes its type from the schema. See
-[Call an endpoint the clients don't cover](./direct-requests) for `request`.
+`music.request(path, init)`, which asks Apple for any path of its API and resolves to the answer, typed by the
+schema. [Call an endpoint the clients don't cover](./direct-requests) covers `request`.
 
 ```ts
 import { z } from "zod";

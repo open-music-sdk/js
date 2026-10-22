@@ -255,7 +255,6 @@ function parseTracklist(text: string): tTrackDescription[] {
   return descriptions;
 }
 
-// #region resolve
 /**
  * Finds a pasted tracklist, one "Artist - Title" a line, in the catalog, and
  * puts the songs it finds in the crate. No sign-in needed: it asks the catalog
@@ -322,4 +321,3 @@ function Unmatched({ skipped }: { skipped: readonly tSkipped[] }) {
     </ul>
   );
 }
-// #endregion resolve

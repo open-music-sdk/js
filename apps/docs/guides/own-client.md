@@ -10,7 +10,8 @@ Before you start, you need:
 - for a page, a route that serves it a developer token. See [Serve a developer token to a page](./token-endpoint).
 - to know which packages you want. See [Which package to install](../concepts/packages).
 
-In the code below, `musicUserToken` is a listener's token, from [Sign a listener in](./sign-in).
+In the code below, `musicUserToken` stands for a listener's Music User Token, which your sign-in gives you. See
+[Sign a listener in](./sign-in).
 
 ## 1. Install the parts
 
@@ -66,6 +67,8 @@ from: set `base-uri 'self'` in your content security policy. See the [security m
 
 Each function of `client-catalog` and `client-user` is a separate export that takes the client first. A bundler
 leaves out of your app every function you don't import.
+
+This code, and the code of the steps below, runs wherever your client does: on your server or in your page.
 
 ```ts
 import { getAlbum } from "@open-music-sdk/client-catalog";
@@ -149,7 +152,7 @@ functions: `request`, `paginate`, `storefront`, `as` or `forUser`.
 
 For sign-in in a page, `createConnect` from `@open-music-sdk/browser` takes anything that holds a
 `developerToken` provider, such as the fetcher from step 2:
-`createConnect({ developerToken }, { app: { name: "Vinyl Collector Simulator" } })`. See [Sign a listener in](./sign-in).
+`createConnect({ developerToken }, { app: { name: "My App" } })`. See [Sign a listener in](./sign-in).
 
 ## Next steps
 

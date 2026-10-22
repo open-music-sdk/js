@@ -7,22 +7,22 @@ playlist without adding any twice.
 
 Before you start, you need:
 
-- a client that acts for the listener: `music.as(token)` or `music.forUser(userId)` on a server, or `useMusic()`
-  in React once the listener has signed in. See [Sign a listener in](./sign-in) and
+- a client from an integration that acts for the listener. See [Sign a listener in](./sign-in) and
   [Keep a listener's token on your server](./store-user-tokens).
 - the tracks to import, each with its [ISRC](../glossary#isrc) where you have it, or its name and artist.
 
 Every client from an integration has the four playlist functions on it, as `playlists`: `resolve`, `plan`,
-`apply` and `read`. They run on a server or in a page. The examples run on your server, where `userId` is your
-own id for the signed-in listener.
+`apply` and `read`. They run on a server or in a page. The examples run on your server.
+
+In the code below, `listener` is that client. On a server, it's what your client's `as(token)` gives for the
+listener's Music User Token, or `forUser(userId)` for your own id of the listener. In a page, it's what
+`as(token)` gives once the listener has signed in, or `useMusic()` in React.
 
 ## 1. Find the tracks in Apple's catalog
 
 On your server, describe each track and hand the list to `resolve`:
 
 ```ts
-const listener = music.forUser(userId);
-
 const { tracks, skipped } = await listener.playlists.resolve([
   { isrc: "GBAYE0601498" },
   { name: "Yesterday", artistName: "The Beatles", albumName: "Help!" },
@@ -82,6 +82,9 @@ with a playlist, and a listener may have another playlist by the same name.
 
 A plan is plain, frozen JSON. You can write it to a file and apply it later.
 
+If your page shows the plan and your server applies it, plan again on the server when the listener confirms. Don't
+apply a plan the page sends back: it can name any playlist and any tracks.
+
 ## 3. Apply the plan
 
 On your server, carry the plan out:
@@ -132,7 +135,8 @@ delete.
 
 ## 4. Read the playlist back later
 
-On your server, `read` gives the playlist as it is now, and you can plan against it:
+On your server, `read` gives the playlist as it is now, and you can plan against it. Here `moreTracks` stands for
+the songs the playlist is to hold, in order, such as the `tracks` another `resolve` found:
 
 ```ts
 const playlist = await listener.playlists.read(id);
@@ -206,21 +210,12 @@ a write's answer was lost, rejects with that write's own error.
 Each function makes one request at a time. The client's own rate limiter, and its wait after a `429`, apply
 underneath `delayMs`. These options set how hard one call pushes; the client sets how hard your whole app does.
 
-## In a page
+## In the sample apps
 
-The four functions run in a page too, with the client `music.as(token)` gives once the listener has signed in.
-`resolve` needs no token at all. The [vanilla sample](../samples) sends its crate of songs this way: it finds a
-pasted tracklist, shows the plan in a dialog, and applies it only when the listener says to.
-
-::: code-group
-
-<<< @/../../samples/web-vanilla/src/crate.ts#resolve{ts} [1. Resolve]
-
-<<< @/../../samples/web-vanilla/src/send.ts#plan{ts} [2. Plan]
-
-<<< @/../../samples/web-vanilla/src/send.ts#apply{ts} [3. Apply]
-
-:::
+Each [sample app](../samples) sends its crate of songs to the listener's library this way: it finds a pasted
+tracklist, shows the plan in a dialog, and applies it only when the listener says to. The Vite samples call the
+four functions in the page. The Next sample calls them in server actions, and plans again on the server before it
+applies, rather than trusting a plan the page sends back.
 
 ## When something goes wrong
 

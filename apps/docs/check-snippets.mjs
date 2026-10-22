@@ -3,6 +3,7 @@
 // fails on a snippet whose file or region is missing.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { PAIRS, VALUES, labelOf, pageScope, parseFor } from "./.vitepress/frameworks.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 // What the site is built from, not what it depends on or what is generated.
@@ -15,15 +16,26 @@ const walk = (dir) =>
   });
 const pages = walk("");
 
+// A region's lines, `// #region <name>` and `// #endregion <name>`, as VitePress 1.6 reads them.
+const MARKER = /^\/\/ ?#?((?:end)?region) ([\w*-]+)$/;
+
 /**
- * Whether `text` has the region as VitePress finds one: a line that is `// #region <name>` and nothing else, then a
- * later `// #endregion`, with the name or without it. A name that only starts another, `play` for `play-from`, is not it.
+ * A region's lines as VitePress 1.6 shows them, or undefined when it finds none: from the line `// #region <name>`
+ * to the first `// #endregion <name>` after it, an #endregion without the name not ending it, and with every region
+ * line inside left out. A name that only starts another, `play` for `play-from`, is not it.
  */
-function hasRegion(text, name) {
+function findRegion(text, name) {
   const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^\s*\/\/\s*#region\s+(\S+)\s*$/.exec(line)?.[1] === name);
-  return start >= 0 && lines.slice(start + 1).some((line) => /^\s*\/\/\s*#endregion(?:\s+(\S+))?\s*$/.test(line) && [undefined, name].includes(/#endregion\s+(\S+)/.exec(line)?.[1]));
+  const marker = (line, tag) => {
+    const [, found, named] = MARKER.exec(line.trim()) ?? [];
+    return found === tag && named === name;
+  };
+  const start = lines.findIndex((line) => marker(line, "region"));
+  const end = lines.findIndex((line, i) => i > start && marker(line, "endregion"));
+  if (start === -1 || end === -1) return undefined;
+  return lines.slice(start + 1, end).filter((line) => !MARKER.test(line.trim()));
 }
+const hasRegion = (text, name) => findRegion(text, name) !== undefined;
 
 const broken = [];
 let snippets = 0;
@@ -32,7 +44,10 @@ for (const page of pages)
     snippets += 1;
     const file = `${root}/${path}`;
     if (!existsSync(file)) broken.push(`${page} shows ${path}, which is not there`);
-    else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that ends`);
+    else if (region !== undefined && !hasRegion(readFileSync(file, "utf8"), region)) broken.push(`${page} shows ${path}#${region}, and the file has no such region, or none that an #endregion of its name ends`);
+    // A whole file is shown as it is, its region lines among it; a region is shown without them.
+    else if (region === undefined && /^\s*\/\/\s*#(?:end)?region\b/m.test(readFileSync(file, "utf8")))
+      broken.push(`${page} shows the whole of ${path}, whose #region lines the reader would see; show a region around all of it instead`);
   }
 
 // A code block on the site shows about 86 characters before it scrolls, margins aside, so a block of code a reader
@@ -57,7 +72,124 @@ for (const page of pages.filter((page) => page !== "README.md")) {
   });
 }
 
-if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there:\n${broken.join("\n")}`);
+// A guide's code follows the reader's frameworks, in `::: for client=react` blocks (see .vitepress/variants.mjs).
+// Blocks next to each other, with nothing but blank lines between them, are one group, and the reader sees exactly
+// one block of a group: so a group covers every framework of its choice once, or, where its blocks name both
+// choices, every client and server the samples run together once. A page for some frameworks alone, with `for:` in
+// its frontmatter, covers those alone. Two blocks of a group that come out the same, once their snippets are read in,
+// are one block for both frameworks. And a block holds no heading, which the page's outline would list while the
+// block is hidden.
+const regionText = (file, region) => {
+  const text = readFileSync(file, "utf8");
+  return region === undefined ? text.split(/\r?\n/) : (findRegion(text, region) ?? []);
+};
+/** What a block shows, with its snippets read in and blank lines and indentation left out, to compare blocks by. */
+const resolved = (lines) =>
+  lines
+    .flatMap((line) => {
+      const snippet = /^\s*<<<\s+@\/([^#{\s]+)(?:#([\w-]+))?/.exec(line);
+      return snippet && existsSync(`${root}/${snippet[1]}`) ? regionText(`${root}/${snippet[1]}`, snippet[2]) : [line];
+    })
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
+
+/** The `::: for` blocks of a page, in groups: each block with its line, what it's for, and its lines. */
+function variantGroups(page) {
+  const lines = readFileSync(`${root}/${page}`, "utf8").split(/\r?\n/);
+  const groups = [];
+  let block;
+  let fence;
+  let lastClose = -2;
+  lines.forEach((line, i) => {
+    const fenceMark = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    const [, colons = "", rest = ""] = /^\s*(:{3,})(.*)$/.exec(line) ?? [];
+    if (block) {
+      // As markdown-it-container does, the first line of at least the block's colons and nothing else closes it,
+      // even inside a code fence. A container inside it, such as a code group, needs fewer colons than the block.
+      if (colons.length >= block.colons) {
+        if (rest.trim() === "") {
+          if (fence !== undefined) block.fenceCut = true;
+          lastClose = i;
+          block = undefined;
+          fence = undefined;
+          return;
+        }
+        block.inner = true;
+      }
+      if (fence !== undefined) {
+        if (fenceMark?.startsWith(fence)) fence = undefined;
+      } else if (fenceMark) fence = fenceMark;
+      else if (/^\s*#{1,6}\s/.test(line)) block.heading = true;
+      block.lines.push(line);
+      return;
+    }
+    if (fence !== undefined) {
+      if (fenceMark?.startsWith(fence)) fence = undefined;
+      return;
+    }
+    if (fenceMark) {
+      fence = fenceMark;
+      return;
+    }
+    const opening = /^for(?:\s+(.*))?$/.exec(rest.trim());
+    if (colons === "" || opening === null) return;
+    block = { page, line: i + 1, colons: colons.length, wanted: parseFor(opening[1] ?? ""), lines: [] };
+    const between = lines.slice(lastClose + 1, i);
+    if (lastClose >= 0 && between.every((text) => text.trim() === "")) groups.at(-1).push(block);
+    else groups.push([block]);
+  });
+  return groups;
+}
+
+const named = (block) => Object.entries(block.wanted).map(([axis, values]) => `${axis}=${values.join(",")}`).join(" ");
+const variants = [];
+let groupCount = 0;
+for (const page of pages.filter((page) => page !== "README.md")) {
+  const scope = pageScope(readFileSync(`${root}/${page}`, "utf8"));
+  const allowed = (axis) => scope[axis] ?? VALUES[axis];
+  for (const group of variantGroups(page)) {
+    groupCount += 1;
+    const where = `${page}:${group[0].line}`;
+    const axes = [...new Set(group.flatMap((block) => Object.keys(block.wanted)))];
+    for (const block of group) {
+      if (block.heading) variants.push(`${page}:${block.line} has a heading inside "::: for ${named(block)}"; put it above the block`);
+      if (block.inner)
+        variants.push(`${page}:${block.line}: a container inside "::: for ${named(block)}" has as many colons as the block, so its closing line would end the block; give the block one more colon`);
+      if (block.fenceCut)
+        variants.push(`${page}:${block.line}: a code block inside "::: for ${named(block)}" has a line of colons alone, which ends the block; give the block more colons than that line`);
+    }
+    if (axes.length === 1) {
+      const [axis] = axes;
+      const seen = group.flatMap((block) => block.wanted[axis]);
+      const missing = allowed(axis).filter((value) => !seen.includes(value));
+      const twice = allowed(axis).filter((value) => seen.filter((other) => other === value).length > 1);
+      const outside = [...new Set(seen.filter((value) => !allowed(axis).includes(value)))];
+      if (missing.length) variants.push(`${where}: the group has no block for ${missing.map((value) => labelOf(axis, value)).join(", ")}`);
+      if (twice.length) variants.push(`${where}: the group has more than one block for ${twice.map((value) => labelOf(axis, value)).join(", ")}`);
+      if (outside.length) variants.push(`${where}: the page is not for ${outside.map((value) => labelOf(axis, value)).join(", ")}, which a block names`);
+    } else if (group.some((block) => Object.keys(block.wanted).length !== 2)) {
+      variants.push(`${where}: some blocks of the group name both choices, so each of them has to`);
+    } else {
+      const pairs = group.flatMap((block) => block.wanted.client.flatMap((client) => block.wanted.server.map((server) => `${client}+${server}`)));
+      const runs = PAIRS.filter(({ client, server }) => allowed("client").includes(client) && allowed("server").includes(server)).map(({ client, server }) => `${client}+${server}`);
+      const missing = runs.filter((pair) => !pairs.includes(pair));
+      const twice = runs.filter((pair) => pairs.filter((other) => other === pair).length > 1);
+      const never = [...new Set(pairs.filter((pair) => !runs.includes(pair)))];
+      const say = (pair) => pair.split("+").map((value, i) => labelOf(i === 0 ? "client" : "server", value)).join(" with ");
+      if (missing.length) variants.push(`${where}: the group has no block for ${missing.map(say).join(", ")}`);
+      if (twice.length) variants.push(`${where}: the group has more than one block for ${twice.map(say).join(", ")}`);
+      if (never.length) variants.push(`${where}: no sample runs ${never.map(say).join(", ")}`);
+    }
+    for (let a = 0; a < group.length; a++)
+      for (let b = a + 1; b < group.length; b++)
+        if (resolved(group[a].lines) === resolved(group[b].lines))
+          variants.push(`${page}:${group[b].line}: "::: for ${named(group[b])}" shows the same as "::: for ${named(group[a])}"; make them one block for both`);
+  }
+}
+
+if (broken.length) console.error(`${broken.length} snippet(s) of a file or region that is not there, or of a whole file with region lines:\n${broken.join("\n")}`);
 if (wide.length) console.error(`${wide.length} line(s) of code blocks over ${WIDTH} characters, which the site would scroll:\n${wide.join("\n")}`);
-if (broken.length || wide.length) process.exit(1);
-console.log(`Snippets checked: ${snippets}, on ${pages.length} pages; ${blocks} code blocks within ${WIDTH} characters.`);
+if (variants.length) console.error(`${variants.length} problem(s) with the framework variants:\n${variants.join("\n")}`);
+if (broken.length || wide.length || variants.length) process.exit(1);
+console.log(`Snippets checked: ${snippets}, on ${pages.length} pages; ${blocks} code blocks within ${WIDTH} characters; ${groupCount} groups of framework variants.`);

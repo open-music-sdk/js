@@ -12,6 +12,8 @@ The artwork functions come from `@open-music-sdk/browser`, `@open-music-sdk/reac
 alike. They run anywhere: in a page, on a server, or wherever you write HTML. They touch neither the page nor the
 network.
 
+In the code below, `song` stands for a song you fetched with a client.
+
 ## 1. Check that the resource has artwork
 
 Anywhere, read the artwork from the resource's attributes:
@@ -23,14 +25,16 @@ const artwork = song.attributes?.artwork;
 ```
 
 Some resources have no artwork, and a resource can come without its attributes. The functions take an artwork,
-not the lack of one, so check before you call them. Every example below does.
+not the lack of one, so check before you call them. The one-line examples below leave the check out.
 
 `width` and `height` are the largest the image comes, in pixels. The artwork also carries colours you can use
 while the image loads: `bgColor` and `textColor1` to `textColor4`, each a hex colour without the `#`.
 
 ## 2. Fill in an `<img>` with `artworkImage`
 
-In your page, give `artworkImage` the artwork and the width you show the image at, in CSS pixels:
+::: for client=vanilla
+In your page, where `img` is an `<img>` element, give `artworkImage` the artwork and the width you show the image
+at, in CSS pixels:
 
 ```ts
 import { artworkImage } from "@open-music-sdk/browser";
@@ -42,8 +46,11 @@ if (artwork) Object.assign(img, artworkImage(artwork, 300));
 // img.width   300
 // img.height  300
 ```
+:::
 
-In a React component, the attribute is spelled `srcSet`:
+::: for client=react,nextjs
+In a component, give `artworkImage` the artwork and the width you show the image at, in CSS pixels. React spells
+the attribute `srcSet`:
 
 ```tsx
 import { artworkImage, type tSong } from "@open-music-sdk/react";
@@ -55,15 +62,31 @@ export function Cover({ song }: { song: tSong }) {
   return <img {...image} srcSet={srcset} alt={song.attributes?.name} />;
 }
 ```
+:::
 
 `artworkImage` works out `src`, `srcset`, `width` and `height` together, and they have to agree. A browser takes
 `src` as the 1x image wherever the `srcset` doesn't offer one, and lays out an image that has no `width` and
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
-The [vanilla sample](../samples) draws every cover with one function. A resource with no artwork gets an empty box
-of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
+::: for client=vanilla
+The [vanilla sample](../samples) draws its 240-pixel covers with one function, where `h(tag, props)` is a helper of
+its own that makes an element with those properties set. A resource with no artwork gets an empty box of the same
+size, so a page laid out around covers keeps its shape:
 
-<<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
+<<< @/../../samples/web-vanilla/src/artwork.ts#cover{ts}
+:::
+
+::: for client=react
+The [React sample](../samples) draws its 240-pixel covers with one component. A resource with no artwork gets an
+empty box of the same size, so a page laid out around covers keeps its shape:
+
+<<< @/../../samples/web-react/src/artwork.tsx#cover{tsx}
+:::
+
+::: for client=nextjs
+In a Next.js app, you can draw artwork with `next/image` instead, through a component you can take into your app:
+see [With `next/image`](#with-next-image).
+:::
 
 How the size is chosen:
 
@@ -92,15 +115,42 @@ too.
 
 ## 4. Build a `srcset` alone with `artworkSrcSet`
 
-In your page, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
+::: for client=vanilla
+In your page, where `img` is an `<img>` element, `artworkSrcSet` gives the `srcset` alone. Set the image's `width`
+and `height` yourself:
 
 ```ts
 import { artworkSrcSet } from "@open-music-sdk/browser";
 
-img.srcset = artworkSrcSet(artwork, 300, { densities: [1, 2] });
-img.width = 300;
-img.height = 300;
+if (artwork) {
+  img.srcset = artworkSrcSet(artwork, 300, { densities: [1, 2] });
+  img.width = 300;
+  img.height = 300;
+}
 ```
+:::
+
+::: for client=react,nextjs
+In a component, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
+
+```tsx
+import { artworkSrcSet, type tSong } from "@open-music-sdk/react";
+
+export function Cover({ song }: { song: tSong }) {
+  const artwork = song.attributes?.artwork;
+  if (!artwork) return null;
+  const srcSet = artworkSrcSet(artwork, 300, { densities: [1, 2] });
+  return (
+    <img
+      srcSet={srcSet}
+      width={300}
+      height={300}
+      alt={song.attributes?.name}
+    />
+  );
+}
+```
+:::
 
 Each candidate is the image at the width times a density, labelled with that density. `densities` takes up to 16
 numbers, and defaults to `[1, 2, 3]`.
@@ -181,8 +231,8 @@ into HTML by hand, escape it like any other attribute value, and don't put it in
 
 In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
 offers, and Apple's image server makes each one, so Next's own optimizer is never used and your Next config needs
-no `remotePatterns` for Apple. The [Next sample](../samples) does this in one component, `Artwork`, in
-`src/components/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
+no `remotePatterns` for Apple. The component below, `Artwork`, does this. It comes from the
+[Next sample](../samples) and uses nothing else of it, so save it in your app as `artwork.tsx`, as it is:
 
 <<< @/../../samples/web-nextjs/src/components/artwork.tsx#artwork{tsx}
 
@@ -233,7 +283,7 @@ For a cover that fills a grid cell, give the cell a position and a shape, and sa
 </div>
 ```
 
-What the sample showed, on 20 October 2026, in Next 16:
+How `next/image` and `Artwork` behave, as seen in Next 16 on 20 October 2026:
 
 - Next picks the widths from its own list, not from the width you show the image at. A cover shown at 240 asks
   for `256x256`, labelled `1x`, and `640x640`, labelled `2x`: for each density, the first of Next's `imageSizes`
@@ -257,7 +307,6 @@ the URL. Each function's reference, linked below, lists every case.
 ## Next steps
 
 - [Play song previews](./previews), with the artwork of the track that is playing.
-- [Next.js](./nextjs), for the rest of a Next app.
 - The reference for [`artworkImage`](../reference/@open-music-sdk/util-artwork/functions/artworkImage),
   [`artworkUrl`](../reference/@open-music-sdk/util-artwork/functions/artworkUrl),
   [`artworkSrcSet`](../reference/@open-music-sdk/util-artwork/functions/artworkSrcSet) and their
