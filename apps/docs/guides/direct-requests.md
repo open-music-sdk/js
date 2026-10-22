@@ -69,27 +69,6 @@ Apple for once.
 Apple answers `404` for an album the listener doesn't hold, as it did against the live API on 18 October 2026,
 and with their copy for one they hold a song of.
 
-::: for client=vanilla
-The [vanilla sample](../samples) turns that into a yes or a no, with the client `music.as(token)` gave it at
-sign-in:
-
-<<< @/../../samples/web-vanilla/src/pages.ts#in-library{ts}
-:::
-
-::: for client=react
-The [React sample](../samples) turns that into a yes or a no, in a query, with the client `useMusic()` gives once
-the listener is signed in:
-
-<<< @/../../samples/web-react/src/pages.tsx#in-library{tsx}
-:::
-
-::: for client=nextjs
-The [Next sample](../samples) turns that into a yes or a no on the server, as it draws the album page, with the
-client `music.forUser(session)` gives for the listener:
-
-<<< @/../../samples/web-nextjs/src/app/(dig)/albums/[id]/page.tsx#in-library{tsx}
-:::
-
 Build a path from values you trust. A value from outside your app, such as an id from a URL, can hold `../` and
 point the request somewhere else on Apple's API, where it carries the listener's token. `segmentOf` checks a
 value as one segment of a path, as the clients check every id.
@@ -108,6 +87,31 @@ await listener.request(path, { user: true });
 ```
 
 The first argument names your function in the error, and the second names the value.
+
+::: for client=vanilla
+The [vanilla sample](../samples) puts the two together, and turns Apple's answer into a yes or a no. Its
+`listener` is the client `music.as(token)` gave it at sign-in, and `now.storefront` is the storefront it reads
+the catalog in:
+
+<<< @/../../samples/web-vanilla/src/pages.ts#in-library{ts}
+:::
+
+::: for client=react
+The [React sample](../samples) puts the two together, and turns Apple's answer into a yes or a no for a query.
+Its `listener` is the client `useMusic()` gives once the listener is signed in:
+
+<<< @/../../samples/web-react/src/pages.tsx#in-library{tsx}
+:::
+
+::: for client=nextjs
+The [Next sample](../samples) puts the two together on the server, as it draws the album page, and turns Apple's
+answer into a yes or a no. Its `listener` is the client `music.forUser()` gives for the signed-in listener:
+
+<<< @/../../samples/web-nextjs/src/app/(dig)/albums/[id]/page.tsx#in-library{tsx}
+:::
+
+Every integration exports `isAppleMusicError` and the types the function names: `tPage`, `tLibraryAlbum`, and
+the client's, `tBrowserMusic` in a page or `tMusic` on a server.
 
 ## 3. Read the status or a header
 
