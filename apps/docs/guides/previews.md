@@ -41,7 +41,7 @@ import {
 } from "@open-music-sdk/browser";
 
 const music = createBrowserClient({
-  tokenUrl: "/api/music/token",
+  tokenUrl: "/api/music/token", // your developer-token route
   storefront: "us",
 });
 
