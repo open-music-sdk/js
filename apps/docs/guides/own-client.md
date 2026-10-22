@@ -68,6 +68,8 @@ from: set `base-uri 'self'` in your content security policy. See the [security m
 Each function of `client-catalog` and `client-user` is a separate export that takes the client first. A bundler
 leaves out of your app every function you don't import.
 
+This code, and the code of the steps below, runs wherever your client does: on your server or in your page.
+
 ```ts
 import { getAlbum } from "@open-music-sdk/client-catalog";
 
