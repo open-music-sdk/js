@@ -50,7 +50,8 @@ CI runs `build` on every pull request that changes the docs or a package, and it
   the same thing, and a heading inside a variant (the same script, as below).
 
 A guide shows a sample's code with `<<<` rather than a copy of it, so that the code on the page is the code that
-runs. A sample marks the lines a guide shows with `// #region <name>` and `// #endregion <name>`; rename one in
+runs. Each guide stands on its own, so a region that uses names the sample defines elsewhere has each of them
+explained beside it; where that would take more than the code, the guide shows short code of its own instead. A sample marks the lines a guide shows with `// #region <name>` and `// #endregion <name>`; rename one in
 both places at once. The `#endregion` names its region, or VitePress doesn't end the region there. A file a page
 shows whole, below its opening comment, is the region `file`, and the region lines inside it are left out.
 
