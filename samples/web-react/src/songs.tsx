@@ -187,7 +187,6 @@ function Love({ id, loved }: { id: string; loved: tLoved }) {
   );
 }
 
-// #region add-to-library
 /**
  * Adds a track to the listener's library. `useMusic()` is bound to the
  * listener once they have signed in, and Apple accepts the request at once and
@@ -223,4 +222,3 @@ function AddToLibrary({ track }: { track: tTrack }) {
     </button>
   );
 }
-// #endregion add-to-library

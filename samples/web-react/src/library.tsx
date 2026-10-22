@@ -105,7 +105,6 @@ async function recentlyPlayed(): Promise<tCard[]> {
   return (await answer.json()) as tCard[];
 }
 
-// #region your-playlists
 /**
  * The listener's playlists, 25 at a time: flipping near the back of the crate
  * asks Apple for the next page.
@@ -142,7 +141,6 @@ function YourPlaylists({ open }: { open: (id: string) => void }) {
     />
   );
 }
-// #endregion your-playlists
 
 /**
  * A playlist of the listener's, with its tracks, under the crates. Songs in a

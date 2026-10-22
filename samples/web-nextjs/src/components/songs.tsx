@@ -173,7 +173,6 @@ function Love({ id, loved }: { id: string; loved: tLoved }) {
   );
 }
 
-// #region add-to-library
 /**
  * Adds a track to the listener's library, through the server action of the
  * same name. Apple accepts the request at once, and adds the track afterwards,
@@ -205,4 +204,3 @@ function AddToLibrary({ track }: { track: tTrack }) {
     </button>
   );
 }
-// #endregion add-to-library
