@@ -2,7 +2,7 @@
 // reference is written to reference/ by TypeDoc before VitePress runs (see package.json), with a sidebar beside it.
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vitepress";
-import { VALUES, dataAttributes, pageScope, settle } from "./frameworks.mjs";
+import { PAIRS, VALUES, dataAttributes, pageScope, settle } from "./frameworks.mjs";
 import { splitIntoSections, variantBlocks } from "./variants.mjs";
 
 // TypeDoc lists the packages alphabetically. The sidebar groups them by tier, with what an app installs first.
@@ -39,8 +39,9 @@ const referenceSidebar = (current) => [
   })),
 ];
 
-// Getting started sets up the client and server the reader picks. A guide for some frameworks alone, such as TanStack
-// Query's, is shown to the readers who picked them (see `scoped` below).
+// Guides' sidebar, which the concepts, the samples and the CLI share, under the nav's Guides; their pages keep their
+// addresses. Getting started sets up the client and server the reader picks. A guide for some frameworks alone, such
+// as TanStack Query's, is shown to the readers who picked them (see `scoped` and `neighbours` below).
 const guides = [
   {
     text: "Getting started",
@@ -63,31 +64,11 @@ const guides = [
       { text: "Validate Apple's responses", link: "/guides/validation" },
       { text: "Call an endpoint the clients don't cover", link: "/guides/direct-requests" },
       { text: "Build your own client from the parts", link: "/guides/own-client" },
-      // Last, so that the pager's run through the guides above has no gap where one of these is hidden.
       { text: "Read and write with TanStack Query", link: "/guides/tanstack-query" },
       { text: "Act and cache on a Next.js server", link: "/guides/nextjs" },
       { text: "Deploy a Worker", link: "/guides/cloudflare-workers" },
     ],
   },
-];
-
-// A page for some frameworks alone says so in its frontmatter, as `for: client=react,nextjs`. Its sidebar entry
-// carries a mark of the same, which the CSS reads to leave the entry, and the pager's link to it, out for a reader who
-// chose others (see theme/frameworks.css).
-const scoped = (groups) =>
-  groups.map((group) => ({
-    ...group,
-    items: group.items.map((item) => {
-      const scope = pageScope(readFileSync(new URL(`..${item.link}.md`, import.meta.url), "utf8"));
-      if (Object.keys(scope).length === 0) return item;
-      return { ...item, text: `${item.text}<span class="for-only"${dataAttributes(scope)}></span>` };
-    }),
-  }));
-
-// The concepts, the samples and the CLI share the guides' sidebar, under the nav's Guides, so the pager runs through
-// all of them. Their pages keep their addresses.
-const guidesSidebar = scoped([
-  ...guides,
   {
     text: "Concepts",
     items: [
@@ -100,7 +81,40 @@ const guidesSidebar = scoped([
   },
   { text: "Samples", items: [{ text: "Sample apps", link: "/samples" }] },
   { text: "CLI", items: [{ text: "The command-line tool", link: "/cli" }] },
-]);
+];
+
+// What a page is for, from the `for:` in its frontmatter, as `client=react,nextjs`: `{}` for a page for every one.
+const scopeOf = (link) => pageScope(readFileSync(new URL(`..${link}.md`, import.meta.url), "utf8"));
+
+// A page for some frameworks alone carries a mark of what it's for in its sidebar entry, which the CSS reads to leave
+// the entry out for a reader who chose others (see theme/frameworks.css).
+const scoped = (groups) =>
+  groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const scope = scopeOf(item.link);
+      if (Object.keys(scope).length === 0) return item;
+      return { ...item, text: `${item.text}<span class="for-only"${dataAttributes(scope)}></span>` };
+    }),
+  }));
+const guidesSidebar = scoped(guides);
+
+// The theme's pager links the page next to this one in the sidebar, whatever it's for. Guides' pages have a pager of
+// their own instead (theme/FrameworkPager.vue), which links, for each client and server the reader may choose, the
+// nearest page `step` away that is for them: one link where every choice has the same page, else one for each choice,
+// of which the CSS shows the reader's.
+const pages = guides.flatMap((group) => group.items).map((item) => ({ ...item, scope: scopeOf(item.link) }));
+const isFor = (page, pair) => Object.entries(page.scope).every(([axis, values]) => values.includes(pair[axis]));
+const neighbours = (index, step) => {
+  const found = PAIRS.map((pair) => {
+    let i = index + step;
+    while (pages[i] && !isFor(pages[i], pair)) i += step;
+    return pages[i];
+  });
+  const target = (page, pair) => ({ text: page.text, link: page.link, ...(pair && { for: pair }) });
+  if (found.every((page) => page === found[0])) return found[0] ? [target(found[0])] : [];
+  return PAIRS.flatMap((pair, n) => (found[n] ? [target(found[n], pair)] : []));
+};
 
 // A package README links to the site by its full URL, so the link works on GitHub and npm too. On the site it is
 // made relative, which keeps it in the same tab and puts it under VitePress's check for dead links. It runs after
@@ -139,6 +153,14 @@ export default defineConfig({
   vite: {
     build: { chunkSizeWarningLimit: 4000 },
     server: { cors: false, fs: { deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "*.p8", ".dev.vars", ".dev.vars.*", "**/.wrangler/**"] } },
+  },
+  // A page in Guides' sidebar gets the links of its own pager (see `neighbours`), and none from the theme's.
+  transformPageData(pageData) {
+    const index = pages.findIndex((page) => `${page.link.slice(1)}.md` === pageData.relativePath);
+    if (index === -1) return;
+    pageData.frontmatter.prev = false;
+    pageData.frontmatter.next = false;
+    pageData.frontmatter.pager = { prev: neighbours(index, -1), next: neighbours(index, 1) };
   },
   markdown: {
     config: (md) => {

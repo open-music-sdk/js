@@ -9,7 +9,7 @@ The docs site, built with [VitePress](https://vitepress.dev/) and published to G
 .vitepress/config.mjs      the site: navigation, sidebars, search, and the base path /js/
 .vitepress/frameworks.mjs  the frameworks a reader picks from, and how the choice is settled
 .vitepress/variants.mjs    the ::: for blocks, and a search result for each of them
-.vitepress/theme/          the default theme, with the framework picker added
+.vitepress/theme/          the default theme, with the framework picker, and a pager that follows it
 index.md                   the home page
 guides/                    how-to guides, one goal each
 concepts/                  explanations: tokens, security, errors, packages, principles

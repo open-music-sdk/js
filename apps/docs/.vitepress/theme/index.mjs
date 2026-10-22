@@ -1,9 +1,11 @@
 // The default theme, with the reader's choice of frameworks: a picker in the nav, at the top of the sidebar, and
-// wherever a page puts <FrameworkPicker />, and the choice settled again before every page and anchor is shown.
+// wherever a page puts <FrameworkPicker />, the choice settled again before every page and anchor is shown, and a
+// pager that follows it in Guides.
 import { inBrowser } from "vitepress";
 import DefaultTheme from "vitepress/theme";
 import { h } from "vue";
 import { VALUES, settle } from "../frameworks.mjs";
+import FrameworkPager from "./FrameworkPager.vue";
 import FrameworkPicker from "./FrameworkPicker.vue";
 import FrameworkScope from "./FrameworkScope.vue";
 import "./frameworks.css";
@@ -21,6 +23,7 @@ export default {
       "nav-bar-content-before": () => h("div", { class: "framework-picker-nav" }, [h(FrameworkPicker)]),
       "sidebar-nav-before": () => h("div", { class: "framework-picker-sidebar" }, [h(FrameworkPicker)]),
       "doc-before": () => h(FrameworkScope),
+      "doc-after": () => h(FrameworkPager),
     }),
   enhanceApp({ app, router }) {
     app.component("FrameworkPicker", FrameworkPicker);
