@@ -326,7 +326,8 @@ it reads the listener's library from the page too.
 
 In its code, `token` and `setToken` come from `useMusicUserToken()`, `music` from `useMusic()`, and `disconnect`
 from `useConnect`. `say(text)` and `showError(e)` show a message, `fromServer(status)` puts the route's answer in
-words, and `signIn`, the sample's own rather than step 4's, keeps the listener's token and storefront in its state:
+words, and `signIn`, the sample's own rather than step 4's, keeps the listener's token and storefront in its state.
+`useEffect` is React's:
 
 <<< @/../../samples/web-react/src/sign-in.tsx#after-sign-in{tsx}
 :::
@@ -340,7 +341,7 @@ for the same reason.
 In its code, `signedIn` says whether the server already holds a token Apple accepts for this visitor, which the
 server passes in as it draws the page. `token` and `setToken` come from `useMusicUserToken()`, and `disconnect` from
 `useConnect`. `say(text)` and `showError(e)` show a message, and `fromServer(status)` puts the route's answer in
-words:
+words. `useEffect` is React's:
 
 <<< @/../../samples/web-nextjs/src/components/sign-in.tsx#after-sign-in{tsx}
 :::
