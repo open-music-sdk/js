@@ -29,7 +29,7 @@ that starts with `"use server"`, here `src/lib/actions.ts`.
 In the code below, `libraryIds(kind, id)` checks what the page sent, and returns the ids `addToLibrary` takes, such
 as `{ songs: [id] }`, or `undefined`. `SIGN_IN_FIRST` is the answer
 `{ ok: false, said: "Sign in with Apple Music first." }`, and `tAnswer<T>` is `{ ok: true, value: T }` or
-`{ ok: false, said: string }`:
+`{ ok: false, said: string }`. `isAppleMusicError` and the type `tMusic` come from `@open-music-sdk/server`:
 
 <<< @/../../samples/web-nextjs/src/lib/actions.ts#add-to-library{ts}
 
