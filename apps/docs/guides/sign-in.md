@@ -163,7 +163,8 @@ When Apple's script restored a token for a returning listener, the provider take
 click.
 
 `error` says why the script isn't ready, when it can't be: a `NetworkError` when the script can't be loaded, and a
-`DeveloperTokenUnavailable` when the developer token can't be fetched from your route.
+`DeveloperTokenUnavailable` when the developer token can't be fetched from your route. It also holds what the last
+`connect()` failed with, until a `connect()` succeeds, so the message above shows after a failed sign-in too.
 :::
 
 The button works after a failure too: the next `connect()` loads and configures the script again before it opens
