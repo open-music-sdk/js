@@ -38,8 +38,8 @@ const music = createBrowserClient({ tokenUrl: "/api/music/token" });
 
 ::: for client=react,nextjs
 Make the page's client once, outside the tree, and hand it to `<MusicProvider>`, which holds the listener's token in
-React state, in memory only. In a Next app, put this in a file of its own that starts with `"use client"`, as
-[Set up your client](./client-setup#_3-make-the-page-s-client-once--nextjs) shows:
+React state, in memory only. Wrap your app in the `Providers` below. In a Next app, put it in a file of its own that
+starts with `"use client"`, and wrap your root layout's `children` in it:
 
 ```tsx
 import { MusicProvider, createBrowserClient } from "@open-music-sdk/react";
@@ -53,6 +53,8 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 ```
 :::
+
+`tokenUrl` is the address of your route that serves the developer token.
 
 ## 2. Create the sign-in helper when the button is shown
 
@@ -309,14 +311,21 @@ delete the token it stored.
 
 ::: for client=vanilla
 The [vanilla sample](../samples) does both. It posts the token, and once its server has kept it, it reads the
-listener's library from the page too:
+listener's library from the page too.
+
+In its code, `say(text)` shows a line of text on the page, `fromServer(status)` puts the route's answer in words,
+and `change` keeps the listener's client and storefront for the rest of the page:
 
 <<< @/../../samples/web-vanilla/src/sign-in.ts#after-sign-in{ts}
 :::
 
 ::: for client=react
 The [React sample](../samples) does both. It posts the token the provider holds, and once its server has kept it,
-it reads the listener's library from the page too:
+it reads the listener's library from the page too.
+
+In its code, `token` and `setToken` come from `useMusicUserToken()`, `music` from `useMusic()`, and `disconnect`
+from `useConnect`. `say(text)` and `showError(e)` show a message, `fromServer(status)` puts the route's answer in
+words, and `signIn`, the sample's own rather than step 4's, keeps the listener's token and storefront in its state:
 
 <<< @/../../samples/web-react/src/sign-in.tsx#after-sign-in{tsx}
 :::
@@ -325,7 +334,12 @@ it reads the listener's library from the page too:
 The [Next sample](../samples) is hybrid alone. It posts the token, has the provider forget it, and loads the page
 again, which its server then draws for the listener. `router.refresh()` would draw only the route that is open:
 Next keeps the pages visited before, hidden, for Back, as they were drawn for no one. Sign-out loads the page again
-for the same reason:
+for the same reason.
+
+In its code, `signedIn` says whether the server already holds a token Apple accepts for this visitor, which the
+server passes in as it draws the page. `token` and `setToken` come from `useMusicUserToken()`, and `disconnect` from
+`useConnect`. `say(text)` and `showError(e)` show a message, and `fromServer(status)` puts the route's answer in
+words:
 
 <<< @/../../samples/web-nextjs/src/components/sign-in.tsx#after-sign-in{tsx}
 :::
