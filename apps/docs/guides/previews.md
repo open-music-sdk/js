@@ -6,13 +6,26 @@ that follows along.
 
 Before you start, you need:
 
-- a page with a client from `createBrowserClient`, and the [token endpoint](./token-endpoint) it gets its
-  developer token from.
+- a route on your server that serves a developer token to your page. See
+  [Serve a developer token to a page](./token-endpoint).
+- in a React or Next.js app, `MusicProvider` and TanStack Query's `QueryClientProvider` around your components. See
+  [Set up your client](./client-setup).
 
 No listener has to sign in. The player asks Apple for nothing: it plays the clips of tracks you already fetched.
 It runs in a page only, because it needs an audio element. The API hands over no audio but previews, so this SDK
 has no way to play a whole song. [MusicKit on the Web](../glossary#musickit-on-the-web) plays whole songs for a
 listener with an Apple Music subscription.
+
+::: for client=vanilla
+In the code below, `playButton`, `pauseButton`, `nextButton` and `previousButton` are buttons in your page, `title`
+is an element that shows the track's name, and `bar` is a `<progress>` element. `say` and `showError` stand for
+your own code: `say(message)` shows the listener a message, and `showError(error)` shows an error.
+:::
+
+::: for client=react,nextjs
+In the code below, `say` and `showError` stand for your own code: `say(message)` shows the listener a message, and
+`showError(error)` shows an error.
+:::
 
 ## 1. Get the tracks from the catalog
 
@@ -59,8 +72,8 @@ export function AlbumPreviews({ id }: { id: string }) {
 A query's list keeps its identity between renders, which the player in step 2, `Previews`, needs.
 
 In Next.js, `AlbumPreviews` and `Previews` are client components, whose files start with `"use client"`. A Next
-app can fetch the tracks in a server component instead, with the server's client, and hand them to `Previews`:
-they're plain data.
+app can fetch the tracks in a server component instead, with a client from `createServerClient`, and hand them to
+`Previews`: they're plain data.
 :::
 
 Any catalog function that hands over songs or music videos works: a search, a chart, or `resolve` from
@@ -73,7 +86,9 @@ fetched without its attributes.
 In your page, make a player and load the tracks:
 
 ```ts
-const player = previewPlayer<tSong | tMusicVideo>();
+type tTrack = tSong | tMusicVideo;
+
+const player = previewPlayer<tTrack>();
 const { tracks: queue, skipped } = player.load(tracks);
 ```
 
@@ -138,25 +153,21 @@ call `play`, `next` or `previous` from a click or a key press.
 In your page:
 
 ```ts
-playButton.onclick = () => void player.play().catch(showWhyNot);
+playButton.onclick = () => void player.play().catch(showError);
 pauseButton.onclick = () => player.pause();
-nextButton.onclick = () => void player.next().catch(showWhyNot);
-previousButton.onclick = () => void player.previous().catch(showWhyNot);
+nextButton.onclick = () => void player.next().catch(showError);
+previousButton.onclick = () => void player.previous().catch(showError);
 ```
-
-The buttons and `showWhyNot` stand for your own code.
 :::
 
 ::: for client=react,nextjs
 In the component, from the buttons' `onClick`:
 
 ```tsx
-<button onClick={() => void play().catch(showWhyNot)}>Play</button>
+<button onClick={() => void play().catch(showError)}>Play</button>
 <button onClick={() => pause()}>Pause</button>
-<button onClick={() => void next().catch(showWhyNot)}>Next</button>
+<button onClick={() => void next().catch(showError)}>Next</button>
 ```
-
-`showWhyNot` stands for your own code.
 :::
 
 - `play()` carries on with the current clip, or starts the first track. `play(2)` plays the third track from its
@@ -182,13 +193,14 @@ A list with a Play button on each row plays the whole list, from the row that wa
 the queue `load` gives back can differ from its place in your list, since tracks with no clip are left out.
 
 ::: for client=vanilla
-The [vanilla sample](../samples) does it this way:
+The [vanilla sample](../samples) does it this way, with the `player` and `tTrack` from step 2:
 
 <<< @/../../samples/web-vanilla/src/player.ts#play-from{ts}
 :::
 
 ::: for client=react,nextjs
-The [React and Next samples](../samples) do it this way, with the functions from `usePreviewPlayer`:
+The [React and Next samples](../samples) do it this way, inside a component like `Previews` in step 2, with its
+`tTrack`, `load` and `play`, and React's `useCallback`:
 
 <<< @/../../samples/web-react/src/player.tsx#play-from{tsx}
 :::
@@ -224,8 +236,8 @@ return (
     <p>{state.track?.attributes?.name}</p>
     {state.status === "playing" ?
       <button onClick={() => pause()}>Pause</button>
-    : <button onClick={() => void play().catch(showWhyNot)}>Play</button>}
-    <button onClick={() => void next().catch(showWhyNot)}>Next</button>
+    : <button onClick={() => void play().catch(showError)}>Play</button>}
+    <button onClick={() => void next().catch(showError)}>Next</button>
   </div>
 );
 ```
