@@ -144,7 +144,6 @@ async function signOut(
 }
 // #endregion sign-out
 
-// #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored
 // for them.
 async function recent(music: tMusic, req: Request): Promise<Response> {
@@ -167,7 +166,6 @@ async function recent(music: tMusic, req: Request): Promise<Response> {
     return reply(status, { error: e._tag });
   }
 }
-// #endregion act-for-listener
 
 /** A JSON answer that no cache keeps. */
 function reply(status: number, body: unknown): Response {

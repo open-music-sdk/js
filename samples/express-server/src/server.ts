@@ -145,7 +145,6 @@ app.delete("/api/music/user-token", async (req, res) => {
 });
 // #endregion sign-out
 
-// #region act-for-listener
 // What the listener played lately, asked by the server with the token it stored
 // for them.
 app.get("/api/me/recent", async (req, res) => {
@@ -171,7 +170,6 @@ app.get("/api/me/recent", async (req, res) => {
     res.status(status).json({ error: e._tag });
   }
 });
-// #endregion act-for-listener
 
 // Anything a route throws, and a body express.json() cannot read, is answered
 // without the stack Express would print. Express tells an error handler by its

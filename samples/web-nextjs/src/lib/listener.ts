@@ -46,7 +46,6 @@ export const listener = cache(async (): Promise<tListener | undefined> => {
   const store = getStore();
   const token = await store.get(session);
   if (token === undefined) return undefined;
-  // #region act-for-listener
   // A client that acts for this session's listener, with the token the
   // user-token route stored for them.
   const music = getMusic().forUser(session);
@@ -65,7 +64,6 @@ export const listener = cache(async (): Promise<tListener | undefined> => {
     // one, rather than every page failing with it.
     return undefined;
   }
-  // #endregion act-for-listener
 });
 
 /**

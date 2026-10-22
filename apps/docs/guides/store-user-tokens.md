@@ -304,29 +304,6 @@ Here and below, `app` is your Express app:
 <<< @/../../samples/web-nextjs/src/app/api/music/user-token/route.ts#sign-out{ts}
 :::
 
-The samples' servers act for the listener this way.
-
-::: for server=workers
-The Worker asks Apple what the listener played lately. `reply(status, body)` answers with JSON that no cache keeps:
-
-<<< @/../../samples/worker-server/src/index.ts#act-for-listener{ts}
-:::
-
-::: for server=express
-The Express server asks Apple what the listener played lately:
-
-<<< @/../../samples/express-server/src/server.ts#act-for-listener{ts}
-:::
-
-::: for server=nextjs
-The Next app acts for the listener as it draws each page. The function each page calls first makes the listener's
-client, and forgets a token Apple refused. In it, `session` is the signed-in user's id, `store` is `getStore()`, and
-`token` is the one the store held for them when the request began. It resolves to the listener's client and
-storefront, or `undefined`:
-
-<<< @/../../samples/web-nextjs/src/lib/listener.ts#act-for-listener{ts}
-:::
-
 ## 5. Take a token in without a web-standard `Request`
 
 If your framework hands you something other than a web-standard `Request`, as Express does, call
