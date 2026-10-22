@@ -204,9 +204,10 @@ both sides.
 Prefetch the catalog only. A listener's queries are in a scope of the page's own, which no server prefetch
 matches, so the page fetches the listener's library itself.
 
-A catalog query from `useMusicQueries()` changes scope at each sign-in too, so a prefetched one stops matching once
-a listener has signed in. To keep it matching, build the page's catalog queries with `musicQueries(music)`, where
-`music` is the client you hand `MusicProvider`: they're in scope 0 whoever is signed in.
+A catalog query from `useMusicQueries()` changes scope at each sign-in too. So once a listener has signed in, the
+`Album` above no longer matches what the server prefetched, and fetches the album again. To keep it matching, build
+the page's catalog queries with `musicQueries(music)`, where `music` is the client you hand `MusicProvider`:
+they're in scope 0 whoever is signed in.
 
 `next build` imports `musicQueries` from `@open-music-sdk/react` into the Next sample's server components, and
 passes in CI.
