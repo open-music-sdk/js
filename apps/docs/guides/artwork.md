@@ -12,6 +12,8 @@ The artwork functions come from `@open-music-sdk/browser`, `@open-music-sdk/reac
 alike. They run anywhere: in a page, on a server, or wherever you write HTML. They touch neither the page nor the
 network.
 
+In the code below, `song` stands for a song you fetched with a client.
+
 ## 1. Check that the resource has artwork
 
 Anywhere, read the artwork from the resource's attributes:
@@ -31,7 +33,8 @@ while the image loads: `bgColor` and `textColor1` to `textColor4`, each a hex co
 ## 2. Fill in an `<img>` with `artworkImage`
 
 ::: for client=vanilla
-In your page, give `artworkImage` the artwork and the width you show the image at, in CSS pixels:
+In your page, where `img` is an `<img>` element, give `artworkImage` the artwork and the width you show the image
+at, in CSS pixels:
 
 ```ts
 import { artworkImage } from "@open-music-sdk/browser";
@@ -66,22 +69,23 @@ export function Cover({ song }: { song: tSong }) {
 `height` by the density of whichever candidate it chose. Use it unless you need only one of the parts.
 
 ::: for client=vanilla
-The [vanilla sample](../samples) draws every sleeve with one function. A resource with no artwork gets an empty box
-of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
+The [vanilla sample](../samples) draws every cover with one function, where `h(tag, props)` is a helper of its own
+that makes an element with those properties set. A resource with no artwork gets an empty box of the same size, so
+a page laid out around covers keeps its shape:
 
-<<< @/../../samples/web-vanilla/src/artwork.ts#artwork{ts}
+<<< @/../../samples/web-vanilla/src/artwork.ts#cover{ts}
 :::
 
 ::: for client=react
-The [React sample](../samples) draws every sleeve with one component. A resource with no artwork gets an empty box
-of the same size, which the sample's crates draw as a plain sleeve with the name written on it:
+The [React sample](../samples) draws every cover with one component. A resource with no artwork gets an empty box
+of the same size, so a page laid out around covers keeps its shape:
 
-<<< @/../../samples/web-react/src/artwork.tsx#artwork{tsx}
+<<< @/../../samples/web-react/src/artwork.tsx#cover{tsx}
 :::
 
 ::: for client=nextjs
-The [Next sample](../samples) draws every sleeve with `next/image` instead, through a component of its own that you
-can take into your app: see [With `next/image`](#with-next-image).
+In a Next.js app, you can draw artwork with `next/image` instead, through a component you can take into your app:
+see [With `next/image`](#with-next-image).
 :::
 
 How the size is chosen:
@@ -112,7 +116,8 @@ too.
 ## 4. Build a `srcset` alone with `artworkSrcSet`
 
 ::: for client=vanilla
-In your page, `artworkSrcSet` gives the `srcset` alone. Set the image's `width` and `height` yourself:
+In your page, where `img` is an `<img>` element, `artworkSrcSet` gives the `srcset` alone. Set the image's `width`
+and `height` yourself:
 
 ```ts
 import { artworkSrcSet } from "@open-music-sdk/browser";
@@ -226,8 +231,8 @@ into HTML by hand, escape it like any other attribute value, and don't put it in
 
 In a Next.js app, `next/image` can take `artworkUrl` as its loader. It asks the loader for each width its `srcset`
 offers, and Apple's image server makes each one, so Next's own optimizer is never used and your Next config needs
-no `remotePatterns` for Apple. The [Next sample](../samples) does this in one component, `Artwork`, in
-`src/components/artwork.tsx`. It stands alone, so you can take it into your own app as it is:
+no `remotePatterns` for Apple. The component below, `Artwork`, does this. It comes from the
+[Next sample](../samples) and uses nothing else of it, so save it in your app as `artwork.tsx`, as it is:
 
 <<< @/../../samples/web-nextjs/src/components/artwork.tsx#artwork{tsx}
 
@@ -278,7 +283,7 @@ For a cover that fills a grid cell, give the cell a position and a shape, and sa
 </div>
 ```
 
-What the sample showed, on 20 October 2026, in Next 16:
+How `next/image` and `Artwork` behave, as seen in Next 16 on 20 October 2026:
 
 - Next picks the widths from its own list, not from the width you show the image at. A cover shown at 240 asks
   for `256x256`, labelled `1x`, and `640x640`, labelled `2x`: for each density, the first of Next's `imageSizes`

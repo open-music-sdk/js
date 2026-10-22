@@ -1,8 +1,8 @@
 // Shows: artworkImage. Guide: /guides/artwork
+// #region cover
 import { artworkImage, type tArtwork } from "@open-music-sdk/browser";
 import { h } from "./dom";
 
-// #region artwork
 /**
  * An `<img>` for an artwork shown `size` CSS pixels wide, with a `srcset` for
  * screens of higher density. A resource with no artwork gets an empty box of
@@ -17,4 +17,4 @@ export function cover(
   }
   return h("img", { alt: "", ...artworkImage(artwork, size) });
 }
-// #endregion artwork
+// #endregion cover

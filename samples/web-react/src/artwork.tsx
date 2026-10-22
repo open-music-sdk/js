@@ -1,4 +1,5 @@
 // Shows: artworkImage. Guide: /guides/artwork
+// #region cover
 import { artworkImage, type tArtwork } from "@open-music-sdk/react";
 
 interface tCoverProps {
@@ -9,7 +10,6 @@ interface tCoverProps {
   readonly lazy?: boolean;
 }
 
-// #region artwork
 /**
  * An `<img>` for an artwork shown `size` CSS pixels wide, with a `srcSet` for
  * screens of higher density. A resource with no artwork gets an empty box of
@@ -24,4 +24,4 @@ export function Cover({ artwork, size, lazy = false }: tCoverProps) {
   const { srcset, ...image } = artworkImage(artwork, size);
   return <img alt="" {...image} srcSet={srcset} loading={loading} />;
 }
-// #endregion artwork
+// #endregion cover
