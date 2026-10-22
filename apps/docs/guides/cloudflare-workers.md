@@ -29,6 +29,7 @@ import {
   tokenEndpoint,
   userTokenIntake,
   type tKvNamespace,
+  type tMusic,
   type tTokenEndpoint,
   type tUserTokenIntake,
 } from "@open-music-sdk/server";
@@ -43,24 +44,27 @@ interface Env {
   readonly PAGE_ORIGIN: string;
 }
 
-interface Routes {
+interface App {
+  readonly music: tMusic;
+  readonly store: KvUserTokenStore;
   readonly token: tTokenEndpoint;
   readonly userToken: tUserTokenIntake;
 }
 
 // Made on the first request, from the env it brings, and kept for the rest.
-let routes: Routes | undefined;
+let app: App | undefined;
 
-function setUp(env: Env): Routes {
+function setUp(env: Env): App {
   const key = {
     pem: env.APPLE_MUSIC_PRIVATE_KEY,
     teamId: env.APPLE_MUSIC_TEAM_ID,
     keyId: env.APPLE_MUSIC_KEY_ID,
   };
   const store = new KvUserTokenStore(env.MUSIC_USER_TOKENS);
-  // music.forUser(userId) reads each listener's token from the same store.
   const music = createServerClient({ ...key, userTokenStore: store });
   return {
+    music,
+    store,
     token: tokenEndpoint({ ...key, origin: [env.PAGE_ORIGIN] }),
     userToken: userTokenIntake(music, { store, userId: sessionOf }),
   };
@@ -68,12 +72,12 @@ function setUp(env: Env): Routes {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    routes ??= setUp(env);
+    app ??= setUp(env);
     switch (new URL(req.url).pathname) {
       case "/api/music/token":
-        return routes.token(req);
+        return app.token(req);
       case "/api/music/user-token":
-        return routes.userToken(req);
+        return app.userToken(req);
       default:
         return new Response(null, { status: 404 });
     }
@@ -85,6 +89,10 @@ export default {
   [Serve a developer token to a page](./token-endpoint).
 - `/api/music/user-token` takes a `POST` of a listener's token from your page, asks Apple whether it works, and
   stores it under the id `sessionOf` resolves to. See [Keep a listener's token on your server](./store-user-tokens).
+
+`app.music` and `app.store` are for the routes you add. `app.music.forUser(userId)` acts for a listener with the
+token the intake stored, and a sign-out forgets it with `app.store.delete(userId)`. The intake answers anything but
+a `POST` with `405`, so send a sign-out's `DELETE` on the same path to your own code before it.
 
 A Worker is handed its secrets with each request, so `setUp` runs on the first one and the module keeps what it
 makes. Don't make the client per request. A client made per request imports the key and signs a new token every
