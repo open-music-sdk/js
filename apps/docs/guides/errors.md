@@ -155,7 +155,8 @@ const music = createServerClient({
 ```
 
 `retryOn` decides which errors get another attempt. It's handed each `AppleMusicError` and returns `true` to try
-again. For a `POST`, it's asked only after the two failures that mean the write didn't happen.
+again. For a `POST`, it's asked only after a `RateLimited` or a `DeveloperTokenUnavailable`, the two failures that
+mean the write didn't happen.
 
 A client's `as()` and `forUser()` keep its policy. For a different policy on one route, create a second client.
 
