@@ -18,8 +18,7 @@ In the code below, `getMusic()` returns that client. `sessionId()` is your own s
 signed-in user's id, or `undefined` when there's none. `explain(e)` puts an Apple Music error in words the listener
 can act on.
 
-The [Next sample](../samples) acts and caches this way, and the code below comes from it. `next build` runs it in
-CI with no key in its environment.
+The [Next sample](../samples) acts and caches this way, and the code below comes from it.
 
 ## 1. Act for a listener in a server action
 
