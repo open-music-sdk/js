@@ -209,8 +209,8 @@ A catalog query from `useMusicQueries()` changes scope at each sign-in too. So o
 the page's catalog queries with `musicQueries(music)`, where `music` is the client you hand `MusicProvider`:
 they're in scope 0 whoever is signed in.
 
-`next build` imports `musicQueries` from `@open-music-sdk/react` into the Next sample's server components, and
-passes in CI.
+`musicQueries` runs in a server component: of `@open-music-sdk/react`, only the provider and the hooks are client
+code.
 
 `useSuspenseQuery` also runs while Next renders a client component on the server. There, a relative `tokenUrl`,
 as you hand it to `createBrowserClient`, has no page to resolve against, so a query that needs a token fails.
