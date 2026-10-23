@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/util-artwork",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Artwork URLs for the Apple Music API: fill in the {w}x{h} template and build a srcset. Nothing but strings and numbers.",
   "license": "MIT",
   "keywords": [

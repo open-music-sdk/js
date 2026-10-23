@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/lib-playlists",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Playlists for the Apple Music API, where a playlist can only be made and added to: resolve tracks to the catalog, read a playlist, plan what is missing and append it. Developer token and Music User Token.",
   "license": "MIT",
   "keywords": [

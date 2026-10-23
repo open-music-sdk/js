@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/lib-preview-player",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A queue player for the preview clips of the Apple Music API: play, pause, next, previous, seek and volume around one audio element. Browser side, no framework.",
   "license": "MIT",
   "keywords": [
