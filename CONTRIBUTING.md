@@ -57,6 +57,26 @@ the change or have the right to submit it under the MIT license.
   client's tests hold them on its namespace's members; the rest, and every `@throws`, is read for in review. See
   [apps/docs](./apps/docs/README.md).
 
+## Releasing
+
+Every `@open-music-sdk` package ships the same version, the CLI among them, and a release moves all of them: a
+matching version means packages released and tested together. [Changesets](https://changesets.dev) keeps the
+record, in one fixed group, and no version is edited by hand.
+
+- A pull request that changes a published package adds a changeset: run `pnpm changeset`, pick the packages it
+  changes and the bump, and write the line that goes in their changelogs. CI fails a pull request that changes a
+  package without one. For a change that should release nothing, such as a test or a comment,
+  `pnpm changeset --empty`.
+- The bump is for the whole family, since every package takes it:
+  - patch: a fix, with nothing added or changed in the API;
+  - minor: an addition, such as a function, an option, an endpoint or a package;
+  - major: a removal or a change in what an existing name does, a higher Node floor, or a higher peer major.
+- On each push to `main`, the `release` workflow opens or refreshes a pull request titled "release: version
+  packages": every package at the new version, each `CHANGELOG.md` with its entries, the changesets consumed.
+  Merging it is the release. The same workflow publishes every package to npm with provenance and creates the
+  GitHub release `v<version>`, with the pull requests since the last one as its notes. A publish that fails part
+  way is rerun from the Actions tab; versions already on npm are skipped.
+
 ## Writing docs
 
 The docs site, in [`apps/docs`](./apps/docs/README.md), follows [Diátaxis](https://diataxis.fr/), without its
