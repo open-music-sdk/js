@@ -11,11 +11,6 @@ Before you start, you need:
 The code below is for the client you pick in the nav: a page with no framework, a React app on Vite, or a Next.js
 app.
 
-::: info Not on npm yet
-Nothing is published to npm yet, so the install commands below work from the first release. Until then, run the
-[sample apps](../samples), which use the packages from the repository.
-:::
-
 ## 1. Install the package
 
 ::: for client=vanilla

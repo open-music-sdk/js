@@ -3,11 +3,6 @@
 Most apps install one package, an [integration](../glossary#integration), and import everything from it. This
 page helps you pick one and explains how the other packages fit around it.
 
-::: info Not on npm yet
-Nothing is published to npm yet. The packages exist and pass their tests, but you can't install them from the
-registry until the first release.
-:::
-
 ## What to install
 
 | You're building | Install |

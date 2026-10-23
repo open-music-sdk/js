@@ -14,10 +14,6 @@ An open, community-led TypeScript SDK for the Apple Music API. It gives you a ty
 endpoint, tokens that look after themselves, and ESM-only packages for servers, web pages and React. It uses
 Apple's MusicKit on the Web for one thing: signing a listener in.
 
-> **🚧 First release in preparation.** Nothing is published to npm yet. Every package exists, passes its tests and
-> has run against the live Apple Music API. See [Status and roadmap](https://open-music-sdk.github.io/js/status)
-> for what exists.
-
 **Documentation: [open-music-sdk.github.io/js](https://open-music-sdk.github.io/js/)**
 
 ## Which package to install

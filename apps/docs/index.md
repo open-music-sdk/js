@@ -34,11 +34,6 @@ features:
     link: /cli
 ---
 
-::: info First release in preparation
-Nothing is published to npm yet. Every package exists, passes its tests and has run against the live Apple Music
-API. See [Status and roadmap](./status) for what exists.
-:::
-
 ## Where to start
 
 1. Read [Which package to install](./concepts/packages). Most apps need one package.

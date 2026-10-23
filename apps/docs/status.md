@@ -1,10 +1,9 @@
 # Status and roadmap
 
-::: info First release in preparation
-Nothing is published to npm yet. Every package below exists, passes its tests and has run against the live Apple
-Music API: the CLI's `check` has asked every endpoint function of both clients, each answer held to its generated
-type, and the sample apps have been walked through, Apple's sign-in among it. The first release, 1.0.0 of every
-package, is being prepared. This table is the source of truth for what works.
+::: tip On npm
+Every package is on npm, all at one version, since 1.0.0 on 23 October 2026. The
+[releases](https://github.com/open-music-sdk/js/releases) say what each version changed. This table is the source
+of truth for what works.
 :::
 
 The SDK is a family of small packages that share one core and one generated type layer, in the manner of the AWS
@@ -33,11 +32,12 @@ ships the same version number. See
 | [Docs site, `apps/docs`](https://github.com/open-music-sdk/js/tree/main/apps/docs#readme) | ✅ Done | 100% | The reference: TypeDoc over every package's doc comments, with arguments, returns and throws on every function, which CI checks · one VitePress site with Getting started, guides, concepts and the reference, published to GitHub Pages from `main` · each guide stands on its own, its code following the client and server the reader picks in the nav, much of it imported from the samples, and CI holds each group of it to every framework once · package READMEs cut to a short template |
 | [`@open-music-sdk/cli`, `apps/cli`](https://github.com/open-music-sdk/js/tree/main/apps/cli#readme) | ✅ Done | 100% | Run with `npx` · `login` gets a Music User Token for your own account through Apple's sign-in, `aws login` style, on a loopback page made of `server`'s token endpoint and intake and `browser`'s sign-in · `token`, `doctor`, `logout` · `check`, a diagnostic of every endpoint function of both clients, each answer held to its type, and of what the SDK takes on trust, each by its name · tested against fakes, and run against the live API: sign-in, `doctor` and `check`, with its writes |
 | [Sample apps, `samples/`](./samples) | ✅ Done | 100% | Vinyl Collector Simulator, one demo written once per way of using the SDK · Express, Worker, a vanilla page and a React page, either page with either server from one command · a Next.js app, its own server, whose build CI runs with no key · a test holds them to using every export · the guides show their code · walked through against the live API, Apple's sign-in among it |
-| First release | 🚧 In progress | 50% | One version across the family · Changesets and the release workflow are in · 1.0.0 of every package to publish to npm with provenance |
+| First release | ✅ Done | 100% | 1.0.0 of every package, published on 23 October 2026 · one version across the family · provenance through npm's trusted publishing from 1.0.1 on |
 
 Progress is a judgement of how much of the described scope exists and is tested.
 
 ## What comes next
 
-The first release: 1.0.0 of every package on npm. After it, releases follow the changesets, as
-[CONTRIBUTING](https://github.com/open-music-sdk/js/blob/main/CONTRIBUTING.md#releasing) describes.
+Releases follow the changesets, as [CONTRIBUTING](https://github.com/open-music-sdk/js/blob/main/CONTRIBUTING.md#releasing)
+describes: a pull request that changes a package says what changed and how big the change is, and merging the
+release pull request publishes every package at the new version.
