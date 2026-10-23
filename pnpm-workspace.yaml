@@ -47,6 +47,9 @@ catalog:
   typedoc-plugin-markdown: ^4.14.0
   typedoc-vitepress-theme: ^1.1.4
   vitepress: ^1.6.4
+  # releases: one fixed group, every @open-music-sdk package at one version (see CONTRIBUTING, "Releasing")
+  "@changesets/cli": ^3.0.3
+  "@changesets/changelog-github": ^1.0.1
   # the docs site's theme: Vue for the framework picker, and the container for a guide's variant blocks, which
   # VitePress bundles inside itself and does not export
   vue: ^3.5.13
