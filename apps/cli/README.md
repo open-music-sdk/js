@@ -9,8 +9,9 @@ pnpm add -D @open-music-sdk/cli
 ```
 
 The command is `open-music-sdk`, so run it with `pnpm exec open-music-sdk`. To run it once without installing,
-pin the version: `npx @open-music-sdk/cli@0.0.0 login`. Without a version, `npx` runs whatever is newest, with
-your key in reach.
+pin the version you tested: `npx @open-music-sdk/cli@<version> login`, with a version from the
+[releases](https://github.com/open-music-sdk/js/releases). Without one, `npx` runs whatever is newest, with your
+key in reach.
 
 You need Node 24 or newer, a MusicKit key from your Apple Developer account, and an Apple Account with an Apple
 Music subscription to sign in with.
