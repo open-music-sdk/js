@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/validate",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Generated Standard Schema validators for Apple Music API responses. Opt-in, tree-shakeable.",
   "license": "MIT",
   "keywords": [

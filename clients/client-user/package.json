@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/client-user",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "A listener's side of the Apple Music API, one typed function per endpoint: library, playlists, ratings, recommendations, history, replay. Developer token and Music User Token.",
   "license": "MIT",
   "keywords": [
