@@ -130,6 +130,21 @@ const siteLinks = (md) =>
       }
   });
 
+// A README opens with the family's header, the logo, a plain-English title and the badges, for GitHub and npm. On the
+// site, which has its own, the header gives way to the package name the rest of the reference uses, and the README's
+// pointer to the repository's "Which package to install" goes to the site's own page. The source is changed before
+// the block rules read it; the reference copies a README after a breadcrumb line, so the header is not at the start.
+const readmeHeader = /<div align="center">[\s\S]*?<\/div>\s*\n> Not affiliated[^\n]*\n/;
+const referenceReadme = (md) =>
+  md.core.ruler.before("block", "reference-readme", (state) => {
+    const name = state.env.relativePath?.match(/^reference\/@open-music-sdk\/([^/]+)\/index\.md$/)?.[1];
+    if (!name) return;
+    if (!readmeHeader.test(state.src)) throw new Error(`${state.env.relativePath}: the README has no header to replace`);
+    state.src = state.src
+      .replace(readmeHeader, `# @open-music-sdk/${name}\n`)
+      .replaceAll("https://github.com/open-music-sdk/js#which-package-to-install", `${site}concepts/packages`);
+  });
+
 export default defineConfig({
   title: "Open Music SDK",
   description: "An open, community-led TypeScript SDK for the Apple Music API.",
@@ -165,6 +180,7 @@ export default defineConfig({
   },
   markdown: {
     config: (md) => {
+      referenceReadme(md);
       siteLinks(md);
       variantBlocks(md);
     },

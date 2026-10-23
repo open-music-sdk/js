@@ -1,4 +1,20 @@
-# @open-music-sdk/types
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Types
+
+`@open-music-sdk/types`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/types)](https://www.npmjs.com/package/@open-music-sdk/types)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 TypeScript types for every object in the Apple Music API, generated from Apple's documentation. The package has no
 dependencies and no runtime: it ships type declarations and nothing that runs.
@@ -7,9 +23,21 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which re-export every type. Use this one to build your own
 client, or to type code that holds Apple's objects.
 
+## Installation
+
 ```
 pnpm add -D @open-music-sdk/types
 ```
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/types/)
+- [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation), for checking a value against
+  its type at runtime
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#types)
+- [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
 
 ## Example
 
@@ -71,11 +99,3 @@ single thing. Apple documents one song as `Songs`, the value of its `type`, so t
   - `artistName` of an album in the listener's library;
   - `artwork` of an album in the listener's library.
 - A dictionary Apple documents with no properties is `Record<string, unknown>`.
-
-## Learn more
-
-- [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation), for checking a value against
-  its type at runtime
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#types)
-- [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/types/)

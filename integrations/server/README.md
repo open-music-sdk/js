@@ -1,8 +1,23 @@
-# @open-music-sdk/server
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK for Servers
+
+`@open-music-sdk/server`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/server)](https://www.npmjs.com/package/@open-music-sdk/server)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
 The Apple Music API for code that runs on a server: Node, Cloudflare Workers, Bun, Deno, a command-line tool or an
 Electron main process. One import gives you a client that signs its own developer token, a route that hands your
 pages a token, and everything else an app uses from the other packages.
+
+## Installation
 
 ```
 pnpm add @open-music-sdk/server
@@ -11,6 +26,21 @@ pnpm add @open-music-sdk/server
 For a web page, use [`@open-music-sdk/browser`](../browser/README.md). For a React app, use
 [`@open-music-sdk/react`](../react/README.md). A Next.js app uses this package on the server and `react` in its
 client components.
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/server/)
+- [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), to check
+  your key and get a Music User Token for your own account
+- [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
+- [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
+- [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
+  the listener's token
+- [Set up your server](https://open-music-sdk.github.io/js/guides/server-setup) and
+  [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers)
 
 ## Example
 
@@ -65,16 +95,3 @@ It re-exports these, under the names each package gives them:
 
 `core`'s `createClient` and the tools the clients are built with aren't re-exported. To build your own client from
 the parts, install the packages themselves.
-
-## Learn more
-
-- [Which package to install](https://open-music-sdk.github.io/js/concepts/packages)
-- [The command-line tool](https://open-music-sdk.github.io/js/cli), to check
-  your key and get a Music User Token for your own account
-- [Serve a developer token to a page](https://open-music-sdk.github.io/js/guides/token-endpoint)
-- [Keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
-- [Security model](https://open-music-sdk.github.io/js/concepts/security), for your key, the token endpoint and
-  the listener's token
-- [Set up your server](https://open-music-sdk.github.io/js/guides/server-setup) and
-  [Deploy a Worker](https://open-music-sdk.github.io/js/guides/cloudflare-workers)
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/server/)
