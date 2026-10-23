@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/browser",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "The Apple Music API for a page: a client that fetches its developer token from your server, with the catalog, the library and the playlist verbs on it, Apple's sign-in run for you, the preview player, and the rest of the family from one import. No signing code.",
   "license": "MIT",
   "keywords": [

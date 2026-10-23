@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/types",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Generated TypeScript types for the Apple Music API. Zero dependencies, declarations only.",
   "license": "MIT",
   "keywords": [

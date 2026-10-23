@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/core",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Fetch-based client core for the Apple Music API: tagged errors, retry, rate limiting, pagination. Zero dependencies.",
   "license": "MIT",
   "keywords": [

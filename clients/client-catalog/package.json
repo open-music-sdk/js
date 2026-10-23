@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/client-catalog",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "The Apple Music API's catalog, one typed function per endpoint: songs, albums, artists, playlists, search, charts, storefronts. Developer token only.",
   "license": "MIT",
   "keywords": [

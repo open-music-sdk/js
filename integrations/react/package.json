@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/react",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "The Apple Music API for a React app: everything in the browser package, a provider that holds the client and the listener's token, hooks for the client, Apple's sign-in and the preview player, and one query factory for TanStack Query.",
   "license": "MIT",
   "keywords": [
