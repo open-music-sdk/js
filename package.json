@@ -19,6 +19,8 @@
     "crawl": "pnpm --filter codegen-docc-crawl crawl"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "tooling-eslint-config": "workspace:*",

@@ -1,0 +1,55 @@
+name: release
+
+# On every push to main. With changesets waiting, it opens or refreshes the pull request that versions every
+# package; with none waiting and a version not yet on npm, it publishes. See CONTRIBUTING, "Releasing".
+on:
+  push:
+    branches: [main]
+
+# Never cut a publish short.
+concurrency: release
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Until every package has a trusted publisher on npm, a granular token with 7 days to live. pnpm reads it from
+      # the home .npmrc alone.
+      - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The CLI's prepack bundles its siblings from their dist, so everything is built first.
+      - run: pnpm turbo run build --filter "@open-music-sdk/*"
+      - id: changesets
+        uses: changesets/action@v2
+        with:
+          publish-script: pnpm changeset publish
+          commit-message: "release: version packages"
+          pr-title: "release: version packages"
+          create-github-releases: false
+          push-git-tags: false
+        env:
+          PNPM_CONFIG_PROVENANCE: "true"
+      # One release for the family, as the AWS SDK does it, with the pull requests since the last one as its notes.
+      - if: steps.changesets.outputs.published == 'true'
+        run: |
+          version=$(node -p "require('./packages/core/package.json').version")
+          gh release create "v$version" --title "v$version" --generate-notes --latest
+        env:
+          GH_TOKEN: ${{ github.token }}

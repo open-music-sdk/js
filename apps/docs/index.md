@@ -34,10 +34,9 @@ features:
     link: /cli
 ---
 
-::: warning Under construction
-Nothing is published to npm yet. The CLI's sign-in has run once against the live Apple Music API, on Windows; the
-rest hasn't, and nothing has run in a React app outside its tests. See [Status and roadmap](./status) for what
-exists.
+::: info First release in preparation
+Nothing is published to npm yet. Every package exists, passes its tests and has run against the live Apple Music
+API. See [Status and roadmap](./status) for what exists.
 :::
 
 ## Where to start
