@@ -1,4 +1,20 @@
-# @open-music-sdk/lib-preview-player
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Preview Player
+
+`@open-music-sdk/lib-preview-player`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/lib-preview-player)](https://www.npmjs.com/package/@open-music-sdk/lib-preview-player)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 A song in Apple's catalog comes with a short preview clip, under `attributes.previews`, that any audio element can
 play. This package is the small player every page would otherwise write around it: a queue of tracks, play, pause,
@@ -9,12 +25,24 @@ Most apps install [`browser`](../../integrations/browser/README.md) or [`react`]
 instead, which re-export `previewPlayer`, and in React add `usePreviewPlayer`. Use this package to build your own
 client.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/lib-preview-player
 pnpm add -D @open-music-sdk/types
 ```
 
 The second line is for the types the example imports.
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/lib-preview-player/)
+- [Play song previews](https://open-music-sdk.github.io/js/guides/previews)
+- [Security model](https://open-music-sdk.github.io/js/concepts/security), for when to set `hosts`
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences), for what Apple doesn't
+  document about clips
 
 ## Example
 
@@ -61,11 +89,3 @@ exported beside it are `tPreviewPlayer`, `tPreviewPlayerOptions`, `tPreviewPlaye
 `tLoadedPreviews`, `tSkippedPreview`, `tPreviewable` and `tPreviewAudio`.
 
 It uses a few checks from `core`, such as the host check `util-artwork` makes for artwork, and none of the client.
-
-## Learn more
-
-- [Play song previews](https://open-music-sdk.github.io/js/guides/previews)
-- [Security model](https://open-music-sdk.github.io/js/concepts/security), for when to set `hosts`
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences), for what Apple doesn't
-  document about clips
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/lib-preview-player/)

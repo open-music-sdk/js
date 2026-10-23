@@ -1,8 +1,23 @@
-# @open-music-sdk/cli
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Command Line
+
+`@open-music-sdk/cli`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/cli)](https://www.npmjs.com/package/@open-music-sdk/cli)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
 
 Get a Music User Token for your own Apple Music account from the command line. A browser opens, you sign in at
 Apple, and the terminal keeps the token, the way `aws login` gets you a session. It also tells you whether Apple
 takes your MusicKit key.
+
+## Installation
 
 ```
 pnpm add -D @open-music-sdk/cli
@@ -15,6 +30,18 @@ key in reach.
 
 You need Node 24 or newer, a MusicKit key from your Apple Developer account, and an Apple Account with an Apple
 Music subscription to sign in with.
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [The command-line tool](https://open-music-sdk.github.io/js/cli), and how it
+  fits beside the packages
+- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens)
+- [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), for your listeners' tokens, from your
+  own page
+- What the CLI is made of: [`@open-music-sdk/server`](../../integrations/server/README.md) and
+  [`@open-music-sdk/browser`](../../integrations/browser/README.md)
 
 ## Example
 
@@ -217,13 +244,3 @@ node apps/cli/dist/bin.js --help
 sign-in page, with `@open-music-sdk/browser` bundled into it. The tests run against fakes of Apple: the arguments,
 the file store, the loopback server over `node:http`, the page in happy-dom, the commands end to end, and what the
 build makes.
-
-## Learn more
-
-- [The command-line tool](https://open-music-sdk.github.io/js/cli), and how it
-  fits beside the packages
-- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens)
-- [Sign a listener in](https://open-music-sdk.github.io/js/guides/sign-in), for your listeners' tokens, from your
-  own page
-- What the CLI is made of: [`@open-music-sdk/server`](../../integrations/server/README.md) and
-  [`@open-music-sdk/browser`](../../integrations/browser/README.md)

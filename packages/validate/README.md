@@ -1,4 +1,20 @@
-# @open-music-sdk/validate
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Validators
+
+`@open-music-sdk/validate`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/validate)](https://www.npmjs.com/package/@open-music-sdk/validate)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 Runtime validators for the Apple Music API's answers, generated from Apple's documentation, with the corrections
 the [types](../types/README.md) make where Apple was seen to differ from it: one for each object,
@@ -9,9 +25,22 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which re-export every validator under `schemas`, such as
 `schemas.song`. Use this one to build your own client.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/validate
 ```
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/validate/), with every
+  validator's name
+- [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation), with the validators for
+  relationships and views, and a schema of your own
+- [Errors](https://open-music-sdk.github.io/js/concepts/errors), for `ValidationError`
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#validate)
 
 ## Example
 
@@ -66,12 +95,3 @@ in the singular where the object is a single thing: `Songs.Attributes` is `songA
 - A key Apple doesn't document is allowed. Apple adds attributes without notice, and that shouldn't break your app.
 
 Each issue carries a `path` from the top of the value, so a bad field deep in an answer is easy to find.
-
-## Learn more
-
-- [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation), with the validators for
-  relationships and views, and a schema of your own
-- [Errors](https://open-music-sdk.github.io/js/concepts/errors), for `ValidationError`
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#validate)
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/validate/), with every
-  validator's name
