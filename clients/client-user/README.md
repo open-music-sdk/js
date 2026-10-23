@@ -1,4 +1,20 @@
-# @open-music-sdk/client-user
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK User Client
+
+`@open-music-sdk/client-user`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/client-user)](https://www.npmjs.com/package/@open-music-sdk/client-user)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 A listener's side of the Apple Music API, with a function for each of its 79 endpoints: their library and its
 playlists, their ratings, the recommendations made for them, what they've played, their replay, and their own
@@ -9,12 +25,28 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which put these functions on `music.user`. Use this
 package to build your own client.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/client-user @open-music-sdk/core
 ```
 
 Keep the two on the same version. See
 [One version for every package](https://open-music-sdk.github.io/js/concepts/packages#one-version-for-every-package).
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/client-user/)
+- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens), and
+  [keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
+- [Import a playlist](https://open-music-sdk.github.io/js/guides/import-playlist), with `lib-playlists`, which
+  builds on these functions
+- [Handle errors](https://open-music-sdk.github.io/js/guides/errors) and
+  [validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation)
+- [Call an endpoint the clients don't cover](https://open-music-sdk.github.io/js/guides/direct-requests)
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences)
 
 ## Example
 
@@ -97,15 +129,3 @@ Arguments are checked before Apple is asked. A mistake is a `TypeError` that nam
 and never repeats the value. An id, a relationship's name and a storefront are each one segment of a path: at most
 64 characters, with no slash, backslash, percent sign or control character, and not `.` or `..`. A search term is
 at most 256 characters. A list holds at most 300 items, each at most 64 characters with no comma.
-
-## Learn more
-
-- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens), and
-  [keep a listener's token on your server](https://open-music-sdk.github.io/js/guides/store-user-tokens)
-- [Import a playlist](https://open-music-sdk.github.io/js/guides/import-playlist), with `lib-playlists`, which
-  builds on these functions
-- [Handle errors](https://open-music-sdk.github.io/js/guides/errors) and
-  [validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation)
-- [Call an endpoint the clients don't cover](https://open-music-sdk.github.io/js/guides/direct-requests)
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences)
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/client-user/)

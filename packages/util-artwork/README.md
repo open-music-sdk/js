@@ -1,4 +1,20 @@
-# @open-music-sdk/util-artwork
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Artwork
+
+`@open-music-sdk/util-artwork`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/util-artwork)](https://www.npmjs.com/package/@open-music-sdk/util-artwork)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 Image URLs from Apple's [artwork templates](https://open-music-sdk.github.io/js/glossary#artwork-template). Apple
 sends a URL such as `https://…/{w}x{h}bb.jpg`, with the pixel size left for you to fill in. This package fills it
@@ -9,12 +25,26 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which re-export this package's functions. Use this one to
 build your own client.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/util-artwork
 ```
 
 Its one dependency is [`core`](../core/README.md), for the check on where a URL points, and that check is all of
 `core` an app carries because of this package.
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/util-artwork/)
+- [Show artwork](https://open-music-sdk.github.io/js/guides/artwork): sizes, crops and formats, the `srcset`, and
+  checking where a URL points with `hosts`
+- [Security model](https://open-music-sdk.github.io/js/concepts/security#urls-in-apple-s-answers), for what a URL
+  from outside your app can do
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#util-artwork), for what
+  Apple documents of artwork and what was seen
 
 ## Example
 
@@ -50,13 +80,3 @@ artwork these functions take.
 The package doesn't read `devicePixelRatio`, since a `srcset` is how a browser picks. It doesn't offer width
 descriptors (`300w` with `sizes`), and it doesn't load or cache an image or show a placeholder: that's the `<img>`
 element's job.
-
-## Learn more
-
-- [Show artwork](https://open-music-sdk.github.io/js/guides/artwork): sizes, crops and formats, the `srcset`, and
-  checking where a URL points with `hosts`
-- [Security model](https://open-music-sdk.github.io/js/concepts/security#urls-in-apple-s-answers), for what a URL
-  from outside your app can do
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences#util-artwork), for what
-  Apple documents of artwork and what was seen
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/util-artwork/)

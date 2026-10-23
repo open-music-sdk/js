@@ -27,10 +27,11 @@ Most apps install one package:
 | A React app | [`@open-music-sdk/react`](./integrations/react/README.md) |
 | A Next.js app | `server` and `react` |
 
-Each gives you a client with the catalog, the listener's library and playlist tools on it. See
-[Which package to install](https://open-music-sdk.github.io/js/concepts/packages) for the rest of the family.
+Each gives you a client with the catalog, the listener's library and playlist tools on it.
+[Which package to install](https://open-music-sdk.github.io/js/concepts/packages) explains how the family fits
+together.
 
-## The CLI
+### The CLI
 
 [`@open-music-sdk/cli`](./apps/cli/README.md) is the command you use beside the packages while you build. `doctor`
 tells you whether Apple takes your MusicKit key. `login` signs you in at Apple in your browser and keeps a Music
@@ -44,6 +45,24 @@ pnpm exec open-music-sdk login
 ```
 
 It reads your key from the same variables as the example below. `open-music-sdk --help` lists every command.
+
+### The parts
+
+Each integration is built from these, and re-exports what an app uses of them. Install one on its own to build your
+own client, or to use one part alone.
+
+| Package | What it is |
+| --- | --- |
+| [`@open-music-sdk/core`](./packages/core/README.md) | The HTTP client every other package is built on: tokens, pagination, errors and retries |
+| [`@open-music-sdk/types`](./packages/types/README.md) | TypeScript types for every object in the API, generated from Apple's documentation |
+| [`@open-music-sdk/validate`](./packages/validate/README.md) | Runtime validators for Apple's answers, one Standard Schema for each object |
+| [`@open-music-sdk/developer-token`](./packages/developer-token/README.md) | Developer tokens: signed from your key on a server, fetched from your token endpoint in a page |
+| [`@open-music-sdk/user-token`](./packages/user-token/README.md) | A listener's Music User Token: validation, the intake route and the stores |
+| [`@open-music-sdk/util-artwork`](./packages/util-artwork/README.md) | Image URLs and `srcset` from Apple's artwork templates |
+| [`@open-music-sdk/client-catalog`](./clients/client-catalog/README.md) | A function for each of the 58 catalog, storefront, search and chart endpoints |
+| [`@open-music-sdk/client-user`](./clients/client-user/README.md) | A function for each of the 79 endpoints of a listener's library, ratings, recommendations and history |
+| [`@open-music-sdk/lib-playlists`](./lib/lib-playlists/README.md) | Find tracks in the catalog, read a playlist whole, and add what it's missing |
+| [`@open-music-sdk/lib-preview-player`](./lib/lib-preview-player/README.md) | A queue of preview clips around one audio element, with no framework |
 
 ## Example
 

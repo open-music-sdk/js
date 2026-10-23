@@ -90,9 +90,11 @@ one of three kinds, and stays that kind:
 | Reference | Doc comments, and each package's README | States the facts: arguments, options, returns, errors | Advice and opinion |
 
 A package README opens that package's reference page, and is also its page on npm and GitHub. It follows one
-template: what the package does in a sentence, when to use an integration instead, install, one example of
-under 20 lines, what is in it, and links to the guides and concepts that use it. Options belong in the doc
-comment of each option, not in a README table.
+template: the family's header, as the root README has it, with a plain-English title and the package name; on a
+part an app rarely installs alone, a note pointing at "Which package to install"; what the package does in a
+sentence, and when to use an integration instead; Installation; Documentation, the links to the guides and
+concepts that use it, the reference first; one example of under 20 lines; and what is in it. Options belong in
+the doc comment of each option, not in a README table. On the site, the header gives way to the package name.
 
 How to write:
 

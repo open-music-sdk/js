@@ -24,7 +24,9 @@ typedoc.plugin.mjs         what the reference needs that TypeDoc does not do by 
 How to write a page, and which kind of page it is, is in [CONTRIBUTING.md](../../CONTRIBUTING.md#writing-docs).
 A package's README opens its reference page, so the README is written for the site as well as for GitHub and npm.
 It links to site pages by their full URL, `https://open-music-sdk.github.io/js/...`, which the site turns into a
-relative link and checks like any other.
+relative link and checks like any other. Its header, the logo, title and badges that GitHub and npm show, gives way
+on the site to the package name, and its pointer to the repository's "Which package to install" to the site's own
+page.
 
 ## Tasks
 

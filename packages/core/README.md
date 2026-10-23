@@ -1,4 +1,20 @@
-# @open-music-sdk/core
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Core
+
+`@open-music-sdk/core`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/core)](https://www.npmjs.com/package/@open-music-sdk/core)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 The HTTP client every other package is built on. It sends each request to the Apple Music API with your tokens,
 follows `next` links, turns Apple's status codes into errors, and retries what is worth retrying. It depends on
@@ -8,12 +24,31 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which build their client with this package. Use `core`
 to build your own client, or to call a path no function covers.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/core
 pnpm add -D @open-music-sdk/types
 ```
 
 The second line is for the types the example imports.
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/core/)
+- [Call an endpoint the clients don't cover](https://open-music-sdk.github.io/js/guides/direct-requests), with
+  `request`, `paginate` and the builders
+- [Build your own client from the parts](https://open-music-sdk.github.io/js/guides/own-client)
+- [Handle errors](https://open-music-sdk.github.io/js/guides/errors) and
+  [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation)
+- [Errors](https://open-music-sdk.github.io/js/concepts/errors): every tag, what is retried, and why a write is
+  sent once
+- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens), for which request
+  sends which token
+- [Security model](https://open-music-sdk.github.io/js/concepts/security), for where requests go and what a `next`
+  link from outside your app can do
 
 ## Example
 
@@ -64,18 +99,3 @@ These are for a package that names endpoints, as the clients do. An app has no n
 
 [Call an endpoint the clients don't cover](https://open-music-sdk.github.io/js/guides/direct-requests) shows how to
 declare one, and each builder's reference says what it checks.
-
-## Learn more
-
-- [Call an endpoint the clients don't cover](https://open-music-sdk.github.io/js/guides/direct-requests), with
-  `request`, `paginate` and the builders
-- [Build your own client from the parts](https://open-music-sdk.github.io/js/guides/own-client)
-- [Handle errors](https://open-music-sdk.github.io/js/guides/errors) and
-  [Validate Apple's responses](https://open-music-sdk.github.io/js/guides/validation)
-- [Errors](https://open-music-sdk.github.io/js/concepts/errors): every tag, what is retried, and why a write is
-  sent once
-- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens), for which request
-  sends which token
-- [Security model](https://open-music-sdk.github.io/js/concepts/security), for where requests go and what a `next`
-  link from outside your app can do
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/core/)

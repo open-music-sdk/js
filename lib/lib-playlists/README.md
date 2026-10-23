@@ -1,4 +1,20 @@
-# @open-music-sdk/lib-playlists
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/open-music-sdk/js/main/assets/open-music-app-logo.svg" alt="open-music-sdk" width="200">
+
+# Open Music SDK Playlists
+
+`@open-music-sdk/lib-playlists`
+
+[![npm](https://img.shields.io/npm/v/@open-music-sdk/lib-playlists)](https://www.npmjs.com/package/@open-music-sdk/lib-playlists)
+[![test coverage](https://codecov.io/gh/open-music-sdk/js/graph/badge.svg)](https://codecov.io/gh/open-music-sdk/js)
+
+</div>
+
+> Not affiliated with, endorsed by, or sponsored by Apple Inc. Apple Music and MusicKit are trademarks of Apple Inc.
+
+> **You probably don't want this package.** Most apps install one integration and import everything from it: see
+> [Which package to install](https://github.com/open-music-sdk/js#which-package-to-install) in the repository's README.
 
 Apple's API can make a playlist in a listener's library and add tracks to its end. It can't take a track out, move
 one, or delete a playlist. This package does the work every app does around that: it finds tracks known from
@@ -9,12 +25,25 @@ Most apps install [`server`](../../integrations/server/README.md), [`browser`](.
 or [`react`](../../integrations/react/README.md) instead, which put these verbs on `music.playlists`. Use this
 package to build your own client.
 
+## Installation
+
 ```
 pnpm add @open-music-sdk/lib-playlists @open-music-sdk/core
 ```
 
 Keep the two on the same version. See
 [One version for every package](https://open-music-sdk.github.io/js/concepts/packages#one-version-for-every-package).
+
+## Documentation
+
+- [The documentation site](https://open-music-sdk.github.io/js/): guides for each client and server, concepts,
+  and the reference
+- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/lib-playlists/)
+- [Import a playlist](https://open-music-sdk.github.io/js/guides/import-playlist)
+- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens)
+- [Handle errors](https://open-music-sdk.github.io/js/guides/errors)
+- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences), for what this package
+  takes on trust about Apple's API
 
 ## Example
 
@@ -58,12 +87,3 @@ none, as long as the client or the call names a storefront.
 | `tNewPlaylist`, `tPlaylistPlan`, `tPlaylistTrack` | `plan` |
 | `tAppliedPlan`, `tApplyOptions`, `tSettleOptions` | `apply` |
 | `tAskOptions`, `tPaceOptions`, `tLimitOptions`, `tProgress`, `tStorefrontOption` | The options the verbs share |
-
-## Learn more
-
-- [Import a playlist](https://open-music-sdk.github.io/js/guides/import-playlist)
-- [Developer tokens and Music User Tokens](https://open-music-sdk.github.io/js/concepts/tokens)
-- [Handle errors](https://open-music-sdk.github.io/js/guides/errors)
-- [Differences from Apple's documentation](https://open-music-sdk.github.io/js/differences), for what this package
-  takes on trust about Apple's API
-- [Reference for this package](https://open-music-sdk.github.io/js/reference/@open-music-sdk/lib-playlists/)
