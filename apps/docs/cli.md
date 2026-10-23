@@ -43,10 +43,5 @@ where it keeps the token: in one file in your user profile, readable by you alon
 forgets it. [On your machine, with the CLI](./concepts/security#on-your-machine-with-the-cli) explains how `login`
 keeps the sign-in safe.
 
-::: info Before the first release
-To run the CLI from a clone of the repository, build it with `pnpm --filter @open-music-sdk/cli... build`, then
-run `node apps/cli/dist/bin.js login`.
-:::
-
 The token the CLI keeps is yours. Your listeners' tokens come from their own sign-in in your app: see
 [Sign a listener in](./guides/sign-in).
