@@ -22,6 +22,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # A pull request that changes a published package carries a changeset, or an empty one on purpose.
+      - if: github.event_name == 'pull_request'
+        run: pnpm changeset status --since=origin/${{ github.base_ref }}
       # The docs build runs TypeDoc's checks and fails on a dead link or anchor, so `check`, the same checks without
       # the site, is left for local use.
       - run: pnpm turbo run build typecheck lint --affected
