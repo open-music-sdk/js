@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/developer-token",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Developer tokens for the Apple Music API: sign one with jose, or get a provider that mints or fetches them and keeps them fresh.",
   "license": "MIT",
   "keywords": [

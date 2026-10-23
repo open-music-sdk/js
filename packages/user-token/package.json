@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/user-token",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Music User Token intake, validation, and pluggable stores for the Apple Music API. Consumes tokens, never issues them.",
   "license": "MIT",
   "keywords": [

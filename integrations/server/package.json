@@ -1,6 +1,6 @@
 {
   "name": "@open-music-sdk/server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The Apple Music API for a server, a worker, a CLI or an Electron main process: a client that mints its own developer token with the catalog, the library and the playlist verbs on it, a token endpoint for your pages, the user-token intake, and the rest of the family from one import.",
   "license": "MIT",
   "keywords": [
